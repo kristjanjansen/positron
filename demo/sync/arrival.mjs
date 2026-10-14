@@ -1,29 +1,7 @@
-// demo/sync/arrival.mjs: the ARRIVAL tab of /sync/, from the old /cues/
-// (plans/plan-demo-structure.md §3.1, step 5).
-//
-// The first of the four regimes in plans/plan-routing-time.md: AS IT HAPPENS.
-// A cue carries no `at`, because it has no moment of its own to wait for: it
-// fires on every open copy the instant it lands, and the only number worth
-// having is how long the landing took.
-//
-// WHAT CAME OVER FROM /cues/: fire a cue, fire ten, the name on show, the
-// list of what arrived, and the delivery time read off the sender's own stamp.
-// WHAT CHANGED ON THE WAY IN, AND WHY:
-//   1  🔴 IT IS `openWire` NOW, NOT A HAND-ROLLED `new WebSocket`. That page
-//      could not tell a full room from a dead relay, never reconnected, and
-//      stamped its own envelope. `demo/shell/wire.mjs` does all three, and the
-//      send stamp is the envelope's `sent` since 2026-10-04, written by
-//      `format()`, never by this tab.
-//   2  🔴 IT JOINS ON THE FIRST PRESS IN THIS TAB, NOT ON LOAD. /cues/ opened
-//      its socket the moment the page loaded, so every visit sat in a relay
-//      room. Building this tab opens nothing (`tab-page.mjs` rule 1).
-//   3  🔴 A SECOND COPY OF THE RECEIVER LIVES IN THE TAB. The old page's one
-//      claim was *"every open copy of this page shows the same cue"*, and it
-//      graded its own echo, which is one copy. The second copy is a second
-//      socket in the same room with its own name on show, so the claim is
-//      graded as two copies agreeing rather than inferred from one.
-//   4  The message is the plan's flat shape, `{ type: 'cue.set', text }`
-//      (plan-routing-time §4.1), rather than a cue whose id was its name.
+// ARRIVAL tab: a cue has no `at` and fires on every open copy the instant it
+// lands. Joins over `openWire` on the first press, and a second socket in the tab
+// stands in for a second copy, so agreement between copies is graded.
+// See lessons/page-sync.md#sync-5
 
 import { el } from '/shell/shell.mjs';
 import { openWire } from '/shell/wire.mjs';
@@ -41,16 +19,10 @@ export const about = 'A cue goes through the relay and shows on every open scree
 export const readout = { screens: '', received: '', typical: 'ms', slowest: 'ms' };
 
 /**
- * THE PICTURE, READ OFF THIS FILE. One Browser holding the two sockets this
- * tab opens, and the relay's Durable Object between them. `join: false`: the
- * two screens do not feed each other, and every line between them goes
- * through the relay, which is the whole point of the tab.
- * ⚠️ ONE BROWSER, NOT TWO. The second screen is a second socket in this same
- * tab standing in for another phone, and a drawing may split a thing by role
- * but may not invent a second machine.
- * ⚠️ ONE RETURN ARROW, NOT TWO. The echo back to `this screen` was drawn as
- * well and `createDiagram` reported it on `cuts`: a return path to the upper
- * box runs through the lower one. Its fact is in the forward arrow's note.
+ * One Browser holding the tab's two sockets, the relay between them. `join:
+ * false`: every line between the screens goes through the relay. One return
+ * arrow, since a second runs through the lower box.
+ * See lessons/page-sync.md#sync-6
  */
 export const diagramSpec = () => ({
   caption: 'A cue has no time of its own, so every screen shows it the moment the relay hands it over.',
@@ -83,9 +55,9 @@ export const diagramSpec = () => ({
 
 export function build({ panel, log, set }) {
   /**
-   * One receiver: a socket, the name it has on show, and the order the cues
-   * reached it in. The tab builds two of them, `here` and `other`, and only
-   * `here` ever sends.
+   * One receiver: a socket, its name on show, and the order cues reached it.
+   * The tab builds `here` and `other`; only `here` sends.
+   * See lessons/page-sync.md#sync-7
    */
   function receiver(label) {
     const zone = el('div', 'sync-zone');
@@ -176,8 +148,9 @@ export function build({ panel, log, set }) {
     if (r?.sent) fired++;
   }
   async function fireOne() { fire(); }
-  // ⚠️ THE BURST IS SPREAD OUT, so the queue is visible on both copies, and
-  // the press is not finished until the last one has gone.
+  // The burst is spread out so the queue is visible, and the press is not
+  // finished until the last one has gone.
+  // See lessons/page-sync.md#sync-8
   async function fireBurst() {
     for (let i = 0; i < BURST; i++) { fire(); await sleep(BURST_GAP_MS); }
   }
@@ -218,8 +191,8 @@ export function build({ panel, log, set }) {
       const p50 = s[Math.floor(s.length / 2)];
       A('delivery under 250 ms', s.length > 0 && p50 < 250,
         s.length ? `middle ${p50.toFixed(1)} ms of ${s.length}, slowest ${s[s.length - 1].toFixed(1)} ms` : 'nothing timed');
-      // 🔴 THE CLAIM THE OLD PAGE COULD ONLY INFER. Two copies, each with its
-      // own socket, agree on every cue, on the order, and on the name on show.
+      // Two copies, each with its own socket, agree on every cue, the order and the name.
+      // See lessons/page-sync.md#sync-9
       const same = here.got.length === other.got.length && here.got.every((id, i) => other.got[i] === id);
       A('every open copy shows the same cue: the other copy got every cue, in the same order, and shows the same name',
         fired > 0 && same && other.got.length >= fired && other.big.textContent === here.big.textContent,

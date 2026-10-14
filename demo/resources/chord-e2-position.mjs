@@ -1,10 +1,6 @@
-// EXPERIMENT 2. "Not moving anywhere": is position in the form real signal, and
-// is it being discarded?
-//
-// `demo/resources/chord-corpus.mjs` reads a jazz chord with
-// `/^[0-9.]+(.*)$/` and keeps only group 1's TAIL, so the Humdrum recip
-// duration that starts every line is dropped at the first regex. Sections are
-// read for the expansion order and then flattened. This re-parses keeping both.
+// Experiment 2: is position in the form real signal? chord-corpus.mjs drops the Humdrum
+// recip duration and flattens sections; this re-parses keeping both.
+// See lessons/page-resources.md#resources-2
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';

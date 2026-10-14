@@ -1,18 +1,7 @@
-// demo/synth/module-page.mjs: a patch of synth modules on a page,
-// played from the kit's keys, a knob per parameter. It was written for three
-// pages, one module each (050 filter, 060 envelope, 070 LFO, the split of
-// synth/040), and since 2026-10-13 builds the one that replaced them,
-// /synth/sound/ Sound design (*"combine filter+envelope+lfo to single
-// sound design concept"*). It stays a module because the page is a patch and a
-// knob list handed to it.
-//
-// The page, top to bottom, as positron-concepts lays out a synth: the
-// waveform at full width, the knob row, the keys, the patchbay. The sound is
-// patch-synth.mjs; the patchbay draws only the nodes the patch links, so it
-// shows exactly the modules this page uses.
-//
-// NOTHING OPENS ON A VISIT. The AudioContext is made on the first key press,
-// and until then a knob only moves the module's stored parameter.
+// A patch of synth modules on a page (/synth/sound/), played from the kit's keys
+// with a knob per parameter: waveform, knob row, keys, patchbay. The sound is
+// patch-synth.mjs. Nothing opens on a visit: the AudioContext waits for a key.
+// See lessons/page-synth.md#synth-10
 
 import { el } from '/shell/shell.mjs';
 import { createPatchbay } from '/shell/patchbay.mjs';

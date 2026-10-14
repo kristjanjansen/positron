@@ -1,62 +1,17 @@
-// demo/code/sc-sampler.mjs: the sampler pages' ONE SuperCollider
-// sampler, since 2026-10-12. Asked: *"should we go all on supercollider
-// sampler?"*, then *"all in"* (BACKLOG, "All in on the SuperCollider sampler").
-// /code/piano/ plays through this (010, 020 and 040 were merged into
-// it 2026-10-12 and forward there); the WebAudio `createSampler` in sampler.mjs
-// stays as it was for anything else.
-//
-// WHAT IT IS: wasm scsynth in the tab (`/shell/scsynth.mjs`, SuperSonic)
-// running the board's two SynthDefs, driven by the board's voice rules. It was
-// /concepts/sampler/040/'s inline engine and is lifted out whole, so 040 and
-// the three older pages are one engine rather than four copies.
-//   - The SynthDefs `posSampler1` and `posSampler2` are
-//     rig/board/norns/possampler-defs.scd, written HERE as bytes by
-//     `/shell/synthdef.mjs` because no sclang runs in a browser. Env.asr(0.001,
-//     1, rel, -6) on an EnvGen with doneAction 2, PlayBuf at rate *
-//     BufRateScale with doneAction 2, times env times amp, Out at `out`.
-//     ⚠️ NOT BYTE COMPARED with what the Pi's sclang wrote: the graph is the
-//     same, the block order may not be.
-//   - The note, band, gain and release rules are imported from sampler.mjs,
-//     which rig/board/test.mjs grades equal to rig/board/scsampler.mjs.
-//   - The voice core (32 voices, a key struck again damps the voice it
-//     replaces, the oldest taken past the cap, `/n_set rel gate 0` as the
-//     damper, a key-off sample when the damper lands, a stereo voice at 0.5)
-//     is COPIED from rig/board/scsampler.mjs `createSamplerCore`, because that
-//     file opens node:child_process at the top and cannot load in a browser.
-//   - The board's capture SUMS out_1 and out_2 to one channel, and the core's
-//     halving of a stereo voice is written for that sum. So this sums too and
-//     both speakers play it: what the Pi sends down the relay, with no relay.
-//     MEASURED in research/scsynth-sampler-in-browser-2026-10-11.md section 2:
-//     the piano is about 1.5 dB quieter and narrower than the WebAudio
-//     sampler's stereo, the Rhodes is identical in level, and the damper is a
-//     ramp that reaches zero (no tick).
-//
-// THE SAME CALL SHAPE AS `createSampler`: `midi(ev)`, `noteOn`, `noteOff`,
-// `program`, `panic`, `inst`, `sounding`, `loading`, `ctx`, `stat`, plus
-//   - `warm(why)`: boot on intent. Pages call it on a pointer over or a touch
-//     of the keys, a focus, or the first Web MIDI message. It makes the
-//     AudioContext and fetches the engine, and boots it as soon as the context
-//     runs: at once if the page has had a gesture, else on the first key.
-//   - an event's `at` (ms, `performance.now()`'s clock): the note sounds at the
-//     SPEAKERS at that time, through a timestamped OSC bundle. No `at` is now.
-//   - `latencyMs()`: how long after a press a live note reaches the speakers,
-//     from the context's own latencies, for a caller that schedules a replay to
-//     land where the live note did.
-//   - `engine()`: the booted engine (its `meter` is after the sum).
-//
-// NOTHING OPENS ON A VISIT. Constructing this adds a download hint for the
-// wasm (our origin) and nothing else: no context, no fetch, no boot.
+// The SuperCollider sampler /code/piano/ plays: wasm scsynth running the board's posSampler1/2
+// (rig/board/norns/possampler-defs.scd, written as bytes, not byte compared) with the board's
+// voice core, summed to mono as the Pi sends it. Same calls as `createSampler`; a visit only hints.
+// See lessons/page-code.md#code-54
 import { createPedal, SUSTAIN_CC } from '/shell/pedal.mjs';
 import { bootScsynth, loadScsynth, prefetchScsynth } from '/shell/scsynth.mjs';
 import { graph, RATE, OP } from '/shell/synthdef.mjs';
 import { PIANO, RHODES, PIANO_NOTES, RHODES_NOTES, RELEASE_KEYS, nearestIn, planFor, velGain }
   from '/code/sampler.mjs';
 
-// ── the two SynthDefs, possampler-defs.scd as bytes ──────────────────────
-// Env.asr(0.001, 1, rel, -6) as EnvGen reads it: start 0, two segments,
-// release node 1, no loop, then (level, time, shape 5 = a curve, curve) per
-// segment. EnvGen's own inputs come first: gate, levelScale 1, levelBias 0,
-// timeScale 1, doneAction 2.
+// The two SynthDefs as bytes. Env.asr(0.001, 1, rel, -6) as EnvGen reads it: start 0, two
+// segments, release node 1, then (level, time, shape 5, curve) per segment, after EnvGen's
+// own inputs: gate, levelScale 1, levelBias 0, timeScale 1, doneAction 2.
+// See lessons/page-code.md#code-55
 export function samplerDef(ch) {
   const g = graph(`posSampler${ch}`);
   const k = g.value;
@@ -90,10 +45,10 @@ const SETS = {
     fileFor: (near, vel) => { const l = RHODES.pick(near, vel); return l == null ? null : RHODES.file(near, l); } },
 };
 
-// ── the voice core, COPIED from rig/board/scsampler.mjs createSamplerCore ─
-// Changed only where a browser differs: `send` takes (address, ...args) as
-// SuperSonic does, buffers are keyed by URL, and the FluidR3 set (program 2)
-// is not here.
+// The voice core, copied from rig/board/scsampler.mjs createSamplerCore (that file needs
+// node:child_process). Changed only for the browser: `send(address, ...args)`, buffers keyed
+// by URL, no FluidR3 set.
+// See lessons/page-code.md#code-56
 const VOICES = 32;
 function createSamplerCore({ send, buffers, programs, onProgram = () => {}, now = () => performance.now() / 1000 }) {
   let program = programs[0], nextId = 2000;
@@ -159,7 +114,6 @@ const LATE_S = 0.3;
 
 /**
  * The SuperCollider sampler.
- *
  * @param {object} o
  * @param {object[]} [o.instruments]  PIANO, and RHODES if the page has it (sampler.mjs's objects)
  * @param {(line:string, kind?:string)=>void} [o.log]
@@ -168,6 +122,7 @@ const LATE_S = 0.3;
  * @param {(eng:object)=>void} [o.onReady]  the engine is up
  * @param {number[]} [o.warm]  [lo, hi] notes to fetch when the Rhodes is switched to
  * @param {() => AudioContext} [o.context]  a context to play in; left out, the first intent makes one
+ * See lessons/page-code.md#code-57
  */
 export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch = () => {},
   onProgram = () => {}, onReady = () => {}, warm: warmRange = null, context: given = null } = {}) {
@@ -204,18 +159,9 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
   }
 
   /**
-   * Boot on intent. The first call makes the context, fetches the engine and
-   * boots it; every later call returns the same promise.
-   * 🔴 A CONTEXT MADE WITHOUT A GESTURE IS SUSPENDED, AND BOOTING INTO IT GAINS
-   * NOTHING AND CAN HANG. MEASURED 2026-10-12, headless Chrome with the real
-   * autoplay policy: SuperSonic's worklet does no work while the context is
-   * suspended, so a boot started on a hover 2 s before the key still finished
-   * 700 ms after the key (first note 802 ms, against 740 to 777 with no hover),
-   * and a hover 7 s before the key left the boot hung for good (no note at
-   * all), because SuperSonic's own 5 s wait for the context ran out inside it.
-   * So a suspended context gets the DOWNLOAD on intent and the boot the moment
-   * the context runs, which is the first key. A context that already runs (the
-   * page has had a gesture, a pick of the patch, an earlier key) boots at once.
+   * Boot on intent; later calls return the same promise. A suspended context only downloads: its
+   * worklet does nothing, a boot into it hangs past SuperSonic's 5 s wait. It boots once running.
+   * See lessons/page-code.md#code-58
    */
   function warm(why = 'intent') {
     context();
@@ -384,12 +330,9 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
   }
 
   /**
-   * Press to speakers on the live path, as the context reports it: its base
-   * and output latency. A replay scheduled this far after its recorded time
-   * lands where the live note did. MEASURED 2026-10-12 headless on
-   * /concepts/sampler/020/: a bundle tagged T is heard about 2.5 ms after T
-   * (scsynth starts a synth on its 128 frame block), and adding a block here
-   * as well put replays 3 ms later than the same notes played live.
+   * Press to speakers on the live path: the context's base plus output latency. Do not add a
+   * block: scsynth already starts a bundle about 2.5 ms late, and a block more put replays 3 ms late.
+   * See lessons/page-code.md#code-59
    */
   function latencyMs() {
     if (!ctx) return 0;
@@ -417,6 +360,7 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
  * The intent that boots the engine, on an element: a pointer over it, a touch,
  * a pointer down (which is also the key) or a focus inside it. Each listener
  * goes after its first call.
+ * See lessons/page-code.md#code-60
  */
 export function warmOnIntent(el, sampler) {
   const go = (e) => { sampler.warm(e.type); for (const t of TYPES) el.removeEventListener(t, go); };

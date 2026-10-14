@@ -1,22 +1,7 @@
-// demo/wire/how.mjs: the "How it works" picture for each tab of `/wire/`, and
-// the three checks every one of them owes.
-//
-// 🔴 ONE PICTURE PER TAB, BECAUSE THE TWO TABS DO DIFFERENT THINGS. MESSAGES is
-// a socket to the relay plus a recorder beside it and a history read over
-// HTTPS; KEYBOARD is notes through the relay to another machine and, on a
-// press, that machine's sound back peer to peer. One picture of both would be
-// two pictures sharing a Cloudflare box.
-//
-// 🔴 DRAWN ON THE TAB'S FIRST SHOWING, NEVER IN `build`. `tab-page.mjs` adds the
-// tab's report (readout and log) AFTER `build` returns, so a picture made in
-// `build` would sit above the log rather than last; and a picture measured in a
-// closed panel is laid out for a width nobody has (the kit's seven diagrams at
-// 320 px inside a 658 px panel). `show()` runs after the report is placed and
-// only on a panel that is open.
-//
-// ⚠️ `atEnd: false`, the way `/stage/` does it. With `atEnd` the component
-// appends to `document.body` and both tabs' pictures would stand under the page
-// whatever tab was open.
+// The "How it works" picture for each tab of /wire/, one per tab since they differ.
+// Drawn on the tab's first showing, after the report is placed, at a real width.
+// `atEnd: false`, or both pictures would append to document.body under the page.
+// See lessons/page-wire.md#wire-3
 
 import { createDiagram } from '/shell/diagram.mjs';
 import { el } from '/shell/shell.mjs';

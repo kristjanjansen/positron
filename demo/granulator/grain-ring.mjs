@@ -1,43 +1,7 @@
-// demo/granulator/grain-ring.mjs: the grain ring's program, and the
-// patches that are sets of its control values. /granulator/grains/ shows
-// the text in its code box, compiles it with `/shell/sclang-lite.mjs` in the
-// tab, and runs it on the tab's scsynth. Kept apart from the page so
-// `sclang-lite-test.mjs` can compile the same text with no browser.
-//
-// THE PROGRAM. What comes in is written round an eight second mono buffer by
-// BufWr; GrainBuf reads grains out of it; SendReply tells the page about every
-// grain: where it read, how long it is, where the write head was, and its
-// playback rate (negative when it plays backwards). `\mix` blends the input against the grains on the last line,
-// with equal power so the middle does not dip; it is the page's wet/dry knob
-// and no patch sets it. Every number a patch moves is a named control, so a patch is
-// a set of `/n_set` values and never a different graph. An edit to the text is
-// a different graph, and the page starts it in place of the old one with the
-// same values, on the same buffer.
-//
-// SINCE 2026-10-13 IT HAS AN ECHO, A TONE, A TAPE THAT SLOWS AND A WAY BACKWARDS,
-// for the Dub patch and the ones after it. `\tone` is a low pass on the
-// grains. `\echo`, `\time` and `\dark` are a delay whose output comes back
-// into its own input (LocalIn, DelayC, LocalOut), through a low pass at `dark`
-// each time round, which is what makes a dub echo darker on every repeat.
-// `\drop` and `\ramp` slow both heads by up to `drop` over every `1 / ramp`
-// seconds, then spring back: a tape stop on a loop. `\dir` -1 plays every grain
-// backwards (GrainBuf takes a negative rate and wraps the ring both ways).
-// Every one of them is neutral at its default (DEFAULTS), so a patch that does
-// not name them sounds as before.
-//
-// AND SINCE 2026-10-13 A BEAT GRID, for /granulator/beat/ (*"make followup
-// demo with ida, dub and add tempo detection and feed it into granulator"*).
-// `\lock` 1 takes the even grains off `Impulse` and onto a Phasor that goes
-// round `density` times a second (`secs / frames` is one over the sample
-// rate, as the buffer was allocated) and that `\beat` sets back to 0 when the
-// page raises it on a beat. GrainBuf, TRand and SendReply all fire when their
-// trigger goes from 0 or below to above 0, so the ramp shifted down by half
-// fires once a turn, at the top. With `density` a whole number of grains a
-// beat the grains land on the beat. Scattered grains (Dust) still come at
-// random and count only on the low half of a turn. `\lock` 0 is the old
-// graph's sound exactly: the Impulse at its old rate and the ramp times 0.
-//
-// The comments in it are for a visitor reading the box: short and plain.
+// The grain ring's program and its patches. BufWr writes the input round an 8 s mono buffer,
+// GrainBuf reads grains, SendReply reports each. Every number a patch moves is a named control,
+// so a patch is `/n_set` values, never a new graph. The program's details are in the lessons.
+// See lessons/page-granulator.md#granulator-13
 import { bootScsynth } from '../shell/scsynth.mjs';
 import { compile } from '../shell/sclang-lite.mjs';
 
@@ -90,26 +54,21 @@ export const PROGRAM = `// grains read out of an eight second ring of what comes
 export const RING_SECONDS = 8;
 
 /**
- * What a control sits at when a patch does not name it. Every control added
- * after the first five patches is NEUTRAL here, so a patch that names none of
- * them sounds as it did: `tone` 20 kHz is the low pass open, `echo` 0 sends
- * nothing round the echo, `drop` 0 never slows the tape, `dir` 1 plays forwards.
+ * What a control sits at when a patch does not name it. Every control after the first five
+ * patches is neutral here (`tone` 20 kHz, `echo` 0, `drop` 0, `dir` 1), so old patches sound as before.
+ * See lessons/page-granulator.md#granulator-14
  */
 export const DEFAULTS = { freeze: 0, speed: 1, back: 0.5, density: 20, scatter: 0, size: 0.1, jitter: 0,
   pitch: 1, detune: 0, pan: 0.5, amp: 1.5, tone: 20000, echo: 0, time: 0.375, dark: 20000, drop: 0, ramp: 0.5, dir: 1, lock: 0 };
 
 /**
- * Ten sounds, each a set of control values on the one program, each one
- * musical idea. `size` and `density` are the two knobs every check leans on,
- * so every patch names both. The first is the one the page opens on.
- *
- * Asked 2026-10-13 (BACKLOG): *"make more interstin ganulator parches. do dub,
- * put ida rec default and dub degault"*. Cloud and Shimmer are the old ones
- * with an echo; Freeze, Stutter and Stretch became Frozen choir, Gate and Slow
- * motion. `amp` levels them against each other, measured on the Ida recording.
+ * Ten sounds, each a set of control values on the one program. Every patch names `size` and
+ * `density`, the two knobs every check leans on; `amp` levels them, measured on Ida.
+ * See lessons/page-granulator.md#granulator-15
  */
 export const PATCHES = [
-  // Tape stop first, the default (asked 2026-10-13, *"raadio 2 and tape stop default"*).
+  // Tape stop first, the default.
+  // See lessons/page-granulator.md#granulator-16
   { name: 'Tape stop', says: 'the tape winds down to a stop every two and a half seconds and springs back',
     set: { size: 0.15, density: 30, pitch: 1, back: 0.1, speed: 1, scatter: 0, freeze: 0,
       jitter: 0, detune: 0, pan: 0.2, drop: 0.9, ramp: 0.4, tone: 10000, amp: 0.95 } },
@@ -147,11 +106,9 @@ export const PATCHES = [
 /** Every control value of a patch, defaults filled in. */
 export const valuesOf = (p) => ({ ...DEFAULTS, ...p.set });
 
-// ── the engine, behind grain-rig.mjs's contract ───────────────────────────
-// Lifted 2026-10-14 from /granulator/grains/ for /connect/ (plans/
-// plan-connect-ui.md, the convergence rule); /granulator/beat/ still carries
-// its own copy with the tempo. Its program is compiled when it is made (pure
-// JavaScript, no fetch); `boot` brings scsynth up in the context it is handed.
+// The engine behind grain-rig.mjs's contract, shared with /connect/; /granulator/beat/ keeps
+// its own copy with the tempo. Compiled when made (no fetch); `boot` brings scsynth up.
+// See lessons/page-granulator.md#granulator-17
 export function createRingEngine({ log = () => {} } = {}) {
   const NODE = 4000, BUF = 0, DEF = 'gring';
   // ── the program: compiled as the page opens, pure JavaScript, no fetch ───
@@ -174,11 +131,10 @@ export function createRingEngine({ log = () => {} } = {}) {
       if (!good.ok) throw new Error('the program did not compile');
       eng = await bootScsynth({
         audioContext: ctx, input, log,
-        // `SendReply.ar(trig, '/grain', [pos, size, write / frames, rate])`
-        // arrives as ['/grain', nodeID, replyID, pos, size, write head, rate]:
-        // SendReply puts two of its own in front. Both positions are fractions
-        // of the same eight seconds, so how long ago the grain's audio came in
-        // is their difference round the ring.
+        // `SendReply.ar(trig, '/grain', [pos, size, write / frames, rate])` arrives with nodeID and
+        // replyID in front. Both positions are fractions of the same 8 s, so how long ago the grain's
+        // audio came in is their difference round the ring.
+        // See lessons/page-granulator.md#granulator-18
         onReply: (m) => {
           if (m[0] !== '/grain') return false;
           const pos = m[3], head = m[5];

@@ -1,19 +1,7 @@
-// demo/reel/build-fixture.mjs — the 1965 catalogue, from bytes we already have.
-//
-// NODE ONLY. Never shipped to a browser, never imported by the page.
-//
-// ZERO UPSTREAM REQUESTS. Every row comes from
-// `proto/megatimeline/search-cache.jsonl`, which is committed — a search this
-// project already ran and kept. ERR's search endpoint is browser-unreachable
-// anyway (its preflight answers 204 with no ACAO), so a page could not do this
-// live even if it were polite to try.
-//
-// WHAT IT WRITES, and what it deliberately does not: slug, title, series, lead,
-// date, and the absolute position. NO MEDIA URLS, no segments, no bytes. A
-// link's worth of metadata is what ERR publishes to be searched; the media
-// stays on their origin and is fetched at play time, once, on a gesture.
-//
-//   node demo/reel/build-fixture.mjs
+// The 1965 catalogue for /reel/, built in node only from the committed search cache
+// proto/megatimeline/search-cache.jsonl: no search request upstream. It writes metadata
+// only (slug, title, series, lead, date, position), no media URLs. Run: node demo/reel/build-fixture.mjs
+// See lessons/page-reel.md#reel-1
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
@@ -34,9 +22,8 @@ for (const line of readFileSync(CACHE, 'utf8').trim().split('\n')) {
 const seriesOf = (it) =>
   (it.navigationLinks || []).find((n) => n.type === 'series')?.data?.[0]?.name || null;
 
-// KEEP WHAT WAS ALREADY FETCHED. Durations cost one upstream request each and
-// six minutes of them; a rebuild that drops them because it was run with
-// --no-fetch is a rebuild that punishes you for rebuilding.
+// Keep durations already fetched: each costs one upstream request, so --no-fetch keeps them.
+// See lessons/page-reel.md#reel-2
 const prior = existsSync(OUT)
   ? new Map(JSON.parse(readFileSync(OUT, 'utf8')).items.map((i) => [i.slug, i]))
   : new Map();
@@ -61,30 +48,19 @@ for (const it of rows) {
     title,
     lead: (it.lead || '').trim() || null,
     date: it.date.slice(0, 10),
-    // MIDDAY, NOT MIDNIGHT. The catalogue records the DAY a film went out and
-    // never the hour, so any time of day we choose is a convention. Midnight
-    // pretends to be a real time and puts the clip against the day boundary;
-    // midday says "somewhere in this day" by sitting in the middle of it, and
-    // it leaves room either side for a clip drawn at its true length.
+    // Midday, not midnight: the catalogue records only the day, and midday sits in its
+    // middle, leaving room either side for a clip drawn at its true length.
+    // See lessons/page-reel.md#reel-3
     at: at + 12 * 3600_000,
     ...(prior.get(slug)?.catalogueMs ? { catalogueMs: prior.get(slug).catalogueMs } : {}),
   });
 }
 items.sort((a, b) => a.at - b.at || a.slug.localeCompare(b.slug));
 
-// ── how long each film runs ────────────────────────────────────────────────
-//
-// The catalogue does NOT publish a duration in this API — checked; there is no
-// `Kestus` anywhere in the item response. What it does publish is a SHOT LIST
-// with real millisecond `beginTime`/`endTime`, so the last shot's end is the
-// best figure available without fetching media.
-//
-// It is a CLAIM, not a measurement, and the two are known to disagree: on one
-// film the shot list runs 6,880 ms past the last frame. So the page redraws a
-// clip at its measured length once it has been played, and until then this is
-// what the catalogue says.
-//
-// One request per film, spaced. Skipped entirely with --no-fetch.
+// Durations: the API has no duration field, so the last shot's endTime is the claim
+// (one film's runs 6,880 ms past its last frame; the page redraws after playing).
+// One spaced request per film, to ERR's server; skipped entirely with --no-fetch.
+// See lessons/page-reel.md#reel-4
 if (!process.argv.includes('--no-fetch')) {
   const UA = 'positron/1.0 (+https://positron.studio; research; contact kristjan.jansen@gmail.com)';
   let got = 0, missing = 0;

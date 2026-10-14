@@ -32,95 +32,27 @@
   import { createBoardCollide } from '/shell/board-collide.mjs';
   import { createCollideVoice, PROGRAM, rmsOf, dbfs } from '/code/collide-voice.mjs';
 
-  // /code/collide/ plus the same voice rendered on the Raspberry Pi as
-  // well. Asked 2026-10-12 (BACKLOG, "synth/090 Collide synth and synth/100"):
-  // *"100 is same but with local and rasperry pi rendering. 1/2 videpanel with
-  // wave on left, pi wave on right. readings on top, 2 local 2 pi ones. pi is
-  // not on lan, backlog its execution, simulate locally until then"*.
-  //
-  // 🔴 THE PI SIDE IS THE REAL BOARD WHEN ONE ANSWERS, AND SIMULATED IN THIS TAB
-  // WHEN NONE DOES, and the page says which on the Pi node's label and in the
-  // `path` cell (`relay`, `direct`, `turn` or `simulated`).
-  // `createPiSide` below is the one place the board goes in (2026-10-12,
-  // plans/plan-pi-supercollider-defs.md steps 3 and 5).
-  //
-  // THE READOUT, every cell measured here and none typed:
-  //   local lag / Pi lag     from the key going down (`performance.now()` in
-  //                          the key's own handler) to the first window of
-  //                          that side's sound above -50 dBFS at its analyser,
-  //                          plus the context's own `baseLatency` and
-  //                          `outputLatency`, which is what is still between
-  //                          the analyser and the speakers. Measured only on a
-  //                          note that starts from silence on that side, so a
-  //                          tail still ringing cannot pass for the new note,
-  //                          and only once that side's engine is up, so the
-  //                          first key's boot is not a lag.
-  //   local spread / Pi spread  the worst minus the best of those lags over
-  //                          every note so far, empty until there are two.
-  //                          Replaced the two level cells 2026-10-12: *"local
-  //                          pi levels have no value"* (both sides play one
-  //                          program, so they read the same number).
-  //
-  // THE CROSSFADER, asked the same day: *"add crossfader to collide on pi"*.
-  // Its own node, `web:xfade`, with the local sound on `audio-in` and the Pi's
-  // on `audio-in-2`, its `audio-out` to the speakers, and the slider a node of
-  // its own, `web:fader:value-out`, cabled into `web:xfade:value-in`. Equal
-  // power, as /radio/blend/. The scopes and the cells read each side
-  // BEFORE the crossfade, so a side faded out still shows its wave.
-  //
-  // NOTHING OPENS ON A VISIT. The text is compiled in JavaScript as the page
-  // opens. A pointer over the keys fetches the engine (our origin); the first
-  // key makes the AudioContext and boots both engines.
+  // /code/collide/ plus the same voice on the Pi: the real board when one answers, else simulated
+  // in this tab, named on the Pi node and in `path`. Lags run key down to -50 dBFS plus the output
+  // latency, from silence only; an equal power crossfader. Nothing opens until a key.
+  // See lessons/page-remote.md#remote-21
   const d = mount({
     name: 'Collide here and on the Pi', what: '', index: '/', indexLabel: 'positron',
-    // The four cells under the title, the log alone at the foot (*"readings on
-    // top"*), as /remote/piano/ does.
+    // The four cells under the title, the log alone at the foot.
+    // See lessons/page-remote.md#remote-22
     joined: false,
-    // `network` and `path` came 2026-10-13 with the direct option, the two
-    // cells remote/010 shows for its link (an even count, as the shell asks).
+    // `network` and `path` for the link: an even count, as the shell asks.
+    // See lessons/page-remote.md#remote-23
     readout: { 'local lag': 'ms', 'local spread': 'ms', 'Pi lag': 'ms', 'Pi spread': 'ms', network: 'ms', path: '' },
   });
   hintCell(d, 'network', NETWORK_HINT);
   hintCell(d, 'path', PATH_HINT);
   conceptNav('remote/collide');
 
-  // ── the Pi side: THE ONE PLACE THE REAL BOARD GOES IN ────────────────────
-  //
-  // The page talks to the Pi through five calls and nothing else: `wake(ctx)`,
-  // `noteOn(note, vel)`, `noteOff(note)`, `param(name, v)` and `out()` (its
-  // sound, as an AudioNode in `ctx`).
-  //
-  // THE BOARD, since 2026-10-12. On the first key, `createBoard` with this
-  // page's own 48 kHz context and `toDestination: false`, so the board's sound
-  // is a node HERE that the router puts through the Pi scope and the
-  // crossfader. Then `audio.status` (does a board answer at all, in
-  // `ASK_MS`), `audio.start {source: 'collide'}`, and `sc.load` of PROGRAM
-  // through `/shell/board-collide.mjs`; a key is `note.on {node: 'collide'}`
-  // and a knob `sc.set`. The board compiles the TEXT with the same compiler
-  // and says `same: true` when its bytes are this tab's. `?path=direct`
-  // offers the direct path, as /remote/piano/ does.
-  // ⚠️ THE BOARD ON THIS PAGE TODAY IS THE STAND-IN: `?relay=ws://127.0.0.1:8897`
-  // with `node demo/fake-board.mjs` running. It answers every verb through the
-  // board's own `rig/board/scollide.mjs`, and its sound is a fixed tone, not
-  // the program. The real Pi has not run `scollide.mjs` yet (plan step 4).
-  //
-  // SIMULATED, when nothing answers: a second scsynth in this tab running the
-  // same program, with the trip modelled around it:
-  //
-  //   up     UP_MS before a note or a knob reaches the engine: half the Mac to
-  //          Pi relay round trip, 64 to 69 ms measured 2026-09-14 (PROGRESS.md,
-  //          quoted in research/pi-drum-machines-2026-09-21.md section 2.3).
-  //   back   DOWN_MS of delay on the sound: the board's JACK period (1024 at
-  //          48 kHz on the dummy backend, `rig/board/jacksynth.mjs`, 21.3 ms),
-  //          one board frame (`BOARD_FRAME_MS`, read from board.mjs), the
-  //          relay back (the same 34 ms), and the playout cushion board.mjs
-  //          opens with (`cushionMs = 100`). The sound is folded to
-  //          `BOARD_CHANNELS` (one) on the way, because the board sends mono.
-  //   ⚠️ A MODEL, NOT A MEASUREMENT OF THE BOARD. Its total, about 210 ms,
-  //   sits inside the 160 to 220 ms that research file estimates for press to
-  //   sound through this rig, and that number has never been measured either
-  //   (same file, section 2.3). The `Pi lag` cell measures the MODEL.
-  //
+  // The Pi side, the one place the board goes in: `wake(ctx)`, `noteOn`, `noteOff`, `param`, `out()`.
+  // The board via `/shell/board-collide.mjs` with this 48 kHz context; else simulated, UP_MS and DOWN_MS
+  // around a second scsynth. A model (about 210 ms), not the board: `Pi lag` measures the model.
+  // See lessons/page-remote.md#remote-24
   const UP_MS = 34;
   const JACK_MS = 1024 / 48000 * 1000;
   const CUSHION_MS = 100;
@@ -151,17 +83,15 @@
 
   /** How long a board has to answer `audio.status` before the Pi side is simulated. */
   const ASK_MS = 3000;
-  // RELAY OR DIRECT, asked 2026-10-13: *"add direct option to all remote
-  // instruments."* The same choice, cell and fall back as remote/010 and 030
-  // (`/remote/path.mjs`): the relay unless `?path=direct`; direct is a
-  // WebRTC link to the board offered once it answers, the relay kept for
-  // presence and as the fall back when no channel opens in 3 s or it drops.
-  // A change of choice makes a new board on the new path (`switchPath`).
+  // Relay or direct via `/remote/path.mjs`: the relay unless `?path=direct`, falling back when no
+  // channel opens in 3 s or it drops. A change makes a new board on the new path (`switchPath`).
+  // See lessons/page-remote.md#remote-25
   const path = createPathChoice({ log: d.log, onPick: (m) => switchPath(m) });
   /**
    * The board if one answers, the simulation if none does. `mode()` is
    * `checking` until it is decided, then `relay`, `direct`, `turn` or
    * `simulated`; `onMode` hears every change.
+   * See lessons/page-remote.md#remote-26
    */
   function createPiSide({ log, onMode = () => {} }) {
     const sim = createSimulatedPi({ log });
@@ -297,11 +227,9 @@
   lay(ID('collide', 'audio-out'), ID('scope', 'audio-in'));
   lay(ID('collide', 'audio-out'), ID('xfade', 'audio-in'));
   lay(PI('audio-out'), ID('scope-pi', 'audio-in'));
-  // ⚠️ VIA RELAY, BECAUSE THAT IS THE WIRE IT RIDES. Both Pi legs read one
-  // `board.playout()` node fed by the relay socket; without this the bay took
-  // the crossfader for a second internet receiver and gave it a MoQ session
-  // the board never opens, and the picture drew it as a wire of its own, a
-  // column wider than the box (884 px in 688 at 1280, 2026-10-12).
+  // Via relay, because that is the wire it rides: both Pi legs read one `board.playout()`. Without
+  // it the bay asks the crossfader for MoQ, which the board never opens, and draws an extra wire.
+  // See lessons/page-remote.md#remote-27
   lay(PI('audio-out'), ID('xfade', 'audio-in-2'), { via: 'relay' });
   lay(ID('fader', 'value-out'), ID('xfade', 'value-in'));
   lay(ID('xfade', 'audio-out'), ID('speaker', 'audio-in'));
@@ -437,13 +365,9 @@
   }));
   const grid = createKnobGrid(knobs, { row: true });
 
-  // ── one scope, both waves on it, each held from its own note's onset ────
-  // Asked 2026-10-13: *"overlay 2 waves on top of each other, full w"*. The
-  // scope, what was measured before it and how each side's onset is found are
-  // in /remote/overlay-scope.mjs, shared with remote/040 since the
-  // same day. Here a key is the trigger, the window is 1024 samples (21 ms at
-  // 48 kHz, about four cycles of A3) and the Pi's window may slide 20 ms (960
-  // samples, a period of the lowest key) to its best match.
+  // One scope, both waves, each held from its own note's onset (/remote/overlay-scope.mjs). A key
+  // is the trigger, 1024 samples (21 ms at 48 kHz), the Pi's window may slide 20 ms to match.
+  // See lessons/page-remote.md#remote-28
   const overlay = createOverlayScope({ win: 1024, slide: 960, axis: '21 ms' });
   const scope = overlay.wave, held = overlay.held, captures = overlay.captures;
   const scoped = (s) => bay.links().some((l) => l.from === s.from && l.to === s.scope);
@@ -463,9 +387,9 @@
     d.set('network', Number.isFinite(rtt) ? Math.round(rtt) : '');
   }
   function showMode(m) {
-    // No longer than the real label: the bay's column is as wide as its widest
-    // box, and `SuperCollider on the Pi, simulated` widened the Pi's column
-    // enough to push the patchbay 11 px past its box at 1280 (2026-10-12).
+    // No longer than the real label: the bay's column is as wide as its widest box, and a longer
+    // one pushed the patchbay past its box at 1280.
+    // See lessons/page-remote.md#remote-29
     piNode.label = m === 'simulated' ? 'SuperCollider, simulated' : 'SuperCollider on the Pi';
     pathCells();
     pb.refresh();
@@ -503,7 +427,8 @@
   const code = createCodeBox({ language: 'sclang', rows: CODE_ROWS, label: '', value: PROGRAM,
     hues: book, ariaLabel: 'the SuperCollider program both synths play, read only' });
   code.input.readOnly = true;
-  // Knobs above the code (*"when there are code and knobs on concepts, move knobs on top of code"*).
+  // Knobs above the code.
+  // See lessons/page-remote.md#remote-30
   d.stack.add(top, scope.el, fader.el, grid.el, code.el, host, pb.el);
 
   const samplesOf = (s) => () => { if (!s.an) return []; s.an.getFloatTimeDomainData(s.buf); return Array.from(s.buf); };

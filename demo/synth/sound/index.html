@@ -13,15 +13,10 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { modulePage } from '/synth/module-page.mjs';
 
-  // Sound design: one voice through every module the synth has. The keys play
-  // the oscillator and open the amp's envelope, the oscillator goes through the
-  // low-pass filter into the amp, the amp to the speakers and the scope, and
-  // the LFO moves the filter's cutoff. Each knob is a node of its own with a
-  // wire into the module it moves, in reading order: oscillator, filter,
-  // envelope, LFO. Asked 2026-10-13, *"combine filter+envelope+lfo to single
-  // sound design concept"*: this page was the filter alone, and 060 (envelope)
-  // and 070 (LFO) were removed into it; their URLs 404 (no forwarding).
-  // The voice is ../patch-synth.mjs and the page is ../module-page.mjs.
+  // Sound design: keys play the oscillator and open the amp envelope; oscillator ->
+  // low-pass filter -> amp -> speakers and scope; the LFO moves the cutoff. One node per
+  // knob, in reading order. Voice ../patch-synth.mjs, page ../module-page.mjs.
+  // See lessons/page-synth.md#synth-8
   const d = mount({ name: 'Sound design', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('synth/sound');
   const PRESET = { wave: 'sawtooth', cutoff: 1100, q: 5, attack: 0.008, decay: 0.35, sustain: 0.55, release: 0.45, rate: 0.8, depth: 1200 };

@@ -134,22 +134,10 @@
     if (gum) navigator.mediaDevices.getUserMedia = (o) => { CAMERA_ASKED.push(o); return gum(o); };
   }
 
-  // ── what the site has, read rather than typed ───────────────────────────
-  // Every node in the grid is one the site's own pages build, each shown ONCE
-  // as a type (a knob, not knob-cutoff and knob-q), with the pages that build
-  // it as links. Three sources:
-  //   1. demo/shell/nodes.mjs NODES, the browser-side types read off the
-  //      concept pages (plans/plan-node-catalogue.md, step 1). The key is the
-  //      catalogue name and it is the box's id here, because four entries share
-  //      the id segment `shader` on four different pages.
-  //   2. boardGraph() in graph-registry.mjs, fed what the board announces
-  //      (rig/board/board.mjs: synth, the granulator insert, the sampler, the
-  //      Circuit on input 1, JACK, the GPU). Only the Pi nodes a concept page
-  //      really plays are kept, and boardGraph has no `pages`, so PI_PAGES says
-  //      which, read 2026-10-14 off the pages' own BOARD_SITE ids.
-  //   3. The hops between sites, which are catalogue entries too (shout,
-  //      stream-live, stream-hls, moq-relay), drawn after the Pi as before.
-  //      cf-relay is not one: the patchbay draws it from a link.
+  // Every node the site's pages build, once per type, read from three sources:
+  // nodes.mjs NODES (concept pages), boardGraph() for the Pi nodes a page plays
+  // (PI_PAGES says which), and the catalogue's endpoint hops between sites.
+  // See lessons/page-connect.md#connect-1
   const PI = boardGraph({ room: 'studio-1', instruments: { synth: true, pappusFx: true, sampler: true, collide: true }, jack: true, gpu: true,
     camera: true, inputs: [{ name: 'circuit', channels: 2, jack: true, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
   const PI_PAGES = { circuit: ['remote/circuit'], sampler: ['remote/piano'], collide: ['remote/collide'], drums: ['drums/remote'],
@@ -240,10 +228,9 @@
     return a.find((t) => b.includes(t)) ?? (a.length === 1 ? a[0] : b.length === 1 ? b[0] : undefined);
   }
 
-  // Example requests, each with the links a right answer contains and the
-  // concept page that already makes them (the third field), so no example
-  // promises something no page does. The self-check proves every one can be
-  // made in this bay, and its stand-in answers with them.
+  // Example requests: the links a right answer contains and the concept page that
+  // already makes them. The self-check proves each can be made in this bay.
+  // See lessons/page-connect.md#connect-2
   const W = (n, p) => `web:${n}:${p}`;
   const KEYS = W('keys', 'midi-out'), SPK = W('speaker', 'audio-in'), REC = 'cf-r2:recording:file-out';
   const KNOB = W('knob', 'value-out'), CAM = W('camera', 'video-out'), SCREEN = W('screen', 'video-in');
@@ -283,10 +270,9 @@
     readout: null, index: '/', indexLabel: 'positron' });
   useMediumColours();
 
-  // ── asking the wish worker ───────────────────────────────────────────────
-  // The worker proposes and never connects (workers/wish/src/wish.mjs), so an
-  // answer becomes rows a person confirms. Every call spends the paid Workers AI
-  // account: only on a press, never on a visit, and never from the self-check.
+  // The wish worker proposes and never connects, so an answer becomes rows a person
+  // confirms. Each call spends paid Workers AI: only on a press, never in a self-check.
+  // See lessons/page-connect.md#connect-3
   const API = new URLSearchParams(location.search).get('api') || 'https://wish.positron.studio';
   const HERE = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   const FACTS = 'Ports carry midi, audio, value, clock, video, program or file, and a link joins an out port to an in port '
@@ -301,10 +287,9 @@
     { from: KEYS, to: 'web:plaits:midi-in', transforms: [] },
     { from: KEYS, to: 'web:plaits:midi-in', transforms: [{ op: 'transpose' }] },
   ];
-  // The worker refuses more than 64 ports (workers/wish/src/index.js MAX_PORTS)
-  // and the bay holds about three times that, so the model is told the most
-  // useful 64: every port an example names, then the other ports of the nodes
-  // those examples use, then nothing. The rest stay pressable in the grid.
+  // The worker refuses more than 64 ports (MAX_PORTS), so the model gets the ports the
+  // examples name, then the other ports of those nodes. The rest stay pressable.
+  // See lessons/page-connect.md#connect-4
   const MAX_PORTS = 64;
   const EXAMPLE_PORTS = new Set(EXAMPLES.flatMap((e) => e.links.flatMap((l) => [l.from, l.to])));
   const EXAMPLE_NODES = new Set([...EXAMPLE_PORTS].map(nodeOf));
@@ -332,11 +317,9 @@
     return out;
   }
 
-  // No typed request for now (asked 2026-10-14, *"rm ask button and input atm"*):
-  // an example press is the request.
-  // What runs of an example, read off the runtimes rather than typed: a node
-  // with no runtime marks its pill until one is written, and a node that opens
-  // a paid service or somebody else's server makes it a person's press only.
+  // An example press is the request. A node with no runtime marks its pill, and a
+  // node that opens a paid service or somebody else's server is a person's press only.
+  // See lessons/page-connect.md#connect-5
   const PRESS_ONLY = {
     'cf-stream:live': 'Stream is billed by the minute',
     'err:station': 'a live station is somebody else\'s server',
@@ -555,12 +538,9 @@
     return { person: GROUPS[0], device: GROUPS[0], engine: GROUPS[1], store: GROUPS[2] }[n.kind] ?? GROUPS[3];
   }
 
-  // ── the live layer: what is present in a room right now ─────────────────
-  // A person presses Listen in a room they choose. The Pi puts its graph on
-  // every beat and a page in the room announces its own (announce.mjs). Live
-  // is a state on the boxes: a green dot when heard inside STALE_MS, an empty
-  // ring once quiet, nothing when never heard. A node the Pi has and no page
-  // here draws yet is a box of its own; another tab is a group of its own.
+  // Live layer: the Pi and each page in the room announce their graph. A box shows a
+  // green dot when heard inside STALE_MS, an empty ring once quiet, nothing if never.
+  // See lessons/page-connect.md#connect-6
   const Q = new URLSearchParams(location.search);
   const STALE = SELFCHECK && Number(Q.get('stale')) > 0 ? Number(Q.get('stale')) : STALE_MS;
   // studio-1 is the owner's desk: only a person's own press listens there, and never a check.
@@ -1044,10 +1024,9 @@
     await checkLive();
   }
 
-  // ── the runtimes past slice 3, one example each ───────────────────────────
-  // Each is pressed the way a person would, through its own face or its own
-  // handler, and graded on the far side of its link: what the next runtime
-  // heard, what reached the speakers, what the OLED drew.
+  // The runtimes past slice 3, one example each, pressed as a person would and graded
+  // on the far side of the link.
+  // See lessons/page-connect.md#connect-7
   async function checkRunners() {
     const A = d.assert;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1386,10 +1365,9 @@
     await runtimes();
   }
 
-  // ── the live layer, against the stand-ins ─────────────────────────────────
-  // Only with `?relay=` on this machine (demo/fake-relay.mjs) and a private
-  // room, where demo/fake-board.mjs answers as the Pi. Without them these are
-  // left out and the log says so, because a check never reaches the real relay.
+  // Only with `?relay=` (demo/fake-relay.mjs) and a private room answered by
+  // demo/fake-board.mjs; otherwise left out, so a check never reaches the real relay.
+  // See lessons/page-connect.md#connect-8
   async function checkLive() {
     const A = d.assert;
     const room = roomField.value();
@@ -1474,10 +1452,9 @@
     await checkPi(room);
   }
 
-  // ── the Pi, joined from its own face, against the stand-in board ───────────
-  // demo/fake-board.mjs answers in the private room and its `-circuit` input
-  // room with the board's own code, and counts on its side what reached the
-  // Circuit's port. Never studio-1: the room is the check's own.
+  // The Pi joined from its own face against demo/fake-board.mjs, which counts what
+  // reached the Circuit's port. Never studio-1: the room is the check's own.
+  // See lessons/page-connect.md#connect-9
   async function checkPi(room) {
     const A = d.assert;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

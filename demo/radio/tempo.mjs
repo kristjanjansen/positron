@@ -1,121 +1,7 @@
-// The tempo detector of /radio/tempo/ and /radio/live/, one
-// copy for both since 2026-10-12. The two pages carried it line for line
-// (checked with `diff` the day it moved), so a change to it is made here once
-// and research/tools/tempo-key/our-tempo.mjs imports this very file to measure
-// it offline. /radio/key/ has no tempo and does not use it.
-//
-//   const det = createTempoDetector(ctx, { pull, playing: () => playing, onReading: (ev) => bay.send(BPM_EV, ev) });
-//   source.connect(det.in);
-//
-// `det.conf` is the last reading's confidence. A reading is
-// { of: 'param', name: 'bpm', v, confidence, beatAt, beats, candidates }.
-// STEADY is the confidence under which a page says "no steady beat" instead
-// of a number (asked 2026-10-12, plan-tempo-key-improve.md item 2).
-//
-// ── the tempo detector. Plain WebAudio and a little arithmetic.
-// 1. Four bands of the sound: below 150 Hz (the kick and the bass), around
-//    400 Hz, around 1.5 kHz (snares, voices) and above 4 kHz (hats), merged
-//    into one four channel input.
-// 2. Each band's energy through a follower (the square, smoothed by two one
-//    pole low passes at FOLLOW_HZ), read every HOP samples on a log scale, and
-//    how much it ROSE since the hop before. The rises, summed over the bands,
-//    are the onset envelope. Before it is used, its own one second running
-//    mean is taken off and only what stands above that is kept.
-// 3. Every half second, the autocorrelation of the last WIN_S seconds of that
-//    envelope. Each tempo from LO to HI scores the mean of its correlation at
-//    one, two and four beats, plus half of it at half a beat (a beat that
-//    splits in two, as nearly all pop does), times a prior that falls off
-//    either side of 120 bpm (a Gaussian in octaves, PRIOR_OCT wide). The
-//    peaks of that score are the CANDIDATES, and all of them are sent.
-// 4. The chosen one is the best candidate, with a bonus of STICK for staying
-//    within 3% of the last choice, and the line is the median of the last
-//    five choices.
-// 5. The confidence is how strong that score is, 1 - exp(-score / CONF_K),
-//    times how many of the last eight choices agree with it (half weight),
-//    times how far the best peak stands above the second (CONF_R0, CONF_P).
-// 6. With the period known, the phase, from each band's own rises kept in a
-//    ring beside the sum, compressed less than the tempo's (PH_LOGK). A beat
-//    envelope weighs the bands PH_W (the low band whole, the hats not at
-//    all). Every offset into the last PH_SPAN_S seconds
-//    is scored as a pulse train: at each beat back, the beat envelope under a
-//    Gaussian PH_SIG_S wide, plus HAT_BETA times the hat band half a beat
-//    later, each beat counting less with age (PH_DECAY_S). The best offset is
-//    the last beat, on this tab's audio clock. The beats on that grid since
-//    the last reading go with it, and the wave draws them.
-//
-// 🔴 WHY, MEASURED 2026-10-11 OFFLINE ON BOTH RECORDINGS, after *"there is
-// very steady beat on r2"* and *"impove yr algis"*. The detector before this
-// read Raadio 2 as 127 and 84.7 by turns (84.7 is 127 times 2/3: the song's
-// pattern repeats every one and a half beats, and the old score could not
-// tell that from a beat), with a median confidence of 0.21, because that
-// confidence was the bare correlation at one beat of a two band envelope.
-// The kicks and bass in the low band come every 0.235 s, and the envelope
-// correlates more at 2, 4 and 8 of those than at 3, 5 and 7, so the beat is
-// two of them: 127.0 bpm on the kick grid. After: 358 of 359 readings within
-// 3% of 127.0 on Raadio 2 (re-measured against the kick grid) and every one
-// of the 231 in Raadio 4's first two minutes, where it was 127 to 129 before
-// as well. Raadio 4's last minute has no steady beat (a 55 s window's best
-// score is 0.02 against 0.48 in its first two minutes) and its confidence
-// falls there, which is right.
-//
-// 🔴 WHY THE PHASE STEP IS A PULSE TRAIN WITHOUT THE HATS, MEASURED 2026-10-11
-// OFFLINE after *"beats are often uppeat"* and *"radio 2 is upbeat. not
-// good."* (research/beat-tracking-2026-10-11.md). The step before took the
-// phase from the four band sum over 4 s, and on Raadio 2 put 48% of its
-// beats exactly half a beat off the kick. The hat band above 4 kHz sits on
-// the offbeat in that music and every band is log compressed on its own, so
-// a quiet hat's rise counted as much as a loud kick's, and the low band could
-// not outvote it because the bass comes back on the offbeat too. With the
-// hats out of the beat envelope, a pulse train over 6 s and the hats scored
-// half a beat later, drawn beats on the kick go from 50% to 97% on Raadio 2
-// and half a beat off from 48% to 3%. Raadio 4 stays at 100%, and Ida (a
-// steady kick at 131.2 bpm and almost nothing above 4 kHz) goes from 97% to
-// 98%. The weights were chosen on Raadio 2, and the hats half a beat later is
-// a dance music prior that would pull the wrong way where the hats land on
-// the beat.
-//
-// 🔴 WHY THE PHASE STEP MEASURES THE HATS' SIDE AND KEEPS ITS GRID, MEASURED
-// 2026-10-12 OFFLINE after *"not good perf of bmp"* on radio/030
-// (research/tempo-key-eval-2026-10-12.md section 4.4, plans/plan-tempo-key-improve.md
-// item 1). The step above chose a phase afresh every half second with no
-// memory, and assumed the hats sit on the offbeat. On three Ida takes where
-// they do not, the drawn beat sat half a beat off beat_this's 17 to 52% of the
-// time and the grid jumped 23 to 27 times a minute. So step 6 is now:
-//   a. The low bands (PH_W) find their own best grid first.
-//   b. The hat band is folded on that grid. Only when the hats sit more on the
-//      offbeat than on the beat, by PH_RATIO, is the HAT_BETA offbeat term
-//      used; otherwise the beat envelope is all four bands at PH_Y and there is
-//      no offbeat term.
-//   c. The last reading's grid, carried forward and allowed to slide PH_SLIDE
-//      of a beat toward the best nearby phase, is kept unless the best new
-//      phase beats it by more than PH_KEEP.
-// Pooled over six recordings (Raadio 2 and 4, four Ida takes) against
-// beat_this: on the beat 63% to 77%, half a beat off 27% to 11%, grid jumps
-// 21.4 to 4.5 a minute. Raadio 2 85% to 83% on. The tempo is untouched.
-// Keep alone, without (b), cut the jumps and left "on" at 62%: it held the
-// wrong grid as steadily as the right one. PH_RATIO 1, 1.5 and 2 gave 75, 77
-// and 78% on, so it is not knife edge. Chosen on those six recordings.
-//
-// 🔴 WHY THE PHASE HAS ITS OWN LOG SCALE AND THE CONFIDENCE ASKS FOR A CLEAR
-// WINNER, MEASURED 2026-10-12 OFFLINE after *"Build better tempo detector."*,
-// same six recordings and tooling. Each band's level is log1p(K * energy) before
-// its rise is taken. At the tempo's K = 1e4 a quiet band's rise counts nearly as
-// much as a loud one's, which is right for finding a period and wrong for
-// placing a beat: the phase reads its own rises at PH_LOGK = 5e2, where the
-// loud kick outweighs the rest. On the beat 77.2% to 81.3%, half off 11.0% to
-// 8.0%, grid jumps 4.5 to 3.8 a minute; Raadio 2 82.5 to 91.5% on. 1e2, 2e2,
-// 3e2, 5e2, 1e3, 3e3 and 1e4 were tried (on 79.8, 81.1, 80.5, 81.3, 79.9, 77.1,
-// 77.2); the same 1e3 on the TEMPO's rises cost Ida 1354 2 points exact and was
-// dropped. The tempo is untouched by it.
-// The confidence was the score and the agreement only, and a reading whose
-// second best period scored nearly as high as the first was shown as steady as
-// one with a clear winner. Times ((1 - r2) / (1 - CONF_R0)) ** CONF_P, capped at
-// 1, where r2 is the second peak's score over the first: shown right 73.4% to
-// 75.9% of scored readings, shown wrong 6.3% to 5.0%, no steady beat 26.6% to
-// 25.0%. CONF_P = 0.5 and CONF_R0 = 0.5 with CONF_K = 0.16 gives 75.2, 4.0 and
-// 26.6 instead: fewer wrong, no more often confident. Chosen on these six
-// recordings; left out one at a time the fitted constants move (K 0.12 to 0.13,
-// R0 0.6 to 0.7) and the held out recording gained or held in five of six.
+// The tempo detector of /radio/tempo/ and /radio/live/, also imported by research/tools/tempo-key/
+// our-tempo.mjs. `createTempoDetector(ctx, { pull, playing, onReading })`, feed `det.in`: four band
+// onsets, autocorrelation scored around 120 bpm, a phase grid from the low bands; method in the lesson.
+// See lessons/page-radio.md#radio-53
 export const HOP = 256;
 export const WIN_S = 12, MIN_S = 4;
 export const LO = 60, HI = 200, PRIOR = 120, PRIOR_OCT = 0.7, HALF_W = 0.5, STICK = 0.15;
@@ -135,10 +21,9 @@ export const PH_W = [1, 0.5, 0.25, 0], HAT = 3, HAT_BETA = 1, PH_SPAN_S = 6, PH_
 // offbeat hats, the band weights when they do not, how much a new phase must
 // beat the carried grid by, and how far the carried grid may slide, in beats.
 export const PH_RATIO = 1.5, PH_Y = [1, 1, 1, 1], PH_KEEP = 0.5, PH_SLIDE = 1 / 16;
-// Under this confidence a page shows "no steady beat" and no number. MEASURED
-// 2026-10-12: readings at 0.5 or more are 92% within 4% of the tools, under 0.5
-// only 54%, and they are 20% of readings. The click already waits for the same
-// 0.5 (DRUM_FLOOR on the pages).
+// Under this confidence a page shows "no steady beat": readings at 0.5 or more are 92% within 4%
+// of the reference tools, under it 54% (20% of readings). The click waits for it too (DRUM_FLOOR).
+// See lessons/page-radio.md#radio-54
 export const STEADY = 0.5;
 export const steady = (ev) => Number.isFinite(ev?.v) && (ev?.confidence ?? 0) >= STEADY;
 

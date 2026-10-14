@@ -1,18 +1,7 @@
-// demo/partitur/score.mjs: the SCORE tab of /partitur/, the page as it was
-// until 2026-10-05, when *"unify partitur and wall to tabbed page"* made the
-// projection wall its second tab (`./wall.mjs`).
-//
-// WHAT CHANGED ON THE WAY IN, AND WHY:
-//   1  🔴 IT JOINS THE ROOM ON A PRESS, NOT ON LOAD (`tab-page.mjs` rule 1):
-//      Find walls, the first press on the transport bar, or a scene mark.
-//   2  🔴 THE ROOM IS `?room=` WHEN THE PAGE HAS ONE, so a suite run no longer
-//      announces a fake score into the owner's `studio-1`
-//      (plans/plan-stage-patchbay.md F6).
-//   3  The checks moved from load into the page's one SELFCHECK pass. They
-//      are still all on data in hand, plus one round trip to a wall in WALL.
-//   4  🔴 THE ROOM, THE ANNOUNCE AND `link.request` ARE `bay-node.mjs`'s SINCE
-//      2026-10-06 (plans/plan-routing-migration.md step 1), the one join helper
-//      `/patchbay/` and WALL use too. What it sends is unchanged.
+// The SCORE tab of /partitur/; the projection wall is the second tab (./wall.mjs).
+// It joins the room on a press, never on load, in `?room=` when given, through
+// bay-node.mjs. Checks run in the one SELFCHECK pass.
+// See lessons/page-partitur.md#partitur-9
 
 import { el } from '/shell/shell.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
@@ -27,22 +16,10 @@ import { createBay } from '/shell/bay.mjs';
 import { createBayNode, randomSite } from '/shell/bay-node.mjs';
 import { ROOM } from './wall.mjs';
 
-/*
- * 🔴 L. MOHOLY-NAGY, PARTITURSKIZZE ZU EINER MECHANISCHEN EXZENTRIK, 1924,
- * the fold-out plate in Bauhausbücher 4 (1925), played as a positron timeline.
- * Asked 2026-10-04 as *"Do it. Better name"* after
- * `research/moholy-nagy-partiturskizze-2026-10-04.md`. The plate was
- * transcribed from the public-domain scan by
- * `demo/resources/build-moholy-partiturskizze.mjs`, every row marked `seen`
- * or `inferred`, and this page only draws and plays what that file holds.
- *
- * ⚠️ NOTHING HERE IS TYPED IN SECONDS. Every position is a fraction of the
- * plate, because Moholy gave no unit, no tempo and no total length. The total
- * is a choice this page makes and says it made: the length control is the
- * only place a duration enters, and everything scales from it.
- * ⚠️ AND IT OPENS NOTHING. The data is a file in this repository and the
- * sirens are oscillators in this tab, started only by pressing play.
- */
+/* Moholy-Nagy's Partiturskizze (1924) played as a timeline, from the transcription
+   by build-moholy-partiturskizze.mjs. Positions are fractions of the plate; the
+   length control is the only duration. Opens nothing: sirens start on play.
+   See lessons/page-partitur.md#partitur-10 */
 const SRC = '/resources/moholy-partiturskizze.json';
 // A file in this repository, fetched when the page loads, as it always was.
 const data = await (await fetch(SRC)).json();
@@ -51,15 +28,13 @@ const [c1, c2, light, music] = data.lanes;
 /** Under the tab row, in the page's one fixed box. */
 export const about = 'Moholy-Nagy\u2019s 1924 stage score as a timeline, with the picture showing its light at the playhead. Press play to run it, or Find walls to send the light to a screen in the WALL tab.';
 
-// `length` was a cell until 2026-10-05 and repeated the length control two
-// blocks up; `links` says what the visitor cannot otherwise see, whether any
-// lane is reaching anything.
+// `links` says whether any lane is reaching anything, which is otherwise unseen.
+// See lessons/page-partitur.md#partitur-11
 export const readout = { light: '', sirens: '', cue: '', links: '' };
 
 export function build({ panel, log, set }) {
 
-  // The plate's story was a THE SCORE block here until 2026-10-05; the tab's
-  // `about` line says what it is now (*"rm top desriptions"*).
+  // See lessons/page-partitur.md#partitur-12
 
 
   // ── time ───────────────────────────────────────────────────────────────────
@@ -77,10 +52,8 @@ export function build({ panel, log, set }) {
   const markText = (m) => m.folge ? `${m.folge.item} (${m.folge.how})` : m.label;
 
   // ── the picture: the light column at the playhead, on the projection wall ─
-  //
-  // ⚠️ WHITE PAPER READ AS WHITE LIGHT IS AN INFERENCE, AND THE TRANSCRIPTION
-  // SAYS SO. The colours are the scan's sampled means, so they are the colour
-  // of a 2014 JPEG of a 1925 print, not of any lamp.
+  // White paper as white light is an inference: colours are sampled means of a scan.
+  // See lessons/page-partitur.md#partitur-13
   const canvas = document.createElement('canvas');
   const g = canvas.getContext('2d');
   const video = createVideoPanel({ media: canvas, left: false });
@@ -117,14 +90,9 @@ export function build({ panel, log, set }) {
   }
 
   // ── the scenes lane: marks that recall a `/patchbay/` scene ───────────────
-  //
-  // 🔴 A MARK IS A RECALL AT A FRACTION OF THE SCORE, asked 2026-10-04. The
-  // patchbay keeps scenes and lists their names in the room as `scene.list`;
-  // a mark here sends `scene.recall` with one of those names when the playhead
-  // passes it while PLAYING forward. A seek, a scrub or a length change moves the
-  // playhead without passing anything, so it fires nothing.
-  // ⚠️ MARKS LIVE IN THIS BROWSER, in `localStorage`, which may throw or come
-  // back empty, so every read and write is wrapped and the lane works without it.
+  // A mark sends `scene.recall` when the playhead passes it playing forward; a seek
+  // or scrub fires nothing. Marks live in localStorage, every access wrapped.
+  // See lessons/page-partitur.md#partitur-14
   const MARKS_KEY = 'positron.partitur.sceneMarks';
   function loadMarks() {
     try {
@@ -179,8 +147,9 @@ export function build({ panel, log, set }) {
     }
   };
   const lanes = [
-    // Plain English since 2026-10-05: the plate's own words (I. Bühne, II.
-    // Bühne, Licht, Ton) stay in the transcription and in the hit text.
+    // The plate's own words (I. Bühne, II. Bühne, Licht, Ton) stay in the
+    // transcription and in the hit text.
+    // See lessons/page-partitur.md#partitur-15
     { id: 'c1', kind: 'c1', label: 'stage 1', subLabel: 'form, motion', height: 30, as: 'ticks',
       rows: markRows(c1, 'c1') },
     { id: 'c2', kind: 'c2', label: 'stage 2', subLabel: 'and film', height: 30, as: 'ticks',
@@ -222,22 +191,15 @@ export function build({ panel, log, set }) {
   });
 
   // ── the light lane as a patchbay source ───────────────────────────────────
-  //
-  // 🔴 A LANE WITH A DESTINATION, asked 2026-10-04 (*"how universl patchbay
-  // and timeline relate"*, then *"Yea"*). Moholy bound his columns to stages;
-  // this binds the light lane to a port. The page announces the lane in the
-  // studio's room as an out port, lists every wall it hears (the WALL tab), and a pick is a
-  // link checked by `bay.mjs` like any other. Once linked, every change of
-  // stripe at the playhead goes to that wall, playing or scrubbing.
+  // Announced as an out port; a pick of a wall is a link checked by bay.mjs, and
+  // every stripe change at the playhead goes to that wall, playing or scrubbing.
+  // See lessons/page-partitur.md#partitur-16
   const SITE = randomSite('partitur');
   const OUT = `${SITE}:light:out`;
-  /*
-   * 🔴 THREE LANES, THREE OUT PORTS, asked 2026-10-04 (*"Do"*): the light lane
-   * to a wall's light, the Ton lane's siren bands to any MIDI input in the room
-   * (a board input like the Circuit, or a board synth), and the stage cues to a
-   * wall's captions. Each pick is a link `bay.mjs` checks, and `/patchbay/` can
-   * ask for the same link with `link.request`, which this page answers.
-   */
+  /* Three lanes, three out ports: light to a wall's light, the Ton sirens to any
+     MIDI input in the room, stage cues to a wall's captions. Each answers
+     `link.request` from /patchbay/.
+     See lessons/page-partitur.md#partitur-17 */
   const SOURCES = {
     light: { port: OUT, label: 'light lane', dir: 'out', medium: 'value', shape: { channels: 3 }, choice: 'light to' },
     sirens: { port: `${SITE}:light:sirens`, label: 'siren lane', dir: 'out', medium: 'midi', emits: ['note'], choice: 'sirens to' },
@@ -341,11 +303,9 @@ export function build({ panel, log, set }) {
     lastCueSent = text;
     node.send({ type: 'cue.set', to: linked.cues, text, sender: 'partitur' });
   }
-  /*
-   * 🔴 THE ROOM IS JOINED ON A PRESS, NOT ON LOAD: Find walls, the first press
-   * on the transport bar, or a scene mark that needs the room. The old page
-   * joined `studio-1` the moment it opened (`tab-page.mjs` rule 1).
-   */
+  /* The room is joined on a press: Find walls, the first transport press, or a
+     scene mark that needs it.
+     See lessons/page-partitur.md#partitur-18 */
   let joined = null;
   function join() {
     if (!joined) joined = node.join();
@@ -418,16 +378,9 @@ export function build({ panel, log, set }) {
   drawMarkRow();
   window.addEventListener('pagehide', () => sirenOff());
 
-  /*
-   * 🔴 THE PICTURE AND THE TIMELINE FIRST, ONE SURFACE, AND THE LINKING UNDER
-   * THEM. Until 2026-10-05 the tab stacked the length, Find walls, three link
-   * picks, a sentence about scenes and the mark row ABOVE the picture, about
-   * 650 px at the desk and 960 on a phone before the thing a visitor came to
-   * see, and the three picks read `none` with nothing to pick until the room
-   * was joined. Now the picks and the scene marks appear when the room is
-   * joined (or when this browser already keeps marks), so what a first visit
-   * shows is the score, its length, and one button.
-   */
+  /* The picture and the timeline first, the linking under them: the picks and scene
+     marks appear once the room is joined (or marks are already kept).
+     See lessons/page-partitur.md#partitur-19 */
   const links = el('div', 'pt-text');
   links.append(find.el, wallHost, markHost);
   function showJoined() {
@@ -449,9 +402,8 @@ export function build({ panel, log, set }) {
   }
 
   // ── sirens, only while playing ─────────────────────────────────────────────
-  //
-  // ⚠️ SOUND NEVER GATES THE WORK. The context is made on the first play press
-  // and its resume is not awaited; the picture and the line run without it.
+  // Sound never gates the work: the context's resume is not awaited.
+  // See lessons/page-partitur.md#partitur-20
   let ac = null, voice = null;
   const SIREN_HZ = { blue: 330, yellow: 440, red: 550, grey: 262 };
   function siren(on, colour) {
@@ -482,13 +434,9 @@ export function build({ panel, log, set }) {
       .sort((a, b) => (b.at ?? b.from) - (a.at ?? a.from))[0];
     return cue ? cue.folge.item : '';
   };
-  /* 🔴 THE LANES' DESTINATIONS ARE DRIVEN FROM A TIMER TOO, NOT ONLY FROM THE
-     ANIMATION FRAME. MEASURED 2026-10-04 with three tabs: /partitur/ behind
-     another tab stopped sending entirely, because a browser pauses
-     `requestAnimationFrame` in a hidden tab, while a wall in another room went
-     on waiting. A timer still runs there, about once a second, so a wall keeps
-     following a score that nobody is looking at. Each send is a no-op unless
-     its value changed, so running it from both is free. */
+  /* Destinations are also driven from a timer: a hidden tab pauses rAF, but a timer
+     still runs about once a second. Each send is a no-op unless its value changed.
+     See lessons/page-partitur.md#partitur-21 */
   /* A seek or a scrub resets where the scenes lane last saw the playhead, so a
      mark it jumped over is not passed. A play starts just behind the playhead,
      so a mark exactly under it is passed on the way out. */
@@ -544,8 +492,9 @@ export function build({ panel, log, set }) {
       A('the score gives no length and the page says it chose one',
         data.unit.given === false && LENGTHS.some(([, s]) => s === totalS), `${totalS} s`);
       {
-        // ⚠️ NEGATIVE CONTROL: the wall at the start is the first stripe, black,
-        // and at the longest darkness is black, and at a yellow stripe is not.
+        // Negative control: the wall at the start and at the longest darkness is black,
+        // and at a yellow stripe is not.
+        // See lessons/page-partitur.md#partitur-22
         const off = document.createElement('canvas').getContext('2d');
         const first = paint(off, 10, 10, 0);
         const yellow = lightSpans.find((s) => s.colour === 'yellow');
@@ -597,7 +546,8 @@ export function build({ panel, log, set }) {
         const first = play.at(0.31, true), again = play.at(0.32, true);
         A('a scene mark passed while playing fires once', first.length === 1 && first[0].name === 'a' && again.length === 0,
           `${first.length} then ${again.length}`);
-        // ⚠️ NEGATIVE CONTROLS: a seek over the mark, and a scrub over it while paused.
+        // Negative controls: a seek over the mark, and a scrub over it while paused.
+        // See lessons/page-partitur.md#partitur-23
         const jump = createCrosser(() => marks);
         jump.seek(0.1);
         jump.seek(0.5);

@@ -1,28 +1,7 @@
-// demo/partitur/wall.mjs: the WALL tab of /partitur/, from the old /wall/.
-//
-// 🔴 A PROJECTION WALL ANY SCREEN CAN BECOME, asked 2026-10-04 after *"how
-// universl patchbay and timeline relate"*: the smallest step is a timeline lane
-// with a destination, and a destination has to exist first. Open this tab on a
-// projector, a television's browser or a phone, press Become a wall, and it
-// joins the studio's room as a patchbay node with one `light` input (a `value`
-// of three channels) and one captions input. The SCORE tab links its light lane
-// to it; `/patchbay/` draws it.
-// 🔴 ONE PAGE WITH THE SCORE SINCE 2026-10-05, asked *"unify partitur and wall
-// to tabbed page"*. `/wall/` is gone with no redirect, as the 2026-10-04
-// regrouping did it.
-// WHAT CHANGED ON THE WAY IN, AND WHY:
-//   1  🔴 IT JOINS ON A PRESS, NOT ON LOAD. The old page sat in `studio-1` the
-//      moment it opened. Building this tab opens nothing (`tab-page.mjs` rule 1).
-//   2  🔴 THE ROOM IS THE PAGE'S `?room=` WHEN IT HAS ONE. The old page ignored
-//      it and announced into the real `studio-1`, so every suite run put a fake
-//      wall on the owner's patchbay (plans/plan-stage-patchbay.md F6). The
-//      harness hands every run a room of its own; a person gets `studio-1`.
-//   3  🔴 THE ROOM, THE ANNOUNCE AND THE RE-ANNOUNCE ARE `bay-node.mjs`'s SINCE
-//      2026-10-06 (plans/plan-routing-migration.md step 1), and so is the
-//      choice of room: `?room=`, or a room of the run's own under the harness
-//      even when no `?room=` was passed, or `studio-1` for a person.
-// ⚠️ IT ONLY LISTENS AND PAINTS. It asks nobody for anything, and a colour
-// arrives only because somebody linked a lane to this wall.
+// The WALL tab of /partitur/: any screen joins the room on a press as a node with
+// one `light` input (three channel value) and a captions input. Room choice and
+// announce are bay-node.mjs's. It only listens and paints.
+// See lessons/page-partitur.md#partitur-5
 
 import { createVideoPanel } from '/shell/video-panel.mjs';
 import { font, whenFaces } from '/shell/canvas-font.mjs';
@@ -71,10 +50,9 @@ export function build({ panel, log, set }) {
       g.font = font(400, Math.max(14, Math.round(H / 14)));
       g.fillText(caption, Math.round(W * 0.04), Math.round(H * 0.92));
     }
-    // 🔴 UNTIL A LIGHT ARRIVES THE WALL SAYS WHAT IT IS AND WHAT IT IS CALLED,
-    // added 2026-10-05. It was a black box either side of the press, and the
-    // name SCORE lists it under (`wall ab12`) was written nowhere on the wall,
-    // so with two walls open nobody could tell which one to pick.
+    // Until a light arrives the wall shows what it is and its name, so with two walls
+    // open the one SCORE lists can be told apart.
+    // See lessons/page-partitur.md#partitur-6
     if (!heard) {
       g.fillStyle = '#8a93a6';
       g.font = font(400, Math.max(13, Math.round(H / 22)));
@@ -147,17 +125,17 @@ export function build({ panel, log, set }) {
       // The check pass runs only under the harness, so this is the harness's room.
       A('the harness is in a room of its own, never the studio\u2019s', ROOM !== 'studio-1', ROOM);
 
-      // 🔴 THE ROUND TRIP THE TWO OLD PAGES NEVER HAD: SCORE and this tab join
-      // the run's own room, SCORE hears the wall, links its light lane to it,
-      // and a stripe chosen there arrives here. Only in this pass, and only in
-      // the room the harness named, so nothing reaches `studio-1`.
+      // Round trip: SCORE and this tab join the run's own room, SCORE links its light
+      // lane here, and a stripe arrives. Only in the harness room, never studio-1.
+      // See lessons/page-partitur.md#partitur-7
       const score = page.built('score');
       if (!score) { A('SCORE was built before WALL, so the round trip can run', false, 'no SCORE handle'); return; }
       const until = async (ok, ms) => { const t0 = performance.now(); while (!ok() && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 50)); return ok(); };
       await join();
       await score.join();
       const seen = await until(() => score.registry.merged().ports.some((p) => p.id === PORT && !p.stale), 6000);
-      // ⚠️ NEGATIVE CONTROL: in the room and heard, but linked by nobody.
+      // Negative control: in the room and heard, but linked by nobody.
+      // See lessons/page-partitur.md#partitur-8
       score.drive();
       await new Promise((r) => setTimeout(r, 300));
       A('a wall nobody linked receives nothing', seen && heard === 0, seen ? `${heard} lights arrived` : 'SCORE never heard this wall');

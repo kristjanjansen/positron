@@ -22,29 +22,10 @@
   import { faustCompile, faustNode } from '/shell/faust.mjs';
   import { createCodeBox } from '/shell/code-box.mjs';
 
-  // The patchbay synth of /synth/patch-synth.mjs (synth/040 until 2026-10-13) with the sound made by a Faust program,
-  // and every parameter that program declares a knob node of its own, cabled
-  // into the engine's `value-in`, as on /fau/.
-  //
-  // THE PROGRAM IS THIS PAGE'S OWN, asked 2026-10-10 as *"make fau synth more
-  // interesting (parameters etc)"*. It was the synths deck's `lfo` until then,
-  // a test tone with no keys. Now it is one mono voice that the keyboard plays:
-  // two detuned saws and a square an octave down, through a Moog style
-  // resonant low pass that an envelope and an LFO both move, an envelope on
-  // the volume, and an echo. `freq`, `gain` and `gate` are set by the keys
-  // through `fau:midi-in`, last note wins; every other slider is a knob.
-  //
-  // IT IS COMPILED IN THE TAB ON THE FIRST PRESS, as /fau/ does, because
-  // `demo/resources/build-faust-aot.mjs` compiles a fixed list (the Organ and
-  // the deck's steps) and a page-local program would mean editing that shared
-  // script and the build's stale check. The first press therefore fetches
-  // libfaust (`faust.mjs` lists the files and their sizes) and every press
-  // after it reuses the compiler and the compiled program.
-  //
-  // NOTHING OPENS ON A VISIT. The knobs a visit shows are read off the
-  // program's TEXT; the AudioContext, the compiler and the node come on the
-  // first press of play or of a key, and the knobs are then rebuilt from the
-  // compiled program's own JSON.
+  // The patchbay synth with the sound made by this page's own Faust program, one mono voice;
+  // each declared parameter is a knob node cabled into `value-in`. Compiled in the tab on the
+  // first key (libfaust fetched then); a visit opens nothing and reads the knobs off the text.
+  // See lessons/page-code.md#code-10
   const d = mount({ name: 'Faust synth', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('code/faust');
 
@@ -211,13 +192,9 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
     voice();
   }
 
-  // ── the bay, built again whenever the parameter list changes ─────────────
-  // `bay.mjs` cannot take a port away, so, as on /fau/, the knob nodes, their
-  // cables and the names on `web:fau:value-in` are rebuilt into a fresh bay
-  // from the list: a name that survives keeps its value and its cable's
-  // counts, a gone one takes its node with it, a new one gets a node and a
-  // cable. `createPatchbay` keys a wire by its printed link, so the picture
-  // keeps the wires that survive.
+  // `bay.mjs` cannot take a port away, so the knob nodes, cables and `value-in` names are rebuilt
+  // into a fresh bay from the list; surviving names keep their values, the picture its wires.
+  // See lessons/page-code.md#code-11
   let bay = createBay();
   let knobs = new Map(), grid = null, names = [];
   const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
@@ -279,10 +256,9 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
     pb?.refresh();
   }
 
-  // ── a key switches the synth on ──────────────────────────────────────────
-  // No play button since 2026-10-11 (*"does fau (now 080) need start button?
-  // if not rm"*): the first key press is the gesture, fetches the compiler
-  // and compiles, and the held note sounds once the node is ready.
+  // No play button: the first key press fetches the compiler and compiles, and the held note
+  // sounds once the node is ready.
+  // See lessons/page-code.md#code-12
   function sound(v) {
     on = v;
     if (master) master.gain.setTargetAtTime(v ? 0.8 : 0, ctx.currentTime, 0.03);
@@ -326,16 +302,16 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
     flowing: (l) => !!node && on && (l.from !== ID('keys', 'midi-out') || held.length > 0),
   });
 
-  // The program itself in the kit's code box, read only (asked 2026-10-10,
-  // *"show faust code"*, *"use code panel"*): the knobs below are its sliders.
+  // The program in the kit's code box, read only: the knobs are its sliders.
+  // See lessons/page-code.md#code-13
   const lines = CODE.replace(/\n$/, '').split('\n').length;
-  // A third of the program's height; it scrolls (asked 2026-10-10, *"make faust
-  // source code 1/3 of current h"*).
+  // A third of the program's height; it scrolls.
+  // See lessons/page-code.md#code-14
   const code = createCodeBox({ language: 'faust', rows: CODE_ROWS, label: '', value: CODE.replace(/\n$/, ''),
     ariaLabel: 'the Faust program this synth plays, read only' });
   code.input.readOnly = true;
-  // Knobs above the code, asked 2026-10-12: *"when there are code and knobs on
-  // concepts, move knobs on top of code"*.
+  // Knobs above the code.
+  // See lessons/page-code.md#code-15
   d.stack.add(wave.el, grid.el, host, code.el, pb.el);
   window.__demo.knobs = grid;
   window.__demo.keyboard = kb;

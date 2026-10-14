@@ -1,36 +1,16 @@
-// demo/drums/sample-voices.mjs: the rows of /drums/samples/, one per sample,
-// which play SAMPLES on the same one SuperCollider engine the synth drums run
-// on. Asked 2026-10-12 (BACKLOG, "drums/020"): /drums/knobs/ with the
-// voices playing samples, a default kit on R2, any pack or zip of WAVs dropped
-// on the page replacing it.
-//
-// ONE DEFINITION, `drumsample`, WRITTEN AS BYTES BY `/shell/synthdef.mjs`
-// (sclang-lite has no PlayBuf). The graph, as SuperCollider would say it:
-//
-//   { |out = 0, buf = 0, rate = 1, amp = 0.8, len = 1, gate = 1|
-//       var play = PlayBuf.ar(1, buf, rate * BufRateScale.kr(buf), doneAction: 2);
-//       var env  = EnvGen.ar(Env.new([0, 1, 1, 0], [0.002, len, 0.02]), doneAction: 2);
-//       var cut  = EnvGen.ar(Env.asr(0.001, 1, 0.015), gate, doneAction: 2);
-//       Out.ar(out, (play * env * cut * amp) ! 2)
-//   }
-//
-// So a hit ends at the sample's end OR at `len` seconds, whichever comes
-// first, and the closed hat closes the open hat's `gate` as on 000.
-// Samples are mixed to mono (`toMono`, the mean of the channels) and handed to
-// scsynth as 16 bit WAVs by `sonic.loadSample`, as sc-sampler.mjs does.
-//
-// EVERY SAMPLE IS A ROW since 2026-10-13 (*"show all samples with their
-// names. no preatterns"*): `sampleRows` makes 64 rows, a Circuit pack's slot
-// count, and the page shows as many as are loaded. No knobs: every hit plays
-// at its own pitch, to its own end (the default kit keeps the lengths its four
-// rows had).
+// The rows of /drums/samples/, one per sample, on one `drumsample` definition written as bytes by
+// `/shell/synthdef.mjs` (sclang-lite has no PlayBuf): a hit ends at the sample's end or `len`,
+// whichever is first, and the closed hat gates the open one. Samples go in as mono 16 bit WAVs.
+// See lessons/page-drums.md#drums-28
 
 import { graph, RATE, OP } from '/shell/synthdef.mjs';
 import { toMono } from '/shell/circuit-sample.mjs';
 
-/** The default kit: the four /drums/machine/ drums, one hit each,
- *  rendered in this tab off each drum's own output pair (2026-10-12) and put
- *  on R2 under `rhythm/default-kit/`. */
+/**
+ * The default kit: the four /drums/machine/ drums, one hit each, rendered off each drum's own
+ * output pair and put on R2 under `rhythm/default-kit/`.
+ * See lessons/page-drums.md#drums-29
+ */
 export const KIT_BASE = 'https://positron-station.kristjan-jansen.workers.dev/media/rhythm/default-kit/';
 export const DEFAULT_KIT = ['kick.wav', 'snare.wav', 'open-hat.wav', 'closed-hat.wav'];
 
@@ -75,13 +55,11 @@ export function wavBytes(samples, rate) {
 export const MAX_ROWS = 64;
 
 /**
- * What each row is called: the file's own name, without the folder and the
- * `.wav`, and without a run of leading words every name shares. A pack whose
- * files are all `NOVHTG Hit - Drumstation - 808 ...` reads `808 Crash D1T1`,
- * because the shared part names the pack and not the row. The whole name stays
- * in the row's hover.
+ * What each row is called: the file's name without folder, `.wav` and the leading words every
+ * name shares (`NOVHTG Hit - Drumstation - 808 Crash D1T1` reads `808 Crash D1T1`).
  * @param {string[]} files
  * @returns {string[]}
+ * See lessons/page-drums.md#drums-30
  */
 export function rowNames(files) {
   const bare = files.map((f) => String(f).split('/').pop().replace(/\.wav$/i, ''));
@@ -104,23 +82,19 @@ export function rowNames(files) {
 const KIT_LEN = { kick: 0.5, snare: 0.5, 'open-hat': 0.5, 'closed-hat': 0.1 };
 
 /**
- * One row per sample slot, `MAX_ROWS` of them: `voices()`'s shape for
- * `createDrumMachine`, all on the one `drumsample` definition. A row's label
- * is read live (`nameOf(r)`), so a new kit renames the rows without a new
- * machine. A row is an open hat or a closed hat by its name, and the closed
- * one chokes the open one as on 000. `args()` names the row's buffer, or
- * answers null while it has none, so a hit is skipped rather than playing
- * buffer 0.
+ * `MAX_ROWS` sample rows in `voices()`'s shape. Labels are read live (`nameOf(r)`); a closed hat
+ * chokes the open one by name; `args()` answers null with no buffer, so the hit is skipped.
  * @param {{ nameOf: (r: number) => string|null, fileOf: (r: number) => string|null,
  *   bufOf: (r: number) => number|null }} o
+ * See lessons/page-drums.md#drums-31
  */
 export function sampleRows({ nameOf, fileOf, bufOf }) {
   const def = drumSampleDef();
   return Array.from({ length: MAX_ROWS }, (_, r) => ({
     key: `s${r}`, name: 'drumsample', note: 36 + r, def,
     get label() { return nameOf(r) ?? `slot ${r + 1}`; },
-    // Just the row number on the grid, asked 2026-10-13: *"find a way to
-    // shorten drum grid labels: just numbers and hover?"*.
+    // Just the row number on the grid; the name is in the hover.
+    // See lessons/page-drums.md#drums-32
     short: String(r + 1),
     get title() { const f = fileOf(r), n = nameOf(r); return f ? `${r + 1} ${n ?? ''}, ${f}`.replace(' ,', ',') : `row ${r + 1}, nothing loaded`; },
     get opens() { return /open|\bo?hh?o\b|\boh\b/i.test(nameOf(r) ?? ''); },
@@ -138,6 +112,7 @@ export function sampleRows({ nameOf, fileOf, bufOf }) {
  * The samples on the engine: the default kit (fetched from R2 on the first
  * play), or whatever was dropped. `use(samples)` takes `sample-loader.mjs`'s
  * `{ name, wave }[]`, mixes each to mono and loads it into a fresh buffer.
+ * See lessons/page-drums.md#drums-33
  */
 export function createSampleBank({ log = () => {} } = {}) {
   let eng = null, nextBuf = 100;

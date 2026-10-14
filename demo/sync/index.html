@@ -32,12 +32,9 @@
   .sync-pulse i.on { background: var(--hi); border-color: var(--hi); }
 
   /* AFTER. */
-  /* ⚠️ THE PICTURE BOX HAS ITS SHAPE BEFORE IT HAS A PICTURE, AND SAYS WHAT
-     WILL BE IN IT. Reviewed 2026-10-05: before play it was a 2:1 black strip
-     (a bare <video> with no source is 300 by 150) that read as a player that
-     had failed. The box is the recording's 16:9 from the start, so nothing
-     under it moves when the first frame lands, and a line in it says what will
-     appear and when. Nothing is fetched for it: it is a sentence, not a poster. */
+  /* The picture box has the recording's 16:9 before it has a picture, so nothing
+     moves when the first frame lands, and a line in it says what will appear.
+     See lessons/page-sync.md#sync-1 */
   .sync-screen { display: grid; }
   .sync-screen > * { grid-area: 1 / 1; }
   .sync-video {
@@ -62,29 +59,14 @@
   import * as follow from './follow.mjs';
   import * as after from './after.mjs';
 
-  /*
-   * 🔴 FOUR OLD PAGES AS THE TABS OF ONE, DECIDED BY THE OWNER 2026-10-04:
-   * *"names ok, looper retires, no redrect, capture is fine"*
-   * (plans/plan-demo-structure.md §3.1). The four tabs are the four regimes
-   * plans/plan-routing-time.md settled on for how two places agree on when:
-   *
-   *   ARRIVAL  as it happens: a cue fires on every copy the moment it lands   (was /cues/)
-   *   AHEAD    scheduled ahead on a peer clock both ends agree on            (was /jam/)
-   *   FOLLOW   following a picture that arrives late, by its measured lag    (was /sync/)
-   *   AFTER    aligned after, on one recording whose picture is the clock    (was /replay/)
-   *
-   * Each tab is a module beside this file and `demo/shell/tab-page.mjs` does
-   * the rest: a tab is built when it is first opened, has its own readout and
-   * log, opens nothing until a press inside it, and is checked only from the
-   * one SELFCHECK pass below. AFTER owns the page's one published transport
-   * bar; AHEAD's is `publish: false` and gets the harness's drill as page
-   * asserts.
-   */
+  /* Four tabs, the four timing regimes of plans/plan-routing-time.md: ARRIVAL,
+     AHEAD, FOLLOW, AFTER. `demo/shell/tab-page.mjs` builds each on first open.
+     AFTER owns the published bar; AHEAD's is `publish: false`.
+     See lessons/page-sync.md#sync-2 */
   const d = mount({
     name: 'sync',
-    // No `what` under the title: each tab says what it is in the box under the
-    // tab row (`tab-page.mjs` rule 6), asked 2026-10-05 as *"rm top desriptions"*.
-    // The manifest's `one` line still describes the page on the index.
+    // No `what` under the title: each tab describes itself under the tab row.
+    // See lessons/page-sync.md#sync-3
     readout: null,
     showLog: false,
     controls: [],

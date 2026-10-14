@@ -9,13 +9,10 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/typist/paper.css">
 <style>
-  /* concepts typist/010, TYPEWRITER, 2026-10-11. 000's paper plus a
-     typewriter sounding every key. Asked: *"Second one is type with sound. So
-     there is a sample which comes from our storage, similar where the NOLA
-     samples are coming, but the sample is has to be public domain typewriter
-     sound"*, *"more like a sampler"*. The sounds are nine CC0 cuts of a Hermes
-     Precisa 305 in our R2 bucket, provenance in `SOURCES.md` beside this page.
-     Nothing is fetched until the first key press. */
+  /* Typewriter: /typist/paper/'s sheet plus a sampler sounding every key, nine CC0 cuts of a
+     Hermes Precisa 305 in our R2 bucket (SOURCES.md beside this page). Nothing is fetched
+     until the first key press.
+     See lessons/page-typist.md#typist-39 */
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
@@ -65,13 +62,10 @@
     else if (c.top - line < s.top) sheet.scrollTop -= s.top - (c.top - line);
   }
 
-  // ── the typewriter: a sampler of one Hermes Precisa 305 ─────────────────
-  // Nine short files from our R2 bucket, decoded once into AudioBuffers and
-  // played with one AudioBufferSourceNode per key, so a press costs no fetch
-  // and no decode. NOTHING OPENS ON A VISIT: the AudioContext is made and the
-  // files are fetched on the first key press, which is also the gesture a
-  // browser needs before it lets a page make sound.
-  // R2, through the station worker's /media/ door, which answers CORS for any origin.
+  // Nine files from our R2 bucket (through the station worker's /media/ door, CORS for any
+  // origin), decoded once, one AudioBufferSourceNode per key. Nothing opens on a visit: the
+  // AudioContext and fetch wait for the first key press.
+  // See lessons/page-typist.md#typist-40
   const BASE = 'https://positron-station.kristjan-jansen.workers.dev/media/typewriter/hermes-precisa-305/';
   const FILES = ['key-1', 'key-2', 'key-3', 'key-4', 'key-5', 'space', 'bell-1', 'bell-2', 'return'];
   const STRIKES = ['key-1', 'key-2', 'key-3', 'key-4', 'key-5'];
@@ -143,19 +137,17 @@
   function typed(e) {
     if (muted) return;
     const at = performance.now();
-    // The press that wakes the typewriter always sounds, however long the
-    // samples took (asked 2026-10-11, *"first typing is not hear"*).
+    // The press that wakes the typewriter always sounds, however long the samples took.
+    // See lessons/page-typist.md#typist-41
     const first = !ctx;
     const go = () => { if (first || performance.now() - at < LATE) sound(e); else stat.dropped++; };
     if (stat.decoded === FILES.length) go();
     else wake().then(go);
   }
 
-  // ── the patchbay ─────────────────────────────────────────────────────────
-  // 000's keyboard to paper, plus the keyboard to the typewriter, the
-  // typewriter to the speaker, and the files the typewriter plays coming from
-  // our R2 bucket. The bucket is a node of this page's own bay and announces
-  // nothing (asked: *"web:typewriter has lins to cf storate"*).
+  // Keyboard to paper and to typewriter, typewriter to speaker, and the samples from our R2
+  // bucket, a node of this page's own bay that announces nothing.
+  // See lessons/page-typist.md#typist-42
   const S = 'web', CF = 'cf-r2';
   const bay = createBay();
   addNodes(bay, S, ['typing', 'paper', 'typewriter', 'speaker', 'typewriter-samples'], {
@@ -176,10 +168,9 @@
     typed(e);
   });
 
-  // `file` and `audio` are stream media on the wire, lit rather than pulsed.
-  // The file wire is lit while the samples come down and for 600 ms after, so
-  // a fetch from the local server is still seen; the audio wire while a
-  // sample sounds.
+  // `file` and `audio` wires are lit, not pulsed: the file wire while the samples come down
+  // and 600 ms after (so a local fetch shows), the audio wire while a sample sounds.
+  // See lessons/page-typist.md#typist-43
   const flowing = (l, medium) => {
     if (medium === 'file') return !!loading && (stat.decoded < FILES.length || performance.now() - fetchedAt < 600);
     if (medium === 'audio') return !!ctx && !muted && ctx.currentTime < until;

@@ -24,15 +24,10 @@
   import { createKitPage } from '/shell/kit-page.mjs';
 
   /**
-   * 🔴 kit/logo, THE BRAND SLIDES ONE BY ONE, 2026-10-06. Asked: *"add kit/logo
-   * page and use individual slides from the brand slides. rm brand slids after
-   * it"*. The six slides the front page's `brand` deck played are blocks here,
-   * each its own `createSlide` with the ⛶, drawn from `BRAND_SLIDES` in
-   * `demo/shell/brand-slides.mjs`, in the order the deck had them. The deck is
-   * gone from `decks.mjs`.
-   * ⚠️ A VISIT OPENS NOTHING. The slides are drawn from data; the β costs the
-   * slide face's Greek subset from this origin, which the browser fetches
-   * when a β is laid out. Every check is behind `?selfcheck=1`.
+   * The six brand slides as blocks, each its own createSlide, from BRAND_SLIDES in
+   * demo/shell/brand-slides.mjs. A visit opens nothing: the only fetch is the slide
+   * face's Greek subset for the β, from this origin. Checks are behind ?selfcheck=1.
+   * See lessons/page-kit-logo.md#kit-logo-1
    */
   const { d, section, land, checkPage } = createKitPage({
     part: 'logo',
@@ -58,13 +53,10 @@
     });
   }
 
-  // 🔴 p.s AS A MARK, 2026-10-13: *"for logos icons try also p.s, yellow dot
-  // (play with tracking)"*, then *"-0.12 em, align to center. try icons,
-  // favicons etc"*. The two letters that start positron.studio's two words, the
-  // dot in the accent, the mono face at 600, tracked -0.12 em. Drawn on canvas
-  // and centred on its INK, not its line box: p hangs below the baseline and
-  // s does not, so a line box centred mark sits high. A trial, not the shipped
-  // icon: the favicon and app icon above are unchanged.
+  // p.s as a mark: the mono face at 600, tracked -0.12 em, the dot in the accent.
+  // Centred on its ink, not its line box: p hangs below the baseline and s does not.
+  // A trial: the shipped favicon and app icon above are unchanged.
+  // See lessons/page-kit-logo.md#kit-logo-2
   const PS_TRACK = -0.12;
   async function drawPs(cv, px, { shape = 'square', fill = 0.62, text = 'p.s', dpr = Math.min(window.devicePixelRatio || 1, 3) } = {}) {
     await document.fonts.load(`600 100px "Brand JetBrains Mono"`);
@@ -102,16 +94,16 @@
     c.restore();
   }
   const PS_ICONS = [
-    // the favicons drop the dot, which is two pixels at 16: *"faficon: do 'ps'"*
-    // 32 and 48 as ps went: *"rm favicon 32 ps, favicon 48 ps"*
+    // The 16 px favicon drops the dot, which would be two pixels.
+    // See lessons/page-kit-logo.md#kit-logo-3
     ['favicon', 16, 'square', 0.86, 'ps'],
-    // and 32 and 48 with the dot as well: *"favicon 32, favicon 48 -- try with dot too"*
+    // See lessons/page-kit-logo.md#kit-logo-4
     ['favicon', 32, 'square', 0.86, 'p.s'], ['favicon', 48, 'square', 0.8, 'p.s'],
     ['apple touch', 180, 'ios', 0.62], ['android', 192, 'circle', 0.56], ['store', 512, 'ios', 0.62],
   ];
-  // *"try also insta profile image etc"*: the avatars each network crops to a
-  // circle (or GitHub's and LinkedIn's square), at the size the network shows
-  // them in a feed, with the size it asks to be uploaded at in the caption.
+  // The avatars each network crops to a circle (or GitHub's and LinkedIn's square),
+  // at the size shown in a feed, with the upload size in the caption.
+  // See lessons/page-kit-logo.md#kit-logo-5
   const PS_AVATARS = [
     ['instagram', 110, 'circle', 0.56, 320], ['x', 128, 'circle', 0.56, 400],
     ['bluesky', 128, 'circle', 0.56, 1000], ['youtube', 98, 'circle', 0.56, 800],
@@ -148,13 +140,12 @@
       drawPs(cv, px, { shape, fill });
       const cap = document.createElement('p');
       cap.className = 'kit-n ps-cap';
-      cap.textContent = upload ? name : `${name}, beside a post`;   // no sizes: *"just rm size nrts, keep download links"*
+      cap.textContent = upload ? name : `${name}, beside a post`;   // See lessons/page-kit-logo.md#kit-logo-6
       col.append(cv, cap);
-      // *"add dl buttons to avatars"*: the PNG at the size the network asks
-      // to be uploaded at, which is already 2.5 to 8 times the size it is
-      // shown at, so no 2x on top. A full square with no circle cut out: the
-      // network crops it, and a circle drawn in would show its corners as a
-      // second ring on a light theme.
+      // The PNG at the network's upload size, already 2.5 to 8 times the shown size, so
+      // no 2x. A full square with no circle cut out: the network crops it, and a drawn
+      // circle would show its corners as a second ring on a light theme.
+      // See lessons/page-kit-logo.md#kit-logo-7
       if (upload) {
         const btn = document.createElement('button');
         btn.className = 'pos-linkbtn';
@@ -223,12 +214,10 @@
       + `sizes ${sized ? 'at their step' : 'OFF THEIR STEP'} on a ${h} px slide, the + ${raised ? 'raised' : 'NOT RAISED'}`);
   }
 
-  // 3. the β is drawn in the slide face from its Greek subset, from this origin.
-  // A missing glyph falls back to another face silently, and a fallback β
-  // beside a JetBrains + is a mark in two typefaces, so the Greek face is asked
-  // for by name, its INK is compared against the page's own mono (an advance
-  // alone cannot tell two mono faces apart), and the request that fetched it
-  // is read. Reused from the BRAND tab's checks in bcf56e1.
+  // 3. The β is drawn in the slide face's Greek subset: asked for by name, its ink
+  // compared against the page's mono (an advance cannot tell two mono faces apart),
+  // and the request that fetched it read. A fallback β would mix two typefaces.
+  // See lessons/page-kit-logo.md#kit-logo-8
   {
     const greek = [...document.fonts].find((f) => f.family.replace(/["']/g, '') === 'Slide JetBrains Mono' && /U\+370/i.test(f.unicodeRange));
     const span = lines[0];
@@ -275,7 +264,8 @@
       + `painted ${[...fav, ...app].map(painted).join(', ')} pixels`);
   }
 
-  // 5. NOTHING LEFT THIS ORIGIN, the visit and the checks together
+  // 5. Nothing left this origin, the visit and the checks together.
+  // See lessons/page-kit-logo.md#kit-logo-9
   {
     const off = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => new URL(u).origin !== location.origin);
     d.assert('the page fetched nothing from another origin',

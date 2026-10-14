@@ -8,30 +8,14 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* concepts typist/040, MULTI TYPER, 2026-10-11. Asked: *"multi-typer, which
-     supports multiple columns. So for two, it's two. For three, it's three
-     columns. For four, it's a grid, two by two, etc. Figure out the layouts.
-     ... sample texts. Doesn't have to be editable, just to show out how a
-     layout would work"*, then *"030 typist: layout sound and patchbay for
-     multitype"* and *"no distict knob, use default"*. N papers in one frame,
-     each typed by a typist of its own through a typewriter of its own, every
-     typewriter through its own fx box (`../machines/fx.mjs`, Machine k for paper
-     k, at the default distinctness), all into one speaker. Not wired to
-     other people (that is 040). Nothing is fetched and nothing sounds until
-     the first press of play or of a key.
-     2026-10-12: *"add timeline with typing score. mov play to transport.
-     dim lanes in timeline that are not active (depends num of typist)"*. The
-     typists' seeded walk is a score now, one lane per typist under the
-     frame, played by the transport bar, and the lanes beyond the count are
-     dimmed with the strip's `setActive`. */
+  /* Multi typer: N papers in one frame, each typed by its own typist through its own
+     typewriter and fx box (Machine k for paper k), into one speaker. The typing is a score
+     on the transport; lanes beyond the count are dimmed. Nothing sounds before a press.
+     See lessons/page-typist.md#typist-28 */
 
-  /* ── the frame and the papers ─────────────────────────────────────────
-     `createChatGrid` in demo/shell/chat-ui.mjs, which was lifted from this
-     page: one grid of six tracks, papers edge to edge with no seam, and with
-     `fixed: true` one frame shape at every count, 16:9 at the desk and 3:4
-     under 560 px (asked: *"keep aspect ratio / h on all typist couts"*), the
-     frame (not the window) stacking one to three and going two across for
-     four to six. Every paper paints its own white. */
+  /* The frame is `createChatGrid` (demo/shell/chat-ui.mjs) with `fixed: true`: one shape
+     at every count, 16:9 at the desk and 3:4 under 560 px, papers edge to edge.
+     See lessons/page-typist.md#typist-29 */
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
@@ -57,14 +41,9 @@
   const q = new URLSearchParams(location.search);
   let count = Math.min(MAX, Math.max(1, parseInt(q.get('n'), 10) || 2));
 
-  // ── the texts ────────────────────────────────────────────────────────────
-  // Six typists, each a different kind of typing (asked: *"make 6 typist more
-  // varied. one tyoing and clearing a lot. one contructng concrete poetry, one
-  // drawing ascci mixed with text"*). 1, 5 and 6 write letters; 2 writes and
-  // rubs out, over and over; 3 builds concrete poetry out of spaces and line
-  // breaks; 4 draws in characters and writes around the drawing. So four
-  // papers already show three of the kinds. `\b` in a text is the backspace
-  // key. `pace` slows (above 1) or speeds (below 1) a typist.
+  // Six typists of different kinds: 1, 5 and 6 write letters, 2 writes and rubs out, 3 builds
+  // concrete poetry, 4 draws in characters. `\b` is backspace; `pace` above 1 slows a typist.
+  // See lessons/page-typist.md#typist-30
   const BS = '\b', rub = (s) => BS.repeat(s.length);
   const TEXTS = [
     { text: 'Dear Anna,\nthe weather turned cold this week.\nThe garden is asleep under the snow.' },
@@ -98,11 +77,9 @@
     { text: 'Hello from the fourth floor.\nThe window looks over the harbour.\nShips come in all morning.' },
   ];
 
-  // ── the sound ────────────────────────────────────────────────────────────
-  // ONE sample set for every typewriter, decoded once. Each paper has a voice
-  // (its typewriter, into its own `out` gain), an fx box built for its index
-  // as it arrives, and they all meet in one `master`. NOTHING OPENS ON A
-  // VISIT: the AudioContext is made and the files fetched on the first press.
+  // One sample set for every typewriter. Each paper has a voice and an fx box, all into one
+  // `master`. Nothing opens on a visit: the AudioContext and fetch wait for the first press.
+  // See lessons/page-typist.md#typist-31
   const samples = createSamples();
   let ctx = null, master = null, loading = null, ready = false, muted = false;
   const tw = [];      // per paper k (1 based): { out, voice, fx, fxIndex, twIndex, tuning }
@@ -138,16 +115,10 @@
     return loading;
   }
 
-  // ── the patchbay ─────────────────────────────────────────────────────────
-  // Per paper k: `keys-k` (the typist, its typing as text) to `paper-k` and to
-  // `typewriter-k`; `typewriter-k` audio to `fx-k`; `fx-k` audio to the one
-  // `speaker`. One `cf-r2:typewriter` feeds every typewriter. The index of
-  // each paper comes from ONE node, `machines`, with one out port per paper
-  // (`value-out` for paper 1, `value-out-2` for paper 2, ...) sending k to
-  // `fx-k` and to `typewriter-k`'s second value input, as 020's stepper does.
-  // A constant node per paper would be six more boxes saying one number each.
-  // Links exist only for the papers shown, so `bay.links()` is the truth the
-  // router and the picture both read.
+  // Per paper k: keys-k to paper-k and typewriter-k, typewriter-k to fx-k, fx-k to `speaker`.
+  // One `machines` node sends k on one port per paper. Links exist only for shown papers, so
+  // `bay.links()` is what the router and the picture read.
+  // See lessons/page-typist.md#typist-32
   const S = 'web', CF = 'cf-r2';
   const bay = createBay();
   const P = (k, s) => `${S}:${s}-${k}`;
@@ -220,9 +191,9 @@
   }
 
   /**
-   * THE ROUTER, as 020's: reads `bay.links()` and connects exactly the audio
-   * links that are held, out to in, after disconnecting every out. A paper
-   * that is not shown holds no links, so its typewriter reaches nothing.
+   * The router: connects exactly the held audio links after disconnecting every out. A paper
+   * not shown holds no links, so its typewriter reaches nothing.
+   * See lessons/page-typist.md#typist-33
    */
   const routed = [];
   function route() {
@@ -246,10 +217,9 @@
   function typed(k, e) {
     if (muted) return;
     const v = () => tw[k].voice.sound(e.kind, e.text, papers[k].column());
-    // The press that wakes the typewriters always sounds, however long the
-    // samples took (010 and 020's fix, commits d404cc6c and 38bf10ee).
-    // A typist's letter that arrives before the samples (an unmute while the
-    // typists run) wakes them and is not played late.
+    // The press that wakes the typewriters always sounds, however long the samples took. A
+    // typist's letter that arrives before the samples wakes them and is not played late.
+    // See lessons/page-typist.md#typist-34
     const first = !ctx, at = performance.now();
     if (ready) return v();
     if (e.by !== 'person') { wake(); stat.dropped++; return; }
@@ -261,15 +231,10 @@
       bay.send(`${P(k, 'keys')}:value-out`, { text: e.data || '', kind: e.inputType, by: 'person' }) });
   }
 
-  // THE SCORE. Each typist walks its text one character at a time at a human
-  // pace: a base gap of its own (seeded, so the six never fall into step),
-  // jittered, longer after a space, longer still after punctuation and at a
-  // line's end, and now and then a hesitation. That walk used to run live off
-  // a timer; it is worked out once here instead, so every key of every typist
-  // has a place on the line (asked 2026-10-12: *"add timeline with typing
-  // score. mov play to transport"*), and the transport plays it, seeks it and
-  // loops it. Same seeds, same gaps, so it is the same typing as before, once
-  // through each sheet.
+  // The score: each typist walks its text at a seeded human pace (longer after spaces,
+  // punctuation and line ends, with hesitations), worked out once so every key has a place
+  // on the line, and the transport plays, seeks and loops it.
+  // See lessons/page-typist.md#typist-35
   const KIND = 'key';
   const LEAD_MS = 250;            // position 0 sits this far before the first key
   const TAIL_MS = 1200;           // and the end this far after the last
@@ -331,10 +296,9 @@
   }
 
   const typing = { chars: 0, since: 0 };
-  // The deck's side of the score: a key that fires is sent from typist k's
-  // `keys` port, so it reaches paper k and typewriter k along the links the
-  // bay holds, exactly as the live typist's did. A typist beyond the count
-  // holds no links and sends nothing, and its lane is dimmed.
+  // A key that fires is sent from typist k's `keys` port, reaching paper k and typewriter k
+  // along the held links. A typist beyond the count holds no links and its lane is dimmed.
+  // See lessons/page-typist.md#typist-36
   const adapter = {
     caps: { discrete: true, continuous: false, interpolate: false, stateful: true,
             seek: true, rate: true, catchUp: 'reduce', assertOnSeek: true, rates: [1] },
@@ -412,11 +376,9 @@
     return [{ text: m ? nameOf(tw[+m[1]].fxIndex) : n.label, sans: true }];
   }, flowing });
 
-  // ── the line: one lane per typist, the letter as the mark ──────────────
-  // /typist/'s way of drawing a recording, over a score instead: a letter or
-  // a digit is drawn as itself, a key with no shape (a space, a line break)
-  // gets the strip's dot, and a backspace is a dot in /typist/'s "taken back"
-  // red, so typist 2's rubbing out reads as red along its row.
+  // One lane per typist: a letter or digit is drawn as itself, a key with no shape gets the
+  // strip's dot, and a backspace is a dot in /typist/'s "taken back" red.
+  // See lessons/page-typist.md#typist-37
   const css = getComputedStyle(document.documentElement);
   const tok = (n, fb) => (css.getPropertyValue(n) || '').trim() || fb;
   const INK = { in: tok('--hi', '#ffd400'), out: tok('--bad', '#e0908a') };
@@ -455,11 +417,9 @@
     },
   } });
   const strip = createStripView(glue, deck, { size: 'auto', follow: true, gutter: 132, lanes });
-  // The whole score in view, as /typist/ fits its line to the recording.
-  // ⚠️ NOT AT BUILD TIME: the canvas has no width until it is on the page, and
-  // a fit then MEASURED 168 px of plot and left the 38.6 s score in the first
-  // third of a 554 px line. So it fits when the strip's width is known and
-  // again whenever that width changes.
+  // The whole score in view, fitted when the strip's width is known and whenever it changes:
+  // at build time the canvas had 168 px of plot and the score sat in a third of the line.
+  // See lessons/page-typist.md#typist-38
   let fitW = 0;
   new ResizeObserver(() => {
     const w = strip.el.clientWidth;

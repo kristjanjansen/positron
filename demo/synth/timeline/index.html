@@ -23,12 +23,10 @@
   import { createDeck } from '/timeline/transport.mjs';
   useMediumColours();
 
-  // /synth/recorder/ with the kit's own transport bar and timeline glued together in
-  // place of the hand-made record buttons and notes table. A take is items on a
-  // DECK; the deck plays them back through an adapter that sends each note out of
-  // rec:midi-out. /synth/keyboard/ plus a RECORDER, a node of its own: `rec:midi-in` takes the
-  // keyboard's notes along a link while armed, `rec:midi-out` plays them back
-  // into the synth along another.
+  // /synth/keyboard/ plus a recorder node with the kit's transport bar and timeline:
+  // `rec:midi-in` takes the keyboard's notes while armed, and the deck plays a take
+  // back out of `rec:midi-out` into the synth.
+  // See lessons/page-synth.md#synth-9
   const S = 'web';
   const bay = createBay();
 

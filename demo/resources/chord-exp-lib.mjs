@@ -1,10 +1,6 @@
-// Shared loading for the chord experiments of 2026-09-25.
-// It reuses demo/resources/chord-corpus.mjs verbatim and reproduces
-// bench-chord-suggester.mjs's deterministic by-song split, so every number here
-// is comparable with the ones already published in
-// research/chord-suggester-benchmark-2026-09-23.md.
-//
-// It contacts nobody. tmp/chord-corpora/ is already on this disk.
+// Shared loading for the chord experiments: reuses chord-corpus.mjs and the by-song split of
+// bench-chord-suggester.mjs, so numbers compare. Reads tmp/chord-corpora/ only.
+// See lessons/page-resources.md#resources-7
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -101,27 +97,10 @@ export const pct = (x, n) => (n ? (100 * x / n).toFixed(1) : '0.0');
 export const f = (x, n = 2) => Number(x).toFixed(n);
 
 /**
- * 🔴 THE TABLE IN THE SHAPE THAT SHIPS, WHICH IS NOT THE SHAPE THE PLAN
- * MEASURED, AND THE DIFFERENCE IS THE WHOLE REASON THIS EXISTS.
- * `plans/plan-better-chords-2026-09-25.md` sampled over every row a context had
- * with a count of three or more. `demo/resources/chord-tables.json` keeps the
- * **top three rows only**, drops any context seen fewer than eight times, and
- * writes each probability as **one character in 89 steps**. A sampler graded on
- * the first shape and shipped against the second is a number about a table
- * nobody has.
- *
- * The three constants are read off `build-chord-tables.mjs` and are the same
- * three: `MIN_CTX 8`, `MIN_ROW 3`, `KEEP 5`, quantised over `ALPHA.length - 1`.
- * ⚠️ `KEEP` WAS 3 HERE UNTIL 2026-09-26 AND THIS DEFAULT IS THE ONE THING IN
- * THIS FILE THAT CAN GO STALE SILENTLY. It is a copy of a number that lives in
- * another file, so a prune changed there and not here would make every
- * experiment grade a shape nobody ships, which is the exact defect this function
- * was written to prevent. `chord-e6-keep.mjs` and `chord-e7-take.mjs` pass `keep`
- * explicitly for that reason; `chord-e4-generators.mjs` takes the default.
- *
- * @returns {{id, bi: Map, tri: Map, uni: Map, spell: Map, temp}} the object
- *   `useTables` hands a page, so the shipped `suggest.mjs` can be pointed
- *   straight at it.
+ * The tables in the shape that ships (chord-tables.json): contexts seen 8+ times, rows of
+ * count 3+, top KEEP rows, each probability in 89 steps. Defaults copy build-chord-tables.mjs.
+ * @returns {{id, bi: Map, tri: Map, uni: Map, spell: Map, temp}} what `useTables` hands a page.
+ * See lessons/page-resources.md#resources-8
  */
 export function shipShape(c, { id = 'x', temp = 1, minCtx = 8, minRow = 3, keep = 5,
   steps = 89 } = {}) {

@@ -1,20 +1,7 @@
-// demo/typist/paper.mjs: one sheet of paper, lifted out of
-// /typist/paper/ for /typist/score/, which shows several.
-// 000, 010 and 020 still carry their own copy and are unchanged.
-//
-// ONE BOX, TWO LAYERS PINNED TOGETHER, the way /typist/ does it. The
-// <textarea> on top is invisible and takes every keystroke and every tap (so a
-// phone opens its keyboard); the <pre> underneath draws the text and a block
-// cursor at the offsets the browser reports. Both carry `.tpp-type` and nothing
-// else sets a metric on either, or they drift apart by a character.
-//
-// The sheet is a size container, so its type and its margins follow the sheet
-// and not the window: one paper across a desk gets 000's 64 character column
-// at up to 20 px, and one of six on a phone gets small type and narrow margins.
-//
-//   const p = createPaper({ label: 'paper 1', onInput: (e) => ... });
-//   host.append(p.el);
-//   p.type('a'); p.type('\n'); p.back(); p.clear();
+// One sheet of paper, lifted out of /typist/paper/ for /typist/score/. An invisible
+// <textarea> takes keys and taps over a <pre> that draws text and a block cursor; both
+// carry only `.tpp-type`, or they drift by a character. A size container sets the type.
+// See lessons/page-typist.md#typist-18
 
 import { el } from '/shell/shell.mjs';
 

@@ -31,39 +31,10 @@
   import { createSources, WINDOW_S } from '/granulator/grain-rig.mjs';
   import { PROGRAM, PATCHES, RING_SECONDS, valuesOf } from '/granulator/grain-ring.mjs';
 
-  // concepts shader/020, GRAIN LANDSCAPE, 2026-10-13. Asked (BACKLOG): *"copy
-  // the visualization from videoradio and add it to shaders concept. add all
-  // parameters that adjust its visualization as knobs + add patchbay"*.
-  //
-  // THE PICTURE IS /videoradio/'s, NOT A COPY OF IT. Both pages import
-  // `/shell/scan-field.mjs`; that page builds it baked (its look's numbers
-  // typed into the body), this one live, with every one of those numbers read
-  // from a uniform array the knobs write. At the knobs' opening values the
-  // two bodies draw the same `quartz` look.
-  //
-  // Not 010: shader/010 moved to remote/050 the same day and its old address
-  // 404s on purpose (no forwarding), so a different page there would answer
-  // an old link to the Pi shader with something else. 020 is the next free.
-  //
-  // THE GRAINS ARE REAL. Play brings up the grain ring of
-  // /granulator/grains/ (`../../sampler/grain-ring.mjs`'s program, compiled
-  // in this tab, on the tab's scsynth) on our own Raadio 2 recording from R2,
-  // on its `Cloud` patch. Every grain the engine reports leaves
-  // `web:grains:value-out` as one event and lands in the picture's 64
-  // buckets: across is how long ago the audio under it came in (newest on the
-  // right, over the ring's eight seconds), up is the grain's length on the
-  // 2 ms to 4 s lane /videoradio/ uses. The six audio followers that light it
-  // read the granulator's own output, on `web:grains:audio-out` into the
-  // shader's audio inlet.
-  //
-  // ⚠️ THE ENGINE BOOT IS 060's, written again here in its smallest form (no
-  // knobs on the grains, one patch). Lifting 060's `engine` object into
-  // grain-ring.mjs would let both import it; that touches 060 and is left for
-  // the session to decide.
-  //
-  // NOTHING OPENS ON A VISIT: no audio context, no fetch, no engine. The
-  // picture draws its standby field (scanlines over the slow drift) from the
-  // first frame, which is what /videoradio/ does before Play too.
+  // /videoradio/'s picture (/shell/scan-field.mjs) built live, every number a uniform the
+  // knobs write; at the opening values it draws `quartz`. Play runs the real grain ring on our
+  // Raadio 2 recording into it. Nothing opens on a visit: the standby field draws first.
+  // See lessons/page-shader.md#shader-1
   const S = 'web';
   const d = mount({ name: 'Scan landscape', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('shader/landscape');
@@ -72,67 +43,10 @@
   const PATCH = PATCHES.find((p) => p.name === 'Cloud');
   const NODE = 4000, BUF = 0, DEF = 'gring';
 
-  // ── the knobs: six, the rest fixed at the look's own ───────────────────
-  // Asked 2026-10-13: *"What about lanacape params simplofication?"*, then
-  // *"Cut more"*, then *"3-4 too little. I want it to be ready for
-  // granulator"*. So the row is the few numbers that change the picture most
-  // and most differently, weighted to the ones the sound already moves,
-  // because the granulator's values are going to drive them next. Each is a
-  // node with a value-out (a turn, into the shader) and a value-in (where a
-  // granulator wire can land: it turns the dial and the picture, sends
-  // nothing back). Every other number holds `quartz`'s own value (FIXED), so
-  // at the opening values this is /videoradio/'s picture, number for number.
-  //
-  // 🔴 CHOSEN BY MEASUREMENT, 2026-10-13, on the real GPU (ANGLE Metal, M2
-  // Pro), 960x540. The data texture this page feeds the chain was RECORDED,
-  // 300 frames standby and 300 playing our Raadio 2 recording through the
-  // granulator, and REPLAYED byte for byte into a fresh chain per setting
-  // (the same setting twice read 0.000), each knob alone at its min and its
-  // max. Three numbers per setting, worst of min and max, against the
-  // opening picture, read at frames 200, 250 and 300:
-  //   pixel  mean |change| of 0..255, and the share moved by more than 8
-  //   block  mean |luminance change| over 32 px blocks, which is what the
-  //          eye sees at a glance. A thin line moved by one width moves
-  //          every one of its pixels, so the pixel number saturates near 20
-  //          for any knob that shifts geometry at all and cannot rank them;
-  //          the block number can.
-  //   alike  the correlation of two knobs' block changes (centred), to keep
-  //          two that do the same thing from both getting a knob.
-  // Block, standby / playing, highest first (the full table is in the
-  // report to the session, 2026-10-13):
-  //   halo 40.5/29.2  rows 26.3/18.7  valley 14.5/19.3  gamma 17.8/13.0
-  //   gain 16.3/11.3  amp 14.6/8.8  height 12.5/13.7  floor 13.6/9.0
-  //   depth 12.8/12.2  lines 11.9/7.1  loud 0/10.1  travel 9.0/10.4
-  //   spacing 9.4/7.6  edges 8.7/5.4  horizon 6.5/7.5  white 6.6/4.8
-  //   swell 5.5/3.4  idle 4.5/2.8  heave 3.4/1.3  tunnel 3.3/0.9
-  //   counts 0/3.3  near 3.1/3.3  waves 2.9/1.4  wide 2.6/2.7  blue 2.1/1.6
-  //   sway 0.7/1.3  stretch 0/1.1  breath 1.1/0.6  bass 0/0.9
-  // What the six are, and why each and not its neighbour:
-  //   rows    the strongest that changes the STRUCTURE. halo, gain, gamma
-  //           and lines correlate 0.91 to 0.98 with it: all of them mostly
-  //           make the same lines brighter, so one knob stands for the five.
-  //   height  the master on every sound-driven height (`ampM` multiplies
-  //           amp, loud and bass). valley, floor, depth and amp correlate
-  //           0.80 to 0.89 with it: one knob for the terrain's relief.
-  //   loud    the strongest of the ones the SOUND drives: 0 standby, 10.1
-  //           playing. How far the level follower lifts the ridges. bass
-  //           correlates 0.69 with it and moves a tenth as much.
-  //   swell   the wave walking through the rows; alike nothing above 0.61,
-  //           and in standby it doubles the picture's motion (1.3 to 3.2).
-  //   counts  how much the grain events themselves make the height: 0
-  //           standby, 3.3 playing, and alike nothing above 0.24. The one
-  //           knob that is about the granulator's own events.
-  //   heave   the terrain breathing on the grain clock (`pulse`, advanced by
-  //           the grains reported): the largest gain in playing motion of the
-  //           sound-driven ones (block motion 3.6 to 5.6), alike nothing
-  //           above 0.46.
-  // Left at the look's value although they measure: halo (open 0, which is
-  // the look; at 1 it is the rows/gain family again), travel (0 is why
-  // quartz holds still, see LOOKS), stretch, sway, breath, bass (each under
-  // 1.3 by block, playing). The six removed on 2026-10-12 (echo, glow,
-  // fade, occlude, facet, mirror) measured under 1.3 of 255 by pixel then.
-  // ⚠️ mirror is now the look's own 0, not held at 1: with horizon fixed at
-  // 1.0 the fold is off by construction, so both draw the same bytes.
+  // Six knobs, chosen by measured block luminance change on a recorded and replayed chain and
+  // kept apart by correlation; every other number holds `quartz`'s (FIXED). Each knob has a
+  // value-in where a granulator wire can land. The measurements are in the lessons.
+  // See lessons/page-shader.md#shader-2
   const f2 = (v) => v.toFixed(2), f3 = (v) => v.toFixed(3);
   const K = [
     { name: 'rows', label: 'rows', min: 8, max: 132, step: 1, fmt: (v) => `${Math.round(v)}` },
@@ -167,7 +81,8 @@
   // The shapes are /shell/nodes.mjs's; the labels and the delivery are this page's.
   for (const c of K) LABEL.set(c.name, c.label);
   addNodes(bay, S, [{ name: 'recording', as: SRC.id, site: SRC.store, label: SRC.label }, { name: 'player', as: 'radio', label: 'radio' },
-    // `granulator` on screen and in its ids (asked 2026-10-13: *"no grains mentions"*).
+    // `granulator` on screen and in its ids.
+    // See lessons/page-shader.md#shader-3
     { name: 'grains', as: 'granulator', label: 'granulator' }, 'speaker', 'shader-landscape', 'screen',
     ...K.map((c) => ({ name: 'knob', as: `knob-${c.label}`, label: c.label, variant: 'unshaped' }))], {
     ports: {
@@ -305,7 +220,8 @@
   const knobs = new Map();
   const send = (nm, v) => bay.send(KNOB_OUT(nm), { of: 'param', name: nm, v });
   for (const c of K) {
-    // The invisible hand on every knob (asked 2026-10-13, *"andd inivisible hand for knobs"*).
+    // The invisible hand on every knob.
+    // See lessons/page-shader.md#shader-4
     knobs.set(c.name, createKnob({ label: c.label, min: c.min, max: c.max, value: OPEN[c.name], hand: true,
       ...(c.step ? { step: c.step } : {}), format: c.fmt, onInput: (v) => send(c.name, v) }));
   }
@@ -401,10 +317,9 @@
   const top = el('div', 'cc-top');
   top.append(transport.el);
 
-  // ── the patchbay ────────────────────────────────────────────────────────
-  // The file wire is lit while the recording comes down, the audio wires
-  // while it plays, the video wire while the shader draws; value wires pulse
-  // once per event, a grain or a turn.
+  // The file wire is lit while the recording comes down, the audio wires while it plays, the
+  // video wire while the shader draws; value wires pulse once per event.
+  // See lessons/page-shader.md#shader-5
   const pb = createPatchbay(bay, {
     flowing: (l, medium) => {
       if (medium === 'file') return !!opening || (fetchedAt && performance.now() - fetchedAt < 600);

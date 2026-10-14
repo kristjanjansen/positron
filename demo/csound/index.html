@@ -7,28 +7,22 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* ── SCORE ─────────────────────────────────────────────────────────────
-     🔴 THE SCORE BOX IS THE KIT'S CODE BOX SINCE 2026-09-30
-     (`demo/shell/code-box.mjs`, `plans/plan-code-editor.md`), coloured as a
-     Csound score. Its height is the score's own line count, handed over as
-     `rows`, with the compile note's reserve under it. `--well` is the box's
-     ground, read by the box and the note alike. */
+  /* SCORE: the kit's code box (demo/shell/code-box.mjs), coloured as a Csound score.
+     Its height is the score's line count (`rows`) plus the compile note's reserve.
+     `--well` is the box's ground, read by the box and the note alike.
+     See lessons/page-csound.md#csound-18 */
   .und-editor { --well: #0d1117; }
-  /* 🔴 EACH LINE IN THE COLOUR OF THE LANE THAT DRAWS IT. Asked 2026-09-30,
-     *"can you mathc lane colors and code colors somehow"*: an `i` line is an
-     event tick, a `t` line is the tempo curve, an `m` or `n` line is a part
-     bar, and `code-lang.mjs` tags every coloured token with its line's kind.
-     The inks are the strip's own, set from `INK` and `DERIVED` in score.mjs. */
+  /* Each line in the colour of the lane that draws it (i event, t tempo, m or n part),
+     tagged by code-lang.mjs; the inks are the strip's own, from INK and DERIVED in score.mjs.
+     See lessons/page-csound.md#csound-19 */
   .und-editor .pos-ln-event { color: color-mix(in oklab, var(--ln-on) 70%, var(--ln-off)); }
   .und-editor .pos-ln-part, .und-editor .pos-ln-tempo { color: color-mix(in oklab, var(--ln-derived) 80%, #fff); }
   .und-editor .pos-tk-carry[class*="pos-ln-"] { opacity: .7; }
 
-  /* ── BOTH TABS: a compiled document, one record per line ──────────────
-     Scrolled rather than padded, because a score has no fixed length, and a
-     fixed height so a longer score moves nothing under it.
-     TWO CHANNELS, TWO FACTS: the left border is which part a line belongs to,
-     the text is whether it has played. Hue never means "played".
-     ⚠️ NO `margin` HERE. The stack owns the rhythm between blocks. */
+  /* Both tabs: a compiled document, scrolled at a fixed height so a longer score moves
+     nothing. Left border is the part, text is whether it played; hue never means played.
+     No margin here: the stack owns the rhythm between blocks.
+     See lessons/page-csound.md#csound-20 */
   .sc { max-height: calc(12 * 1.75em + 22px); overflow: auto;
         font: 400 11px/1.75 var(--mono); background: var(--card);
         border: 1px solid var(--line); border-radius: 4px; padding: 10px 0; }
@@ -42,11 +36,9 @@
   .warn { font: 500 10.5px/1.7 var(--mono); color: var(--warn); margin: 0; }
   .warn:empty { display: none; }
 
-  /* ── CLICK ─────────────────────────────────────────────────────────────
-     THEIRS AND OURS, SIDE BY SIDE: the score a composer typed and the
-     document made out of it, lighting at the same moment. One column on a
-     narrow screen, because two 11 px monospace columns at 400 px is a pair of
-     ellipses rather than a comparison. */
+  /* CLICK: the typed score and the document made from it, side by side. One column on a
+     narrow screen, since two 11 px monospace columns at 400 px are only ellipses.
+     See lessons/page-csound.md#csound-21 */
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
   @media (max-width: 720px) { .two { grid-template-columns: 1fr; } }
   .two > div { min-width: 0; }
@@ -64,19 +56,10 @@
   import * as score from './score.mjs';
   import * as click from './click.mjs';
 
-  /*
-   * 🔴 THE TYPED SCORE AND THE CLICK TRACK AS ONE PAGE, asked 2026-10-05:
-   * *"merge click and und, no need for 'mobile screen' / theme"*. `/click/`
-   * was its own page from 2026-09-14 and is gone with no redirect, the way the
-   * 2026-10-04 regrouping retired pages.
-   *
-   *   SCORE  a Csound score you type, compiled when you stop, with sound
-   *   CLICK  U:'s vClick scores, worked out once and played off the page's clock
-   *
-   * Both are Csound made seekable, which is why they share a page.
-   * `demo/shell/tab-page.mjs` does the rest. SCORE owns the page's one
-   * published transport bar; CLICK's is `publish: false` and in its `bars`.
-   */
+  /* Two tabs, both Csound made seekable: SCORE (typed, compiled, with sound) and CLICK
+     (vClick's scores on the page's clock). demo/shell/tab-page.mjs does the rest.
+     SCORE owns the one published transport bar; CLICK's is `publish: false`.
+     See lessons/page-csound.md#csound-22 */
   const d = mount({
     name: 'csound',
     // No `what` under the title: each tab says what it is in the box under the

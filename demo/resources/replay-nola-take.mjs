@@ -1,16 +1,7 @@
-// demo/resources/replay-nola-take.mjs. Play a recorded take back through the
-// real recogniser, at every candidate setting, and see what would be learned.
-//
-//   node demo/resources/replay-nola-take.mjs ~/Downloads/nola-take-*.json
-//
-// 🔴 THE POINT IS THAT THE TAKE IS THE WIRE AND NOT A CONCLUSION. `read-nola-
-// take.mjs` says what the hands did; this says what the PAGE would have made of
-// it, using `demo/shell/name.mjs` itself rather than a copy of its arithmetic,
-// so a setting can be chosen against real playing instead of a guess.
-// ⚠️ AND IT SWEEPS RATHER THAN SCORES. There is no right answer to compare
-// against, because nobody wrote down what they meant to play. What it can show
-// is how violently the output moves with each knob, and a knob that changes
-// everything is a knob nobody should be guessing.
+// Replays a recorded take through demo/shell/name.mjs at every candidate setting.
+// Run: node demo/resources/replay-nola-take.mjs ~/Downloads/nola-take-*.json
+// It sweeps rather than scores: there is no ground truth for what was meant.
+// See lessons/page-resources.md#resources-5
 
 import { readFileSync } from 'node:fs';
 import { createSettler, createTally, nameChord, chordKey } from '../shell/name.mjs';

@@ -1,0 +1,2550 @@
+# Page comments: evo
+
+The full comments cut from the code under demo/ for evo, verbatim. Each heading is the id a pointer in the code names, then the file, the block and the line it stood on before the cut.
+
+<a id="evo-1"></a>
+## evo-1: demo/evo/index.html, style, line 10
+
+````css
+  /* ════════════════════════════════════════════════════════════════════════
+     PART ONE: WHAT TRAVELS, AND IT HAS TRAVELLED.
+
+     🔴 A HARDWARE PANEL ON THIS SITE IS A FIXED COLUMN BESIDE A SCROLLING
+     STRIP, AND THIS PAGE WAS THE FOURTH COPY OF THAT IDEA. Asked 2026-09-21:
+     *"generalize the evoltion layout to reusable components / use from others.
+     same patters"*, then *"do it and add to kit"*. It is now
+     `demo/shell/panel-layout.mjs` and the `.panel-*` family in `shell.css`,
+     used by this page, by `/twelve/` and by `/circuit/`, with a specimen in
+     `/kit/`.
+
+     🔴 **EVERY RULE THAT USED TO BE HERE IS IN `shell.css` WITH ITS
+     MEASUREMENTS AND ITS QUOTED REPORTS, VERBATIM.** The nine point contract,
+     the 310.03 px the keyboard absorbs, the border that had to reach the card's
+     edges, the 5.91:1 that bought `--ctl-off`, the `x 1780` nameplate: all of
+     it moved rather than being summarised, because the measurements and the
+     wrong first answers are the reason a rule survives being argued with.
+     ⚠️ **THE PREFIX CHANGED FROM `.pan-` TO `.panel-`**, because `/twelve/`
+     draws a knob labelled `pan` on all eight channels and a shared prefix that
+     collides with a control's name is a prefix that makes `grep` useless.
+
+     ── WHAT IS LEFT IN THIS FILE ─────────────────────────────────────────────
+     Everything below the second banner, which is the MK-425C in particular:
+     what is in the column, the half height keypad, the two wheels and the four
+     numbers that place their MAX and MIN, the six function buttons and the
+     absolute positions derived from `--i`, the octave pair, the eight rotaries
+     and their one printed divider, and the eight keyboard overrides that let a
+     74 px kit key grow into the depth of a case whose real ratio is 15:1.
+     ⚠️ **A COMPONENT THAT TRAVELS WITH ONE INSTRUMENT'S PROPORTIONS IS A
+     COMPONENT WITH ONE CALLER**, which is why none of that went.
+     ════════════════════════════════════════════════════════════════════════ */
+````
+
+<a id="evo-2"></a>
+## evo-2: demo/evo/index.html, style, line 42
+
+````css
+  /* 🔴 TWO GAPS SET TO THE VALUE THEY ALREADY HAVE, AND THEY ARE DEFENSIVE
+     RATHER THAN DEAD. Decided in writing 2026-09-21 rather than deleted
+     quietly, which is what the extraction plan asked for. MEASURED: both
+     compute to `0px` today, and setting them back to `normal` in the live page
+     left the panel at **503.03 by 646, identical to the digit**, because
+     neither `.panel` nor `.panel-wrap` declares a gap.
+     ✅ **THEY ARE KEPT, AND THE EXTRACTION IS THE REASON.** `.panel-flow`
+     gained `gap: var(--panel-gap)` the same day, so a gap arriving on `.panel`
+     or `.panel-wrap` tomorrow is not hypothetical, and those two rules are now
+     read by three pages rather than one: a gap added for `/circuit/`'s benefit
+     would silently push this panel's column away from its strip. Two
+     declarations are the cheapest possible insurance against a change made in
+     another page's interest. */
+````
+
+<a id="evo-3"></a>
+## evo-3: demo/evo/index.html, style, line 58
+
+````css
+  /* ════════════════════════════════════════════════════════════════════════
+     PART TWO: WHAT STAYS. THE MK-425C'S OWN PARTS.
+
+     🔴 THE PANEL IS ONE STRIP ALONG THE BACK AND ONE COLUMN AT THE LEFT END,
+     AND THE KEYS FILL EVERYTHING ELSE. That is the whole layout of a real
+     MK-425C, read off three photographs of two privately owned units plus the
+     manufacturer's own in `research/evo-mk425c-face-2026-09-21.md`, and it is
+     also exactly how the owner described it, so there was no design decision to
+     take: *"left is sticky area a la model12 rigth area. led on top, below 3x4
+     digits and wheels below"* and *"put funciton buttons, -+ and rotaty to the
+     top. its a overflow panel along withy stn keyboard component"*.
+
+     🔴 **AND IT IS A DRAWING IN THIS PROJECT'S IDIOM, NOT A FACSIMILE OF THE
+     SILKSCREEN.** Four instructions in one afternoon point the same way: half
+     height keypad buttons, no connector lines, and both black header bars gone.
+     What has to be faithful is what the controls ARE, where they SIT relative
+     to each other, and what they are CALLED. The printed graphics that group
+     them, the bars and the brackets and the rules, are a surface's only way of
+     saying *these belong together*; a web page has spacing and position, which
+     say it better and are already standardised here.
+     ✅ **AND THAT AGREES WITH A STANDING RULE RATHER THAN FIGHTING ONE:
+     SEPARATION IS SPACING, NOT LINES.** `shell.css` sets one vertical rhythm
+     precisely so a divider is a second channel saying what the spacing already
+     says, and `.pos-head` carries a note saying exactly that. It is the diagram
+     rule from the other end too: `join: false` exists for a container whose own
+     box already carries the relationship, because a line there *"just gives the
+     eye something to follow that leads nowhere"*.
+     ════════════════════════════════════════════════════════════════════════ */
+````
+
+<a id="evo-4"></a>
+## evo-4: demo/evo/index.html, style, line 88
+
+````css
+  /* ⚠️ AND THE GROUPS IN THE BACK STRIP CENTRE ON EACH OTHER, same ask: the
+     octave pair, the nameplate and the eight rotaries are three things of three
+     heights and their midpoints are what should agree. */
+````
+
+<a id="evo-5"></a>
+## evo-5: demo/evo/index.html, style, line 94
+
+````css
+  /* 🔴 AND THEY ARE CENTRED. Asked 2026-09-21: *"align pitch / mod to centr"*.
+     ⚠️ **THERE ARE TWO CENTRES HERE AND THIS PANEL HAS BOTH, so which one is
+     measured matters.** The column's own centre is one reading and the centre of
+     the keypad above them is the other. MEASURED: the keypad group is the widest
+     thing in the column, so the column's content width IS the keypad's width and
+     the two centres coincide to within the group's own 1 px borders. The page
+     asserts BOTH rather than picking, which is the `/twelve/` lesson: that page
+     was corrected by screenshot twelve times in one evening and every correction
+     was plausible reasoning a rect would have refused. */
+````
+
+<a id="evo-6"></a>
+## evo-6: demo/evo/index.html, style, line 106
+
+````css
+  /* 🔴 THE SMALL FIELD IS AT THE BOTTOM LEFT AND THE THREE DIGITS FILL THE
+     RIGHT TWO THIRDS, which is the order both of the manual's own LCD
+     illustrations draw and is the reverse of what this box shipped with on the
+     first run of this rebuild.
+     🔴 AND THERE IS NO LED ANYWHERE ON THIS INSTRUMENT. *"led on top"* names
+     the display, which is topmost because it sits in the top-left CORNER of the
+     case. Reading it as a separate indicator would put a part on the replica
+     that the object does not have. */
+````
+
+<a id="evo-7"></a>
+## evo-7: demo/evo/index.html, style, line 117
+
+````css
+  /* 🔴 `10 assignable buttons` AND `a 3x4 grid` ARE ONE OBJECT COUNTED TWICE.
+     The ten are `0` to `9`; the other two are `-` and `+`, documented
+     separately as *"+/- buttons. Dual press function sends out Snap Shot
+     command."* So the marketing copy and the owner's sketch never disagreed.
+     🔴 IT IS A TELEPHONE KEYPAD, NOT A CALCULATOR ONE: `1 2 3` on the TOP row
+     and `- 0 +` on the bottom, with `0` between the two. Getting that backwards
+     is the easiest mistake available here, and the old page made a different
+     one, drawing `0` to `9` in source order so `0` came first.
+     🔴 **AND THE BUTTONS ARE HALF HEIGHT.** Asked 2026-09-21: *"evo: half
+     height buttons in numpad"*.
+     ⚠️ **MEASURED BEFORE SHRINKING ANYTHING, BECAUSE A PAD RESERVES SLOTS EVEN
+     WHEN EMPTY AND THAT RESERVATION CAN BE MOST OF A BLOCK'S HEIGHT.** Here it
+     is not: the grid was **268 px = 4 buttons at 184 + 4 digit slots at 48 + 3
+     gaps at 24**, and **zero foot slots were reserved**, because `.pos-pad-bot`
+     is only created when a bottom label is given. So 69 per cent of the height
+     was the working surface and the furniture was 18 per cent, which is what
+     makes `half` the right lever rather than a change that would look wrong and
+     not answer the report. It takes the grid to 176 and the column to 472.
+     ⚠️ AND IT IS CLOSER TO THE PANEL, NOT FURTHER FROM IT: the real buttons are
+     about 1.45 times wider than they are tall, so squat is the right direction
+     and square never was. */
+````
+
+<a id="evo-8"></a>
+## evo-8: demo/evo/index.html, style, line 138
+
+````css
+  /* 🔴 NO BOX ROUND THE KEYPAD. Asked 2026-09-23: *"rm box around it"*. Every
+     other group on this panel is a box because it is a printed area of the real
+     case with a name on it; the keypad's box was carrying nothing, since its
+     label came off on 2026-09-21 with *"rm funciton buttons / assignable buttons
+     labels"* and the fact moved to the hover. What was left was an edge round
+     twelve buttons that are already twelve edges, in the narrowest column on the
+     page.
+     ⚠️ THE PADDING GOES WITH IT, because padding without a box is a gap nobody
+     can see the reason for, and this column is tight. */
+````
+
+<a id="evo-9"></a>
+## evo-9: demo/evo/index.html, style, line 155
+
+````css
+  /* 🔴 `MAX` AND `MIN` ARE PRINTED ONCE IN THE GAP AND SERVE BOTH WHEELS, so
+     they belong to the row rather than to either fader, and they mark the ENDS
+     OF THE TRAVEL rather than the top and bottom of a column.
+     🔴 **AND THEY ARE PLACED FROM PUBLISHED TOKENS, WHICH IS THE WHOLE TRICK.**
+     The first run of this rebuild used `space-between` over the row's full
+     height precisely to avoid arithmetic about a fader's insides, and
+     PHOTOGRAPHED it read as `max` captioning the value readout beside it and
+     `min` captioning the slot number: both labels correct, both attached to the
+     wrong thing. `--fdr-lane-h` is the lane's own height and `--ctl-head` is
+     what the control layout contract reserves above a working surface.
+     ⚠️ AND THE `4px` IS A RESERVATION THE KIT DOES NOT PUBLISH. MEASURED:
+     `.pos-fdr-lane` carries `margin: 4px 0 5px`, so a fader's top edge to its
+     lane's top edge is `--ctl-head` plus four, and the contract has no token for
+     the four. The first build of this row was out by exactly that and the assert
+     named the number. It is typed here, once, beside the thing it governs. */
+````
+
+<a id="evo-10"></a>
+## evo-10: demo/evo/index.html, style, line 175
+
+````css
+  /* 🔴 `PITCH …` AND `MODULA…`, PHOTOGRAPHED ON THE FIRST RUN. A fader's label
+     is `nowrap` with an ellipsis at the control's own width, which is the right
+     rule for a row of faders and wrong for two wheels whose printed names are
+     wider than they are. This project's own rule is that an ellipsis is the
+     SIGNAL that a word is in the wrong place, so the answer is not a shorter
+     word.
+     🔴 **AND WRAPPING WAS THE WRONG ANSWER TOO, WHICH TOOK A SECOND REPORT.**
+     Asked 2026-09-21: *"pichbend single word"*. `PITCH BEND` broke at its space
+     and `MODULATION` could not, so one label was 24.69 px tall and the other
+     12.34, and the two slot numbers underneath them, `C9` and `C10`, ended up
+     **12.34 px apart** on a pair of controls that are otherwise identical. A
+     wrapping label is the control reporting that its name does not fit, and it
+     reports it in the one place a reader cannot act on.
+     ✅ **SO THE NAME IS ONE TOKEN AND THE WIDTH IS A DECISION.** `nowrap` with
+     `overflow: visible` says out loud what this panel is doing: both names are
+     wider than their wheels and are ALLOWED to be, because the two wheels sit
+     28.86 px apart and the names still do not touch. MEASURED after: `pitchbend`
+     57 px and `modulation` 67 px in 46 px boxes, one line each, 11 px of clear
+     air between them, and both slot numbers on one line. The page asserts the
+     gap rather than trusting it, because that clearance is the whole reason
+     this is allowed to overflow.
+     ⚠️ NOT `text-overflow: ellipsis`. An ellipsis here would cut a name the
+     panel really does print, which is the opposite of the signal it exists to
+     give. */
+````
+
+<a id="evo-11"></a>
+## evo-11: demo/evo/index.html, style, line 204
+
+````css
+  /* 🔴 SIX, NOT EIGHT, AND FIVE DUAL PRESS LABELS RATHER THAN EIGHT. Eight is
+     the MK-449C. The manual's own footnote gives six single press functions and
+     five dual press ones for this model and then adds *"Additional unlabelled
+     dual press functions: Velocity Curve, Device ID, Memory Dump"*, so three
+     real abilities are NOT printed on a 425C's face, because six buttons leave
+     five gaps. A replica of the face draws five.
+     🔴 **AND NO GROUP LABEL, WHICH IS THE SECOND BAR TO COME OFF.** Asked
+     2026-09-21: *"rm funciton buttons / assignable buttons labels"*. Each of
+     these six already has its own name printed above it, so a heading saying
+     *these are buttons with functions* is furniture you read once and look
+     past: the diagram rule that a container takes no note, arriving on a panel.
+     🔴 THE LABELS ARE DRAWN BY THE PAGE RATHER THAN IN THE PAD'S OWN SLOTS,
+     because on this panel they are WIDER THAN THE BUTTONS and very nearly touch
+     each other. `.pos-pad-top` is `nowrap` with an ellipsis at the pad's own
+     width, which is the right rule for a control in a row and would have cut
+     `CHANNEL` to `CHANNE…` on every one of these six. Absolutely positioned
+     they overlap exactly as the printing does, and the row stays as narrow as
+     its buttons.
+     ⚠️ EVERY POSITION IS DERIVED FROM `--i` AND THE SHARED PITCH, never typed.
+     A label placed by hand is a label that moves when `--ctl-w` does. */
+````
+
+<a id="evo-12"></a>
+## evo-12: demo/evo/index.html, style, line 240
+
+````css
+  /* 🔴 THE DUAL PRESS NAME, ON THE MIDPOINT OF THE PAIR IT BELONGS TO. With the
+     connector gone the centring is the only thing saying it belongs to BOTH
+     buttons rather than to the left one, so it is no longer decoration and the
+     page asserts it against real rects. */
+````
+
+<a id="evo-13"></a>
+## evo-13: demo/evo/index.html, style, line 250
+
+````css
+  /* 🔴 TWO ROUND BLUE BUTTONS, IN THE BACK STRIP, NOWHERE NEAR THE WHEELS. The
+     old page grouped them WITH the wheels, which is a count without a layout.
+     They are the only round buttons and the only coloured ones on the panel. */
+````
+
+<a id="evo-14"></a>
+## evo-14: demo/evo/index.html, style, line 255
+
+````css
+  /* 🔴 ONE INK FOR EVERY CONTROL ON THE PANEL, DECLARED ONCE. Asked 2026-09-23:
+     *"use lightgray brand color on all controls on evo"*. It was `#7fb2ff`, a
+     blue, typed in two places: once here for the octave pair and once in the
+     keypad's JavaScript. Two copies of one colour is a colour that will
+     disagree with itself, and this page is a MIRROR of a grey instrument, where
+     a blue lamp is a claim about hardware that has none.
+     ⚠️ IT IS `--fg`, THE PROJECT'S OWN LIGHT GREY, rather than a fourth grey
+     invented here. `CLAUDE.md` keeps one meaning for colour across every demo,
+     and a panel drawing has no state to encode in hue: what a control says is
+     said by the dot, the flash and the readout. */
+````
+
+<a id="evo-15"></a>
+## evo-15: demo/evo/index.html, style, line 266
+
+````css
+  /* 🔴 THE CIRCLES LINE UP WITH THE DIALS, AND THE NUMBER IS THE KIT'S OWN.
+     Asked 2026-09-23 off a crop: *"(small/big) padd buttons shoudl align to
+     knobs by center"*. A knob reserves `--ctl-head` above its dial and
+     `--ctl-foot` below for its name; a pad reserves the head and takes the foot
+     only when it carries a bottom label, which these two do not. So in a row
+     centred on its boxes the pads' working surface sat half a foot lower than
+     the dials', which is what the crop shows.
+     ⚠️ RESERVING THE FOOT IS USING THE COMPONENT'S PUBLISHED MEASUREMENT RATHER
+     THAN NUDGING BY AN EYEBALLED NUMBER. `shell.css` says what those two are
+     for in as many words: a fader lane and a pad button start on the same line
+     because both take the same head, and their names end on the same line
+     because both take the same foot. */
+````
+
+<a id="evo-16"></a>
+## evo-16: demo/evo/index.html, style, line 283
+
+````css
+  /* ⚠️ AND THE MIXES CAME DOWN WHEN THE INK WENT GREY. Reported off a crop:
+     *"cotrol still light"*. 16 and 45 per cent were chosen against a BLUE tint,
+     where a low mix reads as a hint of colour; against `--fg` the same numbers
+     are just a paler grey, so a resting octave button was the brightest thing on
+     a panel where nothing else is lit. Halved, it reads as a drawn button again
+     rather than a lamp. */
+````
+
+<a id="evo-17"></a>
+## evo-17: demo/evo/index.html, style, line 296
+
+````css
+  /* 🔴 ONE ROW OF EIGHT, `C1` TO `C8`, LEFT TO RIGHT, WITH A PRINTED DIVIDER
+     BETWEEN `C4` AND `C5`. The divider is the one thing that could mislead
+     somebody into calling this two rows of four; all three photographs agree
+     there is one row.
+     ⚠️ **AND IT IS THE ONE PRINTED LINE KEPT ON THIS PANEL.** It does not tie
+     two controls together, which is what every connector that came off today
+     did: it marks a 4 and 4 split inside ONE row, which the research names as
+     the feature most likely to be misread as two rows. Removing it would lose a
+     fact rather than a graphic. Reversible in one declaration. */
+````
+
+<a id="evo-18"></a>
+## evo-18: demo/evo/index.html, style, line 305
+
+````css
+  /* 🔴 NO BOX ROUND THE ROTARIES. Asked 2026-09-23: *"rm panel around c1-8"*, on
+     the same afternoon the keypad lost its own and for the same reason: the box
+     was a printed area of the real case, its name came off when the printed bars
+     went, and what was left was an edge round eight controls that each already
+     have one. ⚠️ THE DIVIDER STAYS: it marks the 4 and 4 split inside ONE row,
+     which the research names as the feature most likely to be misread as two
+     rows, so removing it would lose a fact rather than a graphic.
+     🔴 AND THE KNOBS CENTRE ON THEIR MIDPOINTS RATHER THAN SITTING ON A FLOOR.
+     Asked as *"all funtional,+0and c1-c8 control buttons should be vertcally
+     centered, ther midpoints"*. `flex-end` lined up their BOTTOMS, which is
+     right when a row of controls stands on a printed baseline and wrong once the
+     baseline is gone: a knob with a two line name under it then hangs lower than
+     its neighbours and the row reads as sagging. */
+````
+
+<a id="evo-19"></a>
+## evo-19: demo/evo/index.html, style, line 319
+
+````css
+  /* ⚠️ THE DIVIDER RULE MOVED INTO `shell.css` AS `.pos-knob-div` when this row
+     became `createKnobBank`. Nothing draws `.evo-rot-div` any more. */
+````
+
+<a id="evo-20"></a>
+## evo-20: demo/evo/index.html, style, line 321
+
+````css
+  /* 🔴 THE ROTARY NAMES WERE `--dim` UNTIL 2026-09-25 AND THEY ARE NOT ANY
+     MORE, BECAUSE THE CONTROLS THEY NAME NOW WORK. `C1` to `C8` are the only
+     type this panel still prints, and a name dimmed below its own control is
+     the shape that was reported here as *"on dislable pad buttons make labels
+     way lighter"*. That report was about a DEAD panel, and it was right about
+     one: the names were the brightest thing in a set of controls nobody could
+     press. On a live panel the same rule points the other way, and the page
+     asserts the ink rather than trusting either reading. */
+````
+
+<a id="evo-21"></a>
+## evo-21: demo/evo/index.html, style, line 331
+
+````css
+  /* 🔴 THE KEYS TAKE A POINTER SINCE 2026-09-25, AND THE RULE THEY REVERSE IS
+     QUOTED IN FULL SO IT IS NOT RE-ARGUED. Asked: *"evo: / make all buttons
+     interactive"*. This rule read `.evo-keys { pointer-events: none }` under the
+     heading *"THE KEYS ARE A PICTURE, NOT A CONTROL SURFACE, AND THAT IS WHY
+     THEY DO NOT TAKE A POINTER. This keyboard has no sound engine in it: it is
+     a controller, so a key that lit when you pressed it on screen would be
+     claiming a thing happened somewhere. Nothing happens anywhere. The keys
+     light when the real ones are played and at no other time."*
+     🔴 **WHAT WAS RIGHT IN IT IS THE CLAIM, AND THE CLAIM IS ANSWERED RATHER
+     THAN DROPPED.** A press here still says nothing about the instrument,
+     because it never reaches the MIDI table, never touches a counter this page
+     measures the hardware with, and cannot leave the browser at all: this page
+     opens INPUTS and there is no `send` anywhere in it. What a press moves is
+     the drawing, which is what a drawing is for.
+     ⚠️ **AND A MOUSE HAS NO VELOCITY, SO THE DISPLAY SAYS NOTHING FOR A KEY
+     PRESSED HERE.** A real key fills the three digits with how hard it was hit.
+     Printing a number this page invented would be the one thing the old rule
+     was protecting, and an empty field is what this project already does with
+     anything unmeasured.
+     ⚠️ THE OLD RULE'S SECOND HALF IS STILL LAW AND IS WHY THESE ARE NOT
+     `disabled`: `disabled` is a `return` in front of a handler and this project
+     has lost sixteen asserts to one, twice in a day. */
+````
+
+<a id="evo-22"></a>
+## evo-22: demo/evo/index.html, style, line 353
+
+````css
+  /* 🔴 `.kpad`, AND THE OLD RULE SAID `.pad`, WHICH MATCHED NOTHING. A dead
+     selector reads as correct, and this one had never hidden anything: the
+     keyboard's own control row was on this page all along, so a replica of a
+     controller with no octave buttons on its keys carried an octave pair and a
+     `Notes off` button underneath them. PHOTOGRAPHED on the first screenshot of
+     this rebuild, which is the fifth dead rule this project has measured.
+     ⚠️ THEY ARE HIDDEN RATHER THAN DISABLED because they are the KIT's octave
+     controls, for a keyboard somebody plays from a computer. This one is a
+     picture of somebody else's instrument and the octave pair it really has is
+     in the back strip, drawn separately and lit by nothing. */
+````
+
+<a id="evo-23"></a>
+## evo-23: demo/evo/index.html, style, line 373
+
+````css
+  /* 🔴 THE KEYS GROW TO THE DEPTH OF THE CASE, AND THAT IS FOUR OVERRIDES INTO
+     A COMPONENT, SO HERE IS WHY. MEASURED on the first run of this rebuild: the
+     left column came out 552 px deep, because a display over a four row pad
+     grid over two faders is that tall, and the back strip plus a 74 px key came
+     to 224. That left 328 px of empty card under the keyboard, and the keys read
+     as floating at the back of a deep case.
+     🔴 **IT IS A SCALE MISMATCH BETWEEN TWO KIT COMPONENTS AND NEITHER IS
+     WRONG.** A kit key is 74 px because that is a playable target; a kit pad is
+     46 px for the same reason. On the real instrument a key is 15 cm and a
+     keypad button is about 1 cm, so the ratio the object has is 15:1 and the
+     ratio the kit has is 1.6:1. `/circuit/` and `/twelve/` never met this because
+     neither has a keyboard. The keys are 28 to 98 per cent of the case's depth,
+     so growing them is the faithful direction and shrinking the panel is not.
+     ⚠️ A PERCENTAGE FOR THE SHARP, NOT THE COMPONENT'S 46 px. That absolute is
+     62 per cent of 74, and left as it is a grown white key would carry a stubby
+     black one. The ratio is what the component means. */
+````
+
+<a id="evo-24"></a>
+## evo-24: demo/evo/index.html, style, line 390
+
+````css
+  /* ⚠️ THE OUTER BOX IS NOT NAMED HERE ANY MORE: `.panel-grow` carries its
+     `flex: 1 1 auto; min-height: 0`, applied by `panel.grow(keysBox)` rather
+     than typed. What is left is the two levels INSIDE the keyboard component,
+     which is where the growth has to reach and which no panel can know about. */
+````
+
+<a id="evo-25"></a>
+## evo-25: demo/evo/index.html, style, line 396
+
+````css
+  /* 🔴 NO BOX ROUND THESE KEYS. Asked 2026-09-23: *"rm extra wrapper bordered
+     around keyboard"*. `.kbd` is the keyboard's own surface, and it earned that
+     box on `/nola/`, where the keys are an instrument you play and the box is
+     what a roll glues onto. Here the keys are part of a PANEL that is already a
+     box, so the wrapper drew a second edge a few pixels inside the first, which
+     is the shape this project calls furniture.
+     ⚠️ THE PADDING GOES WITH IT, and `--kbd-pad` goes to 0 rather than being
+     left declared, because anything glued to this keyboard reads that property
+     to bleed to the edges and a stale 9 px would put it in the wrong place. */
+````
+
+<a id="evo-26"></a>
+## evo-26: demo/evo/index.html, style, line 408
+
+````css
+  /* 🔴 A KEY ON THIS KEYBOARD DOES NOT GROW SIDEWAYS, BECAUSE IT IS A DRAWING AT
+     A FIXED SCALE. `.keys` sizes its columns `minmax(--k-min, 1fr)`, which is
+     right for a keyboard somebody plays: a key fills whatever room it is given.
+     Inside a `max-content` box that `1fr` resolves to the KEY's own max-content,
+     which measured 86 px a white key and drew a two octave keyboard 1297 px wide
+     against a 925 px panel. Pinned to `--k-min` the keys are 49 px, the keyboard
+     is 777 px, and it sits at about three quarters of the panel's width, which is
+     what the photographs show.
+     ⚠️ IT ALSO MEANS THE KEYBOARD NEVER SCROLLS INSIDE THE STRIP, so there is
+     one scroller on this page and not two. The page asserts that. */
+````
+
+<a id="evo-27"></a>
+## evo-27: demo/evo/index.html, inline script, line 435
+
+````js
+  /**
+   * 🔴 AN EVOLUTION MK-425C ON SCREEN. The third hardware panel, and its two
+   * sources are kept apart exactly as `/circuit/` keeps its own, because they
+   * fail differently:
+   *   - **WHAT IT SENDS** is measured, off this desk through `/dump/` on
+   *     2026-09-20, and is in `research/measured-devices-2026-09-20.md`.
+   *   - **WHERE THE CONTROLS ARE** is READ, and it is now read off
+   *     photographs rather than off a numbered list.
+   * 🔴 **AND THAT SECOND HALF USED TO BE THE WEAKEST CLAIM ON THIS PAGE AND NO
+   * LONGER IS.** It was eight knobs over ten buttons with the wheels at the left
+   * of the keys, which is where every 25 key controller of that decade put them,
+   * and the note here said so and asked anybody with the instrument in front of
+   * them to correct it. Somebody did, and
+   * `research/evo-mk425c-face-2026-09-21.md` then settled every part of it off
+   * three manual PDFs and three photographs of two privately owned units.
+   * ⚠️ **A COUNT IS NOT A LAYOUT**, which is what the old arrangement was, and
+   * it was wrong in six separate ways: the rotaries were named `1` to `8`, the
+   * keypad was ten buttons in source order rather than twelve in a telephone
+   * grid, the octave pair sat with the wheels, there were no function buttons at
+   * all, the keyboard was twenty five white keys with no black ones, and the
+   * nameplate was 500 px off the edge of the screen.
+   * ⚠️ **THE ONE THING IN THAT RESEARCH THAT IS A TRAP**: the Advanced User
+   * Guide PDF titled `MK-425C / MK-449C / MK-461C` has a photograph of a
+   * DIFFERENT KEYBOARD on its cover, with a red seven segment LED, a master
+   * volume slider where the keypad goes, and no rotaries. It is the highest
+   * resolution "MK-425C" picture on the open web. Anything drawn from it would
+   * look deliberate and would be a different instrument.
+   */
+````
+
+<a id="evo-28"></a>
+## evo-28: demo/evo/index.html, inline script, line 464
+
+````js
+  /**
+   * 🔴 THE GLOBAL CHANNEL IS 2. MEASURED, on every stream but one stray pair,
+   * and it is the fact a layout for this keyboard would get wrong first.
+   * ⚠️ AND IT IS NOT A CONSTANT OF THE INSTRUMENT. Every controller on it can
+   * carry its own channel, set from the keypad, held in non volatile memory,
+   * and written down nowhere. One program button was measured sending on
+   * channel 1 while the other nine sent on 2, and the manual explains the
+   * mechanism: a controller assigned to channel `00` transmits on the global
+   * one, so a button explicitly set to 1 is somebody's per control assignment.
+   * So this page listens on ALL channels and reports the channel it heard,
+   * rather than filtering on a number that is a setting somebody can change
+   * without a record.
+   */
+````
+
+<a id="evo-29"></a>
+## evo-29: demo/evo/index.html, inline script, line 479
+
+````js
+  /**
+   * 🔴 25 KEYS, MEASURED AS NOTES 47 TO 71, WHICH IS A SEMITONE BELOW WHERE A
+   * 25 KEY CONTROLLER SITS. A C to C keyboard spans 48 to 72. This one is
+   * transposed by -1, and that is a fault which never announces itself: the
+   * instrument plays perfectly, in tune with itself, and a semitone flat
+   * against everything else in the building.
+   * ⚠️ **SO THE KEYS ARE DRAWN WHERE THE WIRE SAYS THEY ARE**, and the page
+   * says what the range means rather than quietly correcting it. Drawing 48 to
+   * 72 and shifting what arrives would hide the one thing worth reporting.
+   * 🔴 **AND THE KEY PATTERN WAS DRAWN WRONG UNTIL THIS REBUILD, WHICH IS A
+   * MEASUREMENT AND NOT A READING.** The note handed to this page said not to
+   * touch the pattern, on the grounds that `createKeyboard` decides black or
+   * white from the OFFSET from the base note, so `base: 47` would draw a
+   * correctly C to C shaped picture while printing `B2` on the leftmost key.
+   * **It does not.** It decides from `sharps.has(k)`, which tests the LETTER
+   * this keyboard is played from against a set of computer keys, and this page
+   * passes twenty five synthetic names `k0` to `k24` that are in no set.
+   * MEASURED at 756 px: **25 white keys, 0 black, `--k-cols: 25`**, so a two
+   * octave keyboard was a chromatic row of twenty five identical white slivers
+   * 1297 px wide. That is the arrangement `shell.css`'s own comment calls *"a
+   * chromatic row rather than a keyboard, and nobody can find C on one"*.
+   * ✅ SO THE PATTERN IS DECLARED BELOW AND HANDED OVER, and the page asserts
+   * the picture rather than the count. What the old assert checked was
+   * `kbd.notes()`, which was 25 notes from 47 and perfectly true, and blind to
+   * there being no black keys in the drawing at all.
+   * ⚠️ **WHAT THE NOTE WAS RIGHT ABOUT IS THE NAMES**, and that half is kept:
+   * the shape is a C to C keyboard because the instrument is one, and the
+   * leftmost key still prints `B2` because that is the note the wire carries.
+   * Correcting the base to make the names read `C3` would hide the transpose;
+   * correcting the shape to start on B would draw an instrument that does not
+   * exist.
+   * ⚠️ **IT IS ALSO TESTABLE FOR FREE AND HAS NOT BEEN TESTED.** The manual's
+   * non volatile memory list names the controller assignments, the draw bar
+   * mode, the two data bytes, the global channel and the last used preset, and
+   * it does NOT name transpose or octave. So switching the keyboard off and on
+   * and playing the bottom key says whether this minus one is a live transpose
+   * somebody left set or the instrument's own base.
+   */
+````
+
+<a id="evo-30"></a>
+## evo-30: demo/evo/index.html, inline script, line 517
+
+````js
+  /* 🔴 48, NOT 47, SINCE THE INSTRUMENT ITSELF WAS FIXED. Reported 2026-09-23:
+     *"evo kyes should start and c2"*, which is the urgent `BACKLOG.md` entry
+     arriving from the desk rather than from the file. The keyboard was measured
+     on 2026-09-20 sending notes **47 to 71** where a 25 key controller sits at
+     **48 to 72**, and that minus one was a live transpose somebody had left set,
+     not the instrument's base. It has been fixed on the device.
+     🔴 AND THE OLD VALUE WOULD HAVE DRAWN THE WRONG PICTURE IN SILENCE, which is
+     why that entry is marked urgent. `const idx = m.note - KEY_LO` indexes a 25
+     entry array, so every key would have lit ONE POSITION TOO HIGH and note 72
+     would have indexed 25 and lit nothing at all.
+     ⚠️ SEVEN OTHER FILES STILL SAY THE INSTRUMENT IS FLAT, listed in that entry,
+     including `demo/wish/index.html` where a VISITOR reads it. This page is the
+     one that drew a wrong picture; the rest are prose and are not fixed here. */
+````
+
+<a id="evo-31"></a>
+## evo-31: demo/evo/index.html, inline script, line 532
+
+````js
+  /**
+   * 🔴 THE KEYBOARD IS 15 WHITE AND 10 BLACK, THE BLACKS IN GROUPS OF 2, 3, 2,
+   * 3, WITH A WHITE AT EACH END. Counted off the manufacturer photograph and
+   * both user photographs: the leftmost key is a white one with no black to its
+   * left, and the rightmost is a white one with no black to its right and a
+   * white immediately before it. That is C up to C, two octaves.
+   * ⚠️ TYPED OFF THE PHOTOGRAPH RATHER THAN DERIVED FROM A PITCH CLASS TEST, so
+   * the drawing and the check against it come from two places and can disagree.
+   * A set built by one expression and asserted against the same expression
+   * agrees perfectly while being wrong, which is the trap that re-credited a
+   * recording in the MIM corpus.
+   */
+````
+
+<a id="evo-32"></a>
+## evo-32: demo/evo/index.html, inline script, line 546
+
+````js
+  /**
+   * 🔴 THE EIGHT ROTARIES ARE NAMED `C1` TO `C8`, LEFT TO RIGHT, AND THAT IS
+   * NOW A MAP RATHER THAN A DISCOVERY ORDER. Reported 2026-09-21: *"rotators:
+   * labels c1 to c8. they are not same order as phsyical buttons"*, and read
+   * against the photographs that is two faults and neither of them is a left to
+   * right reversal. The old page called them `1` to `8`, and it had no order at
+   * all: it bound a controller number to a knob in the sequence the numbers
+   * first arrived on the wire, so the knob a reader turned and the knob that
+   * moved on screen were related only by which they happened to turn first.
+   * ✅ **THE INSTRUMENT PRINTS ITS OWN CONTROL NUMBER ON EVERY ASSIGNABLE
+   * CONTROL IT HAS**, so there is nothing left to discover about position: the
+   * rotaries are `C1` to `C8`, the pitch bend wheel is `C9`, the modulation
+   * wheel is `C10`, the ten keypad digits are 11 to 20, and the sustain socket
+   * on the back is printed `SUSTAIN - C21`. That is one flat numbering across
+   * the whole instrument and it closes with no remainder against the manual's
+   * documented total of 21 controls.
+   * ⚠️ **`C1` IS NOT `CC 1`.** These are the instrument's own control slots,
+   * and a reader who sees `C1` and thinks `CC 1` has been misled. Which MIDI
+   * controller number a given slot sends is a per preset, per unit setting held
+   * in non volatile memory and printed in none of the three manuals, which is
+   * the reason the number belongs in the hover and not on the face.
+   */
+````
+
+<a id="evo-33"></a>
+## evo-33: demo/evo/index.html, inline script, line 574
+
+````js
+  /**
+   * 🔴 SIX FUNCTION BUTTONS, AND THE MANUAL'S OWN FOOTNOTE IS WHAT CONFIRMS
+   * SIX RATHER THAN EIGHT: *"There are also 8 function buttons (6 on the
+   * MK-425C)"*. Printed above each button is its single press function.
+   * ⚠️ TWO LINES WHERE THE PANEL PRINTS TWO LINES, which is why these are
+   * newline separated strings rather than words: `GLOBAL` sits over `CHANNEL`
+   * and `PROGRAM` sits on the lower of those two lines beside it.
+   */
+````
+
+<a id="evo-34"></a>
+## evo-34: demo/evo/index.html, inline script, line 584
+
+````js
+  /**
+   * 🔴 FIVE DUAL PRESS LABELS, EACH BELONGING TO A PAIR OF ADJACENT BUTTONS,
+   * printed BELOW and centred on the midpoint of the pair. Six buttons leave
+   * five gaps, so the three further dual presses the manual lists (velocity
+   * curve, device ID, memory dump) are printed nowhere on a 425C. The 449C
+   * prints them, which is a fact about that face and not this one.
+   */
+````
+
+<a id="evo-35"></a>
+## evo-35: demo/evo/index.html, inline script, line 594
+
+````js
+  /* ⚠️ U+2212 MINUS, NOT A HYPHEN, AND IT IS THE SAME CHARACTER THE OCTAVE PAIR
+     USES. Written two ways for one glyph on the first run of this rebuild, and
+     the keypad assert below caught it: the page rendered a hyphen and the check
+     was comparing against a minus. One mark on the panel is one character in
+     the source. */
+````
+
+<a id="evo-36"></a>
+## evo-36: demo/evo/index.html, inline script, line 603
+
+````js
+  /**
+   * 🔴 SIX CONTROLLER NUMBERS FOR EIGHT KNOBS, AND WHICH SLOT SENDS WHICH IS
+   * STILL NOT KNOWN. Measured: CC 84, 72, 74, 71, 93 and CC 5 all arrived from
+   * the knob row, and none of the three manuals prints a default for any knob
+   * of any preset. Appendix B lists what a control CAN be assigned to and never
+   * what it IS assigned to.
+   * ⚠️ **CC 74 IS `cutoff` AND CC 5 IS `portamento time` BY CONVENTION, AND
+   * THAT SAYS NOTHING ABOUT WHAT EITHER KNOB DOES.** This is the Yoshimi
+   * lesson, measured on real hardware here: the standard meaning of a
+   * controller number is a convention, never a fact about a device.
+   * ✅ **AND THE INSTRUMENT WILL ANSWER IT ONE KNOB AT A TIME, FOR FREE.** Turn
+   * a knob and its own display shows that knob's slot in the two digit field
+   * and the controller number assigned to it in the three digit field. Nobody
+   * has sat down and read all eight off.
+   */
+````
+
+<a id="evo-37"></a>
+## evo-37: demo/evo/index.html, inline script, line 623
+
+````js
+    /* 🔴 NO READOUT, ON PURPOSE. Asked 2026-09-21: *"rm keys / velocity / bend /
+       channel in evo"*, which is all four cells, so the row goes rather than
+       shrinking to an odd two.
+       ✅ **AND THE FACTS DID NOT GO WITH IT.** Three of the four were already on
+       screen twice: the MIDI log lists every message with its channel, its raw
+       bytes and a reading, so `keys` and `velocity` are in it row by row, and
+       `bend` is the number printed under the wheel that moved. The fourth is
+       rehomed to a log line, and `sayChannel` below carries the reason.
+       ⚠️ `readout: null` IS THE DECLARATION AND NOT AN OMISSION. The shell turns
+       it into `readoutOptOut`, so `demo/verify.mjs` asserts *declares that it
+       has no readout, on purpose* rather than failing a page that forgot one:
+       an absent field is still a failure, and this one is a choice.
+       ⚠️ AND A PAGE THAT OPTS OUT OF A SURFACE MUST OPT OUT OF ITS BOX. An
+       empty `.pos-readout` still painted its own 1 px edges on `/typist/` and
+       rendered as a full width rule nobody wrote. The shell hides it now, and
+       this page asserts that rather than trusting it. */
+````
+
+<a id="evo-38"></a>
+## evo-38: demo/evo/index.html, inline script, line 640
+
+````js
+    /* 🔴 NO DECLARED CONTROL. The primary one is a presence button spliced
+       into `.pos-controls` below, which is where `demo/verify.mjs` presses. */
+````
+
+<a id="evo-39"></a>
+## evo-39: demo/evo/index.html, inline script, line 646
+
+````js
+  /* 🔴 THE PANEL IS A KIT COMPONENT NOW, AND THIS PAGE IS ITS FIRST CALLER.
+     `createPanelLayout` owns which of the two children scrolls, which one keeps
+     its width, that they are one depth, and which edge carries the border. This
+     page owns everything that makes it an MK-425C.
+     ⚠️ **THE SCROLLER TAKES FOCUS AND SAYS WHICH WAY IT GOES**, which is why
+     those three attributes are an argument rather than a thing the component
+     decides: it is a second channel beside the fixed column's right border, it
+     costs no pixels, and it is the only one a reader who cannot see the border
+     gets. A panel whose strip holds nothing worth reaching has no use for it. */
+````
+
+<a id="evo-40"></a>
+## evo-40: demo/evo/index.html, inline script, line 667
+
+````js
+  /* 🔴 DECLARED ABOVE EVERYTHING THAT FILLS IT, because the SAVE control is built
+     before `take()` ever runs and a `const` shadows its whole block from the
+     top. `/nola/` hit exactly this an hour earlier and read `Cannot access
+     RECORDING before initialization` at 0/1. */
+````
+
+<a id="evo-41"></a>
+## evo-41: demo/evo/index.html, inline script, line 707
+
+````js
+  /**
+   * 🔴 A FIXED SEGMENT LCD WITH TWO NUMERIC FIELDS: A LARGE THREE DIGIT ONE AND
+   * A SMALL TWO DIGIT ONE, BOTH SEVEN SEGMENT. The manual's Default mode
+   * paragraph is the single best sentence about it: *"In Default mode, the LCD
+   * will show the controller symbol, and the 2 digit display will show the last
+   * selected controller. The 3 digits display the currently assigned MIDI CC
+   * number."*
+   * 🔴 **SO THE THREE DIGITS CARRY THE VALUE AND THE TWO CARRY WHICH CONTROL
+   * THE VALUE IS ABOUT**, and that pattern holds across every reading in the
+   * manual: a program change puts the program in the three and the channel it
+   * went on in the two, and `CONTROL ASSIGN` puts the controller number in the
+   * three and the selected control in the two.
+   * ⚠️ **THE TWO DIGIT FIELD IS BLANK FOR A ROTARY AND FILLED FOR A WHEEL, AND
+   * THAT IS THE HONEST DIFFERENCE RATHER THAN A GAP.** A wheel's slot is
+   * printed on the panel under it, so CC 1 arriving is known to be `C10`. A
+   * rotary sends a controller number and nothing on the wire says which of the
+   * eight slots sent it, so the field shows nothing. It is not a zero: a zero
+   * reads as a very confident measurement of nothing.
+   * ⚠️ AND IT WAS A MONOSPACE TEXT BOX UNTIL NOW, which read as an LCD because
+   * of its two colours and nothing else. `createSegment` draws every unlit bar
+   * faintly, which is the thing that actually makes a panel read as liquid
+   * crystal: you can see the `8` behind the `1`.
+   *
+   * 🔴 **THE BACKLIT SCHEME, ON INSTRUCTION.** Asked 2026-09-21 as *"reverse
+   * secmented display"*, which reverses *"evo: inverse segmented one"* from two
+   * hours earlier. A backlit display has a lamp behind the glass, so a lit bar
+   * is bright and the field behind it is dark.
+   * ⚠️ **WHAT IS KNOWN ABOUT THE REAL PANEL IS UNCHANGED, AND IT IS WORTH
+   * KEEPING BECAUSE IT IS THE PART A LATER READER WOULD OTHERWISE RE-DERIVE.**
+   * The manual says the backlight is blue, and the research could only report
+   * that as READ RATHER THAN SEEN: every photograph of an MK-425C it found was
+   * of a powered-down unit, and a powered-down LCD looks like the reflective
+   * draw, dark segments on pale grey green. **Nobody here has switched this
+   * keyboard on and looked**, so neither scheme is a measurement of a lit
+   * panel. The reflective draw used to be argued for on exactly that ground,
+   * and an instruction outranks the argument the same way it did for two slug
+   * renames today. The measurement stays; the conclusion goes.
+   * ⚠️ THE SCHEME CARRIES ITS OWN GHOST VALUE AND NOTHING HERE HARD-CODES ONE.
+   * Both ghosts were raised twice today on report, so a number copied out of
+   * that module would already be two versions stale.
+   * ⚠️ AND `reflective` IS UNTOUCHED IN THE KIT. It is drawn by `/kit/`'s own
+   * specimen and graded by `demo/shell/segment-test.mjs`, including the
+   * luminance check proving one scheme is the other inverted. This page's
+   * choice says nothing about whether that scheme should exist.
+   */
+````
+
+<a id="evo-42"></a>
+## evo-42: demo/evo/index.html, inline script, line 753
+
+````js
+  /* 🔴 SKINNIER BARS AND QUIETER UNLIT ONES, ASKED 2026-09-23: *"segmented
+     should be skinnier numbers, less empasised nonactive ones"*. The default
+     2.6 is a METER's weight, drawn to be read across a room; this is a panel
+     mirror at 38 px where the digits sit inside a window and the unlit bars are
+     furniture rather than information. ⚠️ THE GLYPH IS UNCHANGED, which is why
+     only the weight is passed: every display on this site is the same typeface
+     and that is what makes two of them side by side read as one instrument. */
+````
+
+<a id="evo-43"></a>
+## evo-43: demo/evo/index.html, inline script, line 762
+
+````js
+  /* 🔴 THE SMALL FIELD NEEDS A HEAVIER BAR TO COME OUT THE SAME COLOUR, WHICH IS
+     NOT THE SAME AS NEEDING A HEAVIER LOOK. Reported *"small segment should have
+     same color as large"*, and both fields are already the same scheme, the same
+     ink and the same ghost. What differs is PIXELS: the glyph is 20 units tall,
+     so at `size: 38` a 1.7 unit bar renders 3.2 px and at `size: 20` it renders
+     1.7 px, and a 1.7 px line is mostly antialiasing, which reads as a paler
+     colour rather than as a thinner one.
+     ⚠️ SO THE NUMBER IS DERIVED FROM THE TWO SIZES rather than eyeballed, and it
+     lands both fields at the same rendered weight. */
+````
+
+<a id="evo-44"></a>
+## evo-44: demo/evo/index.html, inline script, line 782
+
+````js
+    /* 🔴 WHAT THIS FIELD IS FOR, FROM THE MANUAL RATHER THAN FROM INFERENCE.
+       Asked 2026-09-23: *"read from manual whar left smaller segmented numebr
+       does i do not know"*. The Advanced Guide's Default mode paragraph, quoted
+       verbatim in `research/evo-mk425c-face-2026-09-21.md`: *"In Default mode,
+       the LCD will show the controller symbol, and the 2 digit display will show
+       the last selected controller. The 3 digits display the currently assigned
+       MIDI CC number."*
+       ⚠️ SO IT IS THE LAST CONTROLLER SELECTED, NOT THE LAST VALUE SENT, and the
+       hover said something weaker and vaguer than the instrument's own
+       documentation. `00` is what it opens on, before anything has been
+       selected. */
+````
+
+<a id="evo-45"></a>
+## evo-45: demo/evo/index.html, inline script, line 797
+
+````js
+  /* 🔴 THE WINDOW'S OWN GLASS COMES OUT OF THE SAME SCHEME THE FIELDS DO, and
+     that is why it is set from the module rather than declared in the
+     stylesheet. The two are the same colour again now that this page is back on
+     `backlit`, which is exactly when a second source stops being able to
+     disagree and starts looking correct by luck. It is still read from the
+     module, because the day this page changes scheme again is the day a token
+     would be wrong, and the page asserts the window and the fields match. */
+````
+
+<a id="evo-46"></a>
+## evo-46: demo/evo/index.html, inline script, line 810
+
+````js
+  /**
+   * Both fields at once, so a reading can never be half replaced.
+   *
+   * 🔴 THE LARGE FIELD IS THE VALUE AND THE SMALL ONE IS THE CONTROL'S OWN
+   * NUMBER, THE `C1` TO `C10` PRINTED ON THE PANEL. Asked 2026-09-23 as *"small
+   * shows cc num, large the value"*, which I first read as the MIDI CC and got
+   * wrong. The correction was *"ptichbend is 09 and mod 10, can not see it on
+   * small segmented"*, and it is the panel's own vocabulary: every control on
+   * this instrument is printed `C` and a number, so `cc num` here is the C
+   * NUMBER. The MIDI CC is a different fact and is already beside each rotary.
+   * ✅ SO ONLY THE LARGE FIELD DEPARTS FROM THE INSTRUMENT. 📄 The manual's table
+   * reads *"default, after a control moved | 3 digits: the MIDI CC assigned to
+   * it | 2 digits: the control's own number"*, so the small field is doing
+   * exactly what the manual says and the large one shows what a reader cannot
+   * otherwise see, which is what the knob just sent.
+   * ⚠️ AND TWO DIGITS IS ENOUGH FOR IT, which the MIDI CC reading was not:
+   * controls run C1 to C10 and a CC runs to 127, so the first fits the field the
+   * instrument has and the second would have overflowed above 99.
+   */
+````
+
+<a id="evo-47"></a>
+## evo-47: demo/evo/index.html, inline script, line 837
+
+````js
+  /**
+   * 🔴 EVERY CONTROL ON THIS PANEL WORKS NOW, AND NOTHING A HAND DOES HERE MAY
+   * EVER BE MISTAKEN FOR THE INSTRUMENT. Asked 2026-09-25: *"evo: / make all
+   * buttons interactive"*. Until that morning the whole panel was built
+   * `disabled: true` and the keys were `pointer-events: none`, so a visitor
+   * without an MK-425C on the desk saw a drawing that could not be touched.
+   * 🔴 **THE THING THAT MADE THAT DEFENSIBLE IS KEPT, AND IT IS THE SEPARATION
+   * RATHER THAN THE DEADNESS.** `take()` is THE WIRE and nothing else writes to
+   * it: it is what fills the MIDI table, `chSeen`, `ccSeen`, `notes`, `vLo`,
+   * `vHi`, `bendRaw`, `knobCC` and every `{ from: 'hardware' }` move that this
+   * page's own checks are written against. A hand press goes through the
+   * functions below instead, moves the DRAWING and the display, and touches not
+   * one of those. **So the table stays a record of what arrived**, which is what
+   * `/dump/` is for and what this page says its table is.
+   * ⚠️ **AND THE KIT ALREADY HAD THE VOCABULARY, WHICH IS WHY NO COMPONENT
+   * CHANGED.** `knob.mjs` and `fader.mjs` have meant `from: 'hand'` against
+   * `from: 'hardware'` since before this page existed, and both count the two
+   * separately as `handMoves()` and `hardwareMoves()`. The asserts below read
+   * whichever one they are a claim about.
+   * 🔴 **AND NOTHING CAN LEAVE THIS PAGE EVEN IF IT WANTED TO.** `open()` asks
+   * for `{ sysex: false }`, walks `access.inputs`, and there is no `.send(` and
+   * no read of `access.outputs` anywhere in this file. That is what makes this
+   * change safe against `/shape/`'s rule about somebody's real instrument, and
+   * there is an assert on it below rather than a sentence.
+   */
+````
+
+<a id="evo-48"></a>
+## evo-48: demo/evo/index.html, inline script, line 870
+
+````js
+  /**
+   * 🔴 A KEYPAD DIGIT PLAYS BACK WHAT THAT BUTTON WAS MEASURED SENDING, AND THE
+   * READING IS THE SAME ONE THE WIRE GETS. 📄 Measured off this desk through
+   * `/dump/`: a bank select LSB, a bank select MSB and then a program change,
+   * with nine of the ten giving programs 1 to 9 on channel 2.
+   * ⚠️ IT DOES NOT CALL `take()`, WHICH WOULD PUT THREE ROWS IN THE TABLE THAT
+   * NEVER CROSSED A WIRE. The display's reading for a program change is the
+   * manual's own, the program in the three digits and the channel in the two,
+   * and it is written here the same way `take` writes it so the two cannot
+   * drift apart in a way a reader could see.
+   */
+````
+
+<a id="evo-49"></a>
+## evo-49: demo/evo/index.html, style, line 155
+
+````css
+  /* 🔴 AND THE ROW COMES BACK WITH `Loop` IN IT AND NOTHING ELSE, asked
+     2026-09-30 for every keyboard page: *"enable loop button and fucntioanly on
+     onscreen keyboar when evolution is connceted"*. The component puts `Loop`
+     in the row only while `midi.mjs` has seen the Evolution, so `:has` is the
+     whole condition and the octave pair and `Panic` stay hidden for the reason
+     above. The tempo and ratio cells arrive with `Loop` and say what it is
+     doing, so they stay. */
+````
+
+<a id="evo-50"></a>
+## evo-50: demo/evo/index.html, inline script, line 430
+
+````js
+  /**
+   * 🔴 THE `-` AND `+` KEYS AND THE OCTAVE PAIR PRESS AND MOVE NOTHING, AND
+   * THAT IS THE HONEST ANSWER RATHER THAN A HALF FINISHED ONE. Both pairs are
+   * documented and neither has ever been captured: the manual gives the octave
+   * pair 11 octaves of range, `/dump/` saw no octave shift at all in 25 notes,
+   * and nothing this page has heard tells it what a single press of `-` or `+`
+   * sends. **A button that moved this drawing on a guess would be a page
+   * inventing a fact about an instrument**, which is the sentence this page has
+   * carried over the octave pair since it was built and is still true.
+   * ✅ SO THE PRESS IS REAL, THE FLASH IS REAL, AND WHAT IS UNKNOWN IS SAID.
+   * That is what separates this from the state it was in, where the press was
+   * refused and a reader learned nothing.
+   */
+````
+
+<a id="evo-51"></a>
+## evo-51: demo/evo/index.html, inline script, line 447
+
+````js
+  /**
+   * 🔴 A ROTARY TURNED BY HAND FILLS BOTH FIELDS, AND ITS SLOT IS THE ONE THING
+   * THAT IS MORE CERTAIN HERE THAN ON THE WIRE. When a CC arrives, which of the
+   * eight sent it is an INFERENCE this page makes from the order numbers first
+   * appeared. When a hand turns C5, it is C5, and no inference is involved.
+   * ⚠️ **AND NO CONTROLLER NUMBER IS CLAIMED.** Which MIDI CC a slot sends is a
+   * per preset, per unit setting in non volatile memory printed in none of the
+   * three manuals, so a hand turn fills the value and the slot and says nothing
+   * about a number nobody here knows. `knobCC` is the wire's map and a hand
+   * never writes to it.
+   */
+````
+
+<a id="evo-52"></a>
+## evo-52: demo/evo/index.html, inline script, line 467
+
+````js
+  /**
+   * 🔴 EACH PRESS SENDS THREE MESSAGES, NOT ONE. Measured: a bank select LSB, a
+   * bank select MSB and then a program change. Nine buttons gave programs 1 to
+   * 9 on channel 2, which is the documented `Program / Bank preset` assignment
+   * behaving as written, and the manual corroborates it: *"Try for instance
+   * preset 01 which has been setup to send program messages 01 to 10 on the 10
+   * assignable buttons."*
+   * ⚠️ **AND THE TENTH SENT PROGRAM 0 ON CHANNEL 1.** One button carries an
+   * explicit channel while the rest inherit the global one. It is unresolved,
+   * and it is why the program number rather than the channel decides which
+   * button lights here.
+   * ⚠️ IN EDIT MODE THESE TEN ARE THE KEYPAD, which is why the manual says you
+   * cannot select one by pressing it. They are controllers 11 to 20.
+   */
+````
+
+<a id="evo-53"></a>
+## evo-53: demo/evo/index.html, inline script, line 482
+
+````js
+  /**
+   * 🔴 THE WORD `ASSIGNABLE` LIVES IN THE HOVER, WHICH IS THE ONE THING KEPT
+   * WHEN THE PRINTED BAR CAME OFF. Asked 2026-09-21: *"rm funciton buttons /
+   * assignable buttons labels"*. The fact behind that bar is real and is not on
+   * the face any more: twelve keys with no name on them read as broken rather
+   * than as blank on purpose, and `ASSIGNABLE BUTTONS` is the only thing the
+   * real panel prints that says otherwise. So it goes where this page already
+   * keeps a fact a reader may want and does not need on the panel, which is
+   * exactly where the printed controller numbers went.
+   */
+````
+
+<a id="evo-54"></a>
+## evo-54: demo/evo/index.html, inline script, line 501
+
+````js
+        /* 🔴 ON THE FACE SINCE 2026-09-23, ASKED AS *"put number labels on
+           buttons not on top to save space"*. The panel prints them above the
+           buttons and this page followed it, which cost a whole text slot of
+           height on every row of a four row grid in the narrowest column on the
+           page. The face is where a number belongs anyway: `pad.mjs` says the
+           face is read while you are looking at the pad you are about to hit,
+           and a keypad digit is nothing else. */
+````
+
+<a id="evo-55"></a>
+## evo-55: demo/evo/index.html, inline script, line 510
+
+````js
+        /* 🔴 LIVE SINCE 2026-09-25, AND `latch: false` IS WHY A PRESS FLASHES
+           RATHER THAN STAYING LIT. `pad.mjs` calls `onPress` and `flash()` for
+           an unlatched pad, which is the same 160 ms flash a program change
+           arriving on the wire gives this button. One picture for one event,
+           whichever side it came from, and the log line is where they differ.
+           🔴 **AND THE HANDLER IS ON THE GRID AND NOT HERE, WHICH COST A RUN
+           AND WAS FOUND BY A DELIBERATE SABOTAGE RATHER THAN BY READING.**
+           `createPadGrid` builds each pad as
+           `createPad({ ...specs[y][x], onPress: (on, self) => onPress(on, x, y, self) })`,
+           so a per pad `onPress` returned from this factory is SPREAD IN AND
+           THEN OVERWRITTEN. `createPad`'s own documentation lists `onPress` as a
+           pad option and this factory returns pad options, so the wrong version
+           reads as correct, throws nothing and lights the pad on every press
+           because the flash is the component's own.
+           ⚠️ **IT IS THE `/stage/` DEFECT OF THIS SESSION IN A SECOND
+           COSTUME**, where two transport buttons did nothing because the page
+           passed `onPress` where `transport-bar.mjs` reads `onClick`. Here the
+           NAME is right and the LEVEL is wrong, which is harder to see. */
+````
+
+<a id="evo-56"></a>
+## evo-56: demo/evo/index.html, inline script, line 536
+
+````js
+    /* 🔴 ONE HANDLER FOR TWELVE BUTTONS, AT THE LEVEL THE COMPONENT ACTUALLY
+       READS IT. See the note in the factory above for what the other level
+       cost. The grid hands over the position rather than the face, so the face
+       is read back out of `KEYPAD`, which is the one place this panel's layout
+       is written down. */
+````
+
+<a id="evo-57"></a>
+## evo-57: demo/evo/index.html, inline script, line 556
+
+````js
+  /* 🔴 THE `SNAP SHOT` LABEL IS GONE, ASKED 2026-09-23: *"rm 'snap sot' label"*.
+     It named what the `-` and `+` buttons do when pressed together, which is a
+     real function of the panel and is in the hover on those two buttons and in
+     `research/evo-mk425c-face-2026-09-21.md`. What it was on the face was a
+     third line of small grey type under a grid that had just lost its box, in
+     the narrowest column on the page, naming something nothing here can do. */
+````
+
+<a id="evo-58"></a>
+## evo-58: demo/evo/index.html, inline script, line 567
+
+````js
+  /**
+   * 🔴 THE PITCH BEND WHEEL IS SEVEN BIT INSIDE A FOURTEEN BIT MESSAGE.
+   * Measured: 106 bend messages, **every one with an LSB of 0**, 63 distinct
+   * values. So 128 of the 16384 positions exist and the other 16256 cannot be
+   * reached. The assignment type is 14 bit; the wheel behind it is not.
+   * ⚠️ **AND IT DOES NOT REACH EITHER END, NOR RELIABLY REPORT CENTRE.** Raw
+   * range 0 to 13952, with only 6 of 106 messages reading exactly 8192. A
+   * layout that assumes a released wheel reports centre is asserting something
+   * this instrument does not do.
+   */
+````
+
+<a id="evo-59"></a>
+## evo-59: demo/evo/index.html, inline script, line 577
+
+````js
+  /* 🔴 `pitchbend`, ONE WORD. Asked 2026-09-21: *"pichbend single word"*, because
+     `PITCH BEND` wrapped to two lines under a 46 px wheel while `MODULATION`
+     beside it sat on one, so the pair read as two different kinds of label and
+     the two slot numbers under them ended up 12.34 px apart. One token cannot
+     be broken, so both labels are now one line and `C9` and `C10` land level.
+     See the label rule in the styles above for the width decision that goes
+     with it. */
+````
+
+<a id="evo-60"></a>
+## evo-60: demo/evo/index.html, inline script, line 588
+
+````js
+    /**
+     * 🔴 A HAND MOVE IS SNAPPED TO THE STEPS THIS WHEEL REALLY HAS, WHICH IS
+     * THE ONE PLACE INTERACTIVITY COULD HAVE INVENTED PRECISION. Measured: 106
+     * bend messages, **every one with an LSB of 0**, so 128 of the 16384
+     * positions exist and the other 16256 cannot be reached by the object this
+     * is a picture of. A lane 16383 units long hands a dragging finger any of
+     * them, and a drawing that resolves finer than its instrument is the same
+     * mistake as printing a number nobody measured.
+     * ⚠️ AND THE DISPLAY SHOWS THE SEVEN BIT VALUE, which is what `take()` does
+     * with a bend off the wire, for the reason written there.
+     */
+````
+
+<a id="evo-61"></a>
+## evo-61: demo/evo/index.html, inline script, line 613
+
+````js
+    /* 🔴 THE ONE CONTROL WHOSE SLOT AND CONTROLLER NUMBER ARE BOTH KNOWN, so a
+       hand move can fill the display exactly as the wire does and claim nothing
+       extra. CC 1 is the documented default and was measured here. */
+````
+
+<a id="evo-62"></a>
+## evo-62: demo/evo/index.html, inline script, line 635
+
+````js
+  /* 🔴 THE SIX FUNCTION BUTTONS ARE GONE, ASKED 2026-09-23: *"rm/arhive funciton
+     buttons (they are disabled anyway, rigt)"*. They were, and more than that:
+     `fnPads` was pushed to and never read, so nothing on this page could ever
+     light one, and the manual says why nothing could. 📄 *"no data leaves the
+     keyboard in edit mode except program and bank changes"*, so there is no
+     message any of them can send for this page to hear. Six controls that can
+     neither be pressed nor lit are a picture of a picture.
+     ⚠️ WHAT WENT WITH THEM IS THEIR PRINTED NAMES, and that is the real cost:
+     `GLOBAL CHANNEL`, `CONTROL ASSIGN`, `PROGRAM`, the five dual press pairs.
+     Those are the panel's own vocabulary and the only place this page said them.
+     They are in `research/evo-mk425c-face-2026-09-21.md`, which is where the
+     whole face is recorded, and in this repository's history.
+     ⚠️ AND THE ROW IS NOT REPLACED BY A GAP. `row` holds the octave pair, the
+     nameplate and the rotaries, which is what the back strip is for. */
+````
+
+<a id="evo-63"></a>
+## evo-63: demo/evo/index.html, inline script, line 650
+
+````js
+  /**
+   * ⚠️ OCTAVE AND TRANSPOSE ARE DRAWN AND ARE LIT BY NOTHING. The manual gives
+   * 11 octaves of range from these two, and `/dump/` saw no octave shift at
+   * all: the 25 notes measured were one contiguous run, so whatever was pressed
+   * either did not take or was undone before anything was played. **The octave
+   * step is unmeasured**, and a button that moved this drawing on a guess would
+   * be a page inventing a fact about an instrument.
+   */
+````
+
+<a id="evo-64"></a>
+## evo-64: demo/evo/index.html, inline script, line 660
+
+````js
+  /* 🔴 SMALLER CIRCLES, ASKED AS *"also smaller versions of +- circlar ones"*.
+     A panel MIRROR draws a button at the size the real one is relative to what
+     is around it, and `--ctl-w` is sized for a control somebody presses with a
+     finger. These two are drawn, not pressed. */
+````
+
+<a id="evo-65"></a>
+## evo-65: demo/evo/index.html, inline script, line 664
+
+````js
+  /* 🔴 THEY PRESS AND THE DRAWING DOES NOT MOVE, WHICH IS THE WHOLE POINT. The
+     paragraph above is unchanged and is the reason: the octave step is
+     unmeasured, so a keyboard that slid an octave under a press would be this
+     page inventing a fact about an instrument. `createKeyboard` is pinned at
+     `minBase: KEY_LO, maxBase: KEY_LO` for the same reason and stays pinned.
+     ✅ WHAT THE PRESS BUYS IS THE SENTENCE, said once, in the log. Before this
+     the button refused the press and a reader learned nothing at all. */
+````
+
+<a id="evo-66"></a>
+## evo-66: demo/evo/index.html, inline script, line 687
+
+````js
+  /* 🔴 NEITHER NAME IS PRINTED HERE ANY MORE. Asked 2026-09-23: *"rm octave and
+     transpose labels"*, which is the last of this afternoon's printed type to
+     come off this panel after the two group boxes and `SNAP SHOT`.
+     ⚠️ WHAT THEY SAID IS REAL AND IS NOT LOST. `OCTAVE` named the pair and
+     `TRANSPOSE` named what the same two buttons do pressed together, and both
+     are in the hover on those buttons and in
+     `research/evo-mk425c-face-2026-09-21.md`, which is where the whole face is
+     recorded. What came off the face is grey type naming two buttons that carry
+     a minus and a plus and are lit by nothing.
+     ⚠️ AND THE ROW LOSES THE ROOM IT KEPT FOR THEM: `.evo-oct-row`'s bottom
+     padding existed to hold the absolutely positioned `TRANSPOSE` under the
+     pair, so leaving it would be reserving space for a label that is gone. */
+````
+
+<a id="evo-67"></a>
+## evo-67: demo/evo/index.html, inline script, line 703
+
+````js
+  /* The nameplate, in the middle of the back strip where the logo sits, between
+     the octave pair and the rotaries.
+     ⚠️ `place: 'mid'` IS THE WHOLE REASON THE PLACEMENT IS AN OPTION, and the
+     measurement that bought it is on `.panel-plate` in `shell.css`: an `ends`
+     row stretched across this panel's full 1575 px put `MK-425C` at x 1780,
+     500 px off the right edge of the screen, and nobody had ever seen it. */
+````
+
+<a id="evo-68"></a>
+## evo-68: demo/evo/index.html, inline script, line 715
+
+````js
+  /* 🔴 THE KIT'S OWN KNOB BANK, NOT A SECOND ROW OF KNOBS. Asked 2026-09-23:
+     *"use std knob grid and separartors on c1-c9. in general, make evo roghly
+     made of stadard pieces"*. This page had hand rolled both the row and the
+     hairline in it, and `createKnobBank` already existed with a `.pos-knob-row`
+     that does the sideways scrolling and the `min-width: 0` that goes with it.
+     What it did not have was the divider, so the divider moved INTO it rather
+     than a second row being kept here.
+     ⚠️ THE SPLIT IS ONE ROW WITH A GROUPING, NOT TWO BANKS. This instrument's
+     eight rotaries are one row of eight, and this page's own research names the
+     4 and 4 split as the feature most likely to be misread as two rows. Two
+     banks would make the misreading true. */
+````
+
+<a id="evo-69"></a>
+## evo-69: demo/evo/index.html, inline script, line 730
+
+````js
+      /* 🔴 NO `sub`, WHICH IS WHERE THE WORD `unbound` USED TO BE, EIGHT TIMES
+         OVER. Asked 2026-09-21: *"evolution: rm unbound labels and cc labels on
+         hw replicas in general"*. It was never a fact about the instrument, it
+         was the page admitting it did not know what a knob was wired to, and
+         printing that admission under every dial. The controller number's home
+         is the hover and the MIDI table, which is where `/circuit/`, `/twelve/`
+         and `/shape/` already keep theirs. */
+````
+
+<a id="evo-70"></a>
+## evo-70: demo/evo/index.html, inline script, line 752
+
+````js
+  /**
+   * 🔴 THE KIT'S KEYBOARD, NOT A FOURTH COPY OF ONE. `createKeyboard` already
+   * knows where a black key sits on the join, which this project measured
+   * against real piano proportions rather than centring them.
+   * ⚠️ IT TAKES A LETTER MAP because its other callers are played from a
+   * computer keyboard. This one is a picture of somebody else's instrument, so
+   * the letters are off and the map is 25 slots of nothing but a note offset.
+   * 🔴 **AND IT TAKES `sharps` SEPARATELY, WHICH IS THE THING THIS PAGE HAD
+   * NEVER PASSED.** The set holds the LETTER names of the black keys, not their
+   * notes and not their offsets, so a caller inventing its own key names has to
+   * say which of them are black or it gets none. See `KEY_PATTERN` above, and
+   * the note on `KEY_LO` for what that cost.
+   */
+````
+
+<a id="evo-71"></a>
+## evo-71: demo/evo/index.html, inline script, line 769
+
+````js
+  /* 🔴 `onDown` AND `onUp` ARE THE WHOLE OF WHAT MADE THESE KEYS LIVE, AND THE
+     COMPONENT NEEDED NO CHANGE. The keyboard has always lit the key it was
+     pressed on and always called these two; what stopped a press reaching it
+     was this page's own `pointer-events: none`, which came off on 2026-09-25
+     with the reasoning quoted in full at that rule.
+     ⚠️ **`how` IS THE THING TO READ AND NOT THE NOTE.** `lightNote` is what
+     `take()` uses for a note off the wire and it does NOT call these, so a
+     `pointer` here is always somebody's finger and never the instrument. The
+     page asserts that separation rather than trusting this sentence.
+     ⚠️ AND `minBase` AND `maxBase` STAY PINNED, so nothing a hand does can
+     slide the drawing off the range the wire was measured at. */
+````
+
+<a id="evo-72"></a>
+## evo-72: demo/evo/index.html, inline script, line 787
+
+````js
+    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN, asked 2026-09-30 for every
+       keyboard page. This panel has no sound engine, so what a loop plays back
+       here is the LAMP: a note the take heard off the wire, or a key pressed on
+       screen, comes back round lighting its key. It starts withdrawn and Listen
+       is what can bring it, because Listen is when this page opens MIDI. */
+````
+
+<a id="evo-73"></a>
+## evo-73: demo/evo/index.html, inline script, line 794
+
+````js
+    /**
+     * 🔴 THE PAGE LIGHTS THE KEY, AND TAKING `pointer-events` OFF WITHOUT THIS
+     * WOULD HAVE SHIPPED A KEYBOARD THAT TOOK A PRESS AND DID NOTHING AT ALL.
+     * MEASURED 2026-09-25, by the assert below going red on the first run: the
+     * press reached this callback and **0 keys lit**, because `press()` in
+     * `keyboard.mjs` calls `onDown` and never touches a class. Its own comment
+     * is the rule: *"a key is lit by a NOTE and never by the press that caused
+     * it"*, which is why `take()` calls `lightNote` for the wire and why a page
+     * that never passed `onDown` had nothing to light one with.
+     * ⚠️ **SO THE KEYS WERE INERT FOR TWO REASONS AND THE STYLESHEET WAS ONLY
+     * ONE OF THEM.** That is the shape this session already paid for on
+     * `/stage/`, where two transport buttons did nothing because the page
+     * passed `onPress` where the component reads `onClick`. A control that
+     * looks live and is inert is worse than one that refuses a press.
+     * ⚠️ AND `viaKey` IS THE COMPONENT'S OWN GUARD FOR THIS: a `lightNote`
+     * called from inside `onDown` is excluded from the finger set and the tape,
+     * so echoing a press back is not a second note.
+     */
+````
+
+<a id="evo-74"></a>
+## evo-74: demo/evo/index.html, inline script, line 818
+
+````js
+      /* 🔴 THE DISPLAY SAYS NOTHING FOR A KEY PRESSED HERE, AND THAT IS THE
+         RULE RATHER THAN AN OMISSION. A real key fills the three digits with
+         how hard it was hit, and a mouse has no velocity to report. Nothing
+         unmeasured prints as a number on this site, and a zero would read as a
+         very confident measurement of nothing. */
+````
+
+<a id="evo-75"></a>
+## evo-75: demo/evo/index.html, inline script, line 834
+
+````js
+  /* 🔴 THE KEYS ARE WHAT ABSORBS THE PANEL'S SLACK, AND IT IS AN ARGUMENT NOW
+     RATHER THAN A CLASS TYPED ON THIS PAGE. `panel.grow` applies `.panel-grow`,
+     which is `flex: 1 1 auto` plus the `min-height: 0` that everybody leaves
+     out. MEASURED here by switching it off in the live page: the flow goes
+     461.03 to 151 and these keys go **334.03 to 24**, because
+     `.evo-keys .k { height: auto }` below replaces the component's own key
+     height, so growth is the only thing giving this keyboard a size at all.
+     ⚠️ THE GROWTH HAS TO REACH THREE LEVELS AND THE COMPONENT OWNS ONE. This
+     box is the flow's child and `.panel-grow` handles it; the `.kbd` and the
+     `.keys` grid inside it are the keyboard component's insides and are this
+     page's business, below. */
+````
+
+<a id="evo-76"></a>
+## evo-76: demo/evo/index.html, inline script, line 847
+
+````js
+  /**
+   * 🔴 THE LABEL DIMMING SWEEP IS GONE, 2026-09-25, AND THE LINE IT REPLACED
+   * ASKED FOR EXACTLY THIS DAY IN WRITING. It read
+   * `for (const lab of card.querySelectorAll('.panel-sub, .panel-cap')) lab.dataset.off = '1';`
+   * under the heading *"EVERY PRINTED LABEL ON THIS PANEL NAMES SOMETHING
+   * SWITCHED OFF, SO EVERY ONE OF THEM DIMS"*, from the report
+   * *"on dislable pad buttons make labels way lighter"* on 2026-09-21, and its
+   * own comment finished: *"A page where some controls were live would have to
+   * mark only the labels naming the dead ones, so the check below refuses the
+   * day that becomes true here rather than letting these labels quietly start
+   * lying."*
+   * ✅ **THAT DAY IS TODAY AND THE ANSWER IS SIMPLER THAN THE SENTENCE
+   * EXPECTED**, because it is not SOME of the controls: every pad, every
+   * rotary and both wheels take a press now, so there is no dead one left for a
+   * label to name. The sweep does not get narrower, it goes.
+   * ⚠️ AND THE CHECK BELOW TURNED OVER WITH IT, from a ceiling on the loudest
+   * printed name to a floor under the faintest, against the same 3.0. The
+   * baseline it replaces read **1.89:1 on all eight**, which fails the new
+   * bound, so the two asserts sit provably on opposite sides of one number
+   * rather than one of them being retuned until it passed.
+   */
+````
+
+<a id="evo-77"></a>
+## evo-77: demo/evo/index.html, inline script, line 871
+
+````js
+  /**
+   * 🔴 WHAT ARRIVED, IN COLUMNS, BESIDE THE PANEL IT MOVED. Asked 2026-09-21:
+   * *"add midi event logs to circuit and rack demos"*, and this page was built
+   * the same hour, so it carries the same table.
+   * 🔴 **THE READING NEVER REPLACES THE BYTES.** That is `/dump/`'s whole
+   * design and the reason `midi-decode.mjs` returns both: a relative encoder
+   * reads as a position if all you have is an interpretation, and the panel
+   * above is exactly an interpretation.
+   * ⚠️ **CLOCK AND ACTIVE SENSING ARE COUNTED AND NEVER LISTED.** `decode`
+   * flags them as a flood. A table that printed them would be a table nobody
+   * can read a second after the button is pressed.
+   */
+````
+
+<a id="evo-78"></a>
+## evo-78: demo/evo/index.html, inline script, line 886
+
+````js
+  /* 🔴 ON THE PATCHBAY ON A PRESS OF Join, NEVER ON LOAD (plans/plan-routing-migration.md
+     step 5). The instruments plugged into this machine are announced as devices,
+     keyed by their ports and never by their names, so `/patchbay/` can draw and
+     link them. `evo:out -> pi-1:circuit:midi-in` is the plan's
+     own first demo: linked there, this page plays the board's Circuit. Join sits outside `.pos-controls` and asks for MIDI first
+     when Listen has not. `/shell/midi-node.mjs` has the rest. */
+````
+
+<a id="evo-79"></a>
+## evo-79: demo/evo/index.html, inline script, line 905
+
+````js
+  /**
+   * 🔴 THE CHANNEL, SAID ONCE, IN WORDS. This is where the readout's `channel`
+   * cell went when the row was removed on 2026-09-21 (*"rm keys / velocity /
+   * bend / channel in evo"*), and it had to go SOMEWHERE: deleting a display
+   * without rehoming what it said is how a page quietly stops reporting
+   * something, which is worse than reporting it badly.
+   * 🔴 **AND OF THE FOUR IT WAS THE ONLY ONE THAT NEEDED A NEW HOME.** The
+   * other three are already on screen twice over: the log lists every message
+   * with its channel, its raw bytes and a reading, so `keys` and `velocity` are
+   * in it row by row, and `bend` is the number under the wheel that just moved.
+   * The channel was the odd one out because the cell showed the SET of channels
+   * heard across the whole session, which is a fact about the instrument rather
+   * than about any one message, and no row can carry it.
+   * ⚠️ **IT IS WORTH A LINE BECAUSE THE ANSWER IS SURPRISING.** This keyboard's
+   * global channel was measured as 2 rather than 1, which is the kind of thing
+   * somebody rediscovers the hard way; `/bay/` carries a transform to
+   * compensate for it. A log line fires when something happened rather than on
+   * a clock, so it is the right surface for a fact that arrives once.
+   * 🔴 **AND IT IS THE OBSERVATION, NOT THE EXPECTATION, WHICH IS WHY IT IS NOT
+   * A SECOND COPY OF THE LINE THE PRESS ALREADY WRITES.** That one states what
+   * was MEASURED, out of `GLOBAL_CH`. This one states what is ARRIVING, out of
+   * the byte. Two independent sources, so they can disagree and say so, which
+   * is the repair this project took from the MIM corpus: two numbers derived
+   * from one field move together while being wrong.
+   */
+````
+
+<a id="evo-80"></a>
+## evo-80: demo/evo/index.html, inline script, line 931
+
+````js
+  /* 🔴 `decode` ALREADY COUNTS FROM ONE AND THIS LINE COUNTED AGAIN, SO THE ONE
+     SENTENCE THIS PAGE WRITES ABOUT ITS OWN SUBJECT SAID `3` FOR A KEYBOARD ON
+     2. Found 2026-09-25 while making the panel interactive, not by a check.
+     📄 `midi-decode.mjs:122`: `const ch = (st & 0x0f) + 1;   // 1-16 for a
+     reader; the wire is 0-15`, so `m.ch` is already the number a person reads,
+     and `const n = ch + 1` here made it one higher. The page then took its own
+     `n === GLOBAL_CH` test the wrong way and logged the disagreement as a
+     WARNING, on every session, about an instrument that was answering exactly
+     where it was measured.
+     🔴 **IT SURVIVED BECAUSE NOTHING GRADED IT AND ONE NEIGHBOUR DID.** `chSeen`
+     holds the same `m.ch` and the assert on it reads `includes(GLOBAL_CH)`,
+     which is right and passes, so the page had one correct reading of the
+     channel and one wrong one two lines apart. The harness prints no page log,
+     so 59/59 green said nothing about the sentence a visitor reads. There is an
+     assert on the sentence now. */
+````
+
+<a id="evo-81"></a>
+## evo-81: demo/evo/index.html, inline script, line 955
+
+````js
+  /**
+   * 🔴 THE TAP, AND IT ANSWERS A QUESTION NOTHING ELSE ON THIS PAGE CAN. Asked
+   * 2026-09-23: *"can you detect cc smoothinng. tap and measure when i turn
+   * c1-c8 on evi"*.
+   * Whether a rotary is smoothed is a fact about the INSTRUMENT, not about this
+   * code, and no manual says: the Advanced Guide describes what the knobs send
+   * and never how they are read. It is measurable off the wire, and only off the
+   * wire, because everything downstream of `take()` has already thrown away the
+   * timing.
+   * ⚠️ IT RECORDS EVERY CONTROL MESSAGE AND NOT ONLY THE EIGHT, because what
+   * separates a smoothed knob from a coarse one is partly what ELSE arrives
+   * while it is moving, and a filter applied at the tap is a filter the analysis
+   * cannot undo.
+   * ⚠️ AND IT IS BEHIND `?rec=1`, so no control appears for anybody else, no
+   * harness press moves, and nothing is recorded, offered or sent unless
+   * somebody opened the page asking for it.
+   */
+````
+
+<a id="evo-82"></a>
+## evo-82: demo/evo/index.html, inline script, line 983
+
+````js
+      /**
+       * 🔴 EVERY RELEASE ON THIS KEYBOARD IS A NOTE ON AT VELOCITY 0. Measured
+       * 25 times, and **not one real `0x80` in the whole capture**. Anything
+       * treating `0x90` as "on" leaves all 25 keys hanging, which is the trap
+       * `midi-decode.mjs` exists to close, and this instrument is the live
+       * example of it. The decoder has already resolved it above.
+       */
+````
+
+<a id="evo-83"></a>
+## evo-83: demo/evo/index.html, inline script, line 992
+
+````js
+        /* 🔴 A NOTE JUST BELOW THE BOTTOM KEY IS A TRANSPOSE, AND SAYING SO HERE
+           IS THE REPAIR FOR A WARNING THAT HAD BECOME UNREACHABLE. It used to
+           live further down, after this guard, and fire on `m.note < 48`. Moving
+           the base to 48 when the instrument's own transpose was fixed made that
+           test `m.note < KEY_LO`, which is the same condition this guard already
+           returns on, so the warning could never run again.
+           ⚠️ AND IT IS A DIFFERENT SENTENCE FROM `outside the 25 keys`, because
+           the two facts are different: an F7 from some other device is off grid
+           and means nothing, while a B2 arriving one semitone under the bottom
+           key is this instrument shifted. Within an octave below is the band
+           where that is the likely reading. */
+````
+
+<a id="evo-84"></a>
+## evo-84: demo/evo/index.html, inline script, line 1020
+
+````js
+        /* The instrument shows a velocity briefly when a button in note mode is
+           pressed, and a key is the same fact. Nothing on the wire says which
+           slot a KEY is, and a key is not an assignable control, so the small
+           field has nothing to say about it. */
+````
+
+<a id="evo-85"></a>
+## evo-85: demo/evo/index.html, inline script, line 1034
+
+````js
+      /* 🔴 THE SMALL FIELD SAYS `C9` AND THE LARGE ONE STAYS OUT OF IT. Asked
+         2026-09-23: *"ptichbend is 09 and mod 10, can not see it on small
+         segmented"*. Which control moved is a fact this page knows for certain,
+         printed on the panel, and it costs nothing to say.
+         🔴 AND THE VALUE IS THE SEVEN BIT ONE, WHICH IS THE ONLY ONE THIS WHEEL
+         HAS. Asked *"can not see pbend value on segmented"*, and the old comment
+         refused on the grounds that 14 bits overflow three digits, which is true
+         of the NUMBER and false of the INSTRUMENT: this page's own header
+         records 106 bend messages measured with **an LSB of 0 on every one**, so
+         the wheel resolves 128 steps and sends them in the MSB. Three digits
+         hold that exactly, and showing the 14 bit number would be printing
+         precision the hardware does not have. */
+````
+
+<a id="evo-86"></a>
+## evo-86: demo/evo/index.html, inline script, line 1052
+
+````js
+      /* 🔴 THE ONE CONTROL WHOSE SLOT AND CONTROLLER NUMBER ARE BOTH KNOWN. The
+         panel prints `C10` under this wheel, so that is what the small field
+         says, and the wire's CC 1 is a different fact printed beside the wheel
+         itself. */
+````
+
+<a id="evo-87"></a>
+## evo-87: demo/evo/index.html, inline script, line 1074
+
+````js
+      /**
+       * 🔴 THE POSITIONS ARE A MAP NOW AND THE BINDING IS STILL NOT. Knob `n`
+       * on screen is the knob printed `Cn`, full stop, which is what the report
+       * about the order was about and is fixed above by `ROTARIES`. What is
+       * still unknown, and is unknown in the instrument rather than in this
+       * page, is which of the eight slots sends a given controller number: it
+       * is a per preset, per unit setting in non volatile memory and no manual
+       * prints it.
+       * ⚠️ **SO A CONTROLLER NUMBER FOLLOWS THE FIRST FREE ROTARY AND THE LOG
+       * SAYS THAT IN THOSE WORDS.** It is an association this page made, never
+       * a reading of the panel, and the difference is the `/circuit/` drum grid
+       * mistake: that page coloured a pad by a note's position in a discovery
+       * map and so reported the instrument while looking like it was reporting
+       * the beat.
+       * ⚠️ AND THE NUMBER GOES IN THE HOVER RATHER THAN UNDER THE DIAL, because
+       * the face carries what the instrument prints on itself.
+       */
+````
+
+<a id="evo-88"></a>
+## evo-88: demo/evo/index.html, inline script, line 1103
+
+````js
+      /* 🔴 BOTH FIELDS, WHICH IS WHAT THE MANUAL DESCRIBES AND THIS PAGE WAS
+         ONLY HALF DOING. Reported 2026-09-23 as *"segmented does not update when
+         cc's are changed"*, and the three digits were updating all along, which
+         an assert on this page already proved. What never moved was the small
+         field, and it is the one the instrument uses for this.
+         📄 The Advanced Guide, quoted in `research/evo-mk425c-face-2026-09-21.md`:
+         *"In Default mode, the LCD will show the controller symbol, and the 2
+         digit display will show the last selected controller. The 3 digits
+         display the currently assigned MIDI CC number."*
+         ⚠️ THE OLD COMMENT SAID THE SLOT WAS THE UNKNOWN, AND THAT IS NO LONGER
+         TRUE HERE. Nothing on the wire says which of the eight rotaries sent a
+         CC, so the page works it out by order of arrival, and by this line it
+         has a slot in hand. It is an inference and the log already says so in
+         those words, which is why the small field carries the rotary and not a
+         claim about the hardware. */
+````
+
+<a id="evo-89"></a>
+## evo-89: demo/evo/index.html, inline script, line 1130
+
+````js
+        /* 🔴 `port.open()`, WHICH THE SPECIFICATION SAYS IS IMPLICIT AND IS
+           NOT RELIABLE. Measured 2026-09-20: four live instruments read as an
+           empty room because every port sat `connected/closed`. A page with
+           closed ports is pixel for pixel a page watching a silent one. */
+````
+
+<a id="evo-90"></a>
+## evo-90: demo/evo/index.html, inline script, line 1149
+
+````js
+  /* ⚠️ `says: WIRED`, NOT THIS PAGE'S OWN THREE WORDS. Asked 2026-09-21:
+     *"Use connected connecting not connected on all hw demos when applicable"*.
+     `online` and `offline` are network words and suit a board answering over a
+     relay from another building; an instrument on a USB cable on this desk is
+     connected or it is not. The map is one export in `presence.mjs` so that five
+     pages cannot end up with five vocabularies that agree today. */
+````
+
+<a id="evo-91"></a>
+## evo-91: demo/evo/index.html, inline script, line 1166
+
+````js
+      /* ⚠️ ONLINE MEANS A PORT WITH THIS NAME ON IT, NOT THAT MIDI WAS GRANTED.
+         Permission is a fact about the browser and presence is a fact about the
+         desk, and reporting the first as the second says `online` about an
+         empty room. */
+````
+
+<a id="evo-92"></a>
+## evo-92: demo/evo/index.html, inline script, line 1189
+
+````js
+    /* 🔴 THE RANGE MOVED WITH THE INSTRUMENT: 48 to 72 since the transpose was
+       fixed on the desk, where this read 47 to 71. ⚠️ AND 47 IS STILL SENT, ON
+       PURPOSE: a note below the bottom key is what the page has to NOTICE, so
+       the check feeds it one rather than asserting a flag the page set for
+       itself. That is the half the old check could not see. */
+````
+
+<a id="evo-93"></a>
+## evo-93: demo/evo/index.html, inline script, line 1202
+
+````js
+    /**
+     * 🔴 THE DISPLAY'S OWN RULE, ASSERTED AT THE ONE MOMENT BOTH FIELDS CAN BE
+     * FILLED. The mod wheel is the only control on this instrument whose slot
+     * AND controller number are both known, so it is the only reading where the
+     * small field has anything to say. Asserted here rather than at the end,
+     * because the next few messages replace it.
+     */
+````
+
+<a id="evo-94"></a>
+## evo-94: demo/evo/index.html, inline script, line 1209
+
+````js
+    /* ⚠️ THE VALUE IN THE LARGE FIELD AND THE CC IN THE SMALL ONE, which reverses
+       what this check asserted an hour ago and is written down in `show()` with
+       the manual's own contrary table beside it. The mod wheel is CC 1, so the
+       small field is the one that reads 1 now. */
+````
+
+<a id="evo-95"></a>
+## evo-95: demo/evo/index.html, inline script, line 1219
+
+````js
+    /* 🔴 THIS CHECK REVERSED ON 2026-09-23 AND THE OLD ONE IS QUOTED SO IT IS NOT
+       RE-ARGUED. It read `a rotary fills only the value, because nothing says
+       which slot sent it`, and asserted the small field went back to blank.
+       Reported as *"segmented does not update when cc's are changed"*, and the
+       three digits had been updating all along: it was the small field that
+       never moved.
+       📄 THE MANUAL DESCRIBES BOTH FIELDS TOGETHER: *"In Default mode, the LCD
+       will show the controller symbol, and the 2 digit display will show the
+       last selected controller. The 3 digits display the currently assigned MIDI
+       CC number."* Blank was this page being more cautious than the instrument.
+       ⚠️ THE CAUTION IT WAS PROTECTING IS STILL REAL AND HAS MOVED, NOT GONE. A
+       rotary's slot is not on the wire and the page works it out by order of
+       arrival, which is an inference; the log says so in those words already,
+       and the small field carries the page's best reading rather than a claim
+       about what the hardware sent. */
+````
+
+<a id="evo-96"></a>
+## evo-96: demo/evo/index.html, inline script, line 1248
+
+````js
+    /**
+     * 🔴 THE ONE THAT MATTERS ON THIS INSTRUMENT. A release arrives as a note
+     * on at velocity 0 and there is no `0x80` anywhere in its traffic, so a
+     * page that took `0x90` for "on" would hold every key it was ever sent.
+     */
+````
+
+<a id="evo-97"></a>
+## evo-97: demo/evo/index.html, inline script, line 1253
+
+````js
+    /* ⚠️ COUNTED OFF THE PAINTED KEYS, because the keyboard publishes no list
+       of what is held and an assert written against a method it does not have
+       would be satisfied by that absence. Two keys were struck and the higher
+       one was released, so exactly one stays down. */
+````
+
+<a id="evo-98"></a>
+## evo-98: demo/evo/index.html, inline script, line 985
+
+````js
+    /* 🔴 A KEY THAT IS PLAYED SHOWS THE SAME DOT `/nola/` SHOWS, from the same
+       component and the same rule. Asked 2026-09-23: *"reuse keyboard compoend
+       and the active dots we developed for nino"*. This page already builds
+       `createKeyboard`, so what was worth checking is that its ACTIVE state
+       survives the overrides this page puts on those keys: `height: auto`, a 62
+       per cent black key and pinned columns, none of which should reach the dot.
+       ⚠️ MEASURED AS A COMPUTED BACKGROUND rather than as a class, because a
+       class says the page asked and a colour says a reader sees it.
+       🔴 AND IT IS READ AFTER A FRAME, WHICH COST ONE RUN. `.k .kd` carries a
+       60 ms background transition, and `getComputedStyle` taken in the same tick
+       as the class change returns the value the transition is STARTING FROM, so
+       a working dot read as fully transparent. A transition makes an instant
+       reading a reading of the moment before. */
+````
+
+<a id="evo-99"></a>
+## evo-99: demo/evo/index.html, inline script, line 1012
+
+````js
+    /* 🔴 THIS CHECK GRADED THE PAGE'S OWN ARITHMETIC AND COULD NOT SEE THE
+       INSTRUMENT MOVE, WHICH IS WHY IT NEEDED REPLACING RATHER THAN RETUNING.
+       It read `KEY_LO === 47 && flatSaid`, and both halves are the page's own:
+       `KEY_LO` is a constant this file typed, and `flatSaid` is set by a
+       SYNTHETIC message the check feeds itself. `BACKLOG.md` names it as a green
+       suite meaning zero coverage on the one page whose whole job is to report
+       what the wire says, and it was right: the transpose was fixed on the desk
+       and nothing here went red.
+       ✅ WHAT IS CHECKED NOW IS THE PICTURE AND THE WARNING, which are the two
+       things this page owes a reader. The drawing has to start on a C, because a
+       25 key controller does and this instrument is one; and a note arriving
+       below the bottom key has to be SAID, because that is the page noticing a
+       transpose rather than silently lighting the wrong key. */
+````
+
+<a id="evo-100"></a>
+## evo-100: demo/evo/index.html, inline script, line 1037
+
+````js
+    // ⚠️ AND THE NEGATIVE HALF, because a reader that returned a plausible
+    // number for any input would pass the line above.
+````
+
+<a id="evo-101"></a>
+## evo-101: demo/evo/index.html, inline script, line 1046
+
+````js
+    /* ⚠️ OFF THE KNOBS' OWN COUNTERS RATHER THAN OFF THIS PAGE'S BOOKKEEPING,
+       so the claim is about what moved rather than about what was recorded. */
+````
+
+<a id="evo-102"></a>
+## evo-102: demo/evo/index.html, inline script, line 1070
+
+````js
+    /**
+     * 🔴 THE ASK, MADE CHECKABLE. Asked 2026-09-25: *"evo: / make all buttons
+     * interactive"*, against a panel where every pad, every rotary and both
+     * wheels were built `disabled: true` and the keys carried
+     * `pointer-events: none`.
+     * ⚠️ **THE KEYBOARD'S OWN PAD IS EXCLUDED AND THAT IS NOT A CONVENIENCE.**
+     * `createKeyboard` draws an octave pair and a `Notes off` for a keyboard
+     * somebody plays from a computer, and this page hides it with
+     * `.evo-keys .kbd .kpad { display: none }` because this instrument's octave
+     * pair is in the back strip. It is `.step`, not `.pos-pad`, so it is not in
+     * this count anyway, and the next assert is the one that keeps it away.
+     */
+````
+
+<a id="evo-103"></a>
+## evo-103: demo/evo/index.html, inline script, line 1093
+
+````js
+    /**
+     * 🔴 WHAT THE SUITE PRESSES DID NOT CHANGE, AND THAT HAD TO BE TRUE BEFORE
+     * ANY OF THE ABOVE COULD BE DONE. `demo/verify.mjs:819` clicks
+     * `.pos-controls button, .tbar-x` on every run, dozens of times a day, so a
+     * page that makes inert controls live is a page that changes what the suite
+     * DOES to it. **Every control on this panel is inside the card and none of
+     * them is in that row**, which is why enabling them reached nothing.
+     * 🔴 **AND `/shape/` STATES THE RULE THIS IS AN INSTANCE OF**: *"a `move
+     * everything` in there would be the suite putting a random patch on
+     * somebody's synth dozens of times a day"*. There is a Novation Circuit and
+     * a Raspberry Pi on this desk and neither has an undo. This page cannot
+     * reach either even by accident, because it opens MIDI INPUTS and has no
+     * output path at all, and the assert below is that claim rather than this
+     * sentence.
+     * ⚠️ MEASURED WITH THE HARNESS'S OWN SELECTOR, typed once here, so a page
+     * that grew a second control in that row would have to answer for it.
+     */
+````
+
+<a id="evo-104"></a>
+## evo-104: demo/evo/index.html, inline script, line 1120
+
+````js
+    /**
+     * 🔴 A HAND ON THE PANEL MOVES THE DRAWING AND ADDS NOT ONE ROW TO THE
+     * TABLE, WHICH IS THE WHOLE SAFETY ARGUMENT FOR MAKING IT INTERACTIVE AT
+     * ALL. That table is a record of what ARRIVED, the same thing `/dump/` is,
+     * and a screen press did not arrive: it never crossed a wire. A page where
+     * the two were indistinguishable would be worse than a page nobody can
+     * touch, because a reader would believe it.
+     * ⚠️ **BOTH SIDES, BECAUSE ONE OF THEM ALONE IS VACUOUS.** A panel that did
+     * nothing at all would also add no rows, so the display has to have moved;
+     * and a table that was empty to begin with would pass the first half by
+     * accident, so the row count before has to be non zero.
+     * ⚠️ AND THE WIRE'S OWN COUNTERS ARE READ ACROSS THE PRESS, because
+     * `notes`, `ccSeen` and `chSeen` are what this page's measurements of the
+     * instrument are built on and a hand must not be able to move any of them.
+     */
+````
+
+<a id="evo-105"></a>
+## evo-105: demo/evo/index.html, inline script, line 1135
+
+````js
+    /* 🔴 THE PAD IS READ ON ITS OWN BEFORE THE KNOB IS TOUCHED, AND THAT IS NOT
+       TIDINESS: THE FIRST VERSION OF THIS ASSERT PASSED WITH THE PAD DOING
+       NOTHING AT ALL. It read both controls and then one reading at the end, so
+       the knob satisfied every clause and a keypad press that never reached the
+       page was invisible. **A deliberate sabotage is what found it**, by coming
+       back green when it should have gone red, and the defect it uncovered was
+       real: a per pad `onPress` that `createPadGrid` overwrites. Two controls
+       are two readings. */
+````
+
+<a id="evo-106"></a>
+## evo-106: demo/evo/index.html, inline script, line 1160
+
+````js
+    /**
+     * 🔴 THE ONE SENTENCE THIS PAGE WRITES ABOUT ITS OWN SUBJECT SAID THE WRONG
+     * NUMBER, AND NOTHING GRADED IT UNTIL NOW. `sayChannel` added one to a
+     * channel `midi-decode.mjs` had already counted from one, so a keyboard
+     * answering exactly where it was measured was reported as a WARNING naming
+     * a channel it was not on. Found 2026-09-25 by reading, not by a red run,
+     * because the harness prints no page log and every other assert was green.
+     * ✅ **TWO INDEPENDENT SOURCES, WHICH IS THE POINT.** The number in the
+     * sentence comes from the prose path and `chSeen` comes from the byte, so
+     * they can disagree and say so. That is the repair this project took from
+     * the MIM corpus, where two numbers derived from ONE field moved together
+     * while both were wrong.
+     */
+````
+
+<a id="evo-107"></a>
+## evo-107: demo/evo/index.html, inline script, line 1181
+
+````js
+    /**
+     * 🔴 THE PANEL'S COUNTS, WHICH ARE WHERE A REPLICA GOES WRONG FIRST. Six
+     * function buttons and five dual press labels is a 425C; eight and eight is
+     * a 449C, and a cover photograph in one of this instrument's own manuals is
+     * a third keyboard entirely.
+     */
+````
+
+<a id="evo-108"></a>
+## evo-108: demo/evo/index.html, inline script, line 1187
+
+````js
+    /* 🔴 THIS CHECK COUNTED SIX FUNCTION BUTTONS AND NOW ASSERTS THERE ARE NONE,
+       which is the shape a removal has to take here or the count quietly drops
+       out of the run. Asked as *"rm/arhive funciton buttons (they are disabled
+       anyway, rigt)"*, and they were: nothing read `fnPads` and the manual says
+       no data leaves the keyboard in edit mode except program and bank changes,
+       so no message exists for this page to light one with. */
+````
+
+<a id="evo-109"></a>
+## evo-109: demo/evo/index.html, inline script, line 1198
+
+````js
+    /**
+     * 🔴 THE DISPLAY IS TWO FIELDS, READ OFF THE PICTURE RATHER THAN OFF THE
+     * OPTIONS IT WAS BUILT WITH. Seven bars a digit, so three digits is 21
+     * polygons and two is 14, and a field that quietly came back with a
+     * different number of cells could not pass this while `digits` still said
+     * the right thing.
+     */
+````
+
+<a id="evo-110"></a>
+## evo-110: demo/evo/index.html, inline script, line 1215
+
+````js
+      /**
+       * 🔴 A REAL POINTER ON A REAL KEY, BECAUSE THE ALTERNATIVE IS THE FAILURE
+       * THIS WHOLE TASK STARTED FROM: A CONTROL THAT LOOKS LIVE AND IS INERT.
+       * The keys stopped being `pointer-events: none` on 2026-09-25 and nothing
+       * in a stylesheet can say whether a press now REACHES the page, so this
+       * drives the component's own pointer path and reads what the page did.
+       * ⚠️ **SCROLLED IN AND THE RECTANGLE RE-READ AFTER**, which is this
+       * project's own recorded trap: `demo/verify.mjs` runs in an 800 by 600
+       * viewport and these pages are taller, so an event dispatched at a `y`
+       * past the bottom lands on nothing at all, silently, and the check reads
+       * as a dead control.
+       * ⚠️ AND `elementFromPoint` IS WHAT THE COMPONENT USES, so the point has
+       * to be the middle of a key rather than the element being the target.
+       * `keyboard.mjs` wraps its `setPointerCapture` for exactly this: a
+       * `PointerEvent` built in script is untrusted and capture throws on it.
+       * 🔴 **THE DISPLAY MUST STAY EMPTY, WHICH IS THE HALF THAT IS A CLAIM
+       * ABOUT HONESTY RATHER THAN ABOUT WIRING.** A real key fills the three
+       * digits with how hard it was hit and a mouse has no velocity, so a
+       * number there would be this page inventing one.
+       */
+````
+
+<a id="evo-111"></a>
+## evo-111: demo/evo/index.html, inline script, line 1258
+
+````js
+      /**
+       * 🔴 BOTH FIELDS ARE THE BACKLIT KIND AND THE WINDOW THEY SIT IN AGREES.
+       * The failure this catches is a page and a component disagreeing about
+       * which instrument they are drawing, which is visible as a pane in one
+       * scheme's colour behind digits in the other's.
+       * ⚠️ IT SAID `reflective` UNTIL 2026-09-21 AND WAS RE-POINTED RATHER THAN
+       * DELETED, when the panel was put back on `backlit` on instruction. The
+       * claim worth keeping is that the page draws the display it says it draws;
+       * which of the two it is is a decision above this check.
+       * 🔴 **READ AS COMPUTED COLOUR AND AS A DIRECTION, NEVER AS A HEX.** A
+       * check that names a colour is a second copy of the stylesheet and the two
+       * will disagree: both ghost values moved twice in one afternoon and the
+       * blue came a long way down in the same day. So the ink and the glass are
+       * read off the rendered elements, the expectation is resolved from
+       * `SCHEMES` through the browser so a comparison is about colour rather
+       * than spelling, and the LAST clause is what makes it a display rather
+       * than two matching strings: a backlit panel's ink is lighter than its
+       * field, which is what the word means.
+       */
+````
+
+<a id="evo-112"></a>
+## evo-112: demo/evo/index.html, inline script, line 1303
+
+````js
+      /* 🔴 EVERY LAYOUT CLAIM BELOW IS READ OFF A RENDERED RECT AND NOT OFF THE
+         CODE THAT FILLED IT, because the defect this rebuild was handed was
+         invisible in the source and obvious in a rect: a nameplate at x 1780 on
+         a 1280 px screen, written by a `space-between` row that read as
+         perfectly ordinary. */
+````
+
+<a id="evo-113"></a>
+## evo-113: demo/evo/index.html, inline script, line 1309
+
+````js
+      /**
+       * 🔴 THE EIGHT ROTARIES READ `C1` TO `C8` IN LEFT TO RIGHT SCREEN ORDER.
+       * Sorted by rect rather than by DOM order, so the printed divider that
+       * sits between `C4` and `C5` cannot put them out of sequence and neither
+       * can a `flex-direction` somebody changes later.
+       */
+````
+
+<a id="evo-114"></a>
+## evo-114: demo/evo/index.html, inline script, line 1319
+
+````js
+      /* 🔴 AGAINST THE NUMBERING SCHEME, NOT AGAINST `ROTARIES`, AND SABOTAGE
+         IS WHAT FOUND THAT. The first version of this line compared the
+         rendered labels against the same constant that had built them, so
+         reversing that constant to `C8` first left it GREEN: two numbers
+         derived from one field, which is the trap that re-credited a recording
+         in the MIM corpus. The expectation is generated from the instrument's
+         own flat one based numbering instead, which the research closes with no
+         remainder across two models, so the printed list and the scheme are two
+         sources and can disagree. */
+````
+
+<a id="evo-115"></a>
+## evo-115: demo/evo/index.html, inline script, line 1332
+
+````js
+      /**
+       * 🔴 NOTHING ON THE PANEL PRINTS A CONTROLLER NUMBER OR THE WORD
+       * `unbound`. Asked 2026-09-21: *"evolution: rm unbound labels and cc
+       * labels on hw replicas in general"*. Scanned over what the panel
+       * RENDERS, so a `sub` re-added anywhere on it fails this wherever it is
+       * put, rather than only where somebody remembered to look.
+       * ⚠️ THE DISPLAY IS EXEMPT BY CONSTRUCTION AND NOT BY AN EXCEPTION: it is
+       * an SVG of polygons with no text nodes in it, and showing a controller
+       * number is what the real display does.
+       * ⚠️ THE DETAIL NAMES WHICH HALF FAILED, because the first version
+       * reported "none of them a CC" while going red on the word `unbound`, and
+       * a failure line that describes the passing half is one nobody can act on.
+       */
+````
+
+<a id="evo-116"></a>
+## evo-116: demo/evo/index.html, inline script, line 1354
+
+````js
+      /* ⚠️ AND THE OTHER HALF, because deleting the display without rehoming
+         the fact is how a page quietly stops reporting something. */
+````
+
+<a id="evo-117"></a>
+## evo-117: demo/evo/index.html, inline script, line 1360
+
+````js
+      /**
+       * 🔴 NEITHER GROUP CARRIES A PRINTED LABEL, AND THAT IS TWO BARS AND THREE
+       * CONNECTORS GONE. Asked 2026-09-21: *"rm funciton buttons / assignable
+       * buttons labels"* and *"no need to snapshot and funciton button separator
+       * lines"*. Checked over the panel's rendered text so the words cannot come
+       * back anywhere on it, and over the elements so a removed one cannot leave
+       * this assert green against nothing.
+       */
+````
+
+<a id="evo-118"></a>
+## evo-118: demo/evo/index.html, inline script, line 1375
+
+````js
+      /* ⚠️ AND THE FACT THE `ASSIGNABLE` BAR CARRIED IS REHOMED RATHER THAN
+         DELETED. Twelve blank keys with no name anywhere read as broken rather
+         than as blank on purpose, so the word is in the group's hover. */
+````
+
+<a id="evo-119"></a>
+## evo-119: demo/evo/index.html, inline script, line 1378
+
+````js
+      /* ⚠️ THE DETAIL QUOTES THE HOVER RATHER THAN DESCRIBING IT, because the
+         first version printed "the keypad group says so on hover" while going
+         red, which is a failure line describing the thing that did not happen. */
+````
+
+<a id="evo-120"></a>
+## evo-120: demo/evo/index.html, inline script, line 1385
+
+````js
+      /**
+       * 🔴 THE KEYPAD IS THREE ACROSS AND FOUR DOWN, counted off distinct rect
+       * columns and rows rather than off the `cols` and `rows` handed to the
+       * grid, which is the same two-numbers-from-one-field trap the corpus
+       * build shipped once.
+       */
+````
+
+<a id="evo-121"></a>
+## evo-121: demo/evo/index.html, inline script, line 1395
+
+````js
+                               /* ⚠️ THE FACE, NOT THE TOP LABEL. The digits moved
+                                  onto the buttons on 2026-09-23 to save a text
+                                  slot of height per row, and this check read the
+                                  slot they left. It went red reporting two empty
+                                  strings, which is a check measuring furniture
+                                  rather than the thing it names. */
+````
+
+<a id="evo-122"></a>
+## evo-122: demo/evo/index.html, inline script, line 1407
+
+````js
+      /**
+       * 🔴 AND ITS BUTTONS ARE HALF HEIGHT, MEASURED OFF THE BUTTON AND NOT OFF
+       * THE WRAPPER. Asked 2026-09-21: *"evo: half height buttons in numpad"*.
+       * `.pos-pad-half` is *"same width, half the height"*, and its own comment
+       * records that it was `aspect-ratio: 2 / 1` for an hour, which is the same
+       * thing only while the width is fixed. So the WIDTH is asserted too: this
+       * has to be a height change and not a scale-down.
+       */
+````
+
+<a id="evo-123"></a>
+## evo-123: demo/evo/index.html, inline script, line 1421
+
+````js
+      /**
+       * 🔴 AND 0 SITS IN THE BOTTOM ROW BETWEEN `-` AND `+`. The old page drew
+       * `0` to `9` in source order, so `0` came first, and `1 2 3` on the bottom
+       * row is the easiest mistake available here.
+       */
+````
+
+<a id="evo-124"></a>
+## evo-124: demo/evo/index.html, inline script, line 1435
+
+````js
+      /* 🔴 THE DUAL PRESS CENTRING CHECK WENT WITH THE BUTTONS IT MEASURED, and
+         it is recorded here rather than deleted quietly. It asserted that each
+         of the five dual press names sat on the midpoint of its own pair, within
+         a pixel, and it was load bearing: with the connector rules gone, that
+         centring was the only thing saying a name belonged to both buttons
+         rather than to the left one. There are no pairs now, so there is nothing
+         for it to be true about, and an assert about furniture that does not
+         exist is worse than no assert at all. The layout rule it protected lives
+         in `research/evo-mk425c-face-2026-09-21.md` with the rest of the face. */
+````
+
+<a id="evo-125"></a>
+## evo-125: demo/evo/index.html, inline script, line 1445
+
+````js
+      /**
+       * 🔴 THE NAMEPLATE SITS BETWEEN THE OCTAVE PAIR AND THE ROTARIES, INSIDE
+       * THE STRIP'S OWN CONTENT. Asked 2026-09-21: *"evolution title + model nr
+       * goes to the right of transpose, centered, scrolls with overflow"*, so it
+       * is no longer asserted to be on screen at load: it legitimately may not
+       * be, and scrolling reaches it.
+       * ⚠️ **THIS IS STILL THE ASSERT THAT WOULD HAVE CAUGHT THE ORIGINAL BUG.**
+       * That was not *a nameplate inside a scroller*: it was a `space-between`
+       * row stretched across the panel, which put `MK-425C` at x 1780 in a
+       * 1280 px window, past the end of everything. A block between two known
+       * neighbours whose centre falls inside the strip's own content cannot land
+       * there.
+       */
+````
+
+<a id="evo-126"></a>
+## evo-126: demo/evo/index.html, inline script, line 1470
+
+````js
+      /**
+       * 🔴 THE LEFT COLUMN HOLDS STILL WHILE THE STRIP SCROLLS, which is the
+       * whole of what *"left is sticky area"* asked for and is the one claim a
+       * screenshot cannot make.
+       * ⚠️ IT PUTS THE SCROLL BACK. A check that leaves a page moved is the test
+       * rather than a check, and this project has already destroyed a
+       * self-moving zoom with one.
+       */
+````
+
+<a id="evo-127"></a>
+## evo-127: demo/evo/index.html, inline script, line 1492
+
+````js
+      /**
+       * 🔴 AND ITS RIGHT BORDER IS WHERE THE SCROLLING STARTS, WHICH IS THE
+       * AFFORDANCE. Asked 2026-09-21: *"rm shade on evolution overflow"*, and
+       * the edge gradient that used to say this came off. A border does the same
+       * job in a channel that does not read as a rendering fault: this project
+       * has measured that a scroller with nothing marking it reads as a clipped
+       * picture, which is how this page was reported in the first place.
+       * ⚠️ **THE COMPUTED VALUE, NEVER THE DECLARATION.** `.pos-glue` exists for
+       * children giving up their border and radius, and a border stripped by a
+       * rule nobody wrote is this project's fifth measured dead rule.
+       * ⚠️ AND THE OVERFLOW IS ASSERTED WITH IT, because a border marking the
+       * edge of a scroll region that has nothing behind it is decoration.
+       */
+````
+
+<a id="evo-128"></a>
+## evo-128: demo/evo/index.html, inline script, line 1510
+
+````js
+      /**
+       * 🔴 THE LEFT COLUMN IS THE FULL DEPTH OF THE PANEL. `align-items:
+       * stretch` rather than `flex-end`, and the difference is invisible until
+       * somebody changes it: bottom alignment makes two children END together
+       * and says nothing about their heights, which is what `/twelve/` was
+       * reported for with a screenshot.
+       */
+````
+
+<a id="evo-129"></a>
+## evo-129: demo/evo/index.html, inline script, line 1522
+
+````js
+      /**
+       * 🔴 AND THE DIVIDER REACHES THE CARD'S OWN EDGES, WHICH IS A DIFFERENT
+       * CLAIM FROM THE ONE ABOVE AND WAS FALSE WHILE THAT ONE PASSED. Asked
+       * 2026-09-21: *"evo border on right sticky panel should extend to top and
+       * bottom of the panel"*. The column was already the full height of the
+       * card's CONTENT box, which is what the assert above measures, and the
+       * card's own `padding: 20px` still sat between each end of the border and
+       * the card's visible edge. `column depth == strip depth` is exactly the
+       * kind of agreement that reads as done: both halves were right and both
+       * were inside the padding.
+       * 🔴 **BOTH ENDS, SEPARATELY.** Two alignments that look like one are two
+       * asserts: this project has measured a case where two of three lined up
+       * while the third was 30 px out, and another where two boxes matched
+       * perfectly while the faders inside them were 17 px apart. One assert on
+       * one end would pass while the other end was wrong, and a border short at
+       * the bottom only is exactly what a `padding-bottom` nobody cancelled
+       * looks like.
+       * ⚠️ AGAINST THE CARD'S INNER EDGE, meaning just inside its own 1 px
+       * border, because that is the line a reader sees as the edge of the panel.
+       */
+````
+
+<a id="evo-130"></a>
+## evo-130: demo/evo/index.html, inline script, line 1558
+
+````js
+      /**
+       * 🔴 THE AIR ABOVE THE KEYBOARD, AND THAT IT IS THE CONTAINER'S. Asked
+       * 2026-09-21: *"more space on top of keyboard"*. All three of the
+       * quantities that make up this distance measured ZERO before the change:
+       * the row's foot (a 24 px label band its two-line names fill completely),
+       * the gap (a flex column with no `gap`), and the keyboard's head (the
+       * kit's `.kbd` margins are overridden to nothing in this file).
+       * ⚠️ **THE NEGATIVE HALF IS WHICH ONE MOVED**, and it is the point of the
+       * assert rather than a flourish. A margin on the keyboard would satisfy
+       * "there is air above the keys" and would be the page correcting for its
+       * container, which breaks the moment the container changes. So this
+       * requires the distance to equal the container's own `row-gap` AND both
+       * children to contribute no margin of their own.
+       */
+````
+
+<a id="evo-131"></a>
+## evo-131: demo/evo/index.html, inline script, line 1583
+
+````js
+      /**
+       * 🔴 ONE SCROLLER ON THIS PAGE AND NOT TWO. `.keys` brings its own
+       * `overflow-x: auto`, so a keyboard squeezed narrower than its keys
+       * scrolls INSIDE the strip that is supposed to be scrolling it, and a
+       * reader dragging the outer one gets the inner one.
+       */
+````
+
+<a id="evo-132"></a>
+## evo-132: demo/evo/index.html, inline script, line 1594
+
+````js
+      /**
+       * 🔴 THE ASSERT THAT WOULD HAVE CAUGHT TWENTY FIVE WHITE KEYS, AND THE
+       * REASON IT IS READ OFF THE RENDERED PICTURE. The old page asserted
+       * `kbd.notes()`, which said 25 notes from 47, was perfectly true, and was
+       * blind to the drawing having no black keys in it at all. MEASURED before
+       * this rebuild: 25 white, 0 black, `--k-cols: 25`.
+       * ⚠️ SORTED BY CENTRE, NOT BY DOM ORDER OR BY LEFT EDGE. A black key
+       * straddles the join between its two whites and is pulled back by half its
+       * own width, so its LEFT edge is left of the white it comes after. Its
+       * centre is between the two, which is what a reader sees.
+       */
+````
+
+<a id="evo-133"></a>
+## evo-133: demo/evo/index.html, inline script, line 1615
+
+````js
+      /**
+       * 🔴 THE WHEELS ARE LEFT OF THE KEYS AND ARE THE FRONTMOST THING ON THE
+       * PANEL, WHICH IS THE CLAIM THIS ASSERT USED TO GET HALF RIGHT. It said
+       * they *"end on their line"*, and they do not: on the instrument they sit
+       * at the very edge of the case nearest the player, lower than the keys'
+       * back edge, with nothing in front of them. So the test is that nothing in
+       * their own column is below them.
+       */
+````
+
+<a id="evo-134"></a>
+## evo-134: demo/evo/index.html, inline script, line 1623
+
+````js
+      /* 🔴 THE ROW, NEVER `.evo-wheels`, AND SABOTAGE IS WHAT FOUND THAT.
+         `.evo-wheels` is the full-width container that CENTRES the row, so its
+         own rect is the column's rect whatever is inside it: switching the
+         centring off left the assert below fully green, because the box it was
+         measuring had not moved and never could. That is this project's rule
+         about measuring the working surface rather than the wrapper, which it
+         already paid for once reading a pad's `el` instead of its `button`. */
+````
+
+<a id="evo-135"></a>
+## evo-135: demo/evo/index.html, inline script, line 1632
+
+````js
+      /* 🔴 THE COLUMN'S CONTENT BOTTOM, NOT ITS BOX BOTTOM, AND THIS ASSERT WENT
+         RED TEACHING THE DIFFERENCE. It read the box bottom, which was the same
+         line until the column took over the card's vertical inset so its right
+         border could reach the card's edges: after that the box ended 20 px
+         below the last control in it and this failed at `20.0 px behind the
+         column's foot` with nothing in the column changed. That is the standing
+         rule about measuring the working surface rather than the wrapper,
+         arriving one level up from the pad it was written about. The claim here
+         is that nothing is drawn BELOW the wheels, so the line to compare with
+         is where the column's content stops. */
+````
+
+<a id="evo-136"></a>
+## evo-136: demo/evo/index.html, inline script, line 1650
+
+````js
+      /**
+       * 🔴 AND THEY ARE CENTRED, WHICH IS TWO CENTRES ON THIS PANEL AND BOTH ARE
+       * MEASURED. Asked 2026-09-21: *"align pitch / mod to centr"*. The column's
+       * own centre is one reading of that and the keypad above them is the other,
+       * and they coincide here only because the keypad is the widest thing in the
+       * column. Asserting both rather than picking is the `/twelve/` lesson: that
+       * page was corrected by screenshot twelve times in one evening and every
+       * correction was plausible reasoning a rect would have refused.
+       */
+````
+
+<a id="evo-137"></a>
+## evo-137: demo/evo/index.html, inline script, line 1662
+
+````js
+      /* ⚠️ THE COLUMN'S RIGHT PADDING IS READ, NOT TYPED. It was a literal `16`
+         here, which is the same distance as `--panel-gap`, now declared in
+         `shell.css` on `.panel`: one measurement in two places, which is the
+         defect that cost this project a row snapping back to the width of one
+         word three reports running. Reading it matters MORE since the token
+         moved into the kit, because the number is no longer even in this file.
+         The computed value cannot disagree with the stylesheet. */
+````
+
+<a id="evo-138"></a>
+## evo-138: demo/evo/index.html, inline script, line 1677
+
+````js
+      /**
+       * 🔴 `MAX` AND `MIN` MARK THE ENDS OF THE TRAVEL, ON BOTH LANES AT ONCE,
+       * AND THAT IS TWO ALIGNMENTS RATHER THAN ONE. Photographed on the first
+       * run of this rebuild sitting level with the value readout and the slot
+       * number instead, which is what `space-between` over a whole column gets
+       * you: two correct labels attached to the wrong things.
+       * ⚠️ AND THE RENDERED TEXT IS GRADED, NOT THE SOURCE, because several kit
+       * components uppercase a label in CSS whatever is typed and a
+       * `toUpperCase()` on top of one is a no-op that reads as a fix.
+       */
+````
+
+<a id="evo-139"></a>
+## evo-139: demo/evo/index.html, inline script, line 1704
+
+````js
+      /**
+       * 🔴 BOTH WHEEL NAMES ARE ONE LINE, SO THEIR SLOT NUMBERS LAND LEVEL.
+       * Asked 2026-09-21: *"pichbend single word"*. `PITCH BEND` had a space to
+       * break at and `MODULATION` did not, so one name was two lines and the
+       * other one, and `C9` ended up **12.34 px below `C10`** on a pair of
+       * controls that are identical in every other respect.
+       * ⚠️ **THE SLOT NUMBERS ARE THE HALF WORTH ASSERTING**, because they are
+       * the visible consequence and they are downstream of the cause. A check
+       * that only counted lines would pass a future label that wraps somewhere
+       * this page does not look, and a check that only compared the two numbers
+       * would pass two names that both wrapped.
+       */
+````
+
+<a id="evo-140"></a>
+## evo-140: demo/evo/index.html, inline script, line 1729
+
+````js
+      /**
+       * 🔴 AND THE WIDTH DECISION IS ASSERTED RATHER THAN ASSUMED, because the
+       * names are deliberately allowed to overflow their wheels and that is only
+       * safe while they do not touch. Both are wider than the 46 px control
+       * under them, which is what the real panel prints; the clearance between
+       * them is the whole reason `overflow: visible` is the right answer here
+       * rather than a cut.
+       */
+````
+
+<a id="evo-141"></a>
+## evo-141: demo/evo/index.html, inline script, line 1749
+
+````js
+      /**
+       * ⚠️ AND NOTHING ON THE PANEL IS CUT WITH AN ELLIPSIS, which this project
+       * treats as the signal that a word is in the wrong place rather than as a
+       * way of fitting it. `PITCH …` and `MODULA…` were both photographed on the
+       * first run of this rebuild.
+       * 🔴 **CUT IS NOT THE SAME AS WIDER THAN ITS CONTROL, AND THE FIRST
+       * VERSION OF THIS CHECK CONFLATED THEM.** It read `scrollWidth >
+       * clientWidth` alone and failed on `MODULATION`, which is one unbreakable
+       * word 66 px long over a 46 px wheel and is drawn IN FULL, because the box
+       * does not clip. That is what the panel does: every printed name on this
+       * instrument is wider than the control under it. A name is cut when it
+       * overflows a box that CLIPS, so the test asks the computed overflow too.
+       */
+````
+
+<a id="evo-142"></a>
+## evo-142: demo/evo/index.html, inline script, line 1770
+
+````js
+      /**
+       * 🔴 EVERY PRINTED NAME ON THIS DEAD PANEL IS DIM, MEASURED AS CONTRAST
+       * AND NOT AS A CLASS NAME. Reported 2026-09-21: *"on dislable pad buttons
+       * make labels way lighter"*, because the names were the brightest thing in
+       * a set of controls nobody can press.
+       * 🔴 **READ AS EFFECTIVE INK, WHICH IS THE ONLY HONEST READING.** A
+       * label's own `color` says nothing about what a reader sees: the opacity
+       * of every ancestor multiplies down onto it, and these names sit inside a
+       * card, sometimes inside a group with a different background. So this
+       * walks the tree for the accumulated alpha, composites over the real
+       * ground, and computes a ratio. A check reading `color` would have passed
+       * the whole time.
+       * 🔴 **A CEILING AND A FLOOR, BECAUSE ONLY ONE OF THEM IS THE BUG THAT WAS
+       * REPORTED AND BOTH ARE FAILURES.** The ceiling catches the dimming being
+       * removed: before the change these ran **3.56 to 5.91:1** and the lowest
+       * of them would fail a 3.0 ceiling, so the bound discriminates rather than
+       * merely passing. The floor catches over-correcting, which the ask itself
+       * warns about: text at the BUTTON's own .38 of `--dim2` measures 1.56:1
+       * and has stopped being a label. Something a reader cannot read at all no
+       * longer says what it is.
+       * ⚠️ AND THE NAMEPLATE IS THE NEGATIVE CONTROL, ASSERTED SEPARATELY BELOW.
+       * A check that pushed everything down would pass "the labels are dim" and
+       * would have taken the make and model down with them.
+       */
+````
+
+<a id="evo-143"></a>
+## evo-143: demo/evo/index.html, inline script, line 1823
+
+````js
+      /* 🔴 THE KNOB NAMES COUNT, AND WITHOUT THEM THIS CHECK HAS NO SUBJECT LEFT.
+         `C1` to `C10` are the only type this panel still prints: the two group
+         boxes, the function buttons, `SNAP SHOT`, `OCTAVE` and `TRANSPOSE` all
+         came off across one afternoon, and the sweep only looked at
+         `.panel-sub` and `.panel-cap`. The list went empty, `reduce` seeded on
+         `undefined`, and the page threw `Cannot read properties of undefined`
+         and took itself to 0 asserts.
+         ⚠️ THAT IS THE THIRD TIME THIS CHECK HAS BEEN WRONG ABOUT ITS OWN
+         SUBJECT in an afternoon, twice as a floor that had to be lowered and now
+         as a selector that had stopped matching anything. A check that counts
+         what it finds needs to look where the thing actually is. */
+````
+
+<a id="evo-144"></a>
+## evo-144: demo/evo/index.html, inline script, line 1839
+
+````js
+      /* ⚠️ SEEDED SO IT CANNOT THROW ON AN EMPTY LIST, which is what took this
+         page to zero asserts once. An empty sweep is a finding, not a crash. */
+````
+
+<a id="evo-145"></a>
+## evo-145: demo/evo/index.html, inline script, line 1844
+
+````js
+      /* ⚠️ AND THE FLOOR IS DERIVED NOW RATHER THAN TYPED. It was six, then three,
+         then two, moved every time a control left, and each move made a removal
+         look like a regression in a check about ink. What it is really for is
+         that a sweep finding NOTHING must not pass, and the panel's eight
+         rotaries are the thing it can count on. */
+````
+
+<a id="evo-146"></a>
+## evo-146: demo/evo/index.html, inline script, line 1849
+
+````js
+      /* 🔴 THE ROTARIES ARE THE KIT'S BANK, WITH ITS OWN DIVIDER, and that is
+         worth an assert because *"make evo roghly made of stadard pieces"* is
+         only true if it stays true. A page that quietly grows a second copy of a
+         component is this project's most repeated defect. */
+````
+
+<a id="evo-147"></a>
+## evo-147: demo/evo/index.html, inline script, line 1853
+
+````js
+      /* 🔴 THE OCTAVE CIRCLES AND THE DIALS SIT ON ONE LINE, MEASURED AS TWO
+         CENTRES RATHER THAN AS THE PADDING THAT PRODUCES THEM. Asked as
+         *"(small/big) padd buttons shoudl align to knobs by center"*, and the
+         padding is the cause while this is the claim. */
+````
+
+<a id="evo-148"></a>
+## evo-148: demo/evo/index.html, inline script, line 1877
+
+````js
+      /* 🔴 THIS ASSERT TURNED OVER ON 2026-09-25 AND THE OLD ONE IS QUOTED SO IT
+         IS NOT RE-ARGUED. It read `every printed name on the panel is dimmed
+         with the controls it names`, at `loudest.r < 3 && faintest.r > 1.5`, and
+         it was right about a panel where nothing could be pressed.
+         ✅ **SAME NUMBER, OTHER SIDE, WHICH IS WHAT MAKES THE CHANGE A
+         MEASUREMENT RATHER THAN A RETUNE.** The old bound was a CEILING at 3.0
+         and this is a FLOOR at 3.0, so the baseline these names measured
+         yesterday, **1.89:1 on all eight**, fails this one outright. A check
+         that would have passed before and after would be saying nothing. */
+````
+
+<a id="evo-149"></a>
+## evo-149: demo/evo/index.html, inline script, line 1891
+
+````js
+      /* ⚠️ THE NEGATIVE CONTROL, AND IT OUTLIVED THE SWEEP IT WAS WRITTEN
+         AGAINST. The make and the model name no control, they are true whether
+         or not anything is plugged in, and a sweep that dimmed every word on the
+         card would have taken them too. That sweep went on 2026-09-25 when the
+         panel became workable, so what this guards now is its return: a page
+         that ever dims by class again must not reach these two words. */
+````
+
+<a id="evo-150"></a>
+## evo-150: demo/evo/index.html, inline script, line 1904
+
+````js
+      /**
+       * 🔴 EVERY CONTROL NOW SHOWS THE CURSOR OF A CONTROL THAT WORKS, AND THIS
+       * ASSERT REPLACED ONE THAT COULD NO LONGER RUN AT ALL. It read
+       * `no control on this panel wears the refusal cursor` and it queried
+       * `.pos-pad:disabled`, `.pos-knob[data-off] .pos-knob-dial` and
+       * `.pos-fdr[data-off] .pos-fdr-lane`. Every one of those three matches
+       * nothing on this page since the panel went live, so
+       * `getComputedStyle(null)` would have THROWN and taken every assert after
+       * it out of the run in silence. **A selector that stops matching is this
+       * project's fifth dead rule and this is the sixth**, caught here by
+       * looking rather than by a red run, because a check that throws names the
+       * page and not the change.
+       * ⚠️ WHAT IT WAS FOR IS KEPT: `not-allowed` says *you tried to use this
+       * and were refused*, and nothing on this panel refuses anybody. It used to
+       * be `default` on a dead control and it is the working cursor on a live
+       * one, and neither of them is a refusal.
+       * ⚠️ ALL THREE KINDS, because the rule lives in three separate
+       * declarations in `shell.css` and a check that read one would leave the
+       * fader lane wrong while the pads were right.
+       */
+````
+
+<a id="evo-151"></a>
+## evo-151: demo/evo/index.html, inline script, line 1934
+
+````js
+      /**
+       * 🔴 THIS PAGE DECLARES NO READOUT AND DRAWS NO EMPTY BOX WHERE ONE WOULD
+       * HAVE BEEN. Asked 2026-09-21: *"rm keys / velocity / bend / channel in
+       * evo"*, which is all four cells.
+       * 🔴 **MEASURED RATHER THAN TRUSTED, BECAUSE THE FAILURE IS RECORDED.**
+       * `/typist/` declared `readout: null` and still got a `.pos-readout` div
+       * with no children, whose own 1 px top and bottom borders rendered as a
+       * **2 px full width band 24 px above the controls**: a horizontal rule
+       * nobody wrote, reported as *"old UI creeping in"*. The shell hides an
+       * empty readout now, and *"the shell handles it"* is exactly the kind of
+       * sentence this project keeps finding has outlived its own truth.
+       * ⚠️ IT ACCEPTS EITHER SHAPE. Whether the shell omits the element or hides
+       * it is the shell's business; what this page needs is that nothing paints
+       * an edge where the row used to be, so the test is on the rendered height.
+       */
+````
+
+<a id="evo-152"></a>
+## evo-152: demo/evo/index.html, inline script, line 1973
+
+````js
+    /* 🔴 AND ON THIS PANEL THE ROW COMES BACK WITH `Loop` ALONE IN IT. The kit's
+       octave pair and `Panic` stay hidden with the Evolution present, because
+       the instrument's own octave pair is in the back strip. MEASURED rather than
+       read off the stylesheet, since the whole rule is a `:has`. */
+````

@@ -1,42 +1,7 @@
-// demo/code/collide-voice.mjs: the voice /code/collide/ and
-// /remote/collide/ play, a program in /collide/'s small subset of
-// SuperCollider, compiled in the tab and run on wasm scsynth.
-//
-// Asked 2026-10-12 (BACKLOG, "synth/090 Collide synth and synth/100"): *"do 090
-// synth, similar to 080 but with collide, local. 2 parameters that make sense.
-// 100 is same but with local and rasperry pi rendering"*. Both pages play ONE
-// program, so it lives here once rather than twice.
-//
-// WHAT IS SHARED AND WHAT IS NOT. The compiler is `/shell/sclang-lite.mjs`
-// and the engine is `/shell/scsynth.mjs`, both the kit's, both what /collide/
-// runs. What is here is what /collide/ keeps inline in its page: one `/s_new`
-// per key, `/n_set gate 0` on letting go, `/n_set` of a knob to every node
-// still sounding, `/n_end` taking a node off the list. ⚠️ A COPY OF THAT
-// LOGIC, reported as a kit candidate (`demo/shell/collide-voice.mjs`): this is
-// the third place a page drives scsynth note by note (/collide/, sc-sampler.mjs,
-// here), and a page agent may not write `demo/shell/`.
-//
-// THE TWO KNOBS, AND WHY THESE TWO. The program is a plucked bass and lead:
-// two saws through a resonant low pass whose cutoff starts high and falls back
-// to the note. What a player reaches for on a voice like that is how bright the
-// pluck is and how long it rings, so:
-//   bright   how far above the note the filter opens at the start, 0 (the
-//            cutoff sits at twice the note, a dark thud) to 1 (24 times the
-//            note, a bright snap). It changes the TONE and not the length.
-//            ⚠️ The floor is twice the note and not the note: at rq 0.3 a
-//            cutoff ON the fundamental is a resonant boost of it, and the dark
-//            end measured 8.5 dB LOUDER than the bright one (-26.8 against
-//            -35.3 dBFS), which reads as a level knob rather than a tone one.
-//   decay    the seconds the volume and the filter take to fall from the
-//            attack to the quiet sustain. It changes the LENGTH and not the
-//            tone at the attack.
-// Two knobs that do not overlap, so each one's effect can be heard on its own
-// and measured on its own (the pages measure both).
-//
-// NOTHING OPENS ON A VISIT. Constructing this compiles the text in JavaScript
-// (no fetch, no context, about a millisecond) so the page can show the knobs
-// and the definition's size. `warm()` fetches the engine (our origin) on
-// intent, and `wake(ctx)` boots it, which a page calls on the first key.
+// The voice /code/collide/ and /remote/collide/ play: a program in /collide/'s subset of
+// SuperCollider, compiled in the tab and run on wasm scsynth. Knobs: bright (filter opening,
+// floor at twice the note) and decay (seconds). Nothing opens on a visit: warm(), then wake(ctx).
+// See lessons/page-code.md#code-1
 import { bootScsynth, loadScsynth } from '/shell/scsynth.mjs';
 import { compile } from '/shell/sclang-lite.mjs';
 
@@ -68,23 +33,12 @@ export const PROGRAM = `// a key opens the gate and letting it go closes it
 export const DEF = 'collide';
 
 /**
- * One engine playing PROGRAM, or whatever `load(text)` last compiled.
+ * One engine playing PROGRAM, or whatever `load(text)` last compiled. An edit is the voice
+ * for the next note; a held note finishes on the program it started with (`held`).
  * @param {object} [o]
  * @param {(line: string, kind?: string) => void} [o.log]
  * @param {string} [o.who]  what the log calls this engine
- *
- * 🔴 AN EDIT REPLACES THE VOICE FOR THE NEXT NOTE, AND A HELD NOTE FINISHES
- * ON THE ONE IT STARTED WITH. Asked 2026-10-12, *"make 090 editable"*. Every
- * compile is sent under the one name `DEF`, as /collide/ does, and scsynth
- * keeps the old graph for a node already running until that node ends; a
- * note's `/n_set gate 0` still reaches it, and how it is let go is read off
- * the program it started on (`held` keeps that), not the one loaded since.
- * A failed compile changes nothing: `compiled` stays the last good one.
- *
- * THE KNOBS FOLLOW THE NAMES, NOT THE PROGRAM. `values` is keyed by the knob
- * names PROGRAM declares (the page's knobs are fixed), and a key sends all of
- * them in its `/s_new`; a name the loaded program does not have is a control
- * scsynth ignores, so that knob drives nothing, which `drives(name)` says.
+ * See lessons/page-code.md#code-2
  */
 export function createCollideVoice({ log = () => {}, who = 'SuperCollider' } = {}) {
   const t0 = performance.now();
@@ -121,19 +75,17 @@ export function createCollideVoice({ log = () => {}, who = 'SuperCollider' } = {
   /**
    * Boot scsynth in `ctx` and load the definition. Its sound comes out of
    * `out()`, which is connected to nothing: the caller routes it.
+   * See lessons/page-code.md#code-3
    */
   function wake(ctx) {
     if (eng) return Promise.resolve(eng);
     waking ??= (async () => {
       const e = await bootScsynth({ audioContext: ctx, log, onReply: heard });
       stat.bootMs = Math.round(e.bootMs);
-      // 🔴 `bootScsynth` connects its `out` to the speakers. The pages route
-      // the sound by the bay's links, so it comes off the speakers here and
-      // goes to `junction`, which the page connects where a link says. A
-      // silent branch to the destination stays on whatever the links do,
-      // because Web Audio pulls: an engine nobody pulls is never asked to
-      // process, and its `/d_recv` times out (scsynth.mjs). MEASURED: with
-      // the out simply disconnected here the load never answered.
+      // Off the speakers and onto `junction`, which the page routes by the bay's links. The silent
+      // pull to the destination must stay: an engine nobody pulls never processes and its
+      // `/d_recv` times out (scsynth.mjs).
+      // See lessons/page-code.md#code-4
       e.out.disconnect();
       const pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
       e.out.connect(pull);
@@ -161,9 +113,9 @@ export function createCollideVoice({ log = () => {}, who = 'SuperCollider' } = {
   }
 
   /**
-   * Compile `text` and, once the engine is up, hand it over. A failure keeps
-   * the last good program everywhere and answers `{ ok: false, error }` with
-   * the compiler's own words (a line and a column).
+   * Compile `text` and, once the engine is up, hand it over. A failure keeps the last good
+   * program and answers `{ ok: false, error }` with the compiler's line and column.
+   * See lessons/page-code.md#code-5
    */
   function load(text) {
     const run = chain.then(async () => {

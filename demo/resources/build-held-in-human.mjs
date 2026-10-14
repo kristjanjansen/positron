@@ -1,60 +1,7 @@
-// Builds `demo/resources/held-in-human.json`, the machine readable form of the
-// Held in Human score.
-//
-//   node demo/resources/build-held-in-human.mjs          # writes held-in-human.json
-//   node demo/resources/build-held-in-human.mjs --check  # prints the running order, writes nothing
-//
-// NODE ONLY. Never shipped to a browser, never imported by a page.
-//
-// 🔴 IT IS A THIRD KIND OF THING AGAIN, AND THAT IS WHY IT IS ITS OWN FILE.
-// Every row of `corpus.json` is a pointer to something somebody else holds.
-// Every row of `mimproject.json` points at a file in our own bucket. This file
-// holds no pointers and no files: it is ONE text document read and derived
-// from, so a picture of the piece can be drawn without re-reading the score.
-//
-// ⚠️ THIS FILE OPENED WITH "THE PIECE IS SOMEBODY ELSE'S WORK" AND THAT WAS
-// WRONG. Corrected 2026-09-20: *"they are in my team, attribution is ok"*, *"i
-// mean no attribution"*, *"its a demo for them"*, and on what was asked for,
-// *"they asked for parser"*. Held in Human is by Liis Vares and Taavet Jansen,
-// produced by elektron.art, 2024, and they are on this team. **The page does
-// not credit them**, because a demo built FOR somebody does not open by telling
-// them who they are, and the attribution check that used to enforce it is gone.
-//
-// 🔴 WHAT IS STILL SOMEBODY ELSE'S: THE TEXT. The intro and the outro are Ene
-// Mihkelson, translated by Miriam Anne McIlfarick-Ksenofontov, and neither is
-// on the team. The texts are quoted and never rewritten, and the page names
-// them in its log because it RENDERS that text rather than merely referring to
-// it. That half of the old paragraph was right and it stays.
-//
-// 🔴 AND WHAT WAS ASKED FOR IS A PARSER, WHICH IS THIS FILE RATHER THAN THE
-// PAGE. The score is one text document, and everything downstream is derived
-// from it rather than typed: the scene order from its own three orderings, the
-// durations from its parameters or from summing its content, the events from
-// the names of its `time until ...` parameters, the credits from the credits
-// block. **The page is a way to see whether the parse is right.** If a choice
-// is ever between making the page nicer and making the parse more faithful,
-// the parse wins.
-//
-// WHAT IS DERIVED AND WHAT IS NOT. Nothing that can be read out of the score is
-// typed here. The scene order comes from the score's own three orderings, the
-// durations from its parameters or from summing its own content, the events
-// from the names of its `time until ...` parameters, the credits from the
-// credits block. What this file adds is a LABEL on each of those: `stated`,
-// `measured` or `absent` for a duration, and an `inference` object wherever the
-// reading is ours rather than the score's. An inference is marked in the data,
-// not only in prose, because a consumer drawing a picture cannot read prose.
-//
-// ⚠️ THREE SCENES HAVE NO LENGTH IN THE SCORE AND ONE OF THEM NEVER WILL.
-// The intro is a keystroke recording and its length is the sum of its own
-// delays. The dialogue is sixteen lines and its length is the sum of their
-// times and pauses. The MAZE HAS NOTHING: no duration parameter, and the one
-// QandA line with a negative time asks the visitor to walk somewhere. So
-// `durationMs` is null there and `durationHow` is `absent`, and a consumer must
-// draw "this scene has no length" differently from "this scene is 90 seconds".
-// Filling it with a guess would put a number in this file that nobody measured.
-//
-// ⚠️ AND THE PLACES THE SCORE DOES NOT SETTLE ARE IN `ambiguities`, WITH THE
-// ARITHMETIC OF EACH READING RATHER THAN A CHOICE BETWEEN THEM.
+// Parses the Held in Human score into held-in-human.json; everything is derived, labelled
+// stated, measured, absent or inferred. Ene Mihkelson's texts are quoted, never rewritten.
+// Node only. Run with no flag, or --check to print the running order and write nothing.
+// See lessons/page-resources.md#resources-126
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -108,18 +55,9 @@ function blockLines(name) {
 }
 const nonEmpty = (a) => a.filter((l) => l.trim().length > 0);
 
-// ── the parameter header ────────────────────────────────────────────────────
-//
-// `name` on one line, its value on the next, comments on `//`, blank lines
-// wherever the author felt like one. So the format is an ALTERNATION and
-// nothing marks which line is which.
-//
-// ⚠️ A PARSER THAT CAN LOSE PHASE MUST BE ABLE TO SAY SO. If one value line
-// ever goes missing, every pair after it is a name read as a value and a value
-// read as a name, and the result is a full table of confident nonsense. The
-// check below is cheap and it is the whole reason this is safe: a name has to
-// contain a letter and must not parse as a number, a value has to parse as a
-// number, a tuple of numbers, or one of the words the LUT parameters take.
+// The parameter header alternates name and value lines with nothing marking which, so each
+// pair is checked (a name has a letter, a value is a number, tuple or LUT word) to catch lost phase.
+// See lessons/page-resources.md#resources-127
 
 const NUMERIC = /^-?\d+(\.\d+)?(\s*,\s*-?\d+(\.\d+)?)*$/;
 const header = lines
@@ -147,11 +85,8 @@ const num = (name) => {
 const tuple = (name) => params.get(name).split(',').map((x) => Number(x.trim()));
 const startsWith = (p) => [...params.keys()].filter((k) => k.startsWith(p));
 
-// ── the running order, taken from the score's own three orderings ───────────
-//
-// The score never lists the scenes as an order. It lists them three times AS an
-// order and all three agree, so the order is read off the first and the other
-// two are used as a check. A check that is never run is a comment.
+// The running order, read off the first of the score's three orderings; the other two check it.
+// See lessons/page-resources.md#resources-128
 
 const lutOrder = startsWith('LUT color ').map((k) => k.slice('LUT color '.length));
 const opacityOrder = startsWith('opacity during ').map((k) => k.slice('opacity during '.length).replace(/ scene$/, ''));
@@ -171,10 +106,8 @@ if (!fadeRotated && !agree(fadeIds, SCENES)) throw new Error('build-held-in-huma
 
 const nameOf = new Map(lutOrder.map((n) => [sid(n), n]));
 
-// ── durations ───────────────────────────────────────────────────────────────
-//
-// Five are stated. Two are measured out of the score's own content. One is
-// absent, and stays absent.
+// Durations: five stated, two measured from the score's content, one (the maze) absent.
+// See lessons/page-resources.md#resources-129
 
 const dialogueRows = blockLines('dialogue')
 	.filter((l) => l.trim() && !l.trim().startsWith('//'))
@@ -239,10 +172,8 @@ const scenes = SCENES.map((id, i) => {
 		loopIndex: i,
 		durationMs: d,
 		durationHow: stated != null ? 'stated' : measured ? 'measured' : 'absent',
-		// Read back out of the parameter map rather than rebuilt from the id,
-		// because the score spells `HoldMe` one way in the duration parameter
-		// and another in the LUT block, and a reconstructed name would be a
-		// string that looks like a citation and is not one.
+		// Read back from the parameter map: the score spells `HoldMe` differently in two places.
+		// See lessons/page-resources.md#resources-130
 		durationFrom: stated != null
 			? `the parameter \`${[...params.keys()].find((k) => /^duration (.+) scene$/.test(k) && sid(k.match(/^duration (.+) scene$/)[1]) === id)}\``
 			: measured ? measured.how : 'the score gives this scene no duration parameter and nothing in it can be summed',
@@ -268,13 +199,9 @@ const running = SCENES.filter((id) => id !== 'transition');
 }
 const knownMs = running.reduce((a, id) => a + (byId.get(id).durationMs ?? 0), 0);
 
-// ── events ──────────────────────────────────────────────────────────────────
-//
-// Everything the score writes as `time until <what> in <scene> scene`, plus the
-// three spellings it also uses: no `in`, no `scene`, and neither. The scene
-// token is resolved against the ids read off the LUT block, so a parameter
-// naming a scene that does not exist is a build failure rather than an orphan
-// row.
+// Events: `time until <what> in <scene> scene` and its three shorter spellings; an unknown
+// scene token fails the build.
+// See lessons/page-resources.md#resources-131
 
 function resolveScene(token, param) {
 	const id = sid(token);
@@ -333,16 +260,9 @@ for (const e of events) {
 	}
 }
 
-// ── the two channels ────────────────────────────────────────────────────────
-//
-// Both run the whole piece and neither is a property of a scene: they are step
-// data with a ramp into each step. A consumer draws them without knowing which
-// scene is which, which is why every point carries its own `from` and `value`
-// rather than a scene lookup.
-//
-// The previous value of the FIRST point is the LAST point's, because the score
-// only satisfies its own LUT recommendation if the outro feeds back into the
-// transition. That reading is in `ambiguities` and the flag is here.
+// The two channels: whole-piece step data, each point carrying its own `from` and `value`.
+// The first point's previous value is the last's, a reading flagged in `ambiguities`.
+// See lessons/page-resources.md#resources-132
 
 function channel(read, fade, extra) {
 	const pts = SCENES.map((id, i) => ({ index: i, sceneId: id, sceneName: nameOf.get(id), value: read(id), fadeMs: ms(fade(id)) }));
@@ -369,12 +289,8 @@ const lutPoints = channel(
 );
 const lutBreaks = lutPoints.filter((p) => !p.followsRecommendation);
 
-// ── QandA ───────────────────────────────────────────────────────────────────
-//
-// `text:seconds:pause`, and an empty text is a SILENCE of a stated length
-// rather than a blank to skip. Eight of the twenty four rows are silences and
-// one of them is 46.5 seconds long, so dropping them would lose a minute and a
-// half of the piece and the reason the last block lands where it does.
+// QandA is `text:seconds:pause`; an empty text is a silence of stated length (8 of 24 rows).
+// See lessons/page-resources.md#resources-133
 
 const qaLines = nonEmpty(blockLines('QandA')).map((l, i) => {
 	const a = l.lastIndexOf(':'), b = l.lastIndexOf(':', a - 1);
@@ -386,10 +302,8 @@ const qaLines = nonEmpty(blockLines('QandA')).map((l, i) => {
 		text,
 		silence: text.length === 0,
 		statedSeconds: secs,
-		// 🔴 A NEGATIVE TIME IS NOT A DURATION AND IS NOT WRITTEN AS ONE. The one
-		// line that carries it is the one that asks the visitor to walk, so the
-		// reading is that it holds until she does. `durationMs` is null and the
-		// stated value is kept beside it.
+		// A negative time holds until the visitor walks: `durationMs` is null, the value kept beside.
+		// See lessons/page-resources.md#resources-134
 		durationMs: secs >= 0 ? ms(secs) : null,
 		waitsForVisitor: secs < 0,
 		pauseMs: ms(Number(l.slice(a + 1))),
@@ -401,11 +315,9 @@ const asks = events.filter((e) => e.lines != null).map((e) => ({ eventId: e.id, 
 const asked = asks.reduce((a, x) => a + x.lines, 0);
 const spare = qaLines.length - asked;
 
-// 🔴 MODEL A, AND IT IS AN INFERENCE. The cursor runs down the block once. The
-// line with the negative time goes to the maze, which is the only scene with no
-// duration and the only one that can wait; the rest fall to the scenes in the
-// order the score asks for them. That assignment is OURS, not the score's, and
-// every row it produces carries `how: "inferred"`.
+// Model A, an inference: one cursor down the block, the negative line to the maze, the rest
+// to scenes in score order; every row carries `how: "inferred"`.
+// See lessons/page-resources.md#resources-135
 const qaBlocks = [];
 {
 	let cursor = 0;
@@ -434,12 +346,8 @@ for (const b of qaBlocks) {
 		const L = qaLines[n - 1];
 		L.blockId = b.id;
 		L.sceneId = b.sceneId;
-		// 🔴 EVERY LINE'S SCENE IS AN INFERENCE, NOT ONLY THE SPARE ONE. The
-		// score states how many lines each scene takes and never states WHICH,
-		// so the whole assignment rests on the cursor reading in `qanda.model`.
-		// Under the alternative every row here shifts by one and the last line
-		// is never spoken. A consumer drawing this must be able to see that,
-		// which is why the label is on the line rather than only in prose.
+		// Every line's scene is inferred (the score gives counts, not which lines), so it is labelled.
+		// See lessons/page-resources.md#resources-136
 		L.how = 'inferred';
 		L.from = 'qanda.model';
 		L.countHow = b.countHow;
@@ -477,12 +385,8 @@ const landsBefore = beforeLongest?.landsIn && beforeLongest.landsIn.sceneId === 
 	: null;
 const outroTextGapMs = landsBefore == null ? null : outroTextEvent.atMs - landsBefore;
 
-// ── keystrokes ──────────────────────────────────────────────────────────────
-//
-// 13 is Return, 127 is Backspace, everything else is the character typed.
-// Replaying it is adding the delays and applying the codes to a buffer, which
-// is what makes this the one text in the score that carries a person's timing
-// rather than a string.
+// Keystrokes: 13 is Return, 127 Backspace, anything else the character typed.
+// See lessons/page-resources.md#resources-137
 
 const kEvents = [];
 {
@@ -548,12 +452,8 @@ const correction = (() => {
 	};
 })();
 
-// ── the other texts ─────────────────────────────────────────────────────────
-//
-// 🔴 QUOTED, NEVER REWRITTEN. The markup is the author's, the trailing spaces
-// are the author's, the `;n,n` suffixes are the author's, and the dash in the
-// outro is the author's. Everything here is carried byte for byte and what this
-// build adds sits in fields beside it.
+// The other texts, carried byte for byte; what this build adds sits in fields beside them.
+// See lessons/page-resources.md#resources-138
 
 const wordList = (name) => nonEmpty(blockLines(name)).map((l, i) => {
 	const entry = l.replace(/\r$/, '');
@@ -583,10 +483,8 @@ const river = nonEmpty(blockLines('river')).map((l, i) => {
 const outroText = nonEmpty(blockLines('outro'));
 if (outroText.length !== 1) throw new Error(`build-held-in-human: the outro block holds ${outroText.length} lines, not one paragraph`);
 
-// The credits block is one `<br>` separated run. A double break opens a group,
-// the first line of a group is its heading and the rest are the entries. That
-// is the whole format and it parses cleanly, which is why the names in `meta`
-// below are read out of it rather than typed.
+// Credits: `<br>` separated, a double break opens a group whose first line is its heading.
+// See lessons/page-resources.md#resources-139
 const creditsRaw = nonEmpty(blockLines('credits'));
 const creditGroups = (() => {
 	const parts = creditsRaw.join('').split('<br>');
@@ -838,11 +736,8 @@ const doc = {
 			longestGapMs: delays[delays.length - 1],
 			gapsOverOneSecond: delays.filter((d) => d >= 1000).length,
 			gapsOverTwoSeconds: delays.filter((d) => d >= 2000).length,
-			// ⚠️ TWO BASES ARE POSSIBLE AND THEY DISAGREE IN THE FIRST DECIMAL.
-			// 306 characters are left on screen and 307 keys were pressed,
-			// because six backspaces removed six of the presses. This uses what
-			// a reader ends up looking at, and says so, so a number quoted from
-			// here cannot be silently compared against one built the other way.
+			// Uses the 306 characters left on screen, not the 307 keys pressed (six backspaces).
+			// See lessons/page-resources.md#resources-140
 			wordsPerMinute: r2((keys.text.length / 5) / (introMs / 60000)),
 			wordsPerMinuteToLastVisible: r2((keys.text.length / 5) / (lastVisible.at / 60000)),
 			wordsPerMinuteBasis: `characters left on screen (${keys.text.length}) at five characters a word, not keys pressed (${kEvents.filter((e) => e.kind === 'type').length})`,

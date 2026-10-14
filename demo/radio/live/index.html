@@ -28,31 +28,10 @@
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
-  // concepts radio/030, LIVE TEMPO, 2026-10-11. /radio/tempo/ with one
-  // thing changed, the source. Asked: *"do beats 005 with live radios"*. The
-  // detector, the wave with its beat lines, the tempo scope, the fx box and the
-  // mix knob are radio/020's, line for line. Instead of a recording looped
-  // from our bucket, the station plays LIVE through our own relay
-  // (`cf-shout`, the positron-shout worker, which holds ONE upstream connection
-  // per mount however many tabs listen), read with the kit's createMp3Stream
-  // exactly as /radio/blend/ reads it. `?base=` points the page at
-  // demo/fake-station.mjs instead.
-  //
-  // 🔴 NOTHING OPENS ON A VISIT, AND ONE STATION AT A TIME. Every connection to
-  // an ERR mount is counted in a public broadcaster's listener statistics
-  // (CLAUDE.md, "What costs real money and somebody else's server"), so a
-  // stream is opened only on Play, closed on Stop, and closed BEFORE the next
-  // one opens when the station is switched while playing. Under ?selfcheck=1 the
-  // page never opens a stream at all: Play logs that a check is running and
-  // plays nothing.
-  //
-  // Ida is ADTS AAC, the two ERR mounts MP3. createMp3Stream reads both: it
-  // picks the framing from the response's content-type and configures the
-  // decoder from the first frame's header (mp3-stream.mjs, "TWO CODECS"), as
-  // /radio/blend/ already plays ida-tallinn. No media element.
-  //
-  // The mounts are workers/shout/worker.mjs's: `raadio2` and `raadio4` (ERR,
-  // 128 kbit/s MP3) and `ida-tallinn` (Ida Radio Tallinn).
+  // /radio/tempo/ with a live source: raadio2, raadio4 (ERR, MP3) or ida-tallinn (AAC) through
+  // our relay (`cf-shout`, one upstream per mount), read by createMp3Stream; `?base=` for
+  // fake-station.mjs. One station at a time: opened on Play, closed on Stop and before the next.
+  // See lessons/page-radio.md#radio-34
   const BASE = new URLSearchParams(location.search).get('base') || 'https://shout.positron.studio';
   const STATIONS = [
     { id: 'raadio2', label: 'Raadio 2', site: 'err', node: 'raadio2', mount: 'raadio2', name: 'ERR Raadio 2' },
@@ -70,10 +49,9 @@
   // in, is raised to one loudness, and feeds the wave, the detector and the fx.
   const PLAYER_IN = `${S}:level:audio-in`, PLAYER_OUT = `${S}:level:audio-out`;
 
-  // ── the bay ─────────────────────────────────────────────────────────────
-  // A live station is AUDIO all the way: the station's site into the relay,
-  // the relay into the level node in this tab, and the level node's
-  // `audio-out` feeds the wave, the speakers and the detector.
+  // The bay: station site into the relay into the level node, whose `audio-out` feeds the wave,
+  // the speakers and the detector.
+  // See lessons/page-radio.md#radio-35
   const bay = createBay();
   for (const st of STATIONS) {
     addNodes(bay, S, [{ name: 'station', site: st.site, as: st.node, label: st.name }],
@@ -95,10 +73,9 @@
   // The station's two wires are lit while its stream is live, only for the
   // station picked; the audio wires in this tab while it plays.
   const rig = createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, playerOut: PLAYER_OUT, seen: true,
-    // Holding a link opens nothing. A link out of an `external` node is refused
-    // without `consent: true`, and the consent is the Play press, the moment a
-    // person asks to listen, so it is named here where the link is made, as on
-    // /radio/blend/.
+    // Holding a link opens nothing. A link out of an `external` node needs `consent: true`, which
+    // is the Play press, named here where the link is made.
+    // See lessons/page-radio.md#radio-36
     holdSources: (hold) => {
       for (const st of STATIONS) {
         hold(STATION_OUT(st), RELAY_IN(st), { consent: true, via: 'https' });
@@ -112,56 +89,29 @@
       if (st) return live && leg.st === st;
       return live;
     },
-    // 🔴 A HARNESS NEVER OPENS A LIVE STREAM. Every connection to an ERR mount
-    // lands in a public broadcaster's audience statistics, and Ida's server is
-    // somebody else's too, so under ?selfcheck=1 Play opens nothing, makes no
-    // AudioContext and plays nothing.
+    // A harness never opens a live stream: an ERR connection counts in a broadcaster's audience
+    // figures and Ida's server is somebody else's, so under ?selfcheck=1 Play opens nothing.
+    // See lessons/page-radio.md#radio-37
     refuse: () => {
       if (!SELFCHECK) return false;
       d.log('a self check is running, so no live stream is opened and nothing plays');
       return true;
     },
     build: () => { ({ ctx, pull, out } = rig); levelBuild(); },
-    // ⚠️ THE SOURCE IS LIVE HERE, AND NOTHING ABOUT WHERE A BEAT LANDS CHANGES.
-    // The stream reaches this tab a few seconds behind the station (the relay,
-    // the network and createMp3Stream's cushion), but the detector never sees
-    // the station's clock. It hears the samples this tab plays and stamps them
-    // with `e.playbackTime`, so beats are placed on the tab's audio clock as
-    // before, against the very sound the speakers play, and the click is
-    // scheduled on that same clock. What is new is that a reading cannot look
-    // ahead or loop: the first one waits MIN_S of sound after the stream starts.
-    // The press is the person asking to listen: only now does a stream open,
-    // and only the one station picked.
+    // Live changes nothing about where a beat lands: the detector stamps the samples this tab plays
+    // with `e.playbackTime`, so beats sit on the tab's clock. The first reading waits MIN_S of
+    // sound. The press is the person asking to listen: only now does one station's stream open.
+    // See lessons/page-radio.md#radio-38
     start: (st) => open(st),
     stop: () => close(),
     demo: { open: () => (leg ? leg.st.id : null), live: () => !!leg?.live, stream: () => leg?.stream.stats() ?? null,
       gain: () => (lv ? +lv.g.toFixed(3) : null), levels: () => Object.fromEntries(levels) },
   });
 
-  // ── the level: one gain per station, from a running RMS ──────────────────
-  // radio/020 levels each recording as it is decoded, per 1 s block, toward
-  // -16 dB RMS, raise only, up to 36 dB, then a tanh knee. A live stream has no
-  // whole file to measure ahead of, so here the gain follows the sound as it
-  // arrives. MEASURED on the captures (the session, 2026-10-11): Ida is music
-  // at about -44 dB RMS (peaks -30) for most of its length with one 25 s
-  // stretch at -14 dB, against Raadio 2's -15.5 mean. So the gain has to reach
-  // about 28 to 30 dB AND come down within a fraction of a second when a loud
-  // stretch arrives.
-  //
-  // How: the stream's RMS BEFORE the gain (so the gain never measures itself),
-  // read every LEVEL_READ_MS, followed twice, slowly over LEVEL_SLOW_S and fast
-  // over LEVEL_FAST_S. The louder of the two sets the target LEVEL_RMS / rms,
-  // never under 1 (raise only, a loud station is left alone) and never over
-  // LEVEL_MAX (36 dB, as radio/020). The gain falls to a lower target fast
-  // (LEVEL_DOWN_S) and rises to a higher one slowly (LEVEL_UP_S), so it never
-  // rises into a loud stretch and it never pumps on a single drum hit. Under
-  // LEVEL_FLOOR (a gap, a silence) it holds, so a pause is not raised into
-  // hiss. A DynamicsCompressor set as a limiter after the gain takes what gets
-  // over the top in the moment before the gain has come down, which is the
-  // tanh knee's job in radio/020. Each station keeps its gain, so coming back to
-  // Ida starts where Ida was. The detector hears the levelled sound too.
-  // ⚠️ The limiter delays everything after it by its few ms of look-ahead,
-  // the detector and the speakers alike, so they stay in step with each other.
+  // The level, one gain per station, following the sound as it arrives: RMS before the gain, slow
+  // and fast, the louder sets LEVEL_RMS / rms, raise only, at most LEVEL_MAX (36 dB), down fast,
+  // up slow, held under LEVEL_FLOOR, then a limiter. Ida needs about 28 to 30 dB.
+  // See lessons/page-radio.md#radio-39
   const LEVEL_RMS = 10 ** (-16 / 20), LEVEL_MAX = 10 ** (36 / 20), LEVEL_FLOOR = 10 ** (-60 / 20);
   const LEVEL_READ_MS = 100, LEVEL_SLOW_S = 3, LEVEL_FAST_S = 0.3, LEVEL_DOWN_S = 0.08, LEVEL_UP_S = 1.5;
   const levels = new Map();        // station id -> its gain, kept across plays

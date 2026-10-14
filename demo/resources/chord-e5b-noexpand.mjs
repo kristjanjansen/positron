@@ -1,13 +1,6 @@
-// EXPERIMENT 5. "figure out my playing pattern ... move on with in my vibe".
-// Two questions, both answerable off the cached corpus and neither of them
-// answerable by reasoning.
-//
-//  A. Is a person's OWN harmonic habit a real, learnable thing, or noise?
-//     iRb names a composer on every chart. 51 of them have 5 charts or more,
-//     643 charts in all. Leave one chart out, and ask whether that composer's
-//     OTHER charts predict it better than the world does.
-//  B. How much playing is enough? Adapt on the first N chords of a piece and
-//     predict the rest, sweeping N.
+// Experiment 5. A: does a composer's own charts predict a left-out chart better than the
+// world (51 composers with 5+ charts, 643 charts)? B: adapt on the first N chords, sweep N.
+// See lessons/page-resources.md#resources-4
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';

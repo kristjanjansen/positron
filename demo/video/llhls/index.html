@@ -29,47 +29,10 @@
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
   import { createLoopCamera, createPicture, returnVideo, meter, median, delayText, warm, fadeAt } from '/video/loopback.mjs';
 
-  // /video/camera/ with an LL-HLS round trip through Cloudflare beside
-  // it. The camera, with a clock burned into it, feeds two pictures: the
-  // original as it leaves the page, and an LL-HLS loopback, camera ->
-  // pub.positron.studio/loop (the /stage/ and /cam/ publisher, a container
-  // rewrapping the browser's own H.264 to RTMPS) -> a Stream input of its own
-  // -> back as LL-HLS through the player /llhls/ uses. The returned picture
-  // carries the clock row, so its footer reads the glass to glass delay off
-  // the frames actually shown. The publish goes through the worker, so no
-  // input key reaches this page. Split out of /video/webrtc/ on
-  // 2026-10-12 (*"Split hls and webrtc loopbacks"*); what the two share is
-  // /video/loopback.mjs.
-  //
-  // WHY 060 AND NOT 040: /archive/ labels the archived TV page `video 040`, so
-  // a new page at 040 would carry a number a visitor has already seen on
-  // something else, and /concepts/video/040/ would silently become a
-  // different page (positron-concepts: no forwarding from an old address, and
-  // no reusing one). 050 is MoQ loopback; 060 is the next free number.
-  //
-  // 🔴 EACH PRESS IS REAL CLOUDFLARE STREAM MINUTES, AND THE CAP IS 30 SECONDS
-  // FROM WHEN STREAM SAYS THE INPUT IS LIVE. Billed by the minute delivered
-  // whatever the protocol (positron-streaming). Asked for: "limit to 10 sec.
-  // just fade out", then "limit to 20sec. fade out sloowly", then (2026-10-12)
-  // the cap counted from Stream's live rather than from the first leg, so the
-  // LL-HLS delay has time to settle, and "extend to 30s". Thirty seconds after
-  // that both pictures have faded to the ground over their last three and the
-  // page stops itself exactly as a stop press does.
-  //
-  // 🔴 THE TAKE IS A STREAM RECORDING, AND THE WORKER DELETES IT. RTMPS cannot
-  // have recording turned off, so every take is a video counted against the
-  // account's 1000 storage minutes. The loopback has an input of its own
-  // ("positron-hls-loopback", src/provision-loop.sh), and positron-pub deletes
-  // a take about 90 s after it ends however it ended (this page's stop, a
-  // closed tab, its own cap of 50 s of RTMPS), sweeps the input every 10
-  // minutes, and refuses a take when the account is at or over 600 minutes
-  // (workers/pub/loop.mjs). Nothing here has to stay open for any of it. The
-  // footer counts what is on that input (`rec`) and the account's storage
-  // minutes (in the hover), read from /loop/status after a press. A second
-  // take on the input while one runs is refused, and that is said in words.
-  //
-  // NOTHING OPENS ON A VISIT. The camera, the publish, the play and the status
-  // read are all made on the start press.
+  // /video/camera/ with an LL-HLS round trip: the clock-burned camera goes through
+  // pub.positron.studio/loop to its own Stream input and back via /llhls/'s player, and the
+  // footer reads glass to glass off the frames shown. No input key reaches this page.
+  // See lessons/page-video.md#video-5
   const Q = new URLSearchParams(location.search);
   // ?pub= points the worker routes elsewhere: the laptop stand-in for
   // positron-pub runs the real worker module with real Stream (workerd cannot
@@ -85,14 +48,14 @@
   const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
   const HLS_IN = 'cf-stream:hls:video-in', HLS_OUT = 'cf-stream:hls:video-out';
   const HLS_BACK = `${S}:hls:video-in`;
-  // 30 s a press from Stream's live, the last 3 of them a fade (asked
-  // 2026-10-10, *"fade out bit faster, both videopanels"*; 2026-10-12, *"extend
-  // to 30s (all 20s limits)"*). BACKSTOP_MS arms the cap anyway if Stream has
-  // not started it by then (a publisher that never opens, say).
+  // Each press is real Stream minutes: 30 s from Stream's live, the last 3 a fade, then the
+  // page stops itself. BACKSTOP_MS arms the cap if Stream never starts it. Every take is a
+  // recording; positron-pub deletes it about 90 s after (workers/pub/loop.mjs).
+  // See lessons/page-video.md#video-6
   const CAP_MS = 30000, FADE_MS = 3000, BACKSTOP_MS = 45000;
 
-  // No readout: every number is in the footer of the picture it is about
-  // (asked 2026-10-12, *"move readout data to videpanel footers"*).
+  // No readout: every number is in the footer of the picture it is about.
+  // See lessons/page-video.md#video-7
   const d = mount({ name: 'LL-HLS loopback', what: '', index: '/', indexLabel: 'positron',
     readout: null });
   conceptNav('video/llhls');
@@ -137,11 +100,10 @@
   let hm = null;   // the delay meter on the returned picture
   const camera = createLoopCamera({ log, start: () => start(), stop: () => stop(), render: () => render(), extra: [hlsV] });
 
-  // The footer carries what is on the loopback input (`rec`, the recordings
-  // Stream holds for it, from /loop/status), which is the number the worker's
-  // delete takes back to 0. The account's storage minutes and the picture
-  // size are in the row's hover: MEASURED 2026-10-12, a fifth cell made the
-  // row 334 px wide at 1280 scroll its last cell out of sight.
+  // The footer counts recordings on the loopback input (`rec`, from /loop/status), which the
+  // worker's delete takes back to 0. Storage minutes and size are in the hover: a fifth cell
+  // pushed the row to 334 px and scrolled its last cell out of sight at 1280.
+  // See lessons/page-video.md#video-8
   const H = createPicture();
   const hstate = el('span', 'cc-say', '');
   const leftH = el('span', 'cc-left'); leftH.append(el('span', 'cc-say cc-proto', 'LL-HLS '), hstate);
@@ -153,11 +115,9 @@
   const HV = hlsPanel.values;
   const hover = { size: '', storage: '' };
   const hoverHls = () => { HV.el.title = [hover.size, hover.storage].filter(Boolean).join('\n'); };
-  // The picture says LL-HLS on its tag plate, always, even stopped (reported
-  // 2026-10-12 of the WebRTC one: *"not clear that this is webrtc"*).
-  // The protocol's name is the footer's first word, not a plate over the picture
-  // (asked 2026-10-13: *"rm labels on top of videos in loopback demos. move them
-  // to videopanel fooers"*).
+  // The protocol's name is the footer's first word, not a plate over the picture, so it says
+  // LL-HLS always, even stopped.
+  // See lessons/page-video.md#video-9
 
   const pair = el('div', 'cc-pair');
   pair.append(camera.panel.el, hlsPanel.el);
@@ -203,11 +163,10 @@
     }, CAP_MS);
   }
 
-  // ── the LL-HLS round trip ───────────────────────────────────────────────
-  // The burned frame recorded with MediaRecorder (H.264 in WebM, 2 s
-  // keyframes), sent over the worker's socket, rewrapped to RTMPS by the
-  // publisher container with no encode, and played back from Stream with the
-  // low latency player (camPublish in live.mjs, plans/plan-cam-llhls.md).
+  // The LL-HLS round trip: the burned frame recorded by MediaRecorder (H.264 in WebM, 2 s
+  // keyframes), rewrapped to RTMPS by the publisher with no encode, played back from Stream
+  // (camPublish in live.mjs, plans/plan-cam-llhls.md).
+  // See lessons/page-video.md#video-10
   const HLS_SAY = { busy: 'refused', stopped: 'stopped', closed: 'lost the publisher', unsupported: 'needs Chrome or Edge' };
   // hls.js is a classic script that sets `window.Hls`, which the player reads.
   // Loaded on the press, never on the visit: 600 KB nobody asked for otherwise.

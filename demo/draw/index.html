@@ -7,10 +7,9 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* The pad styles itself — it is `demo/shell/xy-pad.mjs` now, not a canvas
-     this page dresses. What is left here is layout: the row under the transport
-     that carries the knob and the one destructive button, pushed to the far end
-     of the same row. */
+  /* The pad styles itself (demo/shell/xy-pad.mjs). This is layout only: the row
+     that carries the knobs, with the one destructive button at its far end.
+     See lessons/page-draw.md#draw-1 */
   .foot { margin-top: 18px; }
 </style>
 
@@ -28,74 +27,27 @@
 
   const d = mount({
     name: 'draw',
-    // ⚠️ THREE SENTENCES, and it had quietly become five — describing a pink
-    // line and a yellow mark that are both gone now. A description that
-    // advertises things the page no longer draws is worse than a short one.
-    // 🔴 AND HALF AS LONG, ON INSTRUCTION 2026-09-16: *"keep demo desc FONT SIZE
-    // the same, reduce its length by 2x"*. It was 129 words in three long
-    // sentences, which is an essay wearing a word limit's clothes, and the
-    // first answer to it was to set the type at 10px instead — a paragraph
-    // nobody could read is not a paragraph anybody skipped. 65 words, the
-    // shell's own 13.5px. What went is the sentence about the numbers, because
-    // the numbers are on the pad in front of you.
-    // ONE SENTENCE, the manifest's `one`, since the page has a diagram
-    // (2026-10-05); what the paragraph explained is in the diagram's notes.
+    // One sentence, the manifest's `one`; the diagram's notes carry the explanation.
+    // See lessons/page-draw.md#draw-2
     what: 'Press record, then draw a line with a finger or a mouse.',
-    // Every cell moves with the drawing. `invented` is the one to read: it is
-    // the fraction of the drawn line that no sample attests.
-    //
-    // ⚠️ SIX, WHICH IS EVEN. `as two` and `times worse` arrived together for
-    // that reason as much as any other — an odd readout leaves a hole in the
-    // last row on a phone, and `mount()` throws on one. They pair down the page
-    // as they read: what was kept, what was invented · how far the one record
-    // is off and at worst · how far the same gesture is off when it is written
-    // down as two records instead, and by what factor that is worse.
-    // 🔴 PUBLISHED, NOT DRAWN, ON INSTRUCTION 2026-09-16. Asked for by pasting
-    // the whole row back with `rm` in front of it, and the page order that came
-    // with it has no readout in it: description, knobs, pad, transport,
-    // timeline, log. The numbers are not lost and the machine contract is
-    // unchanged (`__demo.readout` still carries all six, and `verify.mjs` still
-    // asserts the page declares them); what goes is a row of six figures above
-    // a page whose whole subject is two lines you can see the difference
-    // between. ⚠️ NOT `readout: null`, which is a page saying it HAS no numbers.
-    // This one has six and has put them where they can be read against the
-    // thing they describe.
+    // Six cells, an even number: an odd readout leaves a hole on a phone and mount()
+    // throws. Not drawn (showReadout false) but published on `__demo.readout`, which
+    // verify.mjs asserts; not `readout: null`, which would mean the page has none.
+    // See lessons/page-draw.md#draw-3
     readout: { kept: '', invented: '%', 'off by': 'px', worst: 'px', 'as two': 'px', 'times worse': '\u00d7' },
     showReadout: false,
-    // 🔴 NOTHING DRAWS FOR YOU. There was a `Draw one for me` control that
-    // synthesised a Lissajous, and it was there because the harness could not
-    // draw — `element.click()` fires no pointer events. It is gone, button and
-    // mechanism: a page about a gesture that offers you a gesture it made
-    // itself is answering its own question, and the line you get is not the
-    // line this page is about.
-    //
-    // The suite reaches it the real way now: `verify.mjs` dispatches actual
-    // pointer events across any element marked `data-gesture`, which the pad
-    // carries for every page that mounts one — so what the checks below grade
-    // is a drag, the same as yours.
-    // ⚠️ EMPTY ON PURPOSE. The shell's control bar sits ABOVE the page body,
-    // and this page's only button belongs under the pad beside the knob —
-    // in the row it acts on, at the far end of it, away from the surface you
-    // draw on. `verify.mjs` presses `.pos-controls button` wherever the row
-    // is, so the footer row below is reached exactly like a top one.
+    // Empty on purpose: the record button lives in the bar, the knobs sit in a
+    // `.pos-controls` row that verify.mjs presses wherever it is. Nothing draws for
+    // you; verify.mjs drags real pointer events across the pad's `data-gesture`.
+    // See lessons/page-draw.md#draw-4
     controls: [],
   });
   guard(d);
 
-  // ── the two records ──────────────────────────────────────────────────────
-  // 🔴 TWO APPEND-ONLY LANES, NEVER ONE MUTABLE ARRAY. The 2025 ancestor of
-  // this page decimated by emptying its own buffer (`realTimePoints.length =
-  // 0`), so the comparison it existed to make had already eaten its own ground
-  // truth. `evidence` is every sample and is never touched by the throttle; it
-  // is the PAD's capture, handed over as the live array, and the pad starts a
-  // fresh one on the next gesture rather than emptying this one.
-  //
-  // The rate is a CONTROL, because it is the other half of this page's
-  // question. The knob below the pad says how much a player may invent
-  // between two samples; this says how many samples there are to invent
-  // between. Move it and `kept`, `invented` and `off by` all move — at 20 ms
-  // interpolation has almost nothing to do, and at half a second no
-  // interpolator rescues a fast corner.
+  // Two append-only lanes, never one mutable array. `evidence` is every sample,
+  // the pad's live capture, never touched by the throttle. The rate is a control:
+  // it sets how many samples there are to interpolate between.
+  // See lessons/page-draw.md#draw-5
   let storeMs = 100;
   let evidence = [], stored = [];
   // The same gesture written down the OTHER way: two records of one number
@@ -104,15 +56,10 @@
   let splitX = [], splitY = [];
 
   /**
-   * The sparse record, DERIVED from the evidence rather than taken instead of
-   * it — so the rate can change after the fact and the same gesture can be
-   * asked the question again.
-   *
-   * 🔴 THE LAST SAMPLE IS ALWAYS KEPT. A plain wall-clock throttle drops the
-   * endpoint whenever a gesture ends mid-interval, and every replay then
-   * undershoots the place the hand actually reached. It is rule 2 of the
-   * capture discipline in `demo/shell/cc-adapter.mjs` and it belongs here for
-   * the same reason.
+   * The sparse record, derived from the evidence so the rate can change after the
+   * fact. The last sample is always kept, or replays undershoot where the hand
+   * ended (rule 2 of the capture discipline in demo/shell/cc-adapter.mjs).
+   * See lessons/page-draw.md#draw-6
    */
   function onAClock() {
     const out = [];
@@ -126,27 +73,10 @@
   }
 
   /**
-   * 🔴 THE NEGATIVE CONTROL — THE SAME NUMBER OF SAMPLES, PUT WHERE THE LINE
-   * BENDS. It was a setting on this page for about an hour, and it is not one
-   * any more because it loses every time (the check below says by how much).
-   * A control whose every position is worse than the default is a decision
-   * handed to a visitor who has no way to make it.
-   *
-   * It stays as CODE because the check needs something to be better than: a
-   * plausible alternative, run for real, and rejected by measurement. Delete
-   * it and the page's claim about sample placement becomes an assertion.
-   *
-   *
-   * A clock spends its budget evenly, which means it spends most of it on the
-   * straight parts — where a player could have worked the line out anyway —
-   * and arrives at a corner with nothing left. This keeps the two ends, then
-   * repeatedly adds whichever point sits furthest from the straight line
-   * between the samples already kept (Douglas-Peucker, top down), until it has
-   * as many as the clock would have taken.
-   *
-   * ⚠️ THE COUNT IS HELD EQUAL ON PURPOSE. "Better because it kept more" is not
-   * a finding, it is a bigger file. Equal count is the only comparison that
-   * says anything about WHERE samples should go.
+   * Negative control: the same sample count, placed where the line bends
+   * (Douglas-Peucker, top down). Kept as code so check() has a plausible rival to
+   * beat; the count is held equal so the comparison is only about placement.
+   * See lessons/page-draw.md#draw-7
    */
   function whereItBends(target) {
     // deviation of point i from the chord a..b, in pixels
@@ -161,17 +91,10 @@
   }
 
   /**
-   * The engine both alternatives below run on, so the comparison between them
-   * is about WHERE they put their samples and nothing else. Keep the two ends,
-   * then repeatedly add whichever sample `dev` says the line already kept is
-   * most wrong about, until `target` are kept. Returns indices into `evidence`.
-   *
-   * `dev(a, b, i)` is "how wrong would the straight line a..b be at i", in
-   * whatever unit the caller measures in — perpendicular pixels for a path,
-   * pixels on one axis for a single series. ⚠️ NEVER A MIXTURE OF THE TWO:
-   * a deviation that adds milliseconds to pixels needs a scale factor between
-   * them, and there is no defensible one, so the number it produces is an
-   * artefact of whoever picked it.
+   * Engine for both alternatives: keep the ends, add whichever sample `dev(a, b, i)`
+   * says the kept line is most wrong about, until `target`; returns indices.
+   * `dev` is in one unit only (px on a path or on one axis), never a mixture.
+   * See lessons/page-draw.md#draw-8
    */
   function pickWorstFirst(dev, target) {
     const n = evidence.length;
@@ -196,28 +119,10 @@
   }
 
   /**
-   * 🔴 THE OTHER READING OF THE SAME GESTURE — ONE DIRECTION, RECORDED ON ITS
-   * OWN. This is the arrangement plan-gesture §3 rejected by inference and P3
-   * measures: a pad that writes down two one-dimensional series rather than one
-   * two-dimensional one, which is what a hardware controller sends and what
-   * `demo/shell/cc-adapter.mjs` receives. The whole of the difference is that
-   * the gate is PER SERIES — across can be written down at an instant down is
-   * not — so nothing here may consult the other axis.
-   *
-   * ⚠️ THE COUNT IS HELD EQUAL PER AXIS, WHICH HANDS THE ALTERNATIVE THE
-   * ADVANTAGE, and that is deliberate. Each series gets as many samples as the
-   * whole 2-D record has, so the split reading stores twice the rows; and its
-   * samples are placed by a pass over the FINISHED gesture, which no live gate
-   * could run. If the best case a two-series recording can reach still loses,
-   * every real per-series gate loses too — and the one that ships (a
-   * per-controller wall-clock throttle over a quantised value) is strictly
-   * worse placed than this.
-   *
-   * ⚠️ THE VALUE RIDES IN `.x`, whichever axis it came from, so the SAME
-   * measured interpolators grade it: `catmullSample` treats x and y
-   * independently over shared time knots, so a one-axis series is exactly a
-   * two-axis one whose other component never moves. No second spline was
-   * written, which is the only way the comparison is about placement.
+   * The same gesture as two one-axis series, each gated on its own, as a hardware
+   * controller sends it. Count held equal per axis and placed over the finished
+   * gesture: its best case. The value rides in `.x` so the same interpolators grade it.
+   * See lessons/page-draw.md#draw-9
    */
   function oneAxisAlone(get, target) {
     const dev = (a, b, i) => {
@@ -232,59 +137,36 @@
 
   function decimate() {
     stored = evidence.length ? onAClock() : [];
-    // THE SAME GESTURE, WRITTEN DOWN AS TWO. Rebuilt with the record, because
-    // the rate knob changes how many samples there are to place.
+    // The same gesture written down as two; rebuilt with the record, since the rate
+    // knob changes how many samples there are.
+    // See lessons/page-draw.md#draw-10
     const n = stored.length;
     splitX = n >= 2 ? oneAxisAlone((p) => p.x, n) : [];
     splitY = n >= 2 ? oneAxisAlone((p) => p.y, n) : [];
   }
 
-  // ── reconstruction ───────────────────────────────────────────────────────
-  // The adapter's own interpolators, which is the whole reason this page did
-  // not need writing: `holdSample`, `lerpSample` and `catmullSample` are the
-  // measured article (0.036 px mean for the spline against 24.19 for a hold).
-  // 🔴 ONE KNOB, NOT THREE BUTTONS. The three reconstructions used to be a
-  // radio row, which makes them three unrelated things you pick between; they
-  // are three points on ONE axis — how much a player is willing to invent
-  // between two samples. At 0 nothing is invented and the line is a staircase;
-  // at 1 the line is a spline through the same samples. Dragging it moves
-  // `off by` continuously, which is the page's whole subject turned into
-  // something you can feel rather than three numbers you compare.
-  //
-  // The ends are EXACTLY the named methods, so the checks below still grade
-  // the three real algorithms rather than a blend of them.
+  // The adapter's interpolators (holdSample, lerpSample, catmullSample), on one
+  // smoothing knob: 0 holds (a staircase), 1 is the spline. The ends are exactly
+  // the named methods, so check() grades the real algorithms.
+  // See lessons/page-draw.md#draw-11
   const HOLD = 0, LINEAR = 0.5, SMOOTH = 1;
   let smooth = SMOOTH;
   const mix = (p, q, k) => ({ ...p, x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k });
 
   /**
-   * The reconstruction, as ONE function — between two attested samples, at
-   * smoothing `s`, with whatever neighbours there are.
-   *
-   * 🔴 IT IS ALSO THE ADAPTER'S `interpolate`, and that is deliberate. The blue
-   * line and the transport's own read of the record both come through here, so
-   * the picture and the playhead cannot disagree about what the same record
-   * says. What that costs is worth writing down: the check
-   * below compares the transport's answer against this page's, and since both
-   * end in this function it CANNOT catch an arithmetic mistake in it — what it
-   * catches is the plumbing (a record the transport never received, a seek that
-   * asserts nothing, interpolation refused), which is what P2 is about. The
-   * arithmetic is graded separately, against the evidence, by `error()`.
-   *
-   * ⚠️ REFLECTED AT THE ENDS, and by `catmullSample` rather than by hand. This
-   * page used to build its own phantom — a DUPLICATE of the near sample placed
-   * one interval earlier, which halves the tangent — while its comment claimed
-   * a reflection. Handing the ends over as `undefined` gets the adapter's
-   * measured behaviour (FIX-3) and makes the comment true.
+   * The reconstruction at smoothing `s`, also the adapter's `interpolate`, so the
+   * picture and the transport cannot disagree; the transport check then catches
+   * plumbing, not arithmetic. Ends go in as undefined so catmullSample reflects them.
+   * See lessons/page-draw.md#draw-12
    */
   function blend(a, b, u, ctx, s = smooth) {
     const held = holdSample(a);
     if (s <= HOLD) return held;
     const straight = lerpSample(a, b, u);
     if (s <= LINEAR) return mix(held, straight, s / LINEAR);
-    // ⚠️ TIME-KNOTTED. A wall-clock throttle never produces evenly spaced
-    // samples, so uniform knots bend the curve toward whichever sample happened
-    // to arrive late.
+    // Time-knotted: throttled samples are never evenly spaced, and uniform knots bend
+    // the curve toward a late sample.
+    // See lessons/page-draw.md#draw-13
     const p0 = (ctx && ctx.prev) || null, p3 = (ctx && ctx.next) || null;
     return mix(straight, catmullSample(p0, a, b, p3, u), (s - LINEAR) / (SMOOTH - LINEAR));
   }
@@ -305,10 +187,11 @@
   /** the same reading pinned at one smoothing, in the shape `error()` takes */
   const atSm = (sm) => (t) => at(t, sm);
 
-  /** Where ONE independently-recorded direction says it was at `t`. Its rows
-   *  carry their value in `.x` whichever axis they came from — see
-   *  `oneAxisAlone` — so this is `at()` with the second component thrown away,
-   *  through the same `blend` and therefore the same measured interpolators. */
+  /**
+   * Where one separately recorded direction says it was at `t`: `at()` on `.x` only,
+   * through the same `blend`.
+   * See lessons/page-draw.md#draw-14
+   */
   function oneAxisAt(rows, t, sm) {
     const n = rows.length;
     if (n < 2) return null;
@@ -344,17 +227,13 @@
     return lerpSample(a, b, u);
   }
 
-  // ── the transport ────────────────────────────────────────────────────────
-  // ONE DECK for the page's life — the bar binds its deck at construction, so
-  // a deck built after the first gesture leaves the bar pointing at something
-  // nobody is playing. The lane is rebuilt (`sched.clear()` + re-schedule)
-  // whenever the record changes, which is every move of the rate knob.
+  // One deck for the page's life: the bar binds its deck at construction. The lane
+  // is rebuilt (sched.clear() and re-schedule) whenever the record changes.
+  // See lessons/page-draw.md#draw-15
   const KIND = 'pointer';
-  // 🔴 THE EVIDENCE POLICY IS NOT OPTIONAL HERE. Interpolating between two
-  // attested samples IS restoration (tier 1), so `sampleAt` and the fold both
-  // THROW on a deck that has not chosen — and under 'attested' the fold is
-  // handed no successor at all and degrades to holding the last sample, which
-  // is this page's own 34 px baseline wearing a transport. Chosen once, here.
+  // The evidence policy must be chosen: interpolating is restoration, so sampleAt
+  // and the fold throw without one, and 'attested' degrades to a 34 px hold.
+  // See lessons/page-draw.md#draw-16
   const RESTORED = { restored: { maxTier: 1 } };
   // a deck with nothing in it still needs a window; long enough that pressing
   // play on an empty page does not immediately hit the end
@@ -365,34 +244,18 @@
 
   const pointer = makePointerAdapter({
     mode: 'catmull',
-    // BOTH DOORS. `actuate` is the attested fire as the playhead crosses a
-    // sample; `assertState` is the fold after a seek, and `pointer-adapter`
-    // routes both here. A state of null (a fold with nothing behind it) never
-    // arrives — the adapter drops it — so the mark can go stale, which is
-    // exactly what the check below watches for.
+    // Both doors: `actuate` fires as the playhead crosses a sample, `assertState`
+    // after a seek. A null state is dropped by the adapter, so the mark can go stale.
+    // See lessons/page-draw.md#draw-17
     onActuate: (s) => {
       if (s && Number.isFinite(s.x) && Number.isFinite(s.y)) { ghost = s; pad.repaint(); }
     },
   });
   pointer.interpolate = (a, b, u, ctx) => blend(a, b, u, ctx);
-  // ⚠️ THE SPEEDS COME FROM THE ADAPTER, AND THE BAR BUILDS THE CONTROL. There
-  // is no speed widget on this page and there must not be: `transport-bar.mjs`
-  // renders one button per rate in the INTERSECTED `caps.rates` of the deck's
-  // adapters, and shows an honest static `1x` when no adapter declares any —
-  // which is what this page showed until now, because `pointer-adapter.mjs`
-  // says `rate: true` and never says which. A capability declared as a boolean
-  // is a capability no UI can offer.
-  //
-  // SET BEFORE `createDeck`, so neither the deck's registration of the kind nor
-  // the bar's first read of the lattice can miss it. (Which of the two caches
-  // is not something this page should have to know.)
-  //
-  // ⚠️ AND IT CHANGES NOTHING THIS PAGE MEASURES. Every number here comes from
-  // the samples' own stamps through `at()` / `atApart()`, and the transport
-  // check seeks to explicit positions — a position is a position at any speed.
-  // The one thing that does read the playhead live is the replay's ink limit
-  // below, and it reads `deck.position()`, which is in the recording's
-  // milliseconds however fast they are being crossed.
+  // The speeds come from the adapter and the bar builds the buttons from the
+  // intersected caps.rates. Set before createDeck so neither the deck nor the bar
+  // misses it. Speed changes nothing measured: every number reads sample stamps.
+  // See lessons/page-draw.md#draw-18
 
   const deck = createDeck({
     items: [], adapters: { [KIND]: pointer },
@@ -400,20 +263,10 @@
   });
 
   /**
-   * Hand the record to the transport. Called when a gesture ends and whenever
-   * the rate knob changes what the record IS — not on every sample, because a
-   * lane rebuilt per pointermove is a lane nobody plays.
-   *
-   * ⚠️ NORMALISED TO ZERO. The samples carry `event.timeStamp`, which is
-   * milliseconds since the page loaded — so a gesture drawn four seconds in
-   * would give the bar a clock reading `0:04.210 / 0:03.200`. A recording
-   * starts at zero. The payload's `at` is normalised too, because the adapter
-   * interpolates against the POSITION it is asked for.
-   *
-   * ⚠️ AND THEN RE-ASSERT AT THE PLAYHEAD. The overdub law fires an event
-   * scheduled behind the playhead immediately — right for a note, wrong for a
-   * position, which would leave the mark at the end of the line rather than
-   * where the playhead is.
+   * Hand the record to the transport when a gesture ends or the rate knob changes.
+   * Normalised to zero (timeStamp counts from page load), then re-asserted at the
+   * playhead, since the overdub law would leave the mark at the line's end.
+   * See lessons/page-draw.md#draw-19
    */
   function publish() {
     deck.sched.clear();
@@ -435,61 +288,28 @@
     deck.assertAt(deck.position(), KIND);
   }
 
-  // 🔴 WHAT YOU DREW IS WHITE AND IT IS THE LOUDEST THING HERE — and the pad
-  // draws it, not this page. It was the other way round once: your line dark
-  // underneath, the reconstruction in the page's yellow on top, which put the
-  // emphasis on the invented line and made the page look like it was about the
-  // reconstruction. It is about the DIFFERENCE. The reconstruction is blue: a
-  // second reading of the same gesture, present and legible without competing.
-  // Not `--hi`, which is the playhead's colour on every page — and on this page
-  // the playhead is the END OF THE WHITE LINE, which is why there is no dot.
-  //
-  // ⚠️ `apart` IS KEPT AND NOTHING STROKES IT. The split reading had a third
-  // line here, dashed and pink, and the first thing anybody asked about this
-  // page was "what is the dotted line?" — which is the entire verdict on it.
-  // The colour stays because the reasoning behind it is worth having if the
-  // line ever comes back: not white (the capture), not blue (the record this
-  // page is about), not `--hi` (the playhead), and deliberately not `--bad` red
-  // or `--ok` green, because painting the loser red would be the picture
-  // asserting the conclusion the numbers are there to reach.
+  // The pad draws your line in white, the loudest thing here. The reconstruction is
+  // blue, not `--hi` (the playhead's colour). `apart` is kept but not stroked; its
+  // colour avoids white, blue, `--hi`, `--bad` and `--ok` so it asserts no verdict.
+  // See lessons/page-draw.md#draw-20
   const C = { guess: '#7aa2f7', apart: '#ff7ab6' };
 
-  // ── the two lines take turns ─────────────────────────────────────────────
-  // 🔴 WHILE YOUR HAND IS DOWN THERE IS ONE LINE ON THE PAD. Reported as *"find
-  // a way to see blue line on drawing (no enough contrast am blue on white)"*.
-  // The reconstruction was drawn at half weight ON TOP of the capture, so
-  // everywhere the two agree the blue landed on white ink rather than on the
-  // pad and came out a pale blue nobody can separate from the white under it.
-  // MEASURED off this canvas, in `check()` below: those two colours are 1.4:1
-  // apart, where 3:1 is the floor for a graphic somebody is meant to make out.
-  //
-  // So they take turns. Drawing, the capture is at full weight and the reading
-  // is not drawn at all — there is nothing to confuse it with. Lift the hand
-  // and the capture fades back to `INK.settled` while the reading fades in to
-  // full: the blue is then on the PAD's ground almost everywhere, the two
-  // measure 3.5:1 apart, and the fat grey band underneath still says where
-  // your hand went. That holds while it is playing too, which is when the
-  // difference between the two lines is the thing you are watching.
-  //
-  // ⚠️ 0.26 IS A TRADE AND BOTH SIDES OF IT ARE MEASURED, on this pad's own
-  // ground: at 0.42 the capture wins its fight with the reading again and the
-  // two read 2.1:1 apart, and at 0.20 the capture is down to 1.7:1 against the
-  // pad it is drawn on and stops being a line you can follow. At 0.26 the two
-  // lines are 3.5:1 apart and the capture holds 2.1:1 against the ground. 3:1
-  // is the floor for a graphic somebody is meant to make out, and it is what
-  // the check below holds the picture to.
+  // The two lines take turns. While a hand is down only the capture is drawn; after,
+  // it fades to INK.settled and the reading fades in. 0.26 is the measured trade:
+  // lines 3.5:1 apart, capture 2.1:1 on the ground (0.42 gives 2.1:1, 0.20 gives 1.7:1).
+  // See lessons/page-draw.md#draw-21
   const FADE_MS = 260;
   const INK = { live: 1, settled: 0.26 };    // the capture, hand down and after
   const READ = { live: 0, settled: 1 };      // the reconstruction, the same two
 
-  // ⚠️ DECLARED BEFORE THE PAD, because the pad PAINTS as it is built and its
-  // paint calls this page's overlay — a `let` below it is in its temporal dead
-  // zone at exactly that moment, and the page dies before `ready`.
+  // Declared before the pad: the pad paints as it is built and calls this overlay,
+  // so a `let` below it would be in its temporal dead zone.
+  // See lessons/page-draw.md#draw-22
   let dirty = true;          // the derived record is stale
   let drawnPoints = 0, drawn = [], drawnApart = [];
-  // ⚠️ AND SO ARE THESE, FOR THE SAME REASON — and `handDown` is the page's own
-  // flag rather than `pad.drawing()`, which would read the pad from inside the
-  // pad's first paint and throw before `ready`.
+  // These too. `handDown` is the page's own flag, since `pad.drawing()` would read
+  // the pad from inside its first paint and throw.
+  // See lessons/page-draw.md#draw-23
   let handDown = false;      // a pointer is on the pad right now
   let settleAt = 0;          // when it came up; 0 means nothing has been drawn
 
@@ -501,75 +321,44 @@
     if (!settleAt) return 1;
     return Math.min(1, (performance.now() - settleAt) / FADE_MS);
   }
-  // ⚠️ NOT `mix` — that name is already a POINT between two samples, forty
-  // lines up, and two of those in one file is the kind of collision a page
-  // finds by refusing to parse.
+  // Not `mix`: that name is already a point between two samples above.
+  // See lessons/page-draw.md#draw-24
   const cross = (a, b, u) => a + (b - a) * u;
-  // 🔴 AND THE CAPTURE ONLY STEPS BACK IF THERE IS SOMETHING TO STEP BACK FOR.
-  // Drawing with record OFF stores nothing, so no reading fades in and there
-  // is nothing for your line to make room for: it stays at full weight, which
-  // is what it did before any of this. PHOTOGRAPHED while building it, with
-  // the record button never pressed: a ghost of a line on an empty pad with no
-  // second line anywhere reads as the page losing what you drew.
+  // The capture steps back only when there is a reading to make room for: with
+  // record off nothing is stored, so the line stays at full weight.
+  // See lessons/page-draw.md#draw-25
   const hasReading = () => drawn.length > 1;
   const inkAlpha = () => (hasReading() ? cross(INK.live, INK.settled, phase()) : INK.live);
   const readAlpha = () => cross(READ.live, READ.settled, phase());
 
-  // ── the pad ──────────────────────────────────────────────────────────────
-  // The surface is `demo/shell/xy-pad.mjs`: it owns the capture, it draws it,
-  // and it hands every sample over at full rate. This page owns the second
-  // record and the second reading, which is what it is about.
-  //
-  // The axes are the pad's own pixels, because that is genuinely this page's
-  // unit — every number it prints is a distance on this surface.
-  // 🔴 NOTHING IS STORED UNTIL RECORD IS ON. Asked for, and it is the right
-  // shape for this page: drawing and RECORDING a drawing are two different
-  // acts, and a page that records everything you do has no way to show you the
-  // difference. It also gives the line an honest start — the first sample is
-  // the one after you armed it, rather than whatever happened to be first.
-  //
-  // ⚠️ The pad still captures at full rate either way. `recording` gates what
-  // reaches the RECORD, never what the pad draws or what the evidence lane
-  // holds — that separation is rule 2 of the capture discipline and this page
-  // exists to measure it.
+  // The surface is demo/shell/xy-pad.mjs, in its own pixels; it owns the capture.
+  // Nothing reaches the record until record is on, but the pad still captures and
+  // the evidence lane still fills at full rate (rule 2 of the capture discipline).
+  // See lessons/page-draw.md#draw-26
   let recording = false, growing = false;
-  // Whether the white line on the pad IS the take the transport is playing.
-  // It is not, after you draw on the pad with record off — that leaves the
-  // record alone (see `onStart`) and the two are then different gestures, so
-  // wiping the ink back to the playhead would be wiping something the playhead
-  // knows nothing about.
+  // Whether the white line is the take being played. Drawing with record off leaves
+  // the record alone (see onStart), so the ink must not be wiped to the playhead.
+  // See lessons/page-draw.md#draw-27
   let traceIsTake = false;
 
   const pad = createXyPad(d.el, {
     label: 'draw a line',
-    // ⚠️ `x` AND `y`, NOT `across` AND `down`. Asked for. The long words were
-    // chosen under the no-jargon rule, and that rule is about this project's
-    // PRIVATE vocabulary — a fold, a lane, an evidence gate — not about the two
-    // most widely known axis names there are. On a pad whose whole subject is a
-    // pair of numbers, `x` and `y` are what a reader already calls them, and
-    // two short labels also stop the strip's gutter paying for two long ones.
+    // `x` and `y`: the widely known axis names, and short labels save strip gutter.
+    // See lessons/page-draw.md#draw-28
     x: { label: 'x', min: 0, max: PAD.w, unit: 'px' },
     y: { label: 'y', min: 0, max: PAD.h, unit: 'px' },
-    // rule 1: this arrives for EVERY coalesced sample. It marks the derived
-    // record stale and returns — the picture is redrawn once a frame by the
-    // pad, and rebuilding a 900-point spline per sample would be three or four
-    // pictures per frame that nobody sees.
-    // Every coalesced sample. While recording, the line and its picture grow
-    // as the hand moves — the timeline is drawn immediately rather than at the
-    // end of the gesture, and the playhead sits on the newest sample, so the
-    // cursor travels along the drawing as you make it.
+    // Every coalesced sample. It marks the derived record stale and returns; the
+    // redraw is once a frame. While recording the timeline grows and the playhead
+    // sits on the newest sample.
+    // See lessons/page-draw.md#draw-29
     onInput: () => {
       dirty = true;
       if (recording) growing = true;
     },
-    // ⚠️ THE RECORD IS ONLY CLEARED WHEN A RECORDING STARTS. Touching the pad
-    // with record OFF draws, and leaves whatever was recorded before intact —
-    // otherwise arming, drawing, and then idly touching the pad would silently
-    // throw the take away.
-    // ⚠️ `handDown` IS SET FOR EVERY GESTURE, ARMED OR NOT. Which line the pad
-    // shows is a question about the hand, not about the record: drawing with
-    // record off still has to be one line at full weight, or the last take's
-    // blue sits on top of a gesture it knows nothing about.
+    // The record is cleared only when a recording starts, so idle touches keep a take.
+    // `handDown` is set for every gesture, armed or not: which line shows depends on
+    // the hand, not the record.
+    // See lessons/page-draw.md#draw-30
     onStart: () => {
       handDown = true;
       traceIsTake = recording;
@@ -583,65 +372,35 @@
       render(); publish(); reframe(); check();
     },
     value: () => ghost,
-    // 🔴 A REPLAY REDRAWS THE LINE, IT DOES NOT DRAW ON TOP OF IT. Asked for,
-    // and it changes what pressing play means: the ink is wiped back to the
-    // playhead and grows under the mark, so what you watch is the replay. It
-    // used to retrace a finished drawing, where the replay and the original are
-    // the same pixels and you cannot tell which you are looking at.
-    //
-    // Paused, the whole line is back — a still page shows what was recorded,
-    // which is the pad's own rule 3 and not something playing gets to change.
-    //
-    // ⚠️ A TIME, NOT A COUNT. `base + position` is the stamp the capture
-    // carries; a count would need this page to know how the pad coalesced.
-    // 🔴 ONLY AS FAR AS THE CURSOR, WHETHER IT IS PLAYING OR BEING DRAGGED.
-    // It was gated on `deck.playing()`, so scrubbing showed the whole line with
-    // a mark sliding along it — and a line you can already see all of does not
-    // need a cursor to tell you where you are in it. The gate is the POSITION,
-    // not the transport state: at the very end the whole line is back, which is
-    // what a finished drawing should look like.
-    // ⚠️ NOT `!recording` — that was the obvious gate and it is the wrong one.
-    // Record stays ARMED after a gesture ends, so the line would never follow
-    // the cursor until you disarmed it, and the check read three identical
-    // pixel counts. `growing` is the state that actually means "a hand is down
-    // right now", which is the only time the line must show everything
-    // regardless of where the playhead is.
+    // A replay redraws the line up to the playhead (a time, `base + position`), while
+    // playing or scrubbing; at the end the whole line is back. The gate is `growing`,
+    // not `!recording`: record stays armed after a gesture ends.
+    // See lessons/page-draw.md#draw-31
     upTo: () => inkLimit(),
     // how strongly the capture is drawn: full while your hand is down, a ghost
     // of itself once the reading has faded in over it. See `INK` above.
     ink: () => inkAlpha(),
     overlay: (ctx, v) => paintSecondReading(ctx, v),
-    // 🔴 NO MARK. The white line now stops AT the playhead, so its end IS the
-    // cursor — a ringed dot on top of that point is a second indicator for one
-    // position, which reads as two. Asked for, and right for the same reason
-    // the pad stopped drawing its own labels.
+    // No mark: the white line ends at the playhead, so a dot would be a second cursor.
+    // See lessons/page-draw.md#draw-32
     showMark: false,
   });
 
   /**
-   * HOW FAR THE INK GOES, as one function, because TWO lines read it now.
-   * 🔴 The blue line grows with the cursor as well — asked for, and it is the
-   * only version that makes sense: with white stopping at the playhead and blue
-   * drawn to the end, the picture showed a reconstruction of a gesture that had
-   * not happened yet, and the gap between them stopped being the thing the page
-   * is about. Both lines end at the same instant, so what you watch while it
-   * plays is the DIFFERENCE arriving, which is the subject.
-   * ⚠️ One function rather than the same condition typed twice: two copies of
-   * this would agree today and disagree the first time either is touched, and
-   * the symptom would be two lines ending in different places — which reads as
-   * a reconstruction error rather than as a layout bug.
+   * How far the ink goes, for both lines, so white and blue always end at the same
+   * instant. One function so two copies cannot drift.
+   * See lessons/page-draw.md#draw-33
    */
   function inkLimit() {
     return (traceIsTake && !growing && stored.length > 1
       && deck.position() < deck.range[1]) ? base + deck.position() : null;
   }
 
-  /** Rebuild everything derived from the SPARSE RECORD as it stands — without
-   *  re-deriving the record itself, because the check below hands it a record
-   *  built another way and needs that one graded, not this one.
-   *
-   *  No canvas: the error functions used to depend on a paint having happened,
-   *  so they could not be asked a question without redrawing the page. */
+  /**
+   * Rebuild everything derived from the sparse record as it stands, without
+   * re-deriving it, so check() can grade a record built another way. No canvas.
+   * See lessons/page-draw.md#draw-34
+   */
   function rebuild() {
     drawnPoints = 0;
     drawn = [];
@@ -651,11 +410,9 @@
       const step = Math.max(2, (t1 - t0) / 900);
       for (let t = t0; t <= t1; t += step) {
         const s = at(t); if (!s) continue;
-        // ⚠️ THE INSTANT TRAVELS WITH THE POINT. Cutting the blue line at the
-        // playhead needs to know WHEN each rebuilt point is, and a count would
-        // not do it — the rebuild walks time in even steps, the capture does
-        // not, so the nth blue point and the nth white sample are different
-        // moments.
+        // The instant travels with the point: the rebuild walks even time steps, the
+        // capture does not, so the blue line is cut by time, not by count.
+        // See lessons/page-draw.md#draw-35
         drawnPoints++; drawn.push({ ...s, t });
         // the same instants, read from the two separate records
         const q = atApart(t); if (q) drawnApart.push(q);
@@ -666,23 +423,9 @@
     const err = error();
     const errApart = error(atApart);
     d.set('kept', stored.length || '');
-    // 🔴 AGAINST WHAT WAS CAPTURED, NOT AGAINST HOW FINELY THE LINE IS DRAWN.
-    // This divided by `drawnPoints`, which is the REBUILD RESOLUTION — the loop
-    // above walks the gesture in `(t1-t0)/900` steps, so `drawnPoints` is about
-    // 900 whatever you do. The cell was therefore `100 × (1 − kept/900)` and
-    // could not come down: turning `sample every` all the way to 10 ms on a 3 s
-    // gesture keeps ~300 samples and still reads **66.7% invented**. Reported
-    // as "cannot get most kept", which is exactly right — the number was
-    // measured against a constant this page picked for SMOOTHNESS, and no
-    // control on the page moves it.
-    //
-    // The honest denominator is what the browser actually gave us. "How much of
-    // what you see no sample attests" is kept against CAPTURED, and it reaches
-    // 0 when the gate is fine enough to keep every sample — which is a state
-    // the knob can actually get to.
-    // ⚠️ `evidence`, not `drawn`: one is the full-rate record of what happened,
-    // the other is this page's own redrawing of it, and only the first is a
-    // measurement of anything.
+    // `invented` is measured against `evidence` (what was captured), not `drawnPoints`,
+    // which is the ~900 point rebuild resolution and would never let it reach 0.
+    // See lessons/page-draw.md#draw-36
     d.set('invented', evidence.length
       ? (100 * (1 - Math.min(1, stored.length / evidence.length))).toFixed(1) : '');
     d.set('off by', err ? err.mean.toFixed(3) : '', err && err.mean < 1 ? 'ok' : err ? 'warn' : '');
@@ -700,21 +443,10 @@
   function paintSecondReading(ctx, v) {
     if (dirty) recompute();
     if (drawn.length < 2) return;
-    // 🔴 THE SAME GESTURE AS TWO RECORDS IS STILL MEASURED AND NO LONGER DRAWN.
-    // It was a third line, dashed and pink, and the first question anybody
-    // asked about this page was "what is the dotted line?" — which is the whole
-    // verdict on it. It answers a question the page asks in its NUMBERS (`as
-    // two`, `times worse`) and the picture could not say which of three lines
-    // was the subject. `drawnApart` is still computed on every recompute,
-    // because the check below grades it; only the stroke is gone.
-    // 🔴 IT USED TO BE DRAWN AT HALF WEIGHT AND THAT IS THE BUG THIS PAGE WAS
-    // REPORTED FOR. The reasoning was that white is what happened and blue is a
-    // reading OF it, so the white should show through wherever the two agree
-    // and the blue should only become visible where it DEPARTS. What it
-    // produced was blue ink on white ink, 1.4:1 apart, and a reader who could
-    // not tell which line was which anywhere. The weight the reading is drawn
-    // at now is `READ`, which is 0 while a hand is down and 1 after: the
-    // capture is what steps back, not the reading.
+    // The two-record reading is measured but not drawn (`drawnApart` is graded by
+    // check()). The reading is drawn at weight READ: 0 while a hand is down, 1 after;
+    // blue over white at half weight was 1.4:1 and unreadable.
+    // See lessons/page-draw.md#draw-37
     const alpha = readAlpha();
     if (alpha <= 0) return;                  // a hand is down: your line alone
     const cut = inkLimit();
@@ -730,14 +462,9 @@
     }
     ctx.stroke();
     ctx.restore();
-    // The samples that are actually attested, so "kept" is a thing you can
-    // count on screen rather than only in a cell. They belong to the sparse
-    // record, so they are the record's colour — a third hue here would say
-    // they were a third kind of thing.
-    // ⚠️ AND THEY STOP WHERE THEIR OWN LINE STOPS. A dot is a sample of the
-    // blue record, so dots past the cut would be the record asserting samples
-    // for a stretch of line it is not drawing — a count on screen that does not
-    // match the line under it.
+    // The attested samples as dots, in the record's colour, so `kept` can be counted
+    // on screen. They stop where the blue line stops.
+    // See lessons/page-draw.md#draw-38
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = C.guess;
@@ -758,27 +485,17 @@
   }
 
   /**
-   * 🔴 THE TIMELINE IS DRAWN AS THE HAND MOVES, not when it stops. Asked for,
-   * and it changes what the page is: a strip that appears at the end is a
-   * report, and one that grows under your hand is a recording.
-   *
-   * ⚠️ ONCE A FRAME, NOT ONCE A SAMPLE. `getCoalescedEvents` hands over every
-   * sample the browser buffered — a dozen per frame on a 120 Hz digitiser —
-   * and rebuilding the lane and its spline for each one is a dozen pictures
-   * per frame that nobody sees. The pad already coalesces its own painting the
-   * same way, for the same reason.
-   *
-   * The playhead is parked on the newest sample, so the cursor travels along
-   * the line as you draw it rather than sitting at zero until you let go.
+   * The timeline is drawn as the hand moves, once a frame and not once a sample
+   * (getCoalescedEvents gives a dozen per frame at 120 Hz). The playhead is parked
+   * on the newest sample so the cursor follows the drawing.
+   * See lessons/page-draw.md#draw-39
    */
   let growTick = 0;
   function growFrame() {
     requestAnimationFrame(growFrame);
-    // ⚠️ THE CROSSOVER NEEDS FRAMES AND NOTHING ELSE WOULD ASK FOR THEM. The
-    // pad repaints when a sample arrives, when the playhead moves or when this
-    // page tells it to — and the moment the two lines trade places is exactly
-    // the moment none of those three is happening. A fade nobody paints is a
-    // jump, which is what it looked like before this line.
+    // The crossover needs frames that nothing else would request: no sample, playhead
+    // move or page call happens while the lines trade places.
+    // See lessons/page-draw.md#draw-40
     if (phase() < 1) pad.repaint();
     if (!growing) return;
     const now = performance.now();
@@ -797,11 +514,9 @@
 
   /** How far the reconstruction sits from what actually happened. Measured
    *  against EVERY evidence sample, not against a subsample of itself. */
-  // ⚠️ IT TAKES THE READING, NOT A SMOOTHING NUMBER. It took `sm` until P3 put
-  // a second reading of the same gesture on the page, and a function that can
-  // only grade one of them is a function that decides which one is the subject.
-  // `reading(t)` is anything that answers "where does this record say the hand
-  // was at t" — including the one that reads two separate records.
+  // Takes a reading, not a smoothing number: `reading(t)` is anything that answers
+  // where a record says the hand was at t, including the two-record one.
+  // See lessons/page-draw.md#draw-41
   function error(reading = (t) => at(t, smooth)) {
     if (evidence.length < 2 || stored.length < 2) return null;
     let sum = 0, worst = 0, n = 0;
@@ -815,14 +530,10 @@
   }
 
   /**
-   * How far the reconstruction sits from what happened AS A SHAPE — nearest
-   * point on the drawn line to each sample, with time thrown away.
-   *
-   * 🔴 TWO QUESTIONS, AND THEY HAVE DIFFERENT ANSWERS. `error()` asks "where
-   * does the record say the hand was at 4.212 s", which is what a playback
-   * needs. This asks "does the ink go through the same places", which is what
-   * a drawing needs. A record can be excellent at one and poor at the other,
-   * and this page measured exactly that on its first run.
+   * Distance as a shape: nearest point on the drawn line to each sample, time
+   * ignored. `error()` asks where at time t, for playback; this asks whether the
+   * ink goes through the same places. A record can be good at one and poor at the other.
+   * See lessons/page-draw.md#draw-42
    */
   function shapeError(line = drawn) {
     if (evidence.length < 2 || line.length < 2) return null;
@@ -837,28 +548,19 @@
   }
 
 
-  // While it is PLAYING the mark moves between the attested samples, which fire
-  // ten times a second at the default rate — a mark that only moved on a fire
-  // would step rather than travel. Paused, nothing here writes: the fold after
-  // a seek is the only thing that moves the mark, which is what the check below
-  // is able to grade.
+  // While playing the mark moves between samples (they fire ten times a second at
+  // the default, so it would step). Paused, only the fold after a seek moves it.
+  // See lessons/page-draw.md#draw-43
   observePosition(deck.transport, ({ pos }) => {
     if (!deck.playing() || stored.length < 2) return;
     const s = deck.sampleAt(KIND, pos);
     if (s && Number.isFinite(s.x)) { ghost = s; pad.repaint(); }
   });
 
-  // 🔴 THE GESTURE AS A SIGNAL, NOT ONLY AS A PATH. The pad shows WHERE the
-  // hand went; this shows WHEN — x and y against time, on the line the
-  // transport actually scrubs. They are the same thirty samples read two ways,
-  // and the second reading is the one that makes the timing visible: a fast
-  // corner is a steep edge here and just a bend up there.
-  //
-  // The polyline comes from the strip's own `continuous` renderer, which calls
-  // `deck.sampleAt(kind, t)` — so it is drawn through the SAME interpolator the
-  // page's blue line and the playhead's mark use. Three surfaces, one answer;
-  // if they ever disagree it is because something real changed, not because a
-  // third drawing path was written.
+  // The gesture as a signal: x and y against time, where a fast corner is a steep
+  // edge. Drawn by the strip's `continuous` renderer through deck.sampleAt, the
+  // same interpolator as the blue line and the mark.
+  // See lessons/page-draw.md#draw-44
   const view = createStripView(d.el, deck, {
     size: 'auto',
     lanes: [
@@ -870,23 +572,10 @@
   });
 
   /**
-   * 🔴 THE TIMELINE OPENS AT TWICE THE FIT. Asked for as *"draw timeline: zoom
-   * 2.0 by default"*. Fitting puts the whole recording on screen, and the
-   * whole of a three second gesture in a strip this wide is two lanes of
-   * wobble: the corners round off, and the one thing these lanes exist to show
-   * — that a fast corner is a steep edge here and only a bend up on the pad —
-   * is drawn too small to read. At twice that, half the recording is on screen
-   * at twice the detail.
-   *
-   * ⚠️ IT IS THE STRIP'S OWN ZOOM, so a wheel with ctrl or shift held moves it
-   * from here, and a view somebody has moved is left alone: this is called
-   * when the RECORDING changes under the view, never when a knob changes what
-   * is drawn in it.
-   *
-   * ⚠️ AND EVERY CALLER IS BELOW THE STRIP. `view` is a `const` declared above,
-   * so reading it from anything the pad runs during its first paint would
-   * throw, which is the same trap the `let`s near the top of this page carry a
-   * note about.
+   * The timeline opens at twice the fit, so corners are big enough to read. It is
+   * the strip's own zoom, set only when the recording changes. Every caller is below
+   * the strip, since `view` is a const the pad's first paint must not read.
+   * See lessons/page-draw.md#draw-45
    */
   const OPEN_ZOOM = 2;
   const FIT_PAD = 0.04;              // what `fit()` leaves over: 2% either side
@@ -895,47 +584,32 @@
     if (!(end > 0)) return null;
     const span = (end * (1 + FIT_PAD)) / OPEN_ZOOM;
     const pos = deck.position();
-    // WHERE THE PLAYHEAD SITS IN THAT WINDOW. The strip's own answer is 0.38,
-    // which leaves most of the view for what is ahead. Two things bend it:
-    // there is nothing before a recording starts or after it ends, so the
-    // window stays inside it rather than spending a third of the strip on
-    // empty time; and the playhead never goes past 0.78, because the strip
-    // scrolls it back the moment it crosses its own follow edge at 0.82 and
-    // the two of us would then fight 25 times a second under a moving hand.
+    // Where the playhead sits in the window: the strip's 0.38, kept inside the
+    // recording, and capped at 0.78 so it never fights the strip's 0.82 follow edge.
+    // See lessons/page-draw.md#draw-46
     const lo = -end * (FIT_PAD / 2), hi = end * (1 + FIT_PAD / 2) - span;
     const origin = Math.min(Math.max(pos - span * 0.38, lo), Math.max(lo, hi));
     const at = Math.min(0.78, (pos - origin) / span);
     return view.strip.frame(pos, span, at);
   }
 
-  // ⚠️ ONE POSITION SURFACE PER PAGE. The strip seeks on press AND on drag,
-  // which the bar's slider does not — two horizontal time axes at different
-  // scales, both scrubbing, is a contradiction rather than a redundancy.
-  // 🔴 RECORD SITS NEXT TO PLAY, because it is a transport verb. `take` puts
-  // its own record button here for the same reason: a control that starts
-  // writing belongs beside the one that starts reading, not in a row of page
-  // buttons a hand's width away.
-  //
-  // ⚠️ IT IS NOT `--hi`. Every primary control on this site is that yellow, and
-  // a record button that looks like the main path is a page inviting you to
-  // start writing before you have anything to write. `--rec` exists for
-  // exactly this one control.
+  // One position surface per page: the strip seeks on press and drag, the bar does
+  // not. Record sits next to play as a transport verb, in `--rec`, not `--hi`, so it
+  // does not look like the main path.
+  // See lessons/page-draw.md#draw-47
   const bar = createTransportBar(d.el, deck, {
     scrub: false,
     /**
-     * 🔴 THE THREE DIRECTIONS, ASKED FOR 2026-09-16: *"in draw allow < > <>
-     * loop mode"*. `/replay/` refused them and was right to: a picture only
-     * runs forwards and reversing sound needs a buffer. Neither applies here.
-     * What plays on this page is a RECORD of a hand, read through a deck at
-     * whatever position the transport asks for, so a lap backwards is the same
-     * record read the other way and the line simply draws itself in reverse.
+     * Reverse and both ways are allowed here: what plays is a record of a hand, so a
+     * lap backwards is the same record read the other way.
+     * See lessons/page-draw.md#draw-48
      */
     loopWays: true,
     extras: [{ id: 'rec', title: 'Record', label: '', aria: 'Record',
                onClick: () => setRecording(!recording) }],
   });
-  // The record face is the kit's icon, not a font glyph (asked 2026-10-12:
-  // *"global: change transport buttons to proper icon buttons"*).
+  // The record face is the kit's icon, not a font glyph.
+  // See lessons/page-draw.md#draw-49
   setIcon(bar.extra('rec'), 'record', 'Record');
 
   function setRecording(on) {
@@ -956,23 +630,15 @@
     d.log(on ? 'recording · draw on the pad' : 'stopped', on ? 'hi' : undefined);
   }
 
-  // UNDER the pad and its transport, because they change the picture above
-  // them and a control that sits below what it moves is read in the order it is
-  // used. A GROUP, not two sliders in a div: `createSliderGroup` shares one set
-  // of columns, so the longer label cannot push its own lane sideways.
+  // A group, not two sliders in a div: createSliderGroup shares one set of columns,
+  // so the longer label cannot push its own lane sideways.
+  // See lessons/page-draw.md#draw-50
   const knobs = createSliderGroup([
     createSlider({
-      // 10..300, and the top end is MEASURED rather than picked. Thinning one
-      // 3.2 s gesture at each interval: 20 ms 0.01 px · 50 ms 0.03 · 100 ms
-      // 0.15 · 200 ms 1.17 · 300 ms 4.32 · 500 ms 24.63 — and holding the last
-      // sample is 34 px, so by half a second interpolation has stopped
-      // rescuing anything and the rest of the travel would be a region that is
-      // uniformly broken. Under ~50 ms is the other dead end: 0.03 px and
-      // 0.01 px are both invisible, so the knob would be moving a number
-      // nobody can see. The range kept is the one where moving it changes the
-      // picture. (The page LOGS this ladder for whatever line you drew — these
-      // are from the suite's drag, re-measured after the ends were reflected
-      // properly, which moved every figure.)
+      // 10 to 300 ms. Measured: above 300 ms interpolation stops rescuing a fast corner
+      // (500 ms is 24.63 px against a 34 px hold); below 50 ms the error is under
+      // 0.03 px and invisible. The page logs this ladder for whatever you draw.
+      // See lessons/page-draw.md#draw-51
       label: 'sample every', min: 10, max: 300, step: 10, value: 100, unit: 'ms',
       onInput: (v) => { storeMs = v; render(); publish(); },
     }),
@@ -982,46 +648,24 @@
     }),
   ], { pair: true });
   /**
-   * 🔴 THERE IS NO CLEAR BUTTON. Asked for 2026-09-16: *"no need for clear
-   * butotn in draw"*, and the page agrees with the instruction: arming the
-   * record button ALREADY empties the pad, the two records, the strip and the
-   * playhead, so Clear was a second way to do a thing the only other control
-   * does on its way to doing something useful.
-   *
-   * ⚠️ WHAT WENT WITH IT WAS A REAL LESSON AND IT LIVES ON THE ARMING PATH NOW.
-   * Clear used to empty the pad and leave the strip below it still drawing the
-   * whole gesture: 33306 lit pixels went to 0 while the strip held 1423 and the
-   * playhead sat parked in a range that had just gone back to empty. A control
-   * that looks like it reset the page and did not is worse than no control.
+   * No clear button: arming record already empties the pad, both records, the
+   * strip and the playhead together.
+   * See lessons/page-draw.md#draw-52
    */
   const row = el('div', 'pos-controls foot');
   row.append(knobs.el);
   d.el.append(row);
 
-  // 🔴 THE ORDER DOWN THE PAGE, GIVEN AS A LIST 2026-09-16: description, the
-  // two knobs, the pad, the transport, the timeline, the log. Each component
-  // appends itself to the body as it is built, so the order the page is
-  // ASSEMBLED in is the order it was drawn in; this states the order it is READ
-  // in, once, in one place. `append` moves a node that is already in the
-  // document, so this is a reordering rather than a second copy of anything.
-  // ⚠️ THE KNOBS MOVE ABOVE THE PAD, which reverses the note above them: they
-  // used to sit under the picture they change, on the argument that a control
-  // below what it moves is read in the order it is used. The knobs are now the
-  // settings you draw AT rather than the ones you correct afterwards.
-  // ⚠️ AND THE ROW IS ONE `.pos-controls`, MOVED WHOLE. `verify.mjs` presses
-  // the buttons in it in DOM order, so moving the row changes where the row is
-  // and not which press is control 0, which is the trap that moved another
-  // page's single harness press by thirty seconds.
+  // The reading order, set in one place: knobs, pad, transport, timeline, then the
+  // log. `append` moves nodes. The row moves whole, so verify.mjs's DOM-order
+  // presses still find the same control first.
+  // See lessons/page-draw.md#draw-53
   d.el.append(row, pad.el, bar.el, view.el);
 
-  // ── how it works ─────────────────────────────────────────────────────────
-  // One machine, because nothing here leaves the tab: no relay, no upload, no
-  // storage. The boxes are the five things built above, in the order a sample
-  // travels through them, and the check at the end of `check()` holds the
-  // picture to that list. `atEnd` puts it under the log on `document.body`, so
-  // the pad the harness drags on does not move by a pixel.
-  // The record's sub is read off the knob's opening value rather than typed,
-  // so the picture and the knob cannot disagree about where the page starts.
+  // One machine: nothing leaves the tab. Five boxes in the order a sample travels,
+  // held to that list by check(). `atEnd` keeps the pad still for the harness drag.
+  // The record's sub is read off the knob's opening value.
+  // See lessons/page-draw.md#draw-54
   const DG_BOXES = ['Browser', 'xy pad', 'record', 'Catmull-Rom', 'transport', 'timeline'];
   const dg = createDiagram(d.el, {
     caption: 'Every sample the browser hands over is kept, a sparse record is taken from it on a '
@@ -1062,37 +706,15 @@
     ],
   }, { how: true, atEnd: true });
 
-  // ── the page checks itself, once, on the first line you finish ───────────
-  // Not on every `pointerup`: `d.assert` appends, so checking on each one would
-  // grow the count without end and make "diff the per-demo assert count" —
-  // this project's cheapest regression test — meaningless.
-  //
-  // ⚠️ AND NOT ON A THRESHOLD OF LINE QUALITY. What is graded below is a real
-  // gesture, so it can be slow, fast, short or scribbled; every check here is
-  // about the RELATIONSHIP between the two records, which holds for any line.
+  // Checks run once, on the first finished line, since d.assert appends and the
+  // assert count is the regression test. They grade relationships between the two
+  // records, which hold for any line, never line quality.
+  // See lessons/page-draw.md#draw-55
   /**
-   * 🔴 NOT FOR A VISITOR. NOT ONE OF THEM, EVER. CLAUDE.md's standing rule,
-   * and this page was one of the forty-one still breaking it.
-   *
-   * PHOTOGRAPHED 2026-09-16: a visitor's log carrying two red FAIL lines about
-   * a record of a moving point and a playhead, after drawing one line. Nothing
-   * on the page was broken. What the checks below do is seek the transport
-   * twenty times, walk five sampling rates, move the view and read the pad's
-   * pixels, all in front of somebody who came to draw a line, and then report
-   * on it in the box where this page's real faults are reported.
-   *
-   * ⚠️ AND THE RED WAS NOT NOISE, WHICH IS WHY GATING IT IS ONLY HALF AN
-   * ANSWER. Both claims hold for the suite's smooth synthetic drag and were
-   * refuted by a real hand: at 100 ms a scribble makes two records CLOSER than
-   * one at every rate on the ladder (0.5x to 0.9x), and refusing to interpolate
-   * costs 3.9x rather than the 5x the second check requires. That belongs in
-   * `BACKLOG.md` as a question about the claim, not in a threshold quietly
-   * loosened until it goes green.
-   *
-   * ⚠️ THE FLAG COMES FROM `shell/selfcheck.mjs` NOW, NOT FROM A LINE OF ITS OWN
-   * HERE. Four pages each had their own copy and the other forty-one never grew
-   * one; one import is what makes a `grep -L selfcheck` over the demo pages an
-   * answer to "which ones have never been swept".
+   * Never for a visitor: gated on SELFCHECK from shell/selfcheck.mjs. Two claims
+   * fail for a real scribble (two records can be closer at 100 ms; holding costs
+   * 3.9x, not 5x); that is a question for BACKLOG.md, not a loosened threshold.
+   * See lessons/page-draw.md#draw-56
    */
   let checked = false;
   function check() {
@@ -1107,84 +729,51 @@
       stored.length >= 4 && stored.length < evidence.length / 2,
       `${evidence.length} samples in, ${stored.length} kept · ${(evidence.length / stored.length).toFixed(1)}:1`);
 
-    // 🔴 THE ONE THIS PAGE EXISTS FOR. Most of the line you see was never
-    // recorded — say how much, in the same breath as how wrong it is.
-    // ⚠️ AGAINST WHAT WAS CAPTURED, the same denominator the cell uses. It
-    // divided by `drawnPoints` — the rebuild resolution, ~900 whatever you do —
-    // so the assert and the readout could report DIFFERENT percentages for the
-    // same gesture, and briefly did: the cell said 0.0% at 10 ms while this
-    // line said 96.7%. Two numbers with one name is worse than either being
-    // wrong, because whichever a reader happens to see becomes the fact.
+    // The one this page exists for: how much of the line was never recorded. Same
+    // denominator as the cell (`evidence`), so the assert and readout agree.
+    // See lessons/page-draw.md#draw-57
     const invented = 100 * (1 - Math.min(1, stored.length / evidence.length));
     d.assert('most of the drawn line was never recorded, at the rate the page opens on',
       invented > 80,
       `${evidence.length} samples captured, ${stored.length} kept · ${invented.toFixed(1)}% of the `
       + `line you see is joined up rather than recorded`);
 
-    // ⚠️ ASSERT THE ORDER, NOT A THRESHOLD. The three reconstructions are the
-    // subject, and a threshold on any one of them says nothing about whether
-    // interpolating helped. Holding must be worse than joining, and joining
-    // worse than smoothing, on the same recording.
+    // Assert the order, not a threshold: hold worse than lerp, lerp worse than
+    // spline, on the same recording.
+    // See lessons/page-draw.md#draw-58
     const errs = { hold: error(atSm(HOLD)).mean, linear: error(atSm(LINEAR)).mean, catmull: error(atSm(SMOOTH)).mean };
     d.assert('smoothing beats straight lines, and straight lines beat holding',
       errs.catmull < errs.linear && errs.linear < errs.hold,
       `hold ${errs.hold.toFixed(2)} px · linear ${errs.linear.toFixed(3)} px · smoothed ${errs.catmull.toFixed(3)} px`);
 
-    // ⚠️ A RATIO, NOT A DISTANCE. `< 1 px` was calibrated against a smooth
-    // synthetic curve; a person scribbles, and a fast corner is several pixels
-    // wrong however well you interpolate. What is true of every gesture is that
-    // smoothing is worth a lot MORE than holding, and how much is the number.
+    // A ratio, not a distance: a real fast corner is several pixels wrong however well
+    // it is interpolated, but smoothing always beats holding by a wide margin.
+    // See lessons/page-draw.md#draw-59
     d.assert('smoothing is many times closer than holding the last sample',
       errs.hold / errs.catmull > 5,
       `${(errs.hold / errs.catmull).toFixed(0)}x closer · ${errs.catmull.toFixed(3)} px against ${errs.hold.toFixed(2)} px`);
 
-    // 🔴 THE ONE THAT ANSWERS "HOW DO I MAKE THIS BETTER". Three levers exist —
-    // keep more samples, interpolate better, or put the samples somewhere
-    // cleverer — and only the third one is free. This grades the third with the
-    // COUNT HELD EQUAL, so it cannot win by keeping more.
+    // Three levers: keep more, interpolate better, or place samples cleverer. This
+    // grades the third with the count held equal.
+    // See lessons/page-draw.md#draw-60
     const measure = (pick) => { stored = pick(); rebuild(); return { n: stored.length, t: error(atSm(SMOOTH)).mean, s: shapeError().mean }; };
     const evenly = measure(onAClock);
     const bends = measure(() => whereItBends(evenly.n));
     render();
 
-    // 🔴 THIS CHECK WAS WRITTEN THE OTHER WAY ROUND AND THE PAGE REFUSED IT.
-    // The guess was that the same number of samples, put where the line turns,
-    // must beat samples spaced evenly — a straight stretch needs almost none
-    // and a corner needs them all. MEASURED, 30 samples either way, both ways:
-    //
-    //                      in time      as a shape
-    //   evenly in time     0.347 px     0.674 px
-    //   where it bends     3.009 px     0.958 px
-    //
-    // Evenly wins BOTH, and by 8.7x on the one that matters for playback. The
-    // reason is the reconstruction, not the placement: the blue line is a
-    // spline knotted on TIME, and picking samples by how far they sit from a
-    // straight line ignores time completely — so the knots come out unevenly
-    // spaced in the one dimension the curve is parameterised by, and it
-    // overshoots between the far-apart ones.
-    //
-    // So the answer to "how do I make the blue line closer" is: keep samples
-    // more often, or interpolate better. NOT: be cleverer about which ones you
-    // keep. Placing by shape is right for a line nobody replays — a coastline
-    // on a map — and wrong for a gesture that has to happen at the right time.
+    // Measured, 30 samples: evenly in time 0.347 px (shape 0.674), where it bends
+    // 3.009 px (shape 0.958). Even spacing wins because the spline is knotted on time
+    // and shape-based picks space its knots unevenly.
+    // See lessons/page-draw.md#draw-61
     d.assert('a line replayed on a clock wants samples spaced on that clock, not samples where it bends',
       evenly.t < bends.t && bends.n <= evenly.n,
       `${evenly.n} samples either way · in time ${evenly.t.toFixed(3)} px evenly against ${bends.t.toFixed(3)} px `
       + `where it bends (${(bends.t / evenly.t).toFixed(1)}x worse); as a shape ${evenly.s.toFixed(3)} against ${bends.s.toFixed(3)}`);
 
-    // WHAT THE RATE BUYS YOU, as a ladder rather than a claim. The knob spans a
-    // range and nothing on the page said which end of it is worth being at, so
-    // it says so here: the same gesture, thinned at each interval, each one
-    // reconstructed the same way — and beside it what the SAME gesture costs
-    // when the two directions are written down separately, which is the check
-    // below asked at every density instead of only at the default.
-    //
-    // ⚠️ 500 ms IS PAST THE KNOB'S TOP END AND IS IN THE LADDER ON PURPOSE.
-    // It is where the record stops being worth reconstructing at all (24.63 px
-    // against a 34 px hold), and it is also where the two-record reading stops
-    // losing — at eight samples, placing them well beats spacing them evenly.
-    // Both readings are broken there, so it is not a rate anybody picks, and
-    // the check below does not grade it.
+    // What the rate buys: the same gesture thinned at each interval, as one record
+    // and as two. 500 ms is past the knob on purpose: both readings break there, so
+    // check() does not grade it.
+    // See lessons/page-draw.md#draw-62
     const keep = storeMs;
     const RATES = [20, 50, 100, 200, 300, 500];
     const OFFERED = 300;                       // the top of the knob, in ms
@@ -1198,49 +787,10 @@
     d.log(`what the rate buys: ${ladder.map((r) =>
       `${r.ms}ms ${r.n}n ${r.one.toFixed(2)}px (${(r.two / r.one).toFixed(1)}x as two)`).join(' · ')}`);
 
-    // ── ONE RECORD OF A MOVING POINT, OR TWO RECORDS OF A MOVING NUMBER ────
-    //
-    // 🔴 WRITTEN DOWN BEFORE IT WAS RUN, and it is in plan-gesture §5 P3 in the
-    // same words so it cannot be back-fitted. The last time this page compared
-    // two ways of placing samples, the guess was backwards and the measurement
-    // refused it; that is the whole reason the prediction goes first.
-    //
-    //   ORDER — one 2-D record, knotted on a clock, lands closer to what the
-    //           hand did IN TIME than two 1-D records each gated on its own.
-    //   RATIO — by more than 2x.
-    //
-    // 🔴 THE ORDER HELD AND THE RATIO DID NOT SURVIVE AS A ONE-POINT CHECK.
-    // At the knob's default the prediction passed — 0.15 px as one record
-    // against 0.34 px as two, 2.3x — but the ladder above asks the same
-    // question at six densities and the answer MOVES, all the way across:
-    //
-    //   sample every     one record     as two records
-    //   20 ms  (101n)    0.01 px        6.3x worse
-    //   50 ms   (51n)    0.03 px        9.0x worse
-    //   100 ms  (30n)    0.15 px        2.3x worse
-    //   200 ms  (17n)    1.17 px        2.4x worse
-    //   300 ms  (12n)    4.32 px        1.9x worse
-    //   500 ms   (8n)   24.63 px        0.5x — TWO RECORDS WIN
-    //
-    // So "> 2x" is a property of one gesture at one knob position and not a
-    // relationship that holds for any line, which is the bar every check on
-    // this page has to clear. Shipping it would have been a threshold dressed
-    // as a ratio. What IS true at every rate the knob offers is the ORDER, and
-    // what makes the gap material rather than noise is that it reaches 9x
-    // somewhere in that range — so the check grades both ends of the ladder
-    // and not its middle. plan-gesture §3 has the correction; the short form is
-    // that two 1-D series are NOT the 8.6x failure it inferred (they are ~2x at
-    // the default, and the 13x "where it bends" arrangement is six times worse
-    // than they are), because a per-axis gate can still place its samples by
-    // TIME, and this one does.
-    //
-    // ⚠️ THE SHAPE FIGURES ARE PRINTED AND NOT ASSERTED. A shape metric throws
-    // time away, and time is the whole of the claim.
-    //
-    // ⚠️ AND THE TWO AXES HAVE TO ACTUALLY DISAGREE, or this compares a record
-    // with itself and passes while measuring nothing. Two axes gated together
-    // is not the alternative being tested, so how many instants they share is
-    // part of the check rather than part of the prose.
+    // One 2-D record against two 1-D records. The order (one is closer in time) holds
+    // at every knob rate; the ratio moves (0.5x to 9x), so check() grades the order at
+    // both ends of the ladder. Shape figures are printed, not asserted.
+    // See lessons/page-draw.md#draw-63
     const rungs = ladder.filter((r) => r.ms <= OFFERED);
     const gaps = rungs.map((r) => r.two / r.one);
     const together = { t: error().mean, s: shapeError().mean };
@@ -1255,26 +805,10 @@
       + `record against ${apart.t.toFixed(3)} px as two, as a shape ${together.s.toFixed(3)} against `
       + `${apart.s.toFixed(3)}; the two directions chose ${shared} of ${stored.length} instants in common`);
 
-    // ── the transport, at twenty positions ─────────────────────────────────
-    //
-    // 🔴 WHAT THIS CAN AND CANNOT CATCH, because that is the first question to
-    // ask of any comparison. The transport's answer and this page's come from
-    // ONE interpolator (see `blend`), so the arithmetic cancels and an error in
-    // it is invisible here. What does NOT cancel is everything between: whether
-    // the record reached the lane at all, whether a seek folds and asserts,
-    // whether the bracket picks the right pair and its neighbours, whether the
-    // evidence policy lets the fold interpolate. Each of those fails by tens of
-    // pixels, not by fractions.
-    //
-    // So the check is: seek, and compare the mark's distance from the HAND
-    // against the record's own distance from the hand at the same instant. Two
-    // real numbers, which must agree.
-    //
-    // ⚠️ 0.042 px IS NOT A THRESHOLD SOMEBODY PICKED, and it is also not a
-    // claim about this gesture. It is `proto/paths`' measured seek accuracy for
-    // this adapter — a 100 ms record of an analytic Lissajous, read back at
-    // three seek positions — so it is the smallest difference that has ever
-    // meant anything for this kind, used here as the width of "agree".
+    // Transport at twenty positions. Both answers use one interpolator, so this
+    // catches plumbing (lane, seek, fold, bracket, policy), not arithmetic. 0.042 px is
+    // proto/paths' measured seek accuracy for this adapter, used as the width of agree.
+    // See lessons/page-draw.md#draw-64
     const SEEK_TOL = 0.042;
     const t0 = stored[0].at, t1 = stored[stored.length - 1].at;
     const probes = [];
@@ -1304,28 +838,14 @@
     // Park the playhead in the middle, so the mark below is somewhere with a
     // line under it rather than at an endpoint.
     deck.seek(deck.range[1] / 2);
-    // ⚠️ AND PAINT IT. The mark moves on a fold, and the pad repaints on the
-    // next animation frame — reading the pixels in the same turn would read the
-    // frame before the seek and report a mark that is there as missing.
+    // Paint first: the pad repaints on the next frame, so reading now sees the old one.
+    // See lessons/page-draw.md#draw-65
     pad.paint();
 
-    // 🔴 THE TIMELINE OPENS AT TWICE THE FIT, AND IT IS GRADED AGAINST THE FIT
-    // ITSELF rather than against a pixels-per-second somebody wrote down. A
-    // number typed into an assert would go stale the first time the strip's
-    // gutter or this page's width changed, and it would agree with the code it
-    // is grading for the wrong reason. `fit()` is the component's own answer
-    // to "the whole recording, exactly"; this page's opening view has to be
-    // twice it. ⚠️ It MEASURES BY MOVING and puts the view back, which is the
-    // one kind of mutation a check here is allowed: a visitor sees both of
-    // these views, and the one they are left in is the one they came for.
-    // 🔴 AND THE 2 BELOW IS TYPED A SECOND TIME ON PURPOSE. Written as
-    // `- OPEN_ZOOM` it passed with `OPEN_ZOOM` set to 1, which is this
-    // project's oldest trap in a new costume: a check derived from the same
-    // constant as the code catches a typo in the arithmetic and can never
-    // catch the page opening at the wrong zoom. PROVED by setting it to 1 and
-    // watching this line stay green. The literal is the ASK — *"zoom 2.0 by
-    // default"* — and the constant is the implementation of it; they are two
-    // different things and they are allowed to disagree, which is the point.
+    // Graded against the strip's own fit(), measured by moving and restoring the view.
+    // The 2 is typed literally, not OPEN_ZOOM: a check derived from the constant
+    // stayed green with the constant set to 1.
+    // See lessons/page-draw.md#draw-66
     const zoomed = reframe().pxPerSecond;
     const fitted = view.strip.fit().pxPerSecond;
     reframe();
@@ -1334,29 +854,10 @@
       `${zoomed.toFixed(1)} px a second against ${fitted.toFixed(1)} fitted · `
       + `${(zoomed / fitted).toFixed(2)}x · ${Math.round(deck.range[1])} ms of gesture`);
 
-    // ⚠️ NOTHING IN THE SUITE LOOKS AT INK, so this page has to. A right answer
-    // in a cell over a blank pad is the defect this project has hit twice.
-    //
-    // 🔴 AND IT IS NO LONGER "NEAR-WHITE". The capture is knocked back to
-    // `INK.settled` the moment a hand comes up, so a test for `r > 200` is now
-    // a test for a line that is being drawn RIGHT NOW rather than a test for a
-    // line. What separates the two of them at every weight is COLOUR: the
-    // capture is grey, its three channels within a few of each other, and the
-    // reading is blue, its blue channel far above its red. The only other ink
-    // on the pad is the grid, which sits at 29 on every channel and is under
-    // the floor below, so a blank pad still cannot pass.
-    //
-    // It hands back the two lines' actual colours as well as their sizes, and
-    // it takes the COMMONEST value in each bucket rather than the brightest
-    // or the bluest. 🔴 THE BRIGHTEST WAS TRIED FIRST AND IT IS A THRESHOLD IN
-    // DISGUISE: a line that crosses itself lays the capture down twice in that
-    // one spot, so the brightest grey is the densest crossing rather than the
-    // line, and how many crossings there are is up to whoever drew it. The
-    // commonest value is the stroke's own core — every other pixel of either
-    // line is a part-covered edge of it, and each of those values occurs a
-    // handful of times where the core occurs thousands. That is what makes the
-    // contrast below a measurement of the picture rather than arithmetic on
-    // the constants that drew it.
+    // The suite never looks at ink, so this does. Lines are told apart by colour (the
+    // capture grey, the reading blue; the grid is 29 on every channel), and each takes
+    // the commonest value per bucket: the brightest is a self-crossing, not the line.
+    // See lessons/page-draw.md#draw-67
     const count = () => {
       const px = pad.ctx.getImageData(0, 0, pad.el.width, pad.el.height).data;
       let grey = 0, blue = 0;
@@ -1365,11 +866,8 @@
       for (let i = 0; i < px.length; i += 4) {
         const r = px[i], g = px[i + 1], b = px[i + 2];
         if (b - r > 40 && g > r) { blue++; bump(blues, (r << 16) | (g << 8) | b); }
-        // ⚠️ 12, AND IT WAS 20 FOR ONE RUN. The capture's own pixels sit 9
-        // apart on those two channels; at 20 the bucket also caught the pixels
-        // where a blue EDGE lands on the capture, and reported the contrast
-        // between the reading and a mixture of the two, which is a colour
-        // nothing on this page draws.
+        // 12: the capture's channels sit 9 apart; 20 also caught blue edges over it.
+        // See lessons/page-draw.md#draw-68
         else if (r > 45 && Math.abs(b - r) < 12) { grey++; bump(greys, (r << 16) | (g << 8) | b); }
       }
       const modal = (m) => {
@@ -1383,20 +881,9 @@
     d.assert('there is a line on the pad, not just numbers in cells', mid.grey > 4000,
       `${mid.grey} pixels of line`);
 
-    // ── THE TWO LINES CAN BE TOLD APART, AT BOTH MOMENTS ──────────────────
-    //
-    // 🔴 WHAT WAS REPORTED WAS A CONTRAST, SO WHAT IS GRADED IS A CONTRAST.
-    // *"find a way to see blue line on drawing (no enough contrast am blue on
-    // white)"*. The reading used to be drawn at half weight over the capture,
-    // which put blue ink on white ink everywhere the two agreed; the number
-    // below says how far apart those two colours were, and it is the reason
-    // the page now draws one line at a time.
-    //
-    // ⚠️ BOTH STATES ARE FORCED, NOT WAITED FOR. `phase()` is a function of
-    // `handDown` and `settleAt` and of nothing else, so each end of the
-    // crossover can be asked for directly and painted. Neither is a state
-    // invented for the check: one is what a visitor sees with a finger down,
-    // the other is what they see a quarter of a second after lifting it.
+    // What was reported was a contrast, so a contrast is graded. Both crossover
+    // states are forced: `phase()` depends only on `handDown` and `settleAt`.
+    // See lessons/page-draw.md#draw-69
     const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
     const lum = (p) => 0.2126 * lin(p[0]) + 0.7152 * lin(p[1]) + 0.0722 * lin(p[2]);
     const apartness = (p, q) => {
@@ -1412,10 +899,9 @@
     d.assert('while a hand is down there is one line on the pad, and it is yours',
       down.blue === 0 && down.grey > 4000 && down.capture[0] > 200,
       `${down.grey} pixels of your line at ${asHex(down.capture)}, and ${down.blue} of anything blue`);
-    // The arrangement this replaced, composited from the capture this run
-    // actually measured: the reading at half weight over the line underneath
-    // it. Labelled as the old one in the message, because it is computed
-    // rather than painted.
+    // The old arrangement (reading at half weight over the capture), composited from
+    // this run's measured colours, not painted.
+    // See lessons/page-draw.md#draw-70
     const was = [0, 1, 2].map((i) => 0.5 * parseInt(C.guess.slice(1 + i * 2, 3 + i * 2), 16) + 0.5 * down.capture[i]);
     const tellApart = apartness(up.capture, up.reading);
     d.assert('lift it and the two lines are far enough apart to be told apart',
@@ -1423,28 +909,10 @@
       `your line ${asHex(up.capture)} against the reading ${asHex(up.reading)} · ${tellApart.toFixed(2)}:1, `
       + `where drawing the reading at half weight over the capture gave ${asHex(was)} against `
       + `${asHex(down.capture)} · ${apartness(was, down.capture).toFixed(2)}:1`);
-    // 🔴 THE LINE'S END IS THE PLAYHEAD NOW, so that is what gets checked.
-    // This assert used to count yellow pixels for a ringed dot; the dot is gone
-    // because the white line stops at the cursor and two indicators for one
-    // position read as two. ⚠️ The CLAIM has not been weakened — it was "the
-    // playhead is visible on the pad, not just a number in a cell", and it
-    // still is — but it is now tested by the thing that carries it. Deleting
-    // the assert along with the dot would have quietly dropped the page from 21
-    // asserts to 20 while reading green, which is this project's cheapest
-    // regression test going blind.
-    //
-    // Measured as a RELATIONSHIP across three positions, never a pixel count:
-    // a count would be a threshold tuned until it passed, and it could not tell
-    // "the line is short because the cursor is early" from "the line failed to
-    // draw". Early < middle < end, and end is the whole line back.
-    // ⚠️ BOTH LINES, NOT JUST YOURS. The reading grows with the cursor too, and
-    // a check that only watched the capture would stay green while the reading
-    // silently went back to being drawn to the end — which is the exact defect
-    // this pairing exists to prevent, because a blue line running past the
-    // capture reads as a RECONSTRUCTION ERROR rather than as a drawing bug.
-    // ⚠️ AND IT IS MEASURED IN THE SETTLED PICTURE, which is the state left
-    // above: with a hand down there is no reading to watch at all, so this
-    // would be grading the wrong half of the page.
+    // The line's end is the playhead, so the check is the line's length at three
+    // positions: early < middle < end, end is the whole line. Both lines, in the
+    // settled picture, so a blue line running past the white one is caught.
+    // See lessons/page-draw.md#draw-71
     const inkAt = (t) => { deck.seek(t); pad.paint(); return count(); };
     const end = deck.range[1];
     const a = inkAt(end * 0.25), b2 = inkAt(end * 0.6), c2 = inkAt(end);
@@ -1491,32 +959,10 @@
   }
 
   /**
-   * 🔴 THE LOOP PAIR WEARS THE SAME EDGE AS EVERY OTHER BUTTON ON THE BAR, AND
-   * THIS PAGE IS WHERE THAT CAN BE SAID. Reported four separate times, the last
-   * one 2026-09-16 with a photograph of this exact row: *"global: loop buton
-   * borders as rest of button"*. MEASURED here before the repair — the pair read
-   * `rgb(106, 114, 128)` while the rate buttons beside it read `rgb(43, 53, 70)`,
-   * which is text grey against a button edge, two and a half times lighter.
-   *
-   * ⚠️ IDLE ONLY, AND THE ARMED RATE IS CHECKED AS THE CONTROL. A state is
-   * allowed to override its own edge: a running loop paints `--fg` and the
-   * armed rate keeps its yellow outline. If this check simply demanded that
-   * every button on the bar match, it would go red on the thing that is working
-   * — so it asserts the two idle families are EQUAL and that the armed rate is
-   * DIFFERENT, which is the pair of claims that can tell the defect from the
-   * design.
-   * ⚠️ `/draw/` is the only demo in the suite that draws a loop pair at all:
-   * `/archive/radio/` and `/tapes/` are the other two and both reach a server that is
-   * not ours.
-   *
-   * 🔴 AND IT IS BEHIND THE FLAG, BECAUSE IT WORKS A CONTROL TO TAKE ITS
-   * READING. `loopBtn.dataset.loop = 'off'` is the LOOP button being set to a
-   * state nobody asked for so its idle edge can be measured, and putting it back
-   * only happens where there was something to put back — a button that arrived
-   * with no `data-loop` at all is left saying `off`. That is the whole shape the
-   * rule is about: a check that reaches into what a visitor is looking at.
-   * Everything else this page asserts is already gated; this block was outside
-   * `check()` and ran on every visit.
+   * The idle loop pair must match the idle rate buttons' edge; the armed rate must
+   * differ, so the check tells the defect from the design. Behind SELFCHECK, since
+   * it sets data-loop to measure; it is put back only if it had a value.
+   * See lessons/page-draw.md#draw-72
    */
   if (SELFCHECK) {
     const bc = (e) => (e ? getComputedStyle(e).borderColor : 'none');

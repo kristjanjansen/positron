@@ -13,9 +13,9 @@
      once there is more than one camera. A flex row blockifies the group, so it
      sits on no text line; on a phone the picker wraps under it. */
   .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  /* The picture is asked for at half the content width on a desk, at the left
-     (asked 2026-10-10, *"use 1/2 videoframe"*), and takes the full width on a
-     phone, where half would be a thumbnail. */
+  /* The picture at half the content width on a desk, at the left, and the full width on a
+     phone, where half would be a thumbnail.
+     See lessons/page-video.md#video-1 */
   .cc-half { width: 50%; }
   @media (max-width: 560px) { .cc-half { width: 100%; } }
   .cc-half canvas { display: block; width: 100%; height: 100%; }
@@ -30,13 +30,10 @@
   import { drawCamera, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
   import { createCamera } from '/shell/camera.mjs';
 
-  // The local camera half of /cam/, as a patchbay: the camera is a node with a
-  // video-out, the picture on this page is a node with a video-in, and the
-  // picture shows the camera only while the bay holds that link.
-  //
-  // NOTHING OPENS ON A VISIT, and nothing ever leaves this machine. The camera
-  // is asked for on the start press, so the permission prompt comes after it;
-  // stop ends every track. No WHIP, no relay, no Stream.
+  // The local camera half of /cam/ as a patchbay: the picture shows the camera only while the
+  // bay holds that link. Nothing opens on a visit and nothing leaves this machine: the camera
+  // is asked for on the start press, and stop ends every track. No WHIP, relay or Stream.
+  // See lessons/page-video.md#video-2
   const S = 'web';
   const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
 
@@ -89,17 +86,15 @@
   // Empty until the camera is on, so no placeholder name sits in the footer.
   const name = el('span', 'cc-say', '');
   const size = el('span', 'cc-say', '');
-  // The name at the left, the resolution at the right beside the panel's own
-  // full-screen button (asked 2026-10-10, *"no wrapping for footer. is id
-  // needed? move rest to right ... add fullscreenbutton"*).
+  // The name at the left, the resolution at the right beside the panel's full-screen button.
+  // See lessons/page-video.md#video-3
   const panel = createVideoPanel({ media: canvas, left: name });
   panel.el.querySelector('.pos-vp-r').prepend(size);
   panel.el.classList.add('cc-half');
 
-  // The picture follows the link, as /radio/blend/'s sound does: without
-  // camera -> picture held the panel shows nothing.
-  // An empty picture is the page's own ground, the dither's dark, not black
-  // (asked 2026-10-10, *"keep same bg color initially"*).
+  // The picture follows the link, as /radio/blend/'s sound does. An empty picture is the
+  // page's ground, the dither's dark, not black.
+  // See lessons/page-video.md#video-4
   const GROUND = '#0b0e14';
   function route() {
     const on = camera.on() && holds(CAM, SCREEN);

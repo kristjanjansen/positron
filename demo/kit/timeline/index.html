@@ -26,13 +26,10 @@
   import { createKitPage } from '/shell/kit-page.mjs';
 
   /**
-   * 🔴 kit/timeline, ONE PART OF `/kit/` ON A PAGE OF ITS OWN, 2026-10-06
-   * (plans/plan-kit-split.md). Every block, holder and check below is copied
-   * VERBATIM from `demo/kit/index.html`, in that file's order, so the newest
-   * block is still the first. What changed is mechanical: `section()` lost its
-   * first argument, the holders sit here rather than at the top of the
-   * monolith, the measuring window and the tab row are gone, and every check
-   * is behind `?selfcheck=1`.
+   * kit/timeline: one part of /kit/ on a page of its own (plans/plan-kit-split.md).
+   * Blocks and checks are copied from demo/kit/index.html in its order, newest first;
+   * every check is behind ?selfcheck=1.
+   * See lessons/page-kit-timeline.md#kit-timeline-1
    */
   const { d, out, section, land, checkPage } = createKitPage({
     part: 'timeline',
@@ -42,18 +39,10 @@
   // The video panels, for the checks that their slots and their picture are real.
   let vpSpec = null;
 
-  // The way out of full screen, and the strip that says what is under the
-  // pointer. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the
-  // comments above give: these two blocks are the newest and therefore the
-  // topmost, and a `let` left where a block used to be is read in its dead zone
-  // and swallowed by `section()` into `failed`.
-  // The panel with a transport glued under it, held for the two checks that
-  // measure it. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the
-  // comments above give: this is the newest block and therefore the topmost,
-  // and a `let` left where a block used to be is read in its dead zone.
-  // The four shapes a transport bar takes, and the message it refuses one pair
-  // with. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the lines
-  // above give: a `let` left beside a block that moves is read in its dead zone.
+  // Holders for the way out of full screen, the hover strip, the glued panel and
+  // transport, and the four transport shapes. Declared up here so a block that moves
+  // does not leave a let behind to be read in its dead zone.
+  // See lessons/page-kit-timeline.md#kit-timeline-2
   let liveSpec = null;        // the live run whose dense lane is binned, newest block
   let tbarSpec = null;        // { whole, noScrub, noToggle, refused, deck }
   let ngSpec = null;          // { grid, ev }
@@ -62,26 +51,15 @@
   let footSpec = null;        // the strip whose footer says what is hovered
   let vpUnder = null;         // the control row a panel lifts while full
   let vpStorey = null;        // the off-screen panel that row is graded against
-  // The three panel specimens, for the checks at the foot of this file: one
-  // with an absorber, one without as the negative control, and one at a phone's
-  // width. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the
-  // lines above give: this is the newest block and therefore the topmost one,
-  // and a `let` left where a block used to be is read in its dead zone,
-  // swallowed by `section()` into `failed`, and reported much later with a
-  // message about a different line.
+  // The three panel specimens for the checks below: with an absorber, without one as
+  // the negative control, and at a phone's width. Declared up here for the same reason.
+  // See lessons/page-kit-timeline.md#kit-timeline-3
 
   /**
-   * 🔴 NEWEST AT THE TOP: A LIVE RUN, 2026-10-12. Asked on
-   * /concepts/clock/090/ as *"keep minimum separation between event bars? why
-   * cursor aint moving? ... we need std behaviour here"*. A lane of 50 marks a
-   * second, one in 37 late, that has been running for 20 s when the page
-   * opens: the whole run is in view at a round span, the write head is the
-   * cursor and walks across it, the view steps out only when the head reaches
-   * the edge (*"lines move very nervously here"*, on clock/010, was a view
-   * refitted every frame), and the marks are binned because they are closer
-   * than their room. It stops by itself after a minute and the head stays.
-   * ⚠️ NOTHING IS FETCHED AND NO TIMER WRITES ROWS. The rows are a function of
-   * the strip's own write head, so a visit costs one canvas and nothing else.
+   * A live run: a lane of 50 marks a second, one in 37 late, 20 s in when the page
+   * opens. The write head is the cursor, the view steps only at the edge, close marks
+   * are binned, and it stops after a minute. Rows come from the head: nothing fetched.
+   * See lessons/page-kit-timeline.md#kit-timeline-4
    */
   section('LIVE RUN',
     'A strip of something being written right now: the whole run in view at a '
@@ -115,35 +93,15 @@ v.strip.stopLive()      // the head freezes where it is`,
 
 
   /**
-   * 🔴 THE SHAPES A TRANSPORT BAR TAKES, AND EVERY ONE OF THEM IS A RULE THAT
-   * WAS PAID FOR. Asked 2026-09-21 as *"time: add transport examples"*, because
-   * the most configurable component in the kit was demonstrated in exactly one
-   * of its shapes on the page whose job is to make drift visible.
-   *
-   * ⚠️ FOUR VIEWS OF ONE DECK, NOT FOUR DECKS. Nothing on this page may move
-   * unless a reader asked it to, and four decks would be four clocks running
-   * behind a gallery. One idle deck with no adapters offers no rates, so the
-   * bars draw no rate row and what is on show is the shape of the row itself.
-   *
-   * 🔴 AND EXACTLY ONE OF THEM PUBLISHES. `__demo.transport` is the only handle
-   * a CDP check has, and every bar used to claim it unconditionally, so which
-   * bar the harness graded was decided by SOURCE ORDER rather than by the page:
-   * `/stage/` grew a second bar and the wrong one won by being further down the
-   * file. This page now holds four, which makes it the worst case in the
-   * repository, so the whole row claims the handle and every other specimen
-   * passes `publish: false`. Asserted both ways, because a page where nothing
-   * claimed it and a page where two did would look the same from the count.
+   * The shapes of a transport bar: four views of one idle deck, so nothing moves
+   * unasked and no rate row is drawn. Only the whole row claims __demo.transport;
+   * the others pass publish: false, asserted both ways.
+   * See lessons/page-kit-timeline.md#kit-timeline-5
    */
   /**
-   * 🔴 THE NEWEST COMPONENT, AT THE TOP OF ITS GROUP, WHICH IS THIS PAGE'S OWN
-   * RULE. Built 2026-09-21 after `/pack/` was asked twice for it: *"can we see
-   * actual notes on timeline"*, then *"so can you show notes in timeline in
-   * pack?"*.
-   * 🔴 AND IT IS DELIBERATELY NOT `strip.mjs`, which is the component directly
-   * below it and the reason this specimen sits here rather than anywhere else.
-   * A strip draws marks against a DECK, in milliseconds, and its mark colour is
-   * reserved for HOW A MARK LANDED. A Circuit pattern has no milliseconds in it
-   * and the thing worth seeing is PITCH, which a strip has no axis for.
+   * Note grid, deliberately not strip.mjs: a strip draws marks against a deck in ms,
+   * coloured by how they landed, while a Circuit pattern has steps and pitch.
+   * See lessons/page-kit-timeline.md#kit-timeline-6
    */
   section('NOTE GRID',
     'Note events where they fall in a pattern, one row per pattern under its beats, '
@@ -152,10 +110,9 @@ v.strip.stopLive()      // the head freezes where it is`,
 grid.set(notesIn(sessionBytes))   // [{ region, step, note, velocity, gate, length? }]`,
     (box) => {
       box.classList.add('kit-wide');
-      /* Two patterns a reader can check by eye: a rising line and a falling
-         one, at alternate steps, so the axis is provable from the picture
-         rather than only from the footer. Lengths in steps on one of them, so
-         both footer forms are on the page: `2 steps` and a raw `gate 13`. */
+      /* Two patterns checkable by eye, a rising and a falling line at alternate steps.
+         One has lengths in steps, so both footer forms show: 2 steps and a raw gate 13.
+         See lessons/page-kit-timeline.md#kit-timeline-7 */
       const ev = [];
       for (let i = 0; i < 8; i++) {
         ev.push({ region: 0, step: i * 2, note: 52 + i * 3, velocity: 20 + i * 15,
@@ -166,14 +123,12 @@ grid.set(notesIn(sessionBytes))   // [{ region, step, note, velocity, gate, leng
       const grid = createNoteGrid(box, { label: 'one rising pattern and one falling' });
       grid.set(ev);
       ngSpec = { grid, ev };
-      /* 🔴 THE AXIS IS ASSERTED RATHER THAN DESCRIBED, which is what this page
-         is for: a specimen nothing grades is a picture of a component that may
-         already have stopped working. A higher note must sit higher, and two
-         patterns must be two rows. */
+      /* The axis is asserted: a higher note sits higher, and two patterns are two rows.
+         See lessons/page-kit-timeline.md#kit-timeline-8 */
       const f = grid.facts();
       const first = grid.place(ev[0]), last = grid.place(ev[14]);
-      // ⚠️ GATED HERE, 2026-10-06: it ran for every visitor of `/kit/`, and on
-      // these pages every check is behind `?selfcheck=1`.
+      // Behind ?selfcheck=1 like every check on these pages.
+      // See lessons/page-kit-timeline.md#kit-timeline-9
       if (SELFCHECK) d.assert('a higher note sits higher, and two patterns are two rows',
         f.regions === 2 && f.count === 16 && last.y < first.y && last.row === first.row,
         `${f.count} notes in ${f.regions} rows, ${f.lo} to ${f.hi}, `
@@ -190,7 +145,8 @@ createTransportBar(host, deck, { chip, live: true })  // throws: one position, t
     (box) => {
       box.classList.add('kit-wide');
       const stack = createStack(undefined, 'kit-col');
-      // ⚠️ ONE DECK. See the note above: four would be four clocks.
+      // One deck: four would be four clocks.
+      // See lessons/page-kit-timeline.md#kit-timeline-10
       const deck = createDeck({ range: [0, 60_000] });
       tbarSpec = {};
 
@@ -202,44 +158,27 @@ createTransportBar(host, deck, { chip, live: true })  // throws: one position, t
       };
 
       /**
-       * 🔴 THE WHOLE ROW, AND IT IS THE ONE BAR ON THIS PAGE THAT PUBLISHES.
-       * `publish` defaults to true, so this passes nothing, and that is the
-       * point: shown in only one of its two states the option is a rule with no
-       * specimen, which is the drift this page exists to catch and is exactly
-       * what `CONTROL ROW` records about a primary button that is working.
-       * ⚠️ AND IT GIVES THE HARNESS A DEFINED PLAYHEAD INSTEAD OF AN ACCIDENTAL
-       * ONE. `__demo.transport` is the only handle a CDP check has; with four
-       * other bars on the page the winner would otherwise be whichever was
-       * built LAST, which is a fact about source order rather than a statement
-       * about the page, and is how `/stage/` handed the suite the wrong bar.
-       * `verify.mjs` will press this toggle and seek this deck, on a deck with
-       * no adapters whose only job is to have a position.
+       * The whole row, the one bar here that publishes (publish defaults to true), so
+       * the harness gets a defined playhead rather than whichever bar was built last.
+       * verify.mjs presses this toggle and seeks this deck, which has no adapters.
+       * See lessons/page-kit-timeline.md#kit-timeline-11
        */
       tbarSpec.whole = at('EVERYTHING, AND THE ONE BAR HERE THAT PUBLISHES',
         { verb: ['start', 'stop'], publish: true });
 
       /**
-       * 🔴 ONE POSITION SURFACE PER PAGE. A page with a strip passes this,
-       * because two horizontal time axes at different scales stacked is not a
-       * redundancy, it is a contradiction: the strip already seeks on press AND
-       * on drag, which the bar's slider never did.
+       * scrub: false: one position surface per page. A page with a strip passes it,
+       * since the strip already seeks on press and on drag.
+       * See lessons/page-kit-timeline.md#kit-timeline-12
        */
       tbarSpec.noScrub = at('SCRUB: FALSE, WHICH IS WHAT A PAGE WITH A STRIP PASSES',
         { scrub: false, verb: ['start', 'stop'] });
 
       /**
-       * 🔴 A BAR WITH NO PLAY BUTTON AT ALL, AND WHAT IT CARRIES INSTEAD. Play,
-       * pause and seek are all claims about a POSITION INSIDE A SOUND, and
-       * `/knobs/` has none: a note sounds while a key is held, so there is
-       * nothing to start or resume and a toggle whose only honest behaviour is
-       * to do nothing is the shape of control this project calls a lie. What
-       * such a bar keeps is the chip, and on both board pages that is the
-       * presence badge, because the fact worth having about an instrument in
-       * another building is whether it is answering.
-       * ⚠️ IT DISARMS WHAT DEPENDED ON PLAYING rather than leaving it to read
-       * false by luck: `api.playing` is forced false, the space bar stops being
-       * a play key, the end stop never arms, and `api.toggles` says so in one
-       * boolean that `demo/verify.mjs` reads before its play drill.
+       * toggle: false, for a page with no position inside a sound: playing is forced
+       * false, space is not a play key, the end stop never arms, and api.toggles says so
+       * for demo/verify.mjs. The chip slot holds the presence badge instead.
+       * See lessons/page-kit-timeline.md#kit-timeline-13
        */
       tbarSpec.noToggle = at('TOGGLE: FALSE, WITH A PRESENCE BADGE IN THE CHIP\u2019S PLACE', {
         toggle: false, scrub: false, loop: false,
@@ -247,12 +186,9 @@ createTransportBar(host, deck, { chip, live: true })  // throws: one position, t
       });
 
       /**
-       * 🔴 AND THE ONE PAIR IT REFUSES, SHOWN AS THE REFUSAL. A chip and a live
-       * badge want the same position in the row, so asking for both is asking
-       * the bar to draw two things in one place; it throws rather than picking.
-       * A specimen showing a refusal is worth as much as one showing a shape,
-       * which this page already does for a readout with an odd number of cells
-       * and for a table with two growing columns.
+       * The one pair it refuses: a chip and a live badge want the same position, so
+       * asking for both throws rather than picking. Shown as the refusal.
+       * See lessons/page-kit-timeline.md#kit-timeline-14
        */
       let refused = 'IT WAS ACCEPTED';
       try {
@@ -276,11 +212,8 @@ createTransportBar(host, deck, { chip, live: true })  // throws: one position, t
 createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
     (box) => {
       box.classList.add('kit-wide');
-      // 🔴 HALF THE WIDTH THE BOX GIVES IT, asked 2026-09-20: *"make it half
-      // w"*. `.kit-half` is `max-width: 50%` rather than a number of pixels,
-      // because the box already owns this width and a figure typed here would
-      // be a second opinion about it. MEASURED after the change: the seam, the
-      // edges and the toggle's two states are all unmoved.
+      // .kit-half is max-width: 50%, not a pixel count, because the box owns this width.
+      // See lessons/page-kit-timeline.md#kit-timeline-15
       const glued = el('div', 'kit-half');
       box.append(glued);
       const c = document.createElement('canvas');
@@ -292,16 +225,10 @@ createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
                                says: { online: 'live' } }).el,
       });
       /**
-       * 🔴 A SECOND GLYPH BESIDE THE ⛶, WHICH IS WHAT THE RIGHT SLOT LOOKS LIKE
-       * WITH TWO THINGS IN IT. `/stage/` puts the film's mute there. The
-       * glyphs are `♫` U+266B and `⊘` U+2298, chosen by looking: the text style
-       * speakers U+1F568 to U+1F56A are an empty tofu box in this font stack,
-       * and U+1F507 and U+1F50A are emoji presentation, 21 px of colour beside
-       * a ⛶ whose ink is 9.86 px of grey.
-       * ⚠️ `setSymbol`, NEVER `textContent`. The centring lives in a span that
-       * writing `textContent` throws away, which is the defect that module was
-       * written for and is invisible until somebody looks closely at a button
-       * whose glyph swaps.
+       * A second glyph beside the full screen one, as /stage/'s mute: U+266B and U+2298,
+       * because U+1F568 to U+1F56A are tofu in this font stack and U+1F507/U+1F50A are
+       * emoji. setSymbol, never textContent, which drops the centring span.
+       * See lessons/page-kit-timeline.md#kit-timeline-16
        */
       let muted = true;
       const mute = el('button', 'ico', '\u2298',
@@ -322,19 +249,15 @@ createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
       const bar = createTransportBar(glued, deck, {
         verb: ['start', 'stop'], live: false, loop: false, scrub: true, absolute: false,
         /**
-         * 🔴 `publish: false`, AND SINCE 2026-09-21 THAT REALLY IS A TIE BREAK
-         * BETWEEN BARS. This comment used to say `/kit/` had no transport of
-         * its own and never had one, which stopped being true the moment the
-         * block above it landed: there are four bars on this page now and the
-         * whole row is the one that claims `__demo.transport`. Whichever bar
-         * claims it has to be a decision, because the alternative is source
-         * order deciding, and this one is further down the file than that one.
+         * publish: false: the whole row above claims __demo.transport, so the choice is
+         * explicit rather than decided by source order.
+         * See lessons/page-kit-timeline.md#kit-timeline-17
          */
         publish: false,
       });
-      // ⚠️ THE PANEL IS ALREADY IN THE BOX AND THE BAR IS APPENDED AFTER IT, so
-      // this is the realistic order and the one the method is for: a page has
-      // its picture on screen before it has built the bar that belongs to it.
+      // The panel is already in the box and the bar is appended after it, which is the
+      // realistic order the method is for.
+      // See lessons/page-kit-timeline.md#kit-timeline-18
       panel.glue(bar.el);
       glueSpec = { panel, bar, deck, mute, half: glued };
 
@@ -343,44 +266,22 @@ createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
       requestAnimationFrame(draw);
 
       /**
-       * 🔴 THE WAY BACK OUT OF FULL SCREEN, BUILT AND NEVER SHOWN. Reported
-       * 2026-09-19 from an iPhone: *"I can not leave fullscreen on mobile"*,
-       * asked for as *"make permanett squaer button with fullscreen icon on
-       * bottom right when going to fullscreen in mobile. fade out it when no
-       * activity"*, and its specimen was taken off this page on 2026-09-20.
-       *
-       * 🔴 IT IS KEPT BECAUSE TWO CHECKS PRESS IT. `/blocks/` shipped a way out
-       * that was built, compiled and drawn every frame and never once updated,
-       * so there was no way out of that page at all while every line of it read
-       * correct. Reading that a control is wired is not the same claim as
-       * pressing it, and a piece deleted with its specimen is a check that stops
-       * running rather than one that fails.
-       * ⚠️ OFF SCREEN AND LAID OUT, the same shape as the video panel's second
-       * storey above and the faded probe at the foot of this file: the checks
-       * read `getBoundingClientRect`, so `display: none` is not available and
-       * `left: -9999px` is.
-       * ⚠️ AND THE HOLDER TAKES NO INLINE `position` THE COVER WOULD HAVE TO
-       * BEAT. `.pos-faux` is `position: fixed; inset: 0` from the stylesheet, a
-       * fixed ancestor is not a containing block for a fixed child, and an
-       * inline style on the host itself would have won against the class and
-       * left the cover parked off the left edge of the screen.
-       * ⚠️ NOTHING HERE SITS IN A `.pos-controls` ROW, ON PURPOSE. Both
-       * harnesses press every button in that row, by position, so an invisible
-       * button in one would be a press landing on nothing a visitor can see.
-       * The way in is pressed by the checks at the bottom instead, which is also
-       * the only way to prove the way out by pressing it.
+       * The way out of full screen, built off screen and never shown, because two checks
+       * press it. Laid out at left: -9999px since they read rects; the holder takes no
+       * inline position, and it is outside .pos-controls so the harness never presses it.
+       * See lessons/page-kit-timeline.md#kit-timeline-19
        */
       const o = out('not filling the screen');
       const host = el('div', 'kit-cover');
       host.append(el('div', 'kit-cover-p', 'a picture'));
-      // ⚠️ THE PIECE IS BUILT BEFORE THE HANDLER THAT READS IT. A `const`
-      // declared under the closure that closes over it is this page's most
-      // repeated defect, and it has already taken this file out once.
+      // The piece is built before the handler that closes over it, so no const is read
+      // in its dead zone.
+      // See lessons/page-kit-timeline.md#kit-timeline-20
       const exit = createFullscreenExit(host, {
         onExit: () => { o.textContent = 'came back'; },
       });
-      // ⚠️ AN ORDINARY BUTTON, NOT A SHELL CONTROL, for the reason in the note
-      // above. It is pressed from the checks rather than by the harness.
+      // An ordinary button, not a shell control: pressed from the checks, not the harness.
+      // See lessons/page-kit-timeline.md#kit-timeline-21
       const go = el('button', '', 'Fill the screen', { type: 'button' });
       go.onclick = async () => {
         const how = await fsToggle(host);
@@ -396,21 +297,10 @@ createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
     });
 
   /**
-   * 🔴 ONE SECTION FOR ONE COMPONENT, MERGED 2026-09-20 on instruction: *"merge
-   * STRIP VIEW + footer"*. They were `STRIP VIEW` and `STRIP FOOTER`, twenty
-   * sections apart on the page, and the footer is an OPTION on the same call
-   * rather than a second component. A reader meeting `createStripView` twice
-   * has to work out that it is the same thing.
-   *
-   * The footer was asked for 2026-09-19 with a photograph of `/reel/` on an
-   * iPhone: *"add feature to timeline: footer section, looks like glued that
-   * shows hovered info below timeline"*. The photograph shows the sticky tap
-   * tooltip covering the right half of the strip, four lines deep, over the
-   * marks it is describing.
-   *
-   * ⚠️ THE STACK GOES INTO THE BOX BEFORE EITHER STRIP IS BUILT. `fit()`
-   * measures the width it has been given, and a strip built into an element
-   * that is not in the document yet measures nothing.
+   * Strip view and its footer, one section because the footer is an option on the
+   * same call. The stack goes into the box before either strip is built, because
+   * fit() measures the width it is given.
+   * See lessons/page-kit-timeline.md#kit-timeline-22
    */
   section('STRIP VIEW',
     'Marks on a lane over the deck\u2019s range. An optional box under it says what the '
@@ -433,11 +323,8 @@ createStripView(host, deck, { lanes, footer: { lines: 3, empty: 'nothing chosen'
           items.push({ id: `${tag}${i}`, kind: 'mark', at: (i + 0.5) * (SPAN / (n + 1)),
                        payload: { label: `${i + 1}` } });
         }
-        // ⚠️ A DECK NEEDS AN ADAPTER PER KIND, and without one the lane draws
-        // NOTHING: a tall empty box, no error, no warning. That is what this
-        // section was on its first attempt, and an empty component in a sandbox
-        // is worse than an absent one, because it reads as the component being
-        // broken.
+        // A deck needs an adapter per kind, or the lane silently draws nothing.
+        // See lessons/page-kit-timeline.md#kit-timeline-23
         return createDeck({ items, adapters: { mark: adapter }, range: [0, SPAN] });
       };
       // The swatch on the lane's left border AND the marks themselves take the
@@ -446,12 +333,9 @@ createStripView(host, deck, { lanes, footer: { lines: 3, empty: 'nothing chosen'
       const hi = getComputedStyle(document.documentElement)
                    .getPropertyValue('--hi').trim() || '#ffd400';
 
-      // ⚠️ NO SUBLABEL ON THE BARE ONE. `14 marks · 8 s` still ellipsized, the
-      // gutter being narrower than fourteen characters at this width, and an
-      // ellipsis means the content is in the wrong place rather than that the
-      // box wants widening. A lane's own name is enough in a sandbox.
-      // 'auto' takes exactly the height its lanes need. 'default' left a band
-      // of empty canvas under a single lane.
+      // No sublabel on the bare one: it ellipsizes in a gutter this narrow. 'auto' takes
+      // exactly the height its lanes need, where 'default' leaves empty canvas.
+      // See lessons/page-kit-timeline.md#kit-timeline-24
       const { strip } = createStripView(bare, marks(14, 'n'), {
         size: 'auto',
         lanes: [{ id: 'mark', kind: 'mark', color: hi }],
@@ -460,12 +344,9 @@ createStripView(host, deck, { lanes, footer: { lines: 3, empty: 'nothing chosen'
 
       footSpec = createStripView(footed, marks(9, 'f'), {
         size: 'auto',
-        // 🔴 ONE LINE. Asked 2026-09-20 with a screenshot: *"1 line footer
-        // here"*. The default is three, which is right on a page whose marks
-        // carry a name, a time and a verdict; this specimen's marks carry a
-        // number, so two of the three rows were reserved air under a single
-        // sentence. **The specimen should show the component doing its job,
-        // not its widest possible job.**
+        // One line: this specimen's marks carry only a number, so the default three rows
+        // would be reserved air.
+        // See lessons/page-kit-timeline.md#kit-timeline-25
         footer: { lines: 1 },
         lanes: [{ id: 'mark', kind: 'mark', label: 'takes', color: hi }],
       });
@@ -474,18 +355,9 @@ createStripView(host, deck, { lanes, footer: { lines: 3, empty: 'nothing chosen'
 
 
   /**
-   * 🔴 NEWEST AT THE TOP, AND THE TWO PRESENCE BLOCKS ARE ONE. Asked 2026-09-17:
-   * *"bring online offline up in kit and merge busy/test into it"*. They were
-   * two sections because the busy words were built second, and that is a fact
-   * about the order the work happened in rather than about the component: one
-   * badge answers both questions, so a reader meeting it twice has to work out
-   * that it is the same thing.
-   *
-   * ⚠️ A SECTION TITLE IS UPPERCASE, and `.kit-h` renders it so whatever is
-   * typed. Type it uppercase anyway, so the source reads like the page.
-   * ⚠️ AND MOVING A BLOCK MOVES EVERY BUTTON AFTER IT. `verify.mjs` presses by
-   * position, so re-run `node demo/verify.mjs kit` and diff the assert count
-   * after any reorder.
+   * Presence, one block for both questions (state and busy). Section titles are
+   * uppercase; verify.mjs presses by position, so diff the assert count after a reorder.
+   * See lessons/page-kit-timeline.md#kit-timeline-26
    */
   section('VIDEO PANEL',
     'A picture, with a status on the left, an empty middle and a fullscreen button under it.',
@@ -496,25 +368,18 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       const stack = createStack(undefined, 'kit-col');
 
       /**
-       * 🔴 THE PICTURE IS THIS PROJECT'S OWN AND COMES FROM NOBODY'S SERVER.
-       * `pattern.mjs` is drawn into a canvas here, so the specimen needs no
-       * network, cannot 403, and looks the same on every run. CLAUDE.md's rule
-       * about external sources has been broken twice; a gallery is the last
-       * place to break it a third time.
-       * ⚠️ ONE CANVAS PER PANEL AND ONE LOOP. A canvas cannot be in two places,
-       * so the master is drawn once a frame and blitted, which is what `/stage/`
-       * does with three of them.
+       * The picture is pattern.mjs drawn into a canvas, so the specimen needs no network.
+       * One canvas and one loop: the master is drawn once a frame and blitted into each panel.
+       * See lessons/page-kit-timeline.md#kit-timeline-27
        */
       const master = document.createElement('canvas');
       master.width = FRAME_W; master.height = FRAME_H;
       const mctx = master.getContext('2d', { alpha: false });
 
       /**
-       * ⚠️ THREE ACROSS, NOT THREE DOWN. A panel is 16 by 9 and a page wide, so
-       * three of them stacked is three screens of scrolling to compare things
-       * that differ in one row of controls. Side by side they are compared at a
-       * glance, which is what a gallery is for, and they wrap to one column on a
-       * phone where the full width is what a panel actually gets.
+       * Three across, not three down, so panels that differ in one row of controls are
+       * compared at a glance; they wrap to one column on a phone.
+       * See lessons/page-kit-timeline.md#kit-timeline-28
        */
       const row = el('div', 'kit-row kit-vps');
       const made = [];
@@ -529,12 +394,9 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
         const c = document.createElement('canvas');
         c.width = FRAME_W; c.height = FRAME_H;
         /**
-         * ⚠️ THE BADGE SAYS `LIVE` RATHER THAN SHOWING A LONE DOT. Asked
-         * 2026-09-17: *"add LIVE to green bullet on footer"*. A coloured dot
-         * with nothing beside it is a mark whose whole meaning is its hue, which
-         * this project already has a rule about, and the panel's own default is
-         * the dot mode because a footer usually holds several small things. Here
-         * it holds one.
+         * The badge says LIVE rather than a lone dot, because a dot means only its hue;
+         * this footer holds one thing, so it has room for the word.
+         * See lessons/page-kit-timeline.md#kit-timeline-29
          */
         const p = createVideoPanel({
           media: c, fullMode: mode,
@@ -545,25 +407,10 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       }
 
       /**
-       * 🔴 THE SECOND STOREY IS STILL GRADED AND IS NO LONGER SHOWN. The
-       * specimen came off 2026-09-20 on instruction: *"rm a second storey under
-       * the footer"*. It was asked for on 2026-09-19 with a photograph of
-       * `/mirror/` filling an iPhone: *"extend videopanel footer in fullscreen
-       * so it can have section below the footer bar (separaet with line). put
-       * controlgroup there"*.
-       *
-       * 🔴 THE MECHANISM IS LIVE AND THIS IS THE ONLY THING THAT GRADES IT.
-       * `/mirror/` calls `panel.under(knobRow)`, and in real element fullscreen
-       * nothing outside the full subtree is on screen, so on a phone that row is
-       * only reachable from inside the picture. Deleting the piece as well as the
-       * specimen would take the check with it, which is this project's own rule
-       * about a control you switch off. So it stays as an off-screen probe.
-       * ⚠️ OFF SCREEN AND LAID OUT, the same shape as the way-out probe at the
-       * foot of this file: the check reads `gridTemplateRows`, so `display:
-       * none` is not available and `left: -9999px` is.
-       * 🔴 IT IS THE SAME ELEMENT, MOVED. Two rows that can disagree about which
-       * option is chosen would be a readout living in two files, so the check
-       * grades that there is exactly ONE of them in the document.
+       * The second storey (panel.under) is no longer shown but still graded: /mirror/
+       * uses it in full screen. Off screen at left: -9999px since the check reads
+       * gridTemplateRows, and it is the same element moved, so exactly one exists.
+       * See lessons/page-kit-timeline.md#kit-timeline-30
        */
       {
         const probe = el('div', '');
@@ -575,11 +422,9 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
         vpStorey = createVideoPanel({ media: c, fullMode: 'footer' });
         probe.append(vpStorey.el, vpUnder);
         document.body.append(probe);
-        // ⚠️ HANDED OVER AFTER IT IS ON THE PAGE, which is the realistic order
-        // and the one that matters: the panel records where the element lives
-        // at the moment it is given it, so an element with no parent yet has no
-        // home to be put back to. The constructor's `under` option is for a page
-        // that builds its controls before it builds its panel.
+        // Handed over after it is on the page: the panel records where the element lives
+        // when given it. The constructor's under option is for controls built first.
+        // See lessons/page-kit-timeline.md#kit-timeline-31
         vpStorey.under(vpUnder);
       }
 
@@ -599,24 +444,18 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
   // A link to a block lands on it. See `land()` in demo/shell/kit-page.mjs.
   land();
 
-  /* ── what a machine can say about this page ─────────────────────────────
-     🔴 EVERY CHECK ON THIS PAGE IS BEHIND `?selfcheck=1`, the page level ones
-     included (CLAUDE.md: a self-check never runs for a visitor). The checks
-     below are copied from `demo/kit/index.html` VERBATIM and keep that
-     file's indent, so a diff against it reads clean; the one line taken out
-     of each is a `settle()` or `measure()`, the measuring window a page with
-     no closed tab has no use for. Their comments still name it.
-     ⚠️ THEY RUN AFTER A FRAME, because `getBoundingClientRect` before the
-     first paint answers about a page that has not been arranged yet. */
+  /* What a machine can say about this page. Every check is behind ?selfcheck=1 and
+     copied from demo/kit/index.html with its indent. They run after a frame,
+     because getBoundingClientRect before the first paint measures an unarranged page.
+     See lessons/page-kit-timeline.md#kit-timeline-32 */
   if (SELFCHECK) {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   checkPage();
 
   /**
-   * 🔴 THE NOTE GRID'S FIVE CLAIMS, asked 2026-10-12 as *"its a mess. rm hover
-   * intereacvtion. add footer to show note info. figure out left lane col.
-   * column headers?"*. Each is a measurement, and the pointer ones dispatch the
-   * events a real pointer would, at a real note's position.
+   * The note grid's five claims, each a measurement; the pointer ones dispatch real
+   * pointer events at a real note's position.
+   * See lessons/page-kit-timeline.md#kit-timeline-33
    */
   if (ngSpec) {
     const { grid, ev } = ngSpec;
@@ -685,14 +524,10 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
 
 
   /**
-   * 🔴 THE NEWEST BLOCK'S TWO CLAIMS, AND BOTH ARE MEASUREMENTS RATHER THAN
-   * LOOKS. A bar UNDER a panel and a bar GLUED to one are the same order of
-   * elements: what differs is whether there is one edge round the pair or two
-   * edges and a gap, which is three numbers.
-   * ⚠️ IT IS THE SAME SHAPE AS THE STRIP'S CHECK BELOW, on purpose. Two
-   * components reach `.pos-glue` and the rule that zeroes a child's border is
-   * double-classed precisely because a component can otherwise win the
-   * specificity fight, so both callers grade it the same way.
+   * Under versus glued: same element order, but one edge round the pair or two edges
+   * and a gap, which is three numbers. Same shape as the strip's glue check, since
+   * the double-classed .pos-glue rule exists to win the specificity fight.
+   * See lessons/page-kit-timeline.md#kit-timeline-34
    */
   if (glueSpec) {
     const surf = glueSpec.panel.surface;
@@ -701,17 +536,9 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
     const bb = glueSpec.bar.el.getBoundingClientRect();
     const seam = bb.top - pb.bottom;
     /**
-     * 🔴 AND HALF THE WIDTH OF ITS BOX, MEASURED RATHER THAN READ OFF THE
-     * STYLESHEET. Asked 2026-09-20 as *"make it half w"*, and a rule that is
-     * present and inert reads exactly like one that works: this file already
-     * records three dead CSS rules found only by computing a value, and
-     * `.kit-half` sits on a child of a box whose `display` another class
-     * decides.
-     * ⚠️ AGAINST THE BOX'S OWN CONTENT WIDTH, NEVER A PIXEL COUNT TYPED HERE. A
-     * figure would be a second opinion about a width the layout owns, and it
-     * would have to be retyped every time the page's column changes.
-     * ⚠️ AND THE NEGATIVE HALF IS IN IT: a specimen still taking the whole box
-     * would satisfy every other clause in this check.
+     * Half the width of its box, measured against the box's content width rather than
+     * read off the stylesheet or typed; a specimen taking the whole box fails it.
+     * See lessons/page-kit-timeline.md#kit-timeline-35
      */
     const half = glueSpec.half;
     const hb = half.parentElement;
@@ -729,18 +556,10 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       + `taking ${took.toFixed(1)} px of the ${room.toFixed(1)} px the box gives it`);
 
     /**
-     * 🔴 THE TWO WORDS ARE THE SAME WIDTH, MEASURED IN BOTH STATES RATHER THAN
-     * ASSERTED FROM THE STYLESHEET. Asked as *"start | stop text labels (same
-     * w)"*, and the reason is the project's standing one about a control that
-     * resizes under the pointer that just pressed it.
-     * ⚠️ **AND THE WIDTH ALONE WOULD PASS ON A BUTTON SHOWING NEITHER WORD.**
-     * `visibility: hidden` on both is the same width as `visibility: hidden` on
-     * one, so the check reads which span is visible in each state as well. That
-     * is the half that would catch the `::before` glyph rule winning the
-     * specificity fight and a word never appearing at all.
-     * ⚠️ IT PRESSES THE TOGGLE AND WAITS FOR THE STATE TO LAND rather than
-     * setting `data-state` by hand, which would grade the stylesheet against
-     * itself and say nothing about the bar.
+     * Start and stop labels keep one width in both states, and the check also reads
+     * which word is visible, since two hidden spans are the same width too. It presses
+     * the toggle and waits for the state, rather than setting data-state by hand.
+     * See lessons/page-kit-timeline.md#kit-timeline-36
      */
     const t = glueSpec.bar.el.querySelector('.tbar-toggle');
     const vis = (cls) => {
@@ -751,11 +570,8 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
     const wIdle = w();
     const seenIdle = [vis('tbar-w0'), vis('tbar-w1')];
     t?.click();
-    // ⚠️ THE MEASURING WINDOW SHUTS ACROSS THIS WAIT AND OPENS AGAIN AFTER IT.
-    // Both widths are read with every part laid out, which is the only state
-    // either of them is a real number in; what may not happen is a frame being
-    // rendered with all parts open, and this loop is one of the two places
-    // on the page that gives the browser the chance. See `measure()` above.
+    // Wait a frame at a time until the toggle's state lands.
+    // See lessons/page-kit-timeline.md#kit-timeline-37
     for (let i = 0; i < 40 && t?.dataset.state !== 'playing'; i++) {
       await new Promise((r) => requestAnimationFrame(r));
     }
@@ -773,15 +589,10 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
   }
 
   /**
-   * 🔴 A BAR WITH NO PLAY BUTTON HAS NO PLAY BUTTON, AND SAYS SO IN A BOOLEAN A
-   * HARNESS CAN READ. Two independent sources, which is the whole check: the
-   * DOM says whether `.tbar-toggle` was ever appended, and `api.toggles` says
-   * what the page asked for, so the two can disagree. Without the boolean
-   * `demo/verify.mjs` clicks `.tbar-toggle` and asserts the position advanced,
-   * which takes a `toggle: false` page red for a reason that is not its fault.
-   * ⚠️ AND THE COMPARISON IS AGAINST THE WHOLE ROW BESIDE IT, never against a
-   * count typed here. A page that had lost its toggle everywhere would satisfy
-   * "this one has none".
+   * No play button, and a boolean a harness can read: the DOM (.tbar-toggle) and
+   * api.toggles must agree, compared against the whole row beside it, because
+   * demo/verify.mjs would otherwise click a toggle that does not exist.
+   * See lessons/page-kit-timeline.md#kit-timeline-38
    */
   if (tbarSpec) {
     const has = (b) => !!b.api.el.querySelector('.tbar-toggle');
@@ -795,16 +606,9 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       + `toggles ${tbarSpec.noToggle.api.toggles}, playing ${tbarSpec.noToggle.api.playing}`);
 
     /**
-     * 🔴 ONE POSITION SURFACE PER PAGE, WHICH IS WHAT `scrub: false` IS FOR.
-     * ⚠️ AND IT IS NOT AN ELEMENT THAT GOES MISSING, WHICH IS WHAT THIS CHECK
-     * FIRST ASSUMED AND WHY IT WENT RED ON A BAR THAT WAS RIGHT. The slider is
-     * always built; `scrub: false` sets `data-scrub="0"` on the bar and
-     * `shell.css` hides it from there. So the question is which rule won, and
-     * the only thing that knows that is the COMPUTED style. A presence test
-     * read `STILL HAS ONE` about a bar with no visible slider at all.
-     * ⚠️ BOTH SIDES, because `data-scrub` is `seekable && wantScrub`: a deck
-     * that could not be seeked would hide the slider on every bar here and a
-     * one-sided check would have called that a success.
+     * scrub: false keeps the slider but sets data-scrub="0" and shell.css hides it, so
+     * this reads computed style. Both sides, because data-scrub is seekable && wantScrub.
+     * See lessons/page-kit-timeline.md#kit-timeline-39
      */
     const shows = (b) => getComputedStyle(b.api.el.querySelector('.tbar-scrub')).display;
     const flag = (b) => b.api.el.dataset.scrub;
@@ -816,12 +620,9 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       + `data-scrub=${flag(tbarSpec.noScrub)} showing ${shows(tbarSpec.noScrub)}`);
 
     /**
-     * 🔴 WHAT SUCH A BAR CARRIES INSTEAD, AND IT IS A BADGE RATHER THAN A WORD.
-     * The chip's position held `LIVE` once: a word drawn because a page passed
-     * `live: true` at BUILD time, so it said LIVE whether or not a byte had
-     * arrived. On both board pages the chip is the presence badge, because the
-     * fact worth having about an instrument in another building is whether it
-     * is answering, which is a thing that can change.
+     * The chip slot holds the presence badge, which changes with whether the
+     * instrument answers, not a LIVE word fixed at build time.
+     * See lessons/page-kit-timeline.md#kit-timeline-40
      */
     const chip = tbarSpec.noToggle.api.el.querySelector('.pos-pres');
     d.assert('the chip on a bar with no toggle is a badge that can change, not a word',
@@ -831,10 +632,9 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
            : 'there is nothing in the chip position');
 
     /**
-     * 🔴 NEGATIVE CONTROL: A CHIP AND A LIVE BADGE WANT THE SAME POSITION AND
-     * THE BAR REFUSES RATHER THAN PICKING. A specimen showing a refusal is
-     * worth as much as one showing a shape, and this page already does it for a
-     * readout with an odd number of cells and a table with two growing columns.
+     * Negative control: a chip and a live badge want the same position, so the bar
+     * throws rather than picking.
+     * See lessons/page-kit-timeline.md#kit-timeline-41
      */
     d.assert('NEGATIVE CONTROL: a chip and a live badge are refused rather than drawn over each other',
       typeof tbarSpec.refused === 'string' && tbarSpec.refused !== 'IT WAS ACCEPTED'
@@ -842,34 +642,18 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       tbarSpec.refused);
 
     /**
-     * 🔴 EXACTLY ONE BAR ON THIS PAGE CLAIMS THE PAGE'S PLAYHEAD, AND THE COUNT
-     * ALONE CANNOT SEE IT. `__demo.transport` is the only handle a CDP check
-     * has; with four bars here, a page where NOTHING claimed it and a page
-     * where two did would both read green, because the handle is not something
-     * an assert count knows about. So both halves are graded: the handle is
-     * filled, and it is filled by the bar this page chose rather than by
-     * whichever was built last.
-     * ⚠️ IDENTITY, NOT A SELECTOR. `document.querySelector('.tbar')` is the
-     * first bar in DOM order, which is the same object only while a page has
-     * one; `/stage/` has already paid for that confusion. This compares the
-     * published object against the specimen itself.
+     * Exactly one bar claims __demo.transport, graded by identity against the chosen
+     * specimen: filled, and by the whole row. document.querySelector('.tbar') would
+     * only find the first bar in DOM order.
+     * See lessons/page-kit-timeline.md#kit-timeline-42
      */
-    /* ⚠️ NOT THE TAB PAGE BLOCK'S, 2026-10-04. That specimen builds its bars
-       lazily, when its BARS tab is first opened, so whether they exist here
-       depends on whether its check pass has run yet. They are publish: false
-       and are graded there; this count is about the rest of the page. */
+    /* The tab page block's bars are excluded: built lazily when its BARS tab opens,
+       publish: false, and graded there.
+       See lessons/page-kit-timeline.md#kit-timeline-43 */
     const bars = [...document.querySelectorAll('.tbar')].filter((b) => !b.closest('.kit-tabpage'));
     const published = d.api.transport || window.__demo?.transport;
-    /* FIVE since 2026-09-22: the STEP GRID block gained a standard transport
-       when its hand-rolled `Play` button was reported. It passes
-       `publish: false` like the other specimens, so the claim below is
-       unchanged and only the count moved. SIX since 2026-10-05: TRANSPORT
-       BAR ON A SLIDE, `publish: false` and drilled in the SLIDES checks.
-       SEVEN since the same day: STEP GRID ON A SLIDE became `/tom/`'s
-       instrument, whose bar is `publish: false` and graded in SLIDES.
-       FOUR on `/kit/timeline/`, 2026-10-06: the STEP GRID's bar is on
-       `/kit/devices/` and the two slide bars stay in `/kit/` with SLIDES, so
-       the count is this page's four and the claim is unchanged. */
+    /* Four bars on this page; every specimen except the whole row passes publish: false.
+       See lessons/page-kit-timeline.md#kit-timeline-44 */
     d.assert('of the four bars here exactly one claims the page\u2019s playhead, and it is the whole row',
       bars.length === 4 && !!published && published === tbarSpec.whole.api
       && published.el === tbarSpec.whole.api.el
@@ -878,21 +662,15 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       + `${published && published === tbarSpec.whole.api ? ', the whole row' : ''}`);
   }
 
-  // 🔴 GLUED, WHICH IS THE WORD THE ASK USED: *"footer section, looks like
-  // glued that shows hovered info below timeline"*. So it is not enough that
-  // the box is under the strip, it has to READ as the same surface, and that is
-  // three measurements rather than a look: one border round the pair, nothing
-  // between them but the 1 px seam `.pos-glue` shows through, and neither child
-  // painting an edge of its own. `.pos-strip` and `.pos-glue.pos-glue > *` both
-  // declare `border`, at (0,1,0) and (0,2,0), and which of them wins is the
-  // specificity trap this stylesheet already records three times.
+  // Glued means one surface: one border round the pair, only the 1 px .pos-glue seam
+  // between, and neither child painting its own edge. .pos-strip (0,1,0) and
+  // .pos-glue.pos-glue > * (0,2,0) both declare border.
+  // See lessons/page-kit-timeline.md#kit-timeline-45
   /**
-   * 🔴 THE LIVE RUN'S CLAIMS, EACH ONE A MEASUREMENT OF WHAT WAS DRAWN. Binned
-   * marks never touch; the cursor is the write head and moves; zoomed in far
-   * enough the same lane draws one mark per row; a bin under the pointer says
-   * how many it holds and the worst of them; and a stopped run's head stands
-   * still. The zoom one is the NEGATIVE CONTROL: a lane that binned at every
-   * zoom would pass the first claim and fail this one.
+   * The live run's claims: binned marks never touch, the cursor is the moving write
+   * head, a bin under the pointer reports its count and worst, a stopped head stays.
+   * Negative control: zoomed in far enough the lane draws one mark per row.
+   * See lessons/page-kit-timeline.md#kit-timeline-46
    */
   if (liveSpec) {
     const s = liveSpec.strip;
@@ -975,12 +753,9 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
   }
   {
     /**
-     * 🔴 THE PANEL'S DEFAULTS ARE THE COMPONENT'S WHOLE ARGUMENT, so they are
-     * what is checked: a page that writes neither still gets something that says
-     * whether its source is answering and something that fills the screen.
-     * ⚠️ AND THE PICTURE IS READ BACK OUT OF THE PANEL'S OWN CANVAS. A canvas
-     * that is blank and one that is painting look identical to every counter,
-     * and `pattern.mjs` burns a clock into the frame precisely so a page can ask.
+     * The panel's defaults: with neither option a page still gets a presence badge and
+     * full screen. The picture is read back from the canvas; pattern.mjs burns a clock in.
+     * See lessons/page-kit-timeline.md#kit-timeline-47
      */
     if (vpSpec) {
       const first = vpSpec[0].panel;
@@ -1009,33 +784,17 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
   if (SELFCHECK) {
     const nap = (ms) => new Promise((r) => setTimeout(r, ms));
     /**
-     * 🔴 THE FOOTER UNDER THE STRIP, WRITTEN AT IT AND MEASURED. Everything
-     * below this line puts words in a box a visitor is looking at, moves a row
-     * of buttons between two parents, or covers the screen, so it is behind
-     * `?selfcheck=1` with the rest. The claim is the one the ask is about: it is
-     * rewritten on every hover change, so it must not be able to change its own
-     * height while somebody reads it.
-     * ⚠️ IT IS FED THE STRIP'S OWN `hit` SHAPE, `{ detail: [...] }`, which is
-     * what `describe()` hands `onHover`. A check that called some other entry
-     * point would grade a path no pointer ever takes.
+     * The footer under the strip is rewritten on every hover change, so it must not
+     * change its own height. Fed the strip's own hit shape, { detail: [...] }, as
+     * describe() hands onHover.
+     * See lessons/page-kit-timeline.md#kit-timeline-48
      */
     if (footSpec?.footer) {
       /**
-       * 🔴 THE CHECK BUILDS ITS OWN FOOTER RATHER THAN GRADING THE SPECIMEN.
-       * The specimen was asked to be ONE line on 2026-09-20, *"1 line footer
-       * here"*, and both checks below read the SECOND row: one asserts six
-       * things are cut to `lines`, the other that a name too long for row 0
-       * does not push row 1 out of a box that is still the same height. Against
-       * a one line footer the second row is `undefined`, so the check did not
-       * fail, it THREW, and took the whole page down with a TypeError about
-       * `startsWith` that named no block.
-       * ⚠️ **A CHECK MUST NOT DECIDE WHAT A SPECIMEN LOOKS LIKE.** That is this
-       * project's rule about a check that mutates, arriving from the other
-       * side: there a check destroyed the thing it graded, here it would have
-       * dictated it. Three lines is what the BEHAVIOUR needs, so the check
-       * makes three lines and puts them back.
-       * ⚠️ IT IS APPENDED AND THEN REMOVED, because both asserts measure a
-       * height and a detached element has none.
+       * The check builds its own three-line footer rather than grading the one-line
+       * specimen, so the check does not dictate what the specimen looks like. Appended
+       * then removed, because a detached element has no height.
+       * See lessons/page-kit-timeline.md#kit-timeline-49
        */
       const f = createStripFooter({ lines: 3 });
       footSpec.el.parentElement.append(f.el);
@@ -1056,14 +815,9 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
         `${idle.toFixed(1)} px empty, ${one.toFixed(1)} with one line, ${six.toFixed(1)} with six, `
         + `${back.toFixed(1)} back to nothing, ${f.lines} lines kept of six, and it says "${empty}"`);
 
-      // 🔴 A NAME TOO LONG ELLIPSISES RATHER THAN WRAPPING, and that is the
-      // half a height check cannot see: a wrapped first line pushes the second
-      // one out of a box that is still exactly as tall as it was. Photographed
-      // on `/reel/`, where a title was cut mid word inside the tooltip.
-      // ⚠️ LONG ENOUGH ON ANY SCREEN, not long enough on this one. The real
-      // title that was photographed being cut is about seventy characters and
-      // FITS a laptop's box, so a check built on it would have passed here and
-      // failed nowhere while the defect it is about lives on a phone.
+      // A name too long ellipsizes rather than wrapping a line out of the box. Long
+      // enough to overflow on any screen, not only on a phone.
+      // See lessons/page-kit-timeline.md#kit-timeline-50
       const long = `${'PÄEVAKAJA. Kaevanduse miiti ja muud, '.repeat(8)}lõpp`;
       f.set({ detail: [long, 'the second line, which must survive it'] });
       const row0 = f.el.firstElementChild;
@@ -1083,15 +837,10 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
     }
 
     /**
-     * 🔴 THE SECOND STOREY IS THE PAGE'S OWN ROW, MOVED, AND THERE IS ONE OF IT.
-     * Asked 2026-09-19: *"extend videopanel footer in fullscreen so it can have
-     * section below the footer bar (separaet with line). put controlgroup
-     * there"*, and the thing that would quietly go wrong is a second copy, which
-     * is two rows of buttons that can disagree about which option is chosen.
-     * ⚠️ IT GOES FULL BY THE CLASS, NOT BY ASKING THE BROWSER. `.pos-full` is
-     * what BOTH real paths set and what `isFull` reads, so this is the state
-     * itself rather than a stand-in for it. Asking for real would put a cover
-     * over the page in the middle of the checks that follow.
+     * The second storey is the page's own row, moved, and there is one of it. Full by
+     * the .pos-full class, which both real paths set and isFull reads, so no cover
+     * lands over the page mid-check.
+     * See lessons/page-kit-timeline.md#kit-timeline-51
      */
     if (vpStorey && vpUnder) {
       const p = vpStorey;
@@ -1114,34 +863,16 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
     }
 
     /**
-     * 🔴 THE WAY BACK OUT, AND IT IS LAST ON PURPOSE. Two of the three checks
-     * below really cover the screen: the faux path puts `overflow: hidden` on
-     * the document and lays a fixed cover over everything, which is a state no
-     * geometry check above would be measuring a visitor's page in. So they run
-     * after every other check has had its answer.
-     *
-     * 🔴 AND THE EXIT IS PROVED BY PRESSING IT. `/blocks/` had a way out that
-     * was built, compiled and drawn every frame and never once updated, so
-     * there was no way out at all while every line of it read correct. Reading
-     * that a control is wired is not the same claim as pressing it.
+     * The way back out, last on purpose: two of these checks cover the screen and set
+     * overflow: hidden. The exit is proved by pressing it, not by reading its wiring.
+     * See lessons/page-kit-timeline.md#kit-timeline-52
      */
     {
       /**
-       * 🔴 FADED MUST MEAN UNPRESSABLE, WHICH IS THE ONE THING `opacity: 0`
-       * DOES NOT SAY. Without `pointer-events: none` the bottom right corner of
-       * a picture exits full screen for somebody reaching past it, on a control
-       * they cannot see. MEASURED HERE RATHER THAN READ OUT OF THE STYLESHEET,
-       * because a rule that is present and inert reads exactly like one that
-       * works.
-       * ⚠️ PROVED BY BREAKING IT, 2026-09-19: with `pointer-events: none` taken
-       * off the faded rule in shell.css this reads `up auto, faded auto at
-       * opacity 0` and goes red, while everything else on the page stays green.
-       * ⚠️ AND IT IS A THROWAWAY PIECE WITH A SHORT IDLE, off screen, rather
-       * than the specimen. The shipped wait is EXIT_IDLE_MS, and a check that
-       * sat still for that long mid-block would fall off the end of the
-       * harness's collector, which stops 400 ms after the last assert.
-       * `.pos-full` is what both real paths set and what `isFull` reads, so the
-       * button is in the state it is graded in.
+       * Faded must mean unpressable: opacity: 0 needs pointer-events: none, measured on
+       * a throwaway piece with a short idle, since EXIT_IDLE_MS would outlast the
+       * harness's collector (400 ms after the last assert).
+       * See lessons/page-kit-timeline.md#kit-timeline-53
        */
       const probeHost = el('div', 'pos-full');
       probeHost.style.cssText = 'position:fixed;left:-9999px;top:0;width:200px;height:120px';
@@ -1171,20 +902,13 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       const gapR = hb.right - bb.right, gapB = hb.bottom - bb.bottom;
       d.assert('the way out is inside the thing that went full, square, and off its bottom right corner',
         host.contains(exit.el) && Math.abs(bb.width - bb.height) <= 0.6
-        /* 🔴 A THRESHOLD, BECAUSE `=== '1'` IS AN EXACT EQUALITY ON AN
-           ANIMATING PROPERTY AND THAT IS A RACE THE CHECK WILL EVENTUALLY
-           LOSE. MEASURED 2026-09-22, when a busier page put a 140 ms fade at
-           **0.998744** after a 200 ms nap. The claim is that the way out is
-           VISIBLE, and 0.998744 is visible; nothing here ever wanted the
-           difference between that and 1. The faded state it has to be told
-           apart from is 0, which no threshold near 1 can reach. */
+        /* A threshold, not === '1': opacity is animating (a 140 ms fade read 0.998744
+           after 200 ms), and the faded state is 0.
+           See lessons/page-kit-timeline.md#kit-timeline-54 */
         && parseFloat(cs.opacity) > 0.9 && cs.pointerEvents === 'auto'
         && gapR >= 10 && gapR < hb.width / 2 && gapB >= 10 && gapB < hb.height / 2,
-        /* 🔴 THE DETAIL COULD NOT NAME ITS OWN FAILING CLAUSE AND THE WORDS
-           `inside the cover` WERE PRINTED WHETHER OR NOT IT WAS. Measured
-           2026-09-22: this went red reporting a square button at the right
-           inset, which is every clause it prints, so the fault was in one of
-           the two it did not. Six clauses, six facts. */
+        /* The detail names every clause, so a red says which one failed.
+           See lessons/page-kit-timeline.md#kit-timeline-55 */
         `${bb.width.toFixed(1)} by ${bb.height.toFixed(1)} px, ${gapR.toFixed(1)} px off the right edge `
         + `and ${gapB.toFixed(1)} off the bottom, contained ${host.contains(exit.el)}, `
         + `opacity ${cs.opacity}, pointer-events ${cs.pointerEvents}`);

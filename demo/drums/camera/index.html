@@ -29,56 +29,10 @@
   import { createDrumMachine } from '/drums/drum-machine.mjs';
   import { voices } from '/drums/voices.mjs';
 
-  // The drum machine played by a picture. Asked 2026-10-12: *"do 050 drums with
-  // camera input and that pixelning shader you already have done on tv demos
-  // but with the size that makes 16 squares per w and according squares per h
-  // (4 ? 5? 6 ?). image sqares drive the drum grid. 1/2 camera image 1/2
-  // pixelated one, below is drum grid. no knobs"*.
-  //
-  // THE SQUARES. The pictures are the panels' 16:9, the camera COVERED into it
-  // (cropped, never squashed), so the frame is always 16 squares by 9 whatever
-  // camera it is: a 4:3 webcam loses a strip top and bottom, and a phone held
-  // upright still gives 16 by 9 rather than 16 by 28. A square is 80 px of the
-  // 1280 px frame.
-  //
-  // NINE ROWS, NINE DRUMS: THE PICTURE IS THE GRID, SQUARE FOR SQUARE. Asked
-  // 2026-10-12: *"why this dotted line? just split the video up to squares.
-  // add more drum rows if needed"*. Until then the top row was dropped and
-  // drawn black with a dotted line, which read as a mark nobody could explain.
-  // So there are nine drums (kick, snare, open hat, closed hat, clap, low tom,
-  // high tom, cowbell, rim shot) and the nine picture rows are those nine, top
-  // to bottom: a lit square is a lit pad at the same row and column.
-  //
-  // ON OR OFF IS THE SHADER'S OWN DITHER. Each square is one brightness, then
-  // one threshold from a 4x4 Bayer matrix, as on /video/shader/ and
-  // /concepts/video/040/, each drum on a row of the matrix chosen for it
-  // (`BAYER_ROW`). The grid reads the square back off the shader's own
-  // pixels (lit or ground), so it cannot disagree with what is on screen. The
-  // Bayer threshold changes square to square, which is what makes it a drum
-  // pattern rather than a mask: a flat mid grey wall gives a regular pattern of
-  // hits instead of all on or all off, and the brighter a region, the busier.
-  //
-  // THE GRID FOLLOWS THE PICTURE EVERY FRAME, asked 2026-10-12: *"grid shold
-  // change immediately"* (it took the picture once a bar until then). Every
-  // frame the shader draws, it also draws the same squares into a 16 by 9
-  // framebuffer, one pixel a square, and reads those 576 bytes back: the same
-  // shader, the same cells and thresholds, so the small copy IS the picture,
-  // and reading it costs one call a frame rather than one per square. When a
-  // read row changes, the whole pattern goes down the pixelate wire and the
-  // grid shows it in that same frame. The sequencer reads the grid as each
-  // step is handed over, so a change is heard from the next step not yet
-  // handed to the engine, 150 ms ahead at most.
-  //
-  // NO CLEAR AND NO PAD PRESSES: the grid is read only here, because the next
-  // frame of the picture would undo either. The tempo stays.
-  //
-  // THE WIRES: camera video-out to the original and to `web:pixelate`, the
-  // pixelate node's video-out to the right panel and its value-out (one whole
-  // pattern a bar) to `web:sequencer:value-in`, then the sequencer to the four
-  // drums and the drums to the speakers, as on /drums/machine/.
-  //
-  // NOTHING OPENS ON A VISIT. The camera is asked for on its own press, the
-  // engine on play's, and nothing leaves this machine.
+  // The drum machine played by a picture: the camera covered into 16:9 (cropped, never squashed),
+  // cut into 16 by 9 squares, each row one drum. The shader dithers each square on or off and the
+  // grid reads those pixels back every frame. Read only grid; nothing opens until pressed.
+  // See lessons/page-drums.md#drums-1
   const d = mount({ name: 'Camera drums', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('drums/camera');
 
@@ -88,47 +42,19 @@
   const PX_IN = ID('pixelate', 'video-in'), PX_OUT = ID('pixelate', 'video-out'), PX_VAL = ID('pixelate', 'value-out');
   const PIXELS = ID('pixels', 'video-in'), SEQ_IN = ID('sequencer', 'value-in');
 
-  // 1x is 16 by 9 squares of 80 px, nine drums, a 16 step loop. 2x, asked
-  // 2026-10-12 (*"can we deliver 2x more res button and drum instruments as
-  // toggle?"*), is 32 by 18 squares of 40 px, eighteen drums, and 32 steps,
-  // which are TWO BARS OF SIXTEENTHS: the step stays a sixteenth at the tempo
-  // shown and the loop doubles, so a picture twice as fine plays for twice as
-  // long rather than twice as fast. The switch is a value on a wire
-  // (`web:scale` into the pixelate node) and lands at the top of the next loop.
+  // 1x is 16 by 9 squares of 80 px, nine drums, 16 steps. 2x is 32 by 18 of 40 px, eighteen drums,
+  // 32 steps as two bars of sixteenths: twice as long, not twice as fast. The switch is a value
+  // on `web:scale` and lands at the top of the next loop.
+  // See lessons/page-drums.md#drums-2
   let scale = 1, COLS = 16, CELL = FRAME_W / COLS, ROWS = Math.round(FRAME_H / CELL);
   const VOICES = voices({ more: true });
   // Every row is read: picture row i is drum i.
   const rowsRead = () => Array.from({ length: ROWS }, (_, i) => i);
   if (VOICES.length !== 2 * ROWS) throw new Error(`2x needs ${2 * ROWS} drums and there are ${VOICES.length}`);
-  // Which row of the 4x4 Bayer matrix each drum's squares are thresholded by,
-  // and how many columns it is shifted, in grid order. The thresholds every
-  // four columns (a beat of sixteenths), lowest first lights first:
-  //   kick     row 0          0 8 2 10    the 1st sixteenth: on the beat
-  //   snare    row 3         15 7 13 5    the 4th, then the 2nd: late and sparse
-  //   open hat row 2          3 11 1 9    the 3rd: the offbeat
-  //   closed   row 1         12 4 14 6    the 2nd and 4th
-  //   clap     row 3, +2     13 5 15 7    the 2nd, then the 4th
-  //   low tom  row 0, +2      2 10 0 8    the 3rd, then the 1st
-  //   high tom row 2, +2      1 9 3 11    the 1st, then the 3rd
-  //   cowbell  row 1, +2     14 6 12 4    the 4th, then the 2nd
-  //   rim shot row 0, +1      8 2 10 0    the 4th, then the 2nd, at the lowest
-  //                                       thresholds of all: a ghosted
-  //                                       sixteenth even on a dark picture
-  // and at 2x, nine more, using the combinations left and then two again:
-  //   ride     row 1, +1      4 14 6 12   on the beat, then the 3rd
-  //   crash    row 3, +3      5 15 7 13   on the beat, sparse: a crash is rare
-  //   shaker   row 2, +3      9 3 11 1    the 4th, then the 2nd
-  //   tambour. row 2, +1     11 1 9 3     the 2nd, then the 4th
-  //   claves   row 0, +3     10 0 8 2     the 2nd, then the 4th, early
-  //   lo conga row 1, +3      6 12 4 14   the 3rd, then the 1st
-  //   hi conga row 3, +1      7 13 5 15   the 3rd, then the 1st, later
-  //   mid tom  row 0, +2      as the low tom
-  //   agogo    row 1, +2      as the cowbell
-  // So a dim picture still grooves: a kick on every beat, an offbeat hat, and
-  // the four new drums each on a different sixteenth from their partner above,
-  // rather than doubling it. MEASURED on 2026-10-12 before the first version of
-  // this: four read rows that all fell on the matrix's two high rows left the
-  // kick row unlit on Chrome's fake camera.
+  // Each drum's row of the 4x4 Bayer matrix and its column shift, chosen so a dim picture still
+  // grooves (kick on the beat, an offbeat hat, partners on different sixteenths). The rows of the
+  // matrix and the shifts per drum are in the lesson.
+  // See lessons/page-drums.md#drums-3
   const BAYER_ROW = [0, 3, 2, 1, 3, 0, 2, 1, 0, 1, 3, 2, 2, 0, 1, 3, 0, 1];
   const BAYER_SHIFT = [0, 0, 0, 0, 2, 2, 2, 2, 1, 1, 3, 3, 1, 3, 3, 1, 2, 2];
 
@@ -147,15 +73,14 @@
   // ── the camera and the pixelate nodes ───────────────────────────────────
   // The shapes are /shell/nodes.mjs's; each port keeps its `node:port` label.
   const lay = (a, b) => { const r = bay.link(a, b, [], { site: S }); if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn'); };
-  // INVERT IS A VALUE ON A WIRE: the button is a node of its own, `web:invert`,
-  // whose `value-out` reaches the shader through `web:pixelate:value-in`, as a
-  // knob reaches a synth on the other concept pages.
-  // Inverted by default, asked 2026-10-12: *"reverse ... default reverse setting"*.
+  // Invert is a value on a wire: `web:invert`'s `value-out` into `web:pixelate:value-in`, as a
+  // knob reaches a synth. Inverted by default.
+  // See lessons/page-drums.md#drums-4
   let invert = true, inverts = 0;
   const INV = ID('invert', 'value-out'), PX_SET = ID('pixelate', 'value-in');
-  // THE 1x / 2x TOGGLE IS ANOTHER VALUE ON A WIRE: `web:scale` into the same
-  // `pixelate:value-in`. It asks the drum machine for the new shape, which
-  // lands at the top of the next loop while playing; the picture follows it.
+  // The 1x / 2x toggle is another value on a wire, `web:scale` into `pixelate:value-in`; the new
+  // shape lands at the top of the next loop while playing, and the picture follows it.
+  // See lessons/page-drums.md#drums-5
   const SCL = ID('scale', 'value-out');
   let scales = 0;
   addNodes(bay, S, [{ name: 'camera', variant: 'page' }, 'pixelate', 'screen', { name: 'screen', as: 'pixels', label: 'pixels' }, 'invert', 'scale'], {
@@ -206,9 +131,8 @@
   // `preserveDrawingBuffer` so the squares can be read back at the bar, after
   // the frame that drew them has been shown.
   const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: true });
-  // The footer carries buttons only, asked 2026-10-12 (*"rm 16 by 9"*, *"rm
-  // pixels"*, *"move conrast button to left"*): invert at the left, the 1x / 2x
-  // toggle and full screen at the right.
+  // The footer carries buttons only: invert at the left, the 1x / 2x toggle and full screen at the right.
+  // See lessons/page-drums.md#drums-6
   const pxPanel = createVideoPanel({ media: canvas, left: el('span') });
   // The invert button on the pixels' own footer, beside full screen, as the
   // kit's icon button with the `contrast` icon.
@@ -227,12 +151,9 @@
     const vs = `#version 300 es
       in vec2 p;
       void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
-    // As /video/shader/'s dither, each row on its drum's own matrix row
-    // and shift (`uBay`, `uShift`), counted from the top.
-    // 🔴 BLACK AND WHITE ONLY, asked 2026-10-12: *"make shaders bw only"*. A lit
-    // square is white and an unlit one black, no tint and no grey. `uInvert`
-    // swaps the two, and
-    // since the grid reads these pixels back, the pattern inverts with it.
+    // Dither as /video/shader/'s, each row on its drum's matrix row and shift (`uBay`, `uShift`).
+    // Black and white only; `uInvert` swaps them, and the read back grid inverts with it.
+    // See lessons/page-drums.md#drums-7
     const fs = `#version 300 es
       precision highp float;
       uniform sampler2D uTex; uniform vec2 uRes; uniform vec2 uFit;
@@ -300,9 +221,9 @@
     drawOrig();
     if (!gl) return;
     gl.viewport(0, 0, FRAME_W, FRAME_H);
-    // No camera, or no link: the page's own dark ground, the same as the camera
-    // panel beside it, never the shader's white (inverted is the default).
-    // Asked 2026-10-12: *"show same dark bg when camera is not on"*.
+    // No camera, or no link: the page's own dark ground, as the camera panel beside it, never the
+    // shader's white.
+    // See lessons/page-drums.md#drums-8
     has = !!cam && holds(CAM, PX_IN) && video.readyState >= 2 && video.videoWidth > 0;
     if (!prog || !holds(PX_OUT, PIXELS) || !has) { gl.clearColor(11 / 255, 14 / 255, 20 / 255, 1); gl.clear(gl.COLOR_BUFFER_BIT); return; }
     if (has) {

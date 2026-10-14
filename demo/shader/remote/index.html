@@ -34,61 +34,25 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createPathChoice, hintCell, PATH_HINT, NETWORK_HINT, viaOf } from '/remote/path.mjs';
 
-  // /shader/mirror/ plus the Raspberry Pi drawing the same shader.
-  // Asked 2026-10-12 (BACKLOG, "shader/010"): *"can you do mirror shader
-  // concept with pi, next after 000? does it need pi udpates? I assume so
-  // (compiling?). when needed simulate and add to backlog the pi part"*.
-  //
-  // 🔴 THE PI SIDE IS SIMULATED IN THIS TAB AND THE PAGE SAYS SO, on the Pi
-  // node's label and in the right panel's footer. `createPiSide` below is the
-  // one place the real board goes in (BACKLOG, "shader/010 on the real Pi").
-  //
-  // ⚠️ THE BOARD NEEDS NO NEW MESSAGE FOR THIS PAGE. Both things this page
-  // sends already exist, read 2026-10-12 in `rig/board/board.mjs` and
-  // `rig/board/video.mjs`, and /mirror/ already sends both:
-  //   `{ type: 'video.params', mirrors }`   clamped 2 to 64 by the board's MAP
-  //       and again by v3dpipe's `seg` verb; answered `video.params` with
-  //       `{ ok, paramsSent, mirrors, grain, hue }`.
-  //   `{ type: 'video.shader', body }`      the program WITHOUT its `#version`
-  //       line (the board refuses one that has it, and anything over 12,000
-  //       characters); v3dpipe puts `#version 310 es` on it, compiles it at its
-  //       next frame, keeps the running picture if it will not build, and
-  //       crossfades a good one in over 900 ms. Answered `video.shader.applied`
-  //       with `{ ok, bytes, detail }` or `{ ok: false, reason }`, the reason
-  //       being the renderer's own `SHADER-REFUSED` line cut to 160 characters.
-  // What the real board needs is to be reachable, `video.start`, and the H.264
-  // coming back decoded, as /mirror/ does it.
-  //
-  // THE READOUT, every cell measured here:
-  //   local fps / Pi fps    frames that reached each panel in the last second.
-  //   local lag / Pi lag    from a knob turn, or the start of an edit's compile,
-  //                         to the first frame on that panel that carries it.
-  //                         On the Pi side that is the MODEL below, measured.
-  //
-  // NOTHING OPENS ON A VISIT: no camera, no fetch, no room.
+  // /shader/mirror/ plus the Raspberry Pi drawing the same shader, with `video.params` (mirrors
+  // 2 to 64) and `video.shader` (body without `#version`, at most 12,000 characters). The Pi side
+  // is simulated in this tab until a board answers, and the page says so. Nothing opens on a visit.
+  // See lessons/page-shader.md#shader-11
   const d = mount({
     name: 'Mirror shader here and on the Pi', what: '', index: '/', indexLabel: 'positron',
     joined: false,
-    // `network` and `path` came 2026-10-13 with the direct option, the two
-    // cells remote/010 shows for its link (an even count, as the shell asks).
+    // `network` and `path` are the two cells remote/010 shows for its link.
+    // See lessons/page-shader.md#shader-12
     readout: { 'local fps': 'fps', 'local lag': 'ms', 'Pi fps': 'fps', 'Pi lag': 'ms', network: 'ms', path: '' },
   });
   conceptNav('shader/remote');
   hintCell(d, 'network', NETWORK_HINT);
   hintCell(d, 'path', PATH_HINT);
 
-  // RELAY OR DIRECT, asked 2026-10-13: *"add direct option to all remote
-  // instruments."* The same choice, cell and fall back as remote/010 and 030
-  // (`/remote/path.mjs`): the relay unless `?path=direct`. Direct is a
-  // WebRTC link to the board's main socket, offered once the board answers;
-  // the knob and the program then leave on its `ctl` channel, and the PICTURE
-  // comes on a third channel `vid`, ordered and reliable, as remote/010's
-  // camera does on `cam` (a decoder fed a frame with a hole is broken to the
-  // next keyframe, so not `pcm`, which never retransmits, and not `ctl`, which
-  // is unordered). The board cuts each frame into 16 KB pieces
-  // (rig/board/board.mjs `video.direct`, camera.mjs `framePieces`). The relay
-  // room stays open for the board's own messages and is where the picture
-  // falls back to when the link drops or no channel opens in 3 s.
+  // Relay or direct (/remote/path.mjs): the relay unless `?path=direct`. Direct sends the knob
+  // and program on `ctl` and the picture on `vid`, ordered and reliable, in 16 KB pieces; it
+  // falls back to the relay room when the link drops or no channel opens in 3 s.
+  // See lessons/page-shader.md#shader-13
   const path = createPathChoice({ log: d.log, onPick: () => switchPath() });
 
   // ── the program, as on 000 ───────────────────────────────────────────────
@@ -144,41 +108,10 @@ void main(){
   /** What travels to the board: the program without its `#version` line. */
   const bodyOf = (text) => text.replace(/^\s*#version[^\n]*\n/, '');
 
-  // ── the Pi side: THE ONE PLACE THE REAL BOARD GOES IN ────────────────────
-  //
-  // The page talks to the Pi through `send(msg, at)` with the board's own
-  // message shapes (see the header), `onReply(msg)` for what the board
-  // answers, and `view` (the canvas the Pi's picture is drawn on). `at` is
-  // when the change was made here, which only the simulation can carry to the
-  // frame that shows it; on the real board the `Pi lag` cell needs a frame
-  // number or a burned clock in the picture to stay a measurement.
-  //
-  // Today it is v3dpipe's loop run in a second WebGL2 context in this tab:
-  //   picture   1280x720 at 30 frames a second, which is what /mirror/ asks
-  //             `video.start` for; `uT` is the frame count over 30; the two
-  //             feedback targets wrap MIRRORED_REPEAT as v3dpipe's `mktarget`
-  //             does (the browser side clamps, as /mirror/ does); every uniform
-  //             is set by name only where the program has it (`uSegments`
-  //             and the old `uSeg` both from `seg`), as `draw_pass`
-  //             does, at v3dpipe's defaults (seg 8, fb 0.78, scale 4, warp
-  //             0.08, hue 1); it boots on v3dpipe's own `FS_KAL`.
-  //   a shader  compiled at the Pi's next frame as `#version 300 es` (the
-  //             board says 310 es, which a browser cannot compile), kept out
-  //             if it fails, crossfaded in over 900 ms with constant alpha
-  //             blending if it builds, exactly v3dpipe's arithmetic.
-  //   the trip  UP_MS to the board, for a knob turn and for a program: half
-  //             the Mac to Pi relay round trip, 64 to 69 ms measured 2026-09-14
-  //             (PROGRESS.md, as /remote/collide/ uses it).
-  //   back      DOWN_MS on the picture: one frame to render and read back,
-  //             one frame in the hardware encoder, the relay back (UP_MS) and
-  //             one frame to decode. ⚠️ ONLY THE RELAY IS MEASURED; the three
-  //             frames are an assumption, about 134 ms in all. No compression
-  //             is modelled.
-  //   upside down  v3dpipe hands `glReadPixels` rows (bottom row first) to
-  //             ffmpeg as raw video, and nothing between there and /mirror/'s
-  //             `drawImage` flips them, so the Pi's picture arrives upside down.
-  //             READ FROM THE CODE, NOT SEEN: this kaleidoscope is symmetric
-  //             top to bottom, so nobody could have. The simulation flips it.
+  // The Pi side, the one place the real board goes in: `send(msg, at)`, `onReply`, `view`. The
+  // simulation is v3dpipe's loop in a second WebGL2 context, 1280x720 at 30 fps, `#version 300 es`;
+  // UP_MS is measured (64 to 69 ms relay round trip), the frames in DOWN_MS are assumed.
+  // See lessons/page-shader.md#shader-14
   const UP_MS = 34;
   const PI_FPS = 30, PI_W = 1280, PI_H = 720;
   const PI_FRAME = 1000 / PI_FPS;
@@ -261,7 +194,7 @@ void main(){
       set('uT', (l) => g.uniform1f(l, i / 30));
       set('uRes', (l) => g.uniform2f(l, PI_W, PI_H));
       set('uSeg', (l) => g.uniform1f(l, P.seg));
-      set('uSegments', (l) => g.uniform1f(l, P.seg));   // v3dpipe sets both since 2026-10-12
+      set('uSegments', (l) => g.uniform1f(l, P.seg));   // v3dpipe sets both. See lessons/page-shader.md#shader-15
       set('uFb', (l) => g.uniform1f(l, P.fb));
       set('uScale', (l) => g.uniform1f(l, P.scale));
       set('uWarp', (l) => g.uniform1f(l, P.warp));
@@ -349,40 +282,10 @@ void main(){
     };
   }
 
-  // ── the real board, when one answers ─────────────────────────────────────
-  //
-  // Since 2026-10-12. A press of the board button asks the Pi in `studio-1`
-  // for `video.status` and gives it ASK_MS to answer, as /remote/collide/
-  // does; no answer, a harness run (`createBoard` will not drive the board
-  // under a check) or a browser with no WebCodecs keeps the simulation, and the
-  // right panel's footer says which. A board that answers but is not drawing
-  // is asked for `video.start`, and only a picture this page started is
-  // stopped when it leaves. The picture comes back through
-  // `demo/shell/board-video.mjs`, the receiver /mirror/ uses.
-  //
-  // 🔴 PI LAG ON REAL FRAMES IS A CHANGE SEEN IN THE PICTURE, NOT A STAMP. The
-  // board's frame counter rides on every frame, but nothing says at which frame
-  // a knob turn or a shader landed, and there is no burned clock. So each
-  // decoded frame is shrunk to 64 x 36 and compared with the one before; the
-  // lag is from the change here to the first frame whose difference stands
-  // clear of the picture's own motion (three times the median of the last
-  // calm frames, and half again over their largest). A segment count change
-  // is a jump and lands on its first frame; a shader fades in over 900 ms on
-  // the Pi, so its lag is to the first frame where the fade shows.
-  //
-  // 🔴 THE PROGRAM WAITS FOR THE PI'S FIRST FRAME (2026-10-12, found on the real
-  // Pi). `video.started` answers as soon as v3dpipe is spawned, while it is
-  // still bringing up EGL and compiling its own program, and it reads its stdin
-  // only inside the render loop. A `video.shader` sent then sat in the pipe past
-  // the 1500 ms the board waits for the renderer's verdict
-  // (`rig/board/video.mjs`), so the board answered "the renderer did not
-  // answer". A decoded frame is proof the loop is running, because v3dpipe
-  // writes pixels only from inside it, so the page holds the program (and any
-  // edit made meanwhile, the newest kept) until the first frame is decoded here.
-  // Not a retry on that refusal: the refused line is still queued in the pipe
-  // and is compiled once the loop starts, so a retry would compile it twice and
-  // the board would hand the first one's verdict to the second waiter. The knob
-  // is not held: `video.params` has no timer and lands on the first frame.
+  // A board press asks `studio-1` for `video.status` within ASK_MS, else the simulation stays.
+  // Pi lag on real frames is a change seen in 64 x 36 frame differences, not a stamp. The program
+  // waits for the first decoded frame: v3dpipe reads stdin only in its render loop.
+  // See lessons/page-shader.md#shader-16
   const ASK_MS = 3000, FIRST_FRAME_MS = 10000;
   const PROBE_W = 64, PROBE_H = 36, GIVE_UP_MS = 3000;
   function createPiSide({ onReply, onShown, onMode = () => {}, log }) {
@@ -438,10 +341,9 @@ void main(){
     /** A change made here; the earliest one not yet seen in the picture is the one timed. */
     const mark = (what, at) => { if (!pending) pending = { what, at }; };
 
-    // ── the picture on the direct link ──────────────────────────────────
-    // `picPath` is where the frames come from: `relay` (the video room) or
-    // `direct` (the `vid` channel). Pieces of one frame are joined back into
-    // the board's frame format and fed to the same decoder.
+    // `picPath` is where frames come from: `relay` (the video room) or `direct` (`vid`). Pieces
+    // of one frame are joined into the board's frame format for the same decoder.
+    // See lessons/page-shader.md#shader-17
     let vid = null, picPath = 'relay', pieces = [], pieceSeq = -1, directFrames = 0;
     function onVid(data) {
       if (!(data instanceof ArrayBuffer) || data.byteLength < 8) return;
@@ -667,9 +569,9 @@ void main(){
 
   // ── the readout ──────────────────────────────────────────────────────────
   const lags = { local: null, pi: null };
-  // ⚠️ `performance.now()`, NOT THE ANIMATION FRAME'S TIMESTAMP, which is the
-  // frame's start and so earlier than a knob turn handled during it: the first
-  // run read -43 ms.
+  // `performance.now()`, not the animation frame's timestamp, which is the frame's start and
+  // earlier than a knob turn handled during it (it read -43 ms).
+  // See lessons/page-shader.md#shader-18
   function landed(side, at) {
     const ms = performance.now() - at;
     lags[side] = ms;
@@ -735,12 +637,9 @@ void main(){
       },
     },
   });
-  // The Pi's node is the one the board announces (graph-registry.mjs `boardGraph`):
-  // `pi-1:shader`, v3dpipe rendering the mirror shader on the Pi's GPU, its
-  // picture on the relay's H.264 room or the `vid` data channel on the direct
-  // link. Simulated in this tab until a real board answers (`showMode`).
-  // ⚠️ THE NODE IS ADDED BEFORE `screen-pi` AND ITS PORTS AFTER, as they always
-  // were, so the picture's order does not move.
+  // The Pi's node is the board's (`boardGraph`): `pi-1:shader`, simulated until a board answers.
+  // The node is added before `screen-pi` and its ports after, so the picture's order holds.
+  // See lessons/page-shader.md#shader-19
   const PI_GRAPH = boardGraph({ room: 'studio-1', gpu: true });
   piNode = addBoardNode(bay, PI_GRAPH, 'shader', { label: 'v3dpipe on the Pi, simulated', withPorts: false });
   addNodes(bay, S, ['screen-pi'], { label: { 'screen-pi': 'Pi picture' }, portLabel: 'node:port' });
@@ -748,9 +647,9 @@ void main(){
     'value-in': (e) => {
       if (e?.of !== 'param' || e.name !== 'segments') return;
       piDelivered++;
-      // ⚠️ `mirrors` IS THE BOARD'S WIRE NAME AND STAYS: the page calls it
-      // segments, `video.params` has always said `mirrors` (it takes `segments`
-      // too since 2026-10-14), and /mirror/ sends it.
+      // `mirrors` is the board's wire name and stays: the page says segments, and `video.params`
+      // and /mirror/ use `mirrors`.
+      // See lessons/page-shader.md#shader-20
       pi.send({ type: 'video.params', mirrors: Math.round(e.v) }, e.at);
     },
     'program-in': (e) => { pi.send({ type: 'video.shader', body: bodyOf(e.source) }, e.at); },
@@ -820,10 +719,9 @@ void main(){
   knob.el.style.setProperty('--param-hue', HUE);
   const grid = createKnobGrid(new Map([['segments', knob]]), { row: true });
 
-  // ── the code box: one node, every compile goes to both shaders ───────────
-  // The kit's idle compile, as on 000. The text leaves on `web:code:program-out`
-  // and both shader nodes compile it for themselves: a program this tab
-  // refuses is refused on the Pi too, and each side keeps its last good one.
+  // The code box is one node: every compile goes to both shaders, so a program this tab refuses
+  // is refused on the Pi too, and each side keeps its last good one.
+  // See lessons/page-shader.md#shader-21
   const code = createCodeBox({ language: GLSL, value: FS, rows: CODE_ROWS, label: '',
     hues: { hueOf: (n) => (n === 'uSegments' ? HUE : null) },
     ariaLabel: 'the fragment shader both sides run, edit it and it recompiles' });
@@ -866,12 +764,9 @@ void main(){
   top.append(join.el, path.el);
   d.stack.add(top, pair, grid.el, code.el, pb.el);
 
-  // ── the path: the wire each Pi link rides, the two cells, the fall back ──
-  // The knob and the program ride `datachannel` while the link is direct; the
-  // picture rides `datachannel` only while its own frames come on `vid`, else
-  // the relay's H.264 room. The `path` cell names the picture's path when it
-  // differs from the link's (`direct, picture relay`), as remote/010 does for
-  // its camera.
+  // The knob and program ride `datachannel` while direct; the picture rides it only while its
+  // frames come on `vid`, else the relay's H.264 room. `path` names the picture's when they differ.
+  // See lessons/page-shader.md#shader-22
   const PIC_LINK = (l) => l.from === PI('video-out');
   let picVia = null;
   function wirePicture(p) {

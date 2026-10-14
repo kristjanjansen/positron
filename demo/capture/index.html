@@ -10,11 +10,9 @@
   /* No vertical margins in here: the gap between blocks is `.pos-stack`, and
      every tab panel is one (`tab-page.mjs` makes it so). */
 
-  /* SIDE BY SIDE, and stacked when there is no room. The source and what came
-     back are the two things compared, and a column puts one off the screen
-     while you look at the other. `min(100%, 300px)`: a bare 300 px floor is a
-     column wider than a 320 px phone's content box, which drags the page
-     sideways rather than stacking. */
+  /* Side by side, stacked when there is no room: source and result are compared.
+     `min(100%, 300px)`, because a bare 300 px floor is wider than a 320 px phone.
+     See lessons/page-capture.md#capture-1 */
   .cap-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
               gap: 10px; align-items: start; }
   .cap-pair figure { margin: 0; min-width: 0; }
@@ -28,10 +26,9 @@
   video.cap-back { display: block; width: 100%; }
   /* ONE VIEWPORT for a sequence of takes: only the one under the playhead is
      shown, so a gallery would draw a claim the timeline does not make. */
-  /* The box draws the screen's edge itself, so before the first take it reads
-     as an empty screen beside the source rather than as a 16:9 hole in the
-     page (photographed at 375: a 230 px void between SOURCE and PLAYBACK). One
-     edge per object, so the videos inside it give up theirs. */
+  /* The box draws the screen's edge, so before the first take it reads as an empty
+     screen rather than a hole. One edge per object: the videos inside give up theirs.
+     See lessons/page-capture.md#capture-2 */
   .cap-seq { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden;
              background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
   .cap-seq video { position: absolute; inset: 0; width: 100%; height: 100%;
@@ -55,26 +52,10 @@
 </style>
 
 <script type="module">
-  // /capture/, four old pages as the tabs of one (2026-10-04, decided by the
-  // owner as *"names ok, looper retires, no redrect, capture is fine"*,
-  // `plans/plan-demo-structure.md` §3.5): TAKES from `take`, SEGMENTS from the
-  // old `capture` and `record`, ROUND TRIP from `keep`, FAR END from `show`.
-  // Each tab is a module beside this file; `createTabPage` builds a tab the
-  // first time it is opened, gives it its own readout and log, and runs every
-  // tab's checks from the one SELFCHECK pass below.
-  //
-  // 🔴 NOTHING OPENS ON LOAD. Building the tab that is open opens nothing
-  // either: no camera, no recording, no ingest request, no WebRTC connection,
-  // no relay ask. Each tab asserts its own half of that before its first press.
-  //
-  // 🔴 ROUND TRIP IS THE ONE DEEP CHECK. It holds a WHIP and a WHEP leg on
-  // Cloudflare Stream, which is minutes billed on every run, so an ordinary run
-  // stops at the relay ask and logs `left for the deep run`;
-  // `DEMO_DEEP=1 node demo/verify.mjs capture` runs the rest.
-  //
-  // THE PUBLISHED BAR IS TAKES's, the tab the page opens on, so the harness
-  // drills it as it drilled `/take/`'s. The other three bars are `publish:
-  // false` and drilled as page asserts by `bar-drill.mjs`.
+  // Four tabs, each a module beside this file, built by `createTabPage` when first
+  // opened. Nothing opens on load. ROUND TRIP bills Stream minutes, so only
+  // `DEMO_DEEP=1` runs past its relay ask. The published bar is TAKES's.
+  // See lessons/page-capture.md#capture-3
   import { mount, guard } from '/shell/shell.mjs';
   import { createTabPage } from '/shell/tab-page.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -85,9 +66,8 @@
 
   const d = mount({
     name: 'capture',
-    // No `what` under the title: each tab says what it is in the box under the
-    // tab row (`tab-page.mjs` rule 6), asked 2026-10-05 as *"rm top desriptions"*.
-    // The manifest's `one` line still describes the page on the index.
+    // No `what` under the title: each tab describes itself under the tab row.
+    // See lessons/page-capture.md#capture-4
     readout: null,
     showLog: false,
   });

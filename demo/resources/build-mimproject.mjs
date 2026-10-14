@@ -1,39 +1,7 @@
-// Builds `demo/resources/mimproject.json`, which is a SECOND corpus and not an
-// addition to the first one.
-//
-// 🔴 IT IS THE OPPOSITE KIND OF THING FROM `corpus.json`, WHICH IS THE WHOLE
-// REASON IT IS A SEPARATE FILE. Every row of `corpus.json` is a POINTER to
-// something somebody else holds, and its rules follow from that: never copy,
-// never re-probe, record what was observed on a date. Every row HERE points at
-// a file we hold ourselves, in our own R2 bucket, because the material is
-// MIMproject's own and mimproject.org has been down long enough that YouTube
-// was the last copy anybody could reach. Merging the two would put "ask nobody
-// else's server" and "this server is ours" under one set of rules, and the
-// first rule would win by being written down.
-//
-// Two kinds of input, and the split is the same one `corpus.json` makes:
-//   - MEASURED facts (duration, picture size, frame rate, bytes) come from
-//     `mimproject-measured.json` (the YouTube channel) and
-//     `mimproject-vimeo-measured.json` (Vimeo), read off the files themselves
-//     with ffprobe when they were pulled. A duration is a fact about a file,
-//     measured once and written down.
-//   - EDITORIAL facts (when the work happened, and how we know) are the table
-//     below, hand-checked against each video's own title and description and
-//     against what is published about the productions.
-//
-// ⚠️ TWO ROWS ARE NOT OURS AND SAY SO. The opera interview and the Made in
-// Estonia Maraton piece were filmed and uploaded by Kanuti Gildi SAAL; the
-// productions are co-productions, the recordings are theirs. Their `holder`,
-// `source` and `licenceBy` carry that rather than letting "MIMproject" stand
-// over the whole file because most of the file is ours.
-//
-// ⚠️ A YOUTUBE UPLOAD DATE IS NOT A DATE OF WORK, and most of these were
-// uploaded years after the thing they show. `uploaded` is carried on every row
-// as the fact it is; `when` is filled only where the work's own date is
-// stated somewhere, and two rows honestly have `precision: "none"`.
-//
-//   node demo/resources/build-mimproject.mjs            # writes mimproject.json
-//   node demo/resources/build-mimproject.mjs --check    # prints, writes nothing
+// Builds mimproject.json: MIMproject videos held in our own R2, separate from corpus.json's
+// pointers. Measured facts come from the *-measured.json files, dates from the table below;
+// `uploaded` is never `when`. Run with no flag, or --check to print only.
+// See lessons/page-resources.md#resources-73
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -44,16 +12,13 @@ const MEASURED = join(HERE, 'mimproject-measured.json');
 const MEASURED_VIMEO = join(HERE, 'mimproject-vimeo-measured.json');
 const OUT = join(HERE, 'mimproject.json');
 
-// Where the files actually are. The station worker serves any object in its
-// bucket at `/media/<key>` with Range and `access-control-allow-origin: *`.
-// ⚠️ It also serves them `immutable` for a year, so a replacement file needs a
-// new name rather than an overwrite.
+// The station worker serves the bucket at `/media/<key>`, immutable for a year, so a
+// replacement needs a new name.
+// See lessons/page-resources.md#resources-74
 const BASE = 'https://positron-station.kristjan-jansen.workers.dev/media/mimproject/';
 
-// The editorial table. Keyed by file name, because that is what a reader of the
-// bucket sees. `how` says where the date came from, in the same spirit as
-// `corpus.json`'s `when.how`: a date with no provenance is a guess in a
-// confident typeface.
+// The editorial table, keyed by file name; `how` says where each date came from.
+// See lessons/page-resources.md#resources-75
 const WHEN = {
 	'party-container-kumu-oo-2010.mp4': {
 		edtf: '2010', precision: 'year', how: 'stated in the video own title',
@@ -120,12 +85,9 @@ const WHEN = {
 		note: 'A short portrait of MIMproject.',
 	},
 
-	// ── from Vimeo. The five Karlsruhe rows are the oldest material here and
-	// they push the corpus back to 2008, three years before anything on the
-	// YouTube channel. ⚠️ The two clips that give a month disagree, March
-	// against April, so only the two of them carry a month and the rest carry
-	// the year. A workshop run twice is the obvious reading and nothing states
-	// it, so nothing here says it.
+	// From Vimeo: the five Karlsruhe rows (2008). Two clips disagree on the month, so only they
+	// carry one.
+	// See lessons/page-resources.md#resources-76
 	'mim-jam-session-karlsruhe-2008.mp4': {
 		edtf: '2008-03', precision: 'month', how: 'the video own description says recorded March 2008',
 		note: 'Day 2 of the MIM workshop in Karlsruhe. An evening jam with piano, SuperCollider-processed sound, Ableton Live synths, trumpet and ragga MC.',
@@ -169,15 +131,9 @@ const WHEN = {
 };
 
 /**
- * 🔴 WHAT WAS PULLED AND THEN TAKEN OUT AGAIN, AND WHY THE ROW STAYS HERE.
- * A corpus that silently shrinks is one nobody can audit: the difference
- * between "this was never found" and "this was found and removed" is the whole
- * value of an archive's index, and the count is the only thing a reader would
- * have noticed. Each entry says where the original still is, so nothing here
- * is a dead end.
- *
- * ⚠️ IT IS A NOTE, NOT A TOMBSTONE WITH THE FILE STILL BEHIND IT. The object is
- * gone from the bucket and the URL answers 404.
+ * Pulled and removed again: each row says where the original still is. The object is gone
+ * from the bucket.
+ * See lessons/page-resources.md#resources-77
  */
 const REMOVED = [
   {
@@ -268,22 +224,8 @@ const items = [
 ];
 
 /**
- * 🔴 A `NOT_OURS` KEY THAT MATCHES NOTHING IS A ROW SILENTLY CREDITED TO US,
- * AND THIS EXACT THING HAPPENED. The opera interview's file was renamed when
- * the 1080p re-encode replaced the 720p rendition; `WHEN` was updated and this
- * table was not. `item()` then read `NOT_OURS[v.file]` as undefined, handed the
- * row `source: 'MIMproject'` and a `holder` saying it is ours, and the build
- * printed nothing. A licence statement about somebody else's recording had
- * flipped and every file still looked right.
- *
- * ⚠️ AND THE PAGE'S OWN CHECK COULD NOT SEE IT, which is the more useful half.
- * It compared `theirs.length` against `counts.theirs`, and both are derived
- * from the same field, so the pair agreed perfectly while being wrong together.
- * That is CLAUDE.md's rule about a statistic that is constant by construction
- * over its subject: not a weak measurement, a blind one. What caught it was the
- * DETAIL line moving from `2 of 28` to `1 of 26`, read by a human.
- *
- * A key here is a claim that a specific file exists. Say so at build time.
+ * A NOT_OURS key that matches no file throws, else that row is silently credited to us.
+ * See lessons/page-resources.md#resources-78
  */
 const byFile = new Set(items.map((i) => i.file.slice(BASE.length)));
 for (const key of Object.keys(NOT_OURS)) {

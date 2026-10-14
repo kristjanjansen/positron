@@ -24,13 +24,10 @@
   import { createChatLog, createChatSign, createChatCompose, createChatColumn, createChatWindow, createChatGrid } from '/shell/chat-ui.mjs';
 
   /**
-   * kit/chat, THE CHAT'S PIECES, 2026-10-11. Asked: *"(make it reusable) as all
-   * chat ui elements"*, *"make it a kit page too and keep it update while we
-   * work on chat for chat components"*. Every piece is `demo/shell/chat-ui.mjs`,
-   * the module the /room/ concept pages draw their chat with. Nothing here is
-   * wired to a room: a line you send lands on this page only.
-   * ⚠️ KEEP IT IN STEP: a piece added to chat-ui.mjs gets a block here, newest
-   * first, and a row in demo/shell/kit-parts.mjs.
+   * Every piece of demo/shell/chat-ui.mjs, the module the /room/ pages draw chat with.
+   * Nothing is wired to a room. A piece added to chat-ui.mjs gets a block here,
+   * newest first, and a row in demo/shell/kit-parts.mjs.
+   * See lessons/page-kit-chat.md#kit-chat-1
    */
   const { d, section, land, checkPage } = createKitPage({
     part: 'chat',

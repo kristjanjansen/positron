@@ -15,13 +15,9 @@
   import { createKitPage } from '/shell/kit-page.mjs';
 
   /**
-   * 🔴 kit/diagram, ONE PART OF `/kit/` ON A PAGE OF ITS OWN, 2026-10-06
-   * (plans/plan-kit-split.md). Every block, holder and check below is copied
-   * VERBATIM from `demo/kit/index.html`, in that file's order, so the newest
-   * block is still the first. What changed is mechanical: `section()` lost its
-   * first argument, the holders sit here rather than at the top of the
-   * monolith, the measuring window and the tab row are gone, and every check
-   * is behind `?selfcheck=1`.
+   * Every block, holder and check is copied from the old one page /kit/, in that
+   * order, newest block first. Every check is behind ?selfcheck=1.
+   * See lessons/page-kit-diagram.md#kit-diagram-1
    */
   const { d, section, land, checkPage } = createKitPage({
     part: 'diagram',
@@ -31,36 +27,10 @@
 
 
 
-  // ── the flow diagram ────────────────────────────────────────────────────
-  // 🔴 THE ONLY WAY TO KNOW THE WRAPPING IS RIGHT IS TO SEE FOUR AWKWARD ONES
-  // SIDE BY SIDE. Every other component on this page can be judged from one
-  // example; this one cannot, because what it does well or badly is decided by
-  // strings nobody has typed yet. So the four cases below are the deliberately
-  // difficult ones — a clean round trip, a label too long for its box, two
-  // return paths that would sit on top of each other, and the whole thing at
-  // the width of a phone.
-  //
-  // ⚠️ AND EACH ONE REPORTS WHAT IT HAD TO CUT. A drawer that quietly shortens
-  // a label leaves the author believing the label fits: the picture looks
-  // fine, and the missing half is only found by somebody reading the page on a
-  // narrower screen. The line under each picture names every label that was
-  // shortened and the width it had to fit — because a cut label is a label
-  // that is too long, which is a thing to go and fix, not a feature.
-  //
-  // 🔴 AND THIS REPORT IS NOW THE ONLY PLACE A CUT SHOWS. The full string used
-  // to sit in an svg `<title>`, i.e. in the browser's own tooltip, which is
-  // gone: a tooltip drew the box's name ON TOP of the box while the line under
-  // the picture was saying the same words, three channels for one fact. The
-  // whole string is still in `aria-label` for a screen reader; nothing draws
-  // it. So a cut that nobody reads here is a cut nobody reads at all.
-  //
-  // It also says whether the type was MEASURED or estimated. `getComputedText-
-  // Length()` answers 0 inside a hidden ancestor, and every string then
-  // "fits" — one line per box, no wrapping, no cuts. That failure reads as a
-  // wrapping bug and is an attachment bug, so it gets its own word here rather
-  // than being inferred from a picture that looks a bit too tidy.
-  // Every diagram's own report, kept so the checks at the bottom can grade the
-  // ones meant to fit against the one deliberately built not to.
+  // The flow diagram: four deliberately awkward cases, since wrapping is decided by
+  // strings nobody has typed yet. Each reports every label it cut and whether type
+  // was measured or estimated (getComputedTextLength answers 0 when hidden).
+  // See lessons/page-kit-diagram.md#kit-diagram-2
   const drawn = new Map();
   const drew = new Map();
   function diagramCase(box, spec, { phone = false, id = null } = {}) {
@@ -84,10 +54,9 @@
         }
       },
     });
-    // 🔴 KEPT, BECAUSE `onRender` CANNOT ANSWER "WAS THIS ARROW DRAWN". It
-    // reports sizes and cuts; whether a link reached the picture at all is a
-    // question about the svg, and the one defect this page exists to catch here
-    // is a link that is quietly not there.
+    // Kept because onRender reports sizes and cuts but cannot say whether an arrow was
+    // drawn, and a link quietly not drawn is the defect this page catches.
+    // See lessons/page-kit-diagram.md#kit-diagram-3
     if (id) drew.set(id, made);
     return made;
   }
@@ -124,17 +93,9 @@
         { from: 'you', to: 'relay', label: 'note number' },
         { from: 'relay', to: 'box', label: 'note number' },
         /**
-         * 🔴 `PCM` IS THE PROJECT'S NAME FOR SOUND COMING BACK, AND A PICTURE
-         * COMING BACK IS `H.264`. Settled 2026-09-19: *"h.264 - unify label and
-         * longer desc on all diagrams where stream back pcm or mp4 video"*.
-         * This specimen said `sound` on one half and `sound back` on the other,
-         * which is two names for one journey, and the code sample above it is
-         * what an author copies, so the wrong word here spreads.
-         * ⚠️ AND THE RETURN CARRIES A NOTE, BECAUSE THAT IS THE OTHER HALF OF
-         * THE CONVENTION: a label is WHAT TRAVELS and the note is what that
-         * actually is. It says nothing that could be a measurement, because
-         * this picture is a made-up studio and a number invented here would be
-         * copied into a real page as though somebody had taken it.
+         * PCM is the name for sound coming back, H.264 for a picture coming back. The label
+         * is what travels and the note what it is; no numbers, since this studio is made up.
+         * See lessons/page-kit-diagram.md#kit-diagram-4
          */
         { from: 'box', to: 'relay', label: 'PCM', back: true },
         { from: 'relay', to: 'you', label: 'PCM', back: true,
@@ -165,14 +126,9 @@
       ],
     }));
 
-  // ── a box inside a box ──────────────────────────────────────────────────
-  // 🔴 THE SAME SPEC AT BOTH WIDTHS, BECAUSE THE TWO ANSWER A LINK INTO A
-  // BOX INSIDE A CONTAINER DIFFERENTLY — and that is the whole of what there
-  // is to look at here. A container's own name is at the TOP of it with its
-  // boxes under, so the ground between its edge and a box inside it is empty
-  // SIDEWAYS and full DOWNWARDS. Left to right an arrow reaches the box it
-  // names; stacked, the same arrow would cross the words `Raspberry Pi` on
-  // the way in, so it stops at the machine.
+  // The same spec at both widths: left to right an arrow reaches the box inside the
+  // container, stacked it would cross the container's name, so it stops at the machine.
+  // See lessons/page-kit-diagram.md#kit-diagram-5
   section('DIAGRAM, CONTAINERS',
     'A machine and the programs on it are not one thing, so a box holds boxes.',
     `nodes: [{ id: 'pi', label: 'Raspberry Pi', kind: 'device', children: [
@@ -211,14 +167,9 @@ links: [{ from: 'you', to: 'synth', label: 'note number' },   // into a box INSI
       diagramCase(box, nested, { phone: true });
     });
 
-  // ── two boxes in one machine, with an arrow between them ────────────────
-  // 🔴 THE PICTURE THAT PROVES THE TIE GIVES WAY. A tie is a bracket with no
-  // head, because a head would claim an order between the parts of one machine
-  // that the drawing does not know. Where the author has DECLARED a link that
-  // order IS known, so the arrow takes the tie's place rather than being drawn
-  // on top of it: one line down that gap, never two. The gap between the two
-  // boxes nothing was declared between still has its tie, which is what makes
-  // this a picture of the rule rather than of a special case.
+  // A tie (a bracket with no head) gives way to a declared arrow between two parts of
+  // one machine: one line down that gap, never two. The undeclared gap keeps its tie.
+  // See lessons/page-kit-diagram.md#kit-diagram-6
   section('DIAGRAM, INNER ARROWS',
     'A declared arrow between two boxes in one machine takes the tie\'s place rather than '
     + 'being drawn over it.',
@@ -255,9 +206,8 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
         ],
         links: [
           { from: 'you', to: 'synth', label: 'note number' },
-          // 🔴 A NOTE AND NO LABEL, WHICH IS WHAT THE COMPONENT ASKS FOR HERE.
-          // A name in a sixteen pixel gap runs under both boxes; the arrow says
-          // which way, and this says what.
+          // A note and no label: a name in a 16 px gap runs under both boxes.
+          // See lessons/page-kit-diagram.md#kit-diagram-7
           { from: 'in', to: 'synth',
             note: 'The room, as the microphone hears it. It is **this** arrow the '
                 + 'synthesiser answers, and it never leaves the board.' },
@@ -293,16 +243,9 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
       ],
     }));
 
-  // ── the fork, which is the case that was not drawable at all ────────────
-  // 🔴 THE SAME SPEC TWICE, AT BOTH WIDTHS, BECAUSE ONE OF THEM USED TO LIE.
-  // Every other block on this page draws its case once; this one cannot, since
-  // a branch was correct left to right and FALSE in one column — a forward
-  // link was a straight vertical at its source's centre and routed around
-  // nothing, so the second branch ran behind the box between its two ends and
-  // came out underneath it with an arrowhead in the next one. A phone read a
-  // path the page does not have, and the name that tells the two branches
-  // apart was drawn at the midpoint, i.e. under that box. Seeing one width
-  // could not have caught it, so the block shows both.
+  // The fork, at both widths: one column must route the second branch around the box
+  // between its ends, and its name must not sit under that box.
+  // See lessons/page-kit-diagram.md#kit-diagram-8
   section('DIAGRAM, ROUTING',
     'An arrow that reaches past a box is routed round it, never through it.',
     '',
@@ -312,11 +255,9 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
         caption: 'Two copies of one machine, fed the same four numbers. One arrow ' +
                  'goes to the copy in this page and one reaches past it, out to the ' +
                  'board, and the sound of the far one comes back.',
-        // ⚠️ SHORT SUBS, MEASURED RATHER THAN PREFERRED. These were 17 to 19
-        // characters and at 258 px the drawer reported ALL FOUR of them cut —
-        // a picture shortening the names of the things it is about. The
-        // shortening is the signal, not a width to tune around, so the words
-        // went instead: nothing is cut anywhere from 258 px up.
+        // Short subs: at 258 px, 17 to 19 characters were all cut. Nothing is cut from
+        // 258 px up.
+        // See lessons/page-kit-diagram.md#kit-diagram-9
         nodes: [
           { id: 'you', label: 'this page', sub: 'one copy here', kind: 'here' },
           { id: 'near', label: 'copy here', sub: 'same settings' },
@@ -326,16 +267,13 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
         links: [
           { from: 'you', to: 'near', label: 'settings' },
           { from: 'you', to: 'cf', label: 'and out' },
-          // ⚠️ `the same` RATHER THAN `the same sound`, MEASURED. A gutter is
-          // sized by the widest name in it, so a longer one here would take
-          // the width straight out of the boxes — and this block's subs were
-          // already cut down once for exactly that. Eight characters is under
-          // `the sound`, so the picture is the same size it was with two of
-          // these five arrows unnamed.
+          // `the same` is short because a gutter is sized by the widest name in it, and a
+          // longer one takes the width out of the boxes.
+          // See lessons/page-kit-diagram.md#kit-diagram-10
           { from: 'cf', to: 'pi', label: 'four settings' },
-          // 🔴 `PCM` ON BOTH HALVES, the settled name for sound coming back.
-          // See the note on the first block in this page for why, and
-          // `/grains/`, which is the real page this picture is a sketch of.
+          // PCM on both halves, the name for sound coming back. /grains/ is the real page
+          // this sketches.
+          // See lessons/page-kit-diagram.md#kit-diagram-11
           { from: 'pi', to: 'cf', label: 'PCM', back: true },
           { from: 'cf', to: 'you', label: 'PCM', back: true,
             note: 'Raw samples, uncompressed, in slices of a few milliseconds each. The far '
@@ -366,8 +304,8 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
       links: [
         { from: 'you', to: 'relay', label: 'note number' },
         { from: 'relay', to: 'box', label: 'note number' },
-        // 🔴 THE SAME FOUR LINKS AS THE FIRST BLOCK, WHICH IS WHAT THE CAPTION
-        // CLAIMS, so the labels and the note track it exactly.
+        // The same four links as the first block, as the caption claims.
+        // See lessons/page-kit-diagram.md#kit-diagram-12
         { from: 'box', to: 'relay', label: 'PCM', back: true },
         { from: 'relay', to: 'you', label: 'PCM', back: true,
           note: 'Raw samples, uncompressed, in slices of a few milliseconds each. Nothing '
@@ -378,24 +316,18 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // A link to a block lands on it. See `land()` in demo/shell/kit-page.mjs.
   land();
 
-  /* ── what a machine can say about this page ─────────────────────────────
-     🔴 EVERY CHECK ON THIS PAGE IS BEHIND `?selfcheck=1`, the page level ones
-     included (CLAUDE.md: a self-check never runs for a visitor). The checks
-     below are copied from `demo/kit/index.html` VERBATIM and keep that
-     file's indent, so a diff against it reads clean; the one line taken out
-     of each is a `settle()` or `measure()`, the measuring window a page with
-     no closed tab has no use for. Their comments still name it.
-     ⚠️ THEY RUN AFTER A FRAME, because `getBoundingClientRect` before the
-     first paint answers about a page that has not been arranged yet. */
+  /* Every check is behind ?selfcheck=1. They are copied from the old one page /kit/
+     and keep its indent. They run after two frames, because getBoundingClientRect
+     before the first paint answers about a page not yet arranged.
+     See lessons/page-kit-diagram.md#kit-diagram-13 */
   if (SELFCHECK) {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   checkPage();
 
 
-  // the diagram grades both directions. A cuts report that can only ever
-  // say "nothing cut" is not a measurement of anything: the picture built out
-  // of deliberately unwritable labels has to come back with cuts, and the one
-  // written properly has to come back with none.
+  // The diagram grades both directions: the picture built from unwritable labels must
+  // report cuts, and the one written properly must report none.
+  // See lessons/page-kit-diagram.md#kit-diagram-14
   const fits = drawn.get('fits');
   const tooLong = drawn.get('too-long');
   d.assert('a diagram whose labels fit reports nothing shortened',
@@ -407,15 +339,9 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
     tooLong ? `${tooLong.cuts.length} shortened: ${tooLong.cuts.map((c) => c.id).join(', ')}`
             : 'that picture never rendered');
 
-  // 🔴 A LINK ASKED FOR AND NOT DRAWN, WHICH IS THE ONE DEFECT A PICTURE
-  // CANNOT SHOW YOU. An arrow between two boxes in one container used to be
-  // thrown away: the diagram still looked complete, because the plain tie
-  // between those boxes stood exactly where the arrow should have been, and
-  // /station/ lost three real arrows that way without anybody noticing. So this
-  // counts the lines rather than looking at them — three links declared must be
-  // three arrows on the picture, and the ONE gap nothing was declared across
-  // must still have its tie. Both numbers matter: three arrows and two ties
-  // would mean the arrow had been drawn on top of the bracket it replaces.
+  // A link declared and not drawn cannot be seen, so the lines are counted: three
+  // links declared must be three arrows, and the one undeclared gap keeps its tie.
+  // See lessons/page-kit-diagram.md#kit-diagram-15
   const arrowsAndTies = (a) => a && {
     arrows: a.svg.querySelectorAll('.pos-dg-link').length,
     ties: a.svg.querySelectorAll('.pos-dg-tie').length,

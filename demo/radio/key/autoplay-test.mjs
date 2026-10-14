@@ -1,13 +1,7 @@
-// demo/radio/key/autoplay-test.mjs. Autoplay's chord choice and voice
-// leading, with no browser at all.
-//
-//   node demo/radio/key/autoplay-test.mjs
-//
-// Mostly NEGATIVE CONTROLS, written so that the bug each names would fail it:
-// a chooser that ignores the chroma, one that never repeats or always repeats,
-// a voicer that always returns root position, one that leaves the range, one
-// that measures motion to the nearest note rather than voice to voice. Count
-// them with `grep -c 'NEGATIVE CONTROL' demo/radio/key/autoplay-test.mjs`.
+// Autoplay's chord choice and voice leading, no browser: node demo/radio/key/autoplay-test.mjs
+// Mostly negative controls, each written so the bug it names would fail it; count them with
+// `grep -c 'NEGATIVE CONTROL' demo/radio/key/autoplay-test.mjs`.
+// See lessons/page-radio.md#radio-4
 
 import { triad, romanOf, fit, chromaSays, walkNext, chooseChord, placements, motion, voiceLead, rootPosition, chromaEase, WALK }
   from './autoplay.mjs';
@@ -50,10 +44,9 @@ ok('the same F A C in A minor is VI', r.step === 5 && r.roman === 'VI', r.roman)
 // chord that is sounding keeps it, or a chooser that never repeats passes.
 r = chooseChord(fac, C, 3);
 ok('NEGATIVE CONTROL: F A C while IV is sounding stays on IV', r.step === 3, r.roman);
-// ...and it is a cost at all: C, E, G and A nearly level fit I and vi
-// almost exactly as well (C and E in both, G against A), and the near tie is
-// broken toward whichever is NOT sounding. With no repeat cost the I's lean
-// keeps I from I, and vi's own fit keeps vi from vi.
+// ...and it is a cost at all: C, E, G and A fit I and vi almost equally, and the near tie goes
+// to whichever is not sounding. With no repeat cost each would keep itself.
+// See lessons/page-radio.md#radio-5
 const split = chroma({ 0: 1, 4: 1, 7: 0.9, 9: 1 });
 const fromI = chooseChord(split, C, 0).step, fromVi = chooseChord(split, C, 5).step;
 ok('NEGATIVE CONTROL: a near tie between I and vi moves off the chord sounding', fromI === 5 && fromVi === 0, `from I ${fromI}, from vi ${fromVi}`);
@@ -94,12 +87,10 @@ ok('C to Am holds C and E and moves 2', v.notes.join() === '60,64,69' && v.motio
 // Root position for the same move, the old autoplay, for comparison.
 const old = motion(rootPosition(0, 'major', 0, 48), rootPosition(0, 'major', 3, 48));
 ok('root position C to F moves more than led', old > 3, `root position ${old}`);
-// A long walk round the circle of fifths, always moving least, sinks a
-// semitone or two a chord and the range is what turns it round. Printed, not
-// graded: the middle voice averages 58.0 here against a range middle of 61.5,
-// on the most one-sided progression there is. On the three R2 recordings it
-// averaged 61.8, 63.9 and 65.5 (autoplay-chords.mjs), so no pull to the middle
-// was added.
+// A long walk round the circle of fifths sinks a semitone or two a chord until the range turns
+// it. Printed, not graded: middle voice 58.0 against a range middle of 61.5 here; 61.8 to 65.5
+// on the R2 recordings (autoplay-chords.mjs), so no pull to the middle.
+// See lessons/page-radio.md#radio-6
 let prev = [60, 64, 67], all = [];
 for (let i = 0; i < 48; i++) {
   const w = voiceLead(prev, triad((i * 7) % 12, 'major', 0), RANGE);

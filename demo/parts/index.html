@@ -14,10 +14,10 @@
      unreadable holes. */
   .pa-pic { overflow-x: auto; border: var(--edge); border-radius: var(--r); background: #f4f1ea; }
   .pa-pic img { display: block; max-width: none; height: auto; }
-  /* The USB chain, drawn with boxes: a plug is a filled tag, a socket an
-     outlined one, and each joint between two parts names the connector. The
-     parts stack at every width, because four in a row leave no room for the
-     tags at the desk either. */
+  /* The USB chain as boxes: a plug is a filled tag, a socket an outlined one, and
+     each joint names the connector. The parts stack at every width, because four
+     in a row leave no room for the tags.
+     See lessons/page-parts.md#parts-1 */
   .pa-chain { display: flex; flex-direction: column; gap: var(--ctl-gap); }
   .pa-legend { display: flex; gap: var(--ctl-gap); }
   .pa-part { display: flex; flex-direction: column; gap: 10px;
@@ -36,16 +36,10 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
 
-  /*
-   * 🔴 A BUILD SHEET, NOT A DEMO, AND UNLISTED. Asked 2026-10-05 as *"write
-   * into not-in-index positron page"*, after a session of shopping list,
-   * breadboard drawings and power questions for the Pico router. It opens
-   * nothing: three pictures from this directory and tables of shop links.
-   * The drawings are `rig/pico/oled/breadboard.mjs`'s output, copied here
-   * because the deploy serves only `demo/`. Re-draw there and copy again.
-   * ⚠️ PRICES AND STOCK WERE READ ON OOMIPOOD 2026-10-04 AND 2026-10-05, not
-   * live. The page says so.
-   */
+  /* A build sheet for the Pico router, unlisted, that opens nothing. The drawings
+     are rig/pico/oled/breadboard.mjs output copied here, because the deploy serves
+     only demo/. Prices and stock were read once, not live, and the page says so.
+     See lessons/page-parts.md#parts-2 */
   const WHAT = 'The parts, the breadboard and the power for the Pico router with its screen and four keys.';
   const d = mount({ name: 'parts', what: WHAT, readout: null, showLog: false, controls: [] });
   guard(d);
@@ -70,7 +64,7 @@
     { part: 'MB102 power module, plus a 9 V adapter, 830 board only', qty: 'instead', price: '€3.50', url: `${OOMI}/en/product/oky0026_toitemoodul_maketeerimislauale_mb102_3_3v_5v_700ma_6_5_12v` },
   ];
   // For the MB102 only: any one of these, set to 9 V before it is plugged in.
-  // Read 2026-10-05, the middle one out of stock that day.
+  // See lessons/page-parts.md#parts-3
   const ADAPTERS = [
     { part: 'Universal adapter, 3 to 12 V, 1 A, 11 tips with 5.5 x 2.1 mm', qty: 'in stock', price: '€17.50', url: `${OOMI}/en/product/universaalne_toiteadapter_312v_1a_12w` },
     { part: 'Universal stabilised adapter, 3 to 12 V, 12 W', qty: 'sold out', price: '€11.00', url: `${OOMI}/product/p_sup_eu1000_universaalne_stab_adapter_3_12vdc_12w` },

@@ -1,31 +1,15 @@
-// demo/capture/common.mjs: what the four tabs of `/capture/` would otherwise
-// each type out: a row of buttons that is not `.pos-controls`, a generated
-// picture with an optional camera under it, and the MediaRecorder duration
-// dance. Four pages carried four copies of the last two (`take`, `record`,
-// `keep`, `show`, plus `capture` itself), so the merge is the moment to keep one.
-//
-// 🔴 THE BUTTON ROW IS HERE AND NOT IN `demo/shell/` ONLY BECAUSE THIS AGENT
-// MAY NOT TOUCH `demo/shell/`. Every tabbed page needs it (`tab-page.mjs` rule
-// 4: a tab's controls never go in `.pos-controls`, because the harness presses
-// that row by position across the whole document), and `/sync/`, `/time/` and
-// `/wire/` will each want the same thing. It belongs in the kit beside
-// `createTabPage`; reported, not done.
+// demo/capture/common.mjs: what the four tabs of /capture/ share: a button row
+// that is not `.pos-controls`, a generated picture with an optional camera
+// under it, and the MediaRecorder duration fix.
+// See lessons/page-capture.md#capture-5
 
 import { el } from '/shell/shell.mjs';
 import { burn, drawCamera } from '/shell/pattern.mjs';
 
 /**
- * Requests this page made whose URL matches `test`, started before `beforeMs`
- * when given, from resource timing: what the browser fetched, not what a tab
- * remembered to count. Read by every tab's "building this tab opened nothing"
- * check and by ROUND TRIP's relay ask.
- *
- * ⚠️ A REQUEST STILL IN FLIGHT HAS NO ENTRY YET. MEASURED 2026-10-04 by
- * sabotage: an ask made while ROUND TRIP was being built, one frame before the
- * check pressed Send and receive, read `0 before it` and stayed green, while
- * the same ask made when the module loaded went red on both checks (2 of 73).
- * So this sees an ask on LOAD, which is the defect it exists for, and can miss
- * one made a few milliseconds before the press.
+ * Requests this page made whose URL matches `test` (resource timing), started
+ * before `beforeMs` when given. A request still in flight has no entry yet.
+ * See lessons/page-capture.md#capture-6
  */
 export function requests(test, beforeMs = null) {
   return performance.getEntriesByType('resource')
@@ -37,15 +21,11 @@ export const H = 720;
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * A row of plain buttons for one tab, with the shell's busy treatment: a
- * handler that returns a promise disables its button and sets `data-busy`
- * (the sweep in shell.css, `button[data-busy="1"]`) until it settles.
- *
- * ⚠️ NOT `.pos-controls`, ON PURPOSE. See the header. The class is `cap-row`
- * and the page's stylesheet lays it out the way the shell lays out its own row.
- *
+ * A row of plain buttons with the shell's busy treatment. Not `.pos-controls`,
+ * because the harness presses that row by position across the whole document.
  * @param {Array<{id:string,label:string,primary?:boolean,end?:boolean}>} spec
  * @param {(msg:string, kind?:string)=>void} log  the tab's log
+ * See lessons/page-capture.md#capture-7
  */
 export function createButtonRow(spec, log) {
   const row = el('div', 'cap-row');
@@ -85,20 +65,13 @@ export function createButtonRow(spec, log) {
 }
 
 /**
- * The generated test picture on a 1280x720 canvas, with the camera drawn UNDER
- * it on request so the burned clock survives either way.
- *
- * 🔴 IT DRAWS ONLY WHILE SOMEBODY COULD BE LOOKING OR SOMETHING IS READING IT.
- * Four tabs each running a 25 fps burn of a 1280 canvas behind closed panels is
- * four pictures nobody sees. `alive()` says when a hidden tab still needs its
- * frames (a recording, a WHIP leg): a captured stream off a canvas that is not
- * redrawn simply stops, which would freeze a far end for a reason that is not
- * the network's.
- *
+ * The test picture on a 1280x720 canvas, camera drawn under it on request.
+ * Draws only while visible or while `alive()` says a hidden reader needs frames.
  * @param {object} o
  * @param {() => object} o.opts   burn options per frame (hue, position, ...)
  * @param {() => boolean} [o.alive]  true when frames are needed while hidden
  * @param {object} [o.media]  getUserMedia video constraints
+ * See lessons/page-capture.md#capture-8
  */
 export function createSource({ opts, alive = () => false, media = { width: 640, height: 360, frameRate: 25 } }) {
   const canvas = el('canvas');

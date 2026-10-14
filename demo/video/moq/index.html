@@ -31,30 +31,10 @@
   import { startMoq, moqSupport, MOQ_RELAY } from '/shell/moq.mjs';
   import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
 
-  // /video/camera/ with one round trip through a MoQ relay beside it.
-  // The camera, with the clock burned into it, is encoded in this tab with
-  // WebCodecs and published over MoQT (QUIC, by WebTransport) to Cloudflare's
-  // public MoQ relay; the same session subscribes to that broadcast and decodes
-  // what comes back. Both ends are this tab, so one clock stamps the frame and
-  // reads it back, and the footer's delay is a median of exact differences.
-  // The publisher and the subscriber are `startMoq` in demo/shell/moq.mjs, the
-  // one /moq/ uses, given the camera to paint instead of testsrc2.
-  //
-  // It is video/030's WebRTC leg with the transport swapped: no WHIP, no WHEP,
-  // no Stream input and no Stream minutes. The relay is Cloudflare's public
-  // draft-14 relay (MOQ_RELAY), which keeps only the live edge and bills
-  // nobody here.
-  //
-  // NOTHING OPENS ON A VISIT. The camera, the session and the subscribe are all
-  // made on the start press; stop closes the session and every track.
-  //
-  // ⚠️ A VPN THAT DROPS UDP DROPS THIS TOO. MoQ rides QUIC, which is UDP. With
-  // the Check Point tunnel up a session may not open at all (CLAUDE.md), so a
-  // session that does not open says that is one possibility, never the cause.
-  //
-  // ⚠️ SAFARI IS REFUSED, ON PURPOSE. @moq/net blocks it by user agent because
-  // of WebKit bug 319818 (positron-streaming), so moqSupport() says no and the
-  // page says why before it asks for the camera.
+  // /video/camera/ with a round trip through Cloudflare's public MoQ relay (MOQ_RELAY, draft-14),
+  // WebCodecs over WebTransport by `startMoq` (demo/shell/moq.mjs); one clock both ends. No Stream
+  // minutes. Nothing opens on a visit. A VPN dropping UDP drops it; Safari is refused by @moq/net.
+  // See lessons/page-video.md#video-16
   const S = 'web';
   const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
   const RELAY_IN = 'cf-moq:relay:video-in', RELAY_OUT = 'cf-moq:relay:video-out';
@@ -114,9 +94,8 @@
     { key: 'codec', label: '', reserve: 3 },
   ] });
   const V = moqPanel.values;
-  // The protocol's name is the footer's first word, not a plate over the picture
-  // (asked 2026-10-13: *"rm labels on top of videos in loopback demos. move them
-  // to videopanel fooers"*).
+  // The protocol's name is the footer's first word, not a plate over the picture.
+  // See lessons/page-video.md#video-17
   const pair = el('div', 'cc-pair');
   pair.append(panel.el, moqPanel.el);
 
@@ -284,8 +263,8 @@
     values: () => Object.fromEntries(V.keys().map((k) => [k, V.cell(k).textContent])),
   };
 
-  // 🔴 SELF-CHECKS ONLY BEHIND ?selfcheck=1, and the round trip only behind
-  // ?selfcheck=2, as on /moq/. The ordinary tier opens nothing.
+  // Self-checks only behind ?selfcheck=1, the round trip only behind ?selfcheck=2, as on /moq/.
+  // See lessons/page-video.md#video-18
   if (SELFCHECK) {
     d.assert('a visit opened nothing', !cam && !leg, cam ? 'a camera is open' : leg ? 'a session is open' : 'nothing open');
     d.assert('the returned picture is tagged MoQ', moqPanel.el.textContent.includes('MoQ'));

@@ -1,58 +1,7 @@
-// demo/resources/build-faust-aot.mjs: Faust programs, compiled ahead of time.
-//
-//   node demo/resources/build-faust-aot.mjs          # compiles, writes demo/resources/faust/
-//   node demo/resources/build-faust-aot.mjs --check  # compiles, compares, writes nothing
-//
-// 🔴 WHAT IT MAKES AND WHY. A Faust program compiled by the vendored libfaust
-// in node and shipped as its compiled factory plays in a browser through
-// `faustwasm.mjs` alone, with no compiler in the tab: 3.8 kB of instrument over
-// brotli instead of 1 MB of libfaust (`plans/plan-live-slides.md` sections 1
-// and 5). The page that loads it is `demo/shell/faust.mjs`'s `faustFactory()`.
-// Per program, plus one mixer and one provenance record:
-//
-//   <id>.json          the voice and effect JSON, both `shaKey`s, and the file names
-//   <id>.voice.wasm    one voice, which the runtime replicates
-//   <id>.effect.wasm   the effect after the mixer, only when the program declares one
-//   mixer32.wasm       libfaust's own voice mixer, the same for every instrument
-//   PROVENANCE.json    what each was compiled from, by what, with what flags
-//
-// and for a MONO program (`mono: true` in `synth-steps.mjs`, since 2026-10-06):
-//
-//   <id>.json          the DSP JSON, its `shaKey`, `mono: true` and the one file name
-//   <id>.wasm          the whole program, no voice and no mixer
-//
-// 🔴 A LIST OF PROGRAMS SINCE 2026-10-06, NOT THE ONE ORGAN. `PROGRAMS` below is
-// the Organ from `demo/fau/presets.mjs` and every step of the `synths` deck
-// from `demo/shell/synth-steps.mjs`, each named by the file and id it is read
-// from. A program with no `effect` line has no effect file and its JSON says
-// `effect: null`, which `factoryFromParts()` already takes.
-// ⚠️ ONE MIXER FOR ALL OF THEM, AND THAT IS CHECKED RATHER THAN ASSUMED. Every
-// program here is two channels out, so libfaust writes the same 502 bytes for
-// each; a compile whose mixer differs from the first one's is refused, because
-// a shared file that is right for one instrument and wrong for another would
-// play quietly wrong.
-//
-// 🔴 ONE SOURCE. Every program is read from the module its page or deck
-// imports, so the text compiled here is the text the page shows. Edit one and
-// `workers/view/build.mjs` refuses to build until this script has been run
-// again, because a stale artefact is silent in the worst direction: the slide
-// would play last week's program and every number on it would still agree
-// with itself. That is `checkCompiledDefs()`'s failure mode for `/grains/`,
-// and `checkFaustAot()` is its twin.
-//
-// 🔴 `--check` RE-COMPILES AND GRADES TWO THINGS, AND IT IS THE STRONGER CHECK.
-// The build only compares md5s, because it must not boot a compiler. Here:
-//   1. the bytes a fresh compile produces are the bytes on disk, file by file;
-//   2. each program rendered offline from the files ON DISK, rebuilt through
-//      the same `factoryFromParts()` a page uses, has the same RMS as that
-//      program rendered from a live compile of the current source, and both
-//      match the figure PROVENANCE.json recorded for it.
-// ⚠️ THE RMS IS AN OFFLINE RENDER IN NODE, NOT THE BROWSER FIGURE. The planning
-// probe read 0.029763811585458978 off an analyser window in headless Chrome,
-// both paths alike; that is a realtime window whose position depends on when
-// it was read. This one is `createOfflineProcessor` with one `keyOn` and a
-// fixed number of samples, so it is exactly reproducible and needs no browser,
-// no audio device and no harness run.
+// Compiles each Faust program in PROGRAMS ahead of time into demo/resources/faust/ (voice,
+// effect and shared mixer wasm, or one wasm for a mono program) for faustFactory(); the view
+// build refuses stale output. --check recompiles and compares bytes and an offline RMS.
+// See lessons/page-resources.md#resources-60
 
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -77,11 +26,9 @@ const RENDER = { sampleRate: 48000, block: 128, voices: 8, note: 60, velocity: 1
 const MIXER = 'mixer32.wasm';
 
 /**
- * Every program this script compiles, as `{ id, source, code }`. `source` is
- * `<file>#<id>`, the key PROVENANCE.json and `checkFaustAot()` both use, and
- * the build resolves it by importing that file, so the two must name the same
- * export the same way: `PRESETS` in `demo/fau/presets.mjs`, `SYNTH_STEPS` in
- * `demo/shell/synth-steps.mjs`.
+ * Every program compiled, as `{ id, source, code }`; `source` is `<file>#<id>`, resolved
+ * by importing `PRESETS` from demo/fau/presets.mjs or `SYNTH_STEPS` from synth-steps.mjs.
+ * See lessons/page-resources.md#resources-61
  */
 const organ = PRESETS.find((p) => p.id === 'organ');
 if (!organ) { console.error("no preset with id 'organ' in demo/fau/presets.mjs"); process.exit(1); }
@@ -90,16 +37,12 @@ const PROGRAMS = [
   ...SYNTH_STEPS.map((s) => ({ id: s.id, source: `demo/shell/synth-steps.mjs#${s.id}`, code: s.code, mono: !!s.mono })),
 ];
 /**
- * 🔴 AN ANSWER WRITTEN DOWN BEFORE THE RENDER, FOR THE PROGRAM SIMPLE ENOUGH TO
- * HAVE ONE. `process = os.osc(440) * 0.5;` is a sine of amplitude 0.5, whose RMS
- * is 0.5 over root two, and 24000 samples at 48 kHz are exactly 220 of its
- * cycles. A mono program has no key to leave up, so the poly programs' negative
- * control (no key, silence) has nothing to say about it; this is its control
- * instead, from arithmetic rather than from the compiler that made the file.
+ * An answer from arithmetic: `os.osc(440) * 0.5` has RMS 0.5 over root two, and 24000
+ * samples at 48 kHz are 220 cycles. The mono programs' control instead of a silent key.
+ * See lessons/page-resources.md#resources-62
  */
-// ⚠️ `volume` is the same sine with its 0.5 on a slider whose default is 0.5,
-// so the render, which turns no slider, predicts the same figure; `pitch` is
-// that with its 440 on a slider whose default is 440, so the same again.
+// `volume` and `pitch` default to the same 0.5 and 440, so they predict the same figure.
+// See lessons/page-resources.md#resources-63
 /** RMS of a band limited saw of amplitude 0.5 at `f` through a two pole Butterworth low pass at `fc()`. */
 function harmonicRms(f, fc) {
   let s = 0;
@@ -114,12 +57,9 @@ const EXPECT = { sine: 0.5 / Math.SQRT2, volume: 0.5 / Math.SQRT2, pitch: 0.5 / 
   // slide 6's `wave` starts at 0, the sine, so the render, which picks
   // nothing, predicts the sine's figure
   wave: 0.5 / Math.SQRT2,
-  // the filter and the LFO, from the harmonic series rather than from the
-  // compiler: a saw of amplitude 0.5 is harmonics of amplitude 1/(pi n) up to
-  // Nyquist, and a two pole Butterworth low pass passes each at
-  // 1/sqrt(1 + (f/fc)^4). At fc 2000 that sums to 0.26637 (rendered 0.26628);
-  // the LFO's cutoff 2000 * (1 + 0.5 sin) averaged over its one 2 Hz cycle in
-  // the half second render, 0.26275 (rendered 0.26266)
+  // Filter and LFO from the harmonic series through a two pole Butterworth: 0.26637 at
+  // fc 2000 (rendered 0.26628), LFO averaged 0.26275 (rendered 0.26266).
+  // See lessons/page-resources.md#resources-64
   filter: harmonicRms(440, () => 2000),
   lfo: (() => { let s = 0; const N = 2000; for (let i = 0; i < N; i++) s += harmonicRms(440, () => 2000 * (1 + 0.5 * Math.sin(2 * Math.PI * i / N))) ** 2; return Math.sqrt(s / N); })() };
 const TOL = { saw: 0.005 };
@@ -134,9 +74,9 @@ const md5 = (b) => createHash('md5').update(b).digest('hex');
 // ── the compiler, booted in node the way demo/shell/code-lang-test.mjs does ──
 const { instantiateFaustModuleFromFile, LibFaust, FaustCompiler, FaustPolyDspGenerator, FaustMonoDspGenerator }
   = await import('../fau/vendor/faustwasm.mjs');
-/* ⚠️ THE GLUE IS COPIED OUT OF THE REPOSITORY FIRST, because it is CommonJS
-   shaped and the repository's own `package.json` scope would have node read it
-   as a module. `code-lang-test.mjs` does the same for the same reason. */
+/* The glue is copied out of the repository first: it is CommonJS and package.json would
+   make node read it as a module.
+   See lessons/page-resources.md#resources-65 */
 const tmp = mkdtempSync(join(tmpdir(), 'faust-aot-'));
 let compiler;
 try {
@@ -149,14 +89,9 @@ try {
 }
 
 /**
- * Compile one program polyphonically.
- * ⚠️ A PROGRAM WITH NO `effect` LINE PRINTS ONE `Aborted(...)` LINE, and that
- * is the expected absence rather than a failure: the poly generator tries to
- * compile the effect, libfaust aborts on a name that is not there, and the
- * generator carries on with no effect. It cannot be held back here, because
- * the glue bound `console.error` once when it was evaluated (`faust.mjs`
- * says why), so every polyphonic program with no effect prints it. A real failure is the
- * `did not compile` line below, with the compiler's own message.
+ * Compile one program polyphonically. A program with no `effect` line prints one expected
+ * `Aborted(...)` line that cannot be silenced; a real failure is `did not compile` below.
+ * See lessons/page-resources.md#resources-66
  */
 async function compileOne(p) {
   const gen = p.mono ? new FaustMonoDspGenerator() : new FaustPolyDspGenerator();

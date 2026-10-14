@@ -8,13 +8,9 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* concepts typist/030, PLAYBACK, 2026-10-11. Asked: *"030 is single typist
-     but uses timeline (text visualization, see original typing demo) and
-     transport to play back. plays from first to last. no permanet store"*.
-     000's paper, and under it /typist/'s line: the same deck, transport bar
-     and strip with the same three lanes, drawn the same way. Every change is
-     kept in memory only, so a reload starts from an empty sheet. Nothing here
-     opens anything and nothing makes a sound. */
+  /* Playback: /typist/paper/'s sheet over /typist/'s line (deck, transport bar, strip, three
+     lanes), playing first to last. Every change is in memory only, so a reload starts empty.
+     See lessons/page-typist.md#typist-21 */
 
   /* The sheet fills the stage, as on 000. paper.mjs makes it a sized block;
      inside the panel it is pinned to the stage instead. */
@@ -52,10 +48,9 @@
   const paper = createPaper({ label: 'the paper' });
   const keys = paper.keys;
 
-  // ── the recording, in memory and nowhere else ───────────────────────────
-  // `whole` is the paper as you left it, built one change at a time. While the
-  // transport plays, the paper shows the recording instead, and `whole` is
-  // what comes back when you type again.
+  // The recording, in memory only. `whole` is the paper as you left it; during playback the
+  // paper shows the recording, and `whole` comes back when you type again.
+  // See lessons/page-typist.md#typist-22
   const blank = () => ({ text: '', selection: [0, 0], dir: 'none' });
   const log = [];
   let whole = blank();
@@ -88,10 +83,9 @@
     paper.draw();
   }
 
-  // ── the deck: the same kit /typist/ plays its log on ────────────────────
-  // The paper during playback is the fold of the first `upTo` changes. Every
-  // way in (a fire, a seek, the transport taking over) goes through `showUpTo`,
-  // so a change that arrives twice is shown once.
+  // The deck, the kit /typist/ plays its log on. The paper is the fold of the first `upTo`
+  // changes, and every way in goes through `showUpTo`, so a change arriving twice shows once.
+  // See lessons/page-typist.md#typist-23
   let shown = blank(), upTo = 0;
   const posOf = [];               // each change's place on the line, in order
   const countAt = (pos) => { let n = 0; while (n < posOf.length && posOf[n] <= pos) n++; return n; };
@@ -112,8 +106,8 @@
     // a seek folds the prefix to one document and writes it in one go
     assert() { if (!capturing) showUpTo(countAt(deck.position())); },
   });
-  // One rate and no rate control (asked: *"030 add sound. no rate controls"*):
-  // the bar draws no rate choice for a lattice of one.
+  // One rate and no rate control: the bar draws no rate choice for a lattice of one.
+  // See lessons/page-typist.md#typist-24
   adapter.caps.rates = [1];
 
   const deck = makeLogDeck({ lanes: [{ kind: KIND, rows: [], adapter }], leadInMs: LEAD_MS, tailMs: TAIL_MS, range: [0, EMPTY_MS] });
@@ -131,10 +125,9 @@
     if (!capturing) return;
     const p = pre || { value: whole.text, s: keys.selectionStart, e: keys.selectionEnd, inputType: ev.inputType || '', atUs: evUs(ev) };
     pre = null;
-    // MEASURED in Chrome: with the box rewritten inside beforeinput, the text
-    // lands in the right place and the caret does not move with it. So on that
-    // one key the caret is worked out from the selection and the change in
-    // length, and put where it belongs afterwards.
+    // In Chrome, rewriting the box inside beforeinput puts the text right but leaves the caret,
+    // so on that key the caret is computed from the selection and the length change.
+    // See lessons/page-typist.md#typist-25
     const caret = p.revived ? Math.max(0, p.e + keys.value.length - p.value.length) : keys.selectionStart;
     const op = deriveOp(p.value, keys.value, caret, p.inputType || ev.inputType || '');
     if (!op) return;
@@ -275,11 +268,9 @@
     if (r && r.ok === false) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
   }
 
-  // ── the sound ────────────────────────────────────────────────────────────
-  // /typist/typewriter/'s Hermes Precisa 305 samples from R2, through the
-  // shared sampler. NOTHING LOADS ON A VISIT: the AudioContext and the files
-  // come with the first key or the first press anywhere on the page, which is
-  // also the gesture a browser asks for before it will sound.
+  // The sound: /typist/typewriter/'s samples through the shared sampler. Nothing loads on a
+  // visit: the AudioContext and files come with the first key or press.
+  // See lessons/page-typist.md#typist-26
   let ctx = null, voice = null;
   const samples = createSamples();
   function wake() {

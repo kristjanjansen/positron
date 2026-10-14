@@ -39,31 +39,10 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
 
-  // /video/camera/'s camera with a RECORDER. The camera's own MediaStream is
-  // recorded with `MediaRecorder`, at most 10 seconds, kept in IndexedDB in
-  // this browser, and played back in the right panel on the kit's transport bar
-  // and timeline glued together, as /synth/timeline/ does for notes.
-  //
-  // THE BAY: camera -> screen is the left panel. camera -> rec -> store ->
-  // player -> playback is the right one. The recorder, `web:rec`, takes the
-  // camera on `rec:video-in` and hands the finished file out of `rec:file-out`
-  // into a store node labelled "this browser", `web:store`. That link rides
-  // `indexeddb`, which is what bay.mjs's TRANSPORTS table chooses for `file` on
-  // one machine; the read back out of the store into `web:player` is READS'
-  // machine cell, `indexeddb` again.
-  //
-  // ONE TAKE, REPLACED EACH TIME. A new recording overwrites the stored one, so
-  // this browser holds at most one ten second take for this page.
-  //
-  // ONE SCALE. The strip is fitted to 0 to 10 s once and never refitted, so a
-  // short take fills the part of the line it covers rather than the whole
-  // width, whether it was just recorded or read back after a reload.
-  //
-  // 🔴 NOTHING OPENS ON A VISIT. The camera is asked for on its press.
-  // IndexedDB is not opened, read or listed on load, not even to show whether a
-  // take exists: it is opened on the first record, or on the first play when no
-  // take is in memory, which is how a take recorded before a reload comes back.
-  // Nothing ever leaves this machine.
+  // /video/camera/ with a recorder: MediaRecorder, at most 10 s, one take in IndexedDB (rides
+  // `indexeddb`, bay.mjs TRANSPORTS), replaced each time, played on a strip fixed at 0 to 10 s.
+  // Nothing opens on a visit: IndexedDB opens on the first record or play. Nothing leaves.
+  // See lessons/page-video.md#video-19
   const S = 'web';
   const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
   const REC_IN = `${S}:rec:video-in`, REC_OUT = `${S}:rec:file-out`;
@@ -150,11 +129,9 @@
   const pair = el('div', 'cc-pair');
   pair.append(panel.el, pbPanel.el);
 
-  // ── the store: one take in IndexedDB, the /stage/ pattern ───────────────
-  // One record under one key, written once when a take has landed (ten seconds
-  // of picture is one Blob, so there is nothing to write piece by piece). A
-  // browser that refuses IndexedDB (a private window can) keeps the take in
-  // this tab's memory, and the log says which.
+  // One record under one key, written once when a take lands. A browser that refuses IndexedDB
+  // (a private window can) keeps the take in memory, and the log says which.
+  // See lessons/page-video.md#video-20
   const LOCAL_DB = 'positron-concept-620';
   const LOCAL_STORE = 'takes';
   const KEY = 'take';
@@ -209,11 +186,9 @@
   const kib = (b) => `${Math.round(b / 1024)} KiB`;
   const secs = (ms) => `${(ms / 1000).toFixed(1)} s`;
 
-  // ── the timeline: a deck, its bar and its strip ─────────────────────────
-  // The deck's range is 0 to 10 s for the page's whole life. While recording
-  // it runs on its own clock from 0; once a take is in the player the player's
-  // element is the clock (media-master's L1) and the deck follows it, stopping
-  // where the take ends.
+  // The deck's range is 0 to 10 s always. Recording, it runs on its own clock; with a take in
+  // the player, the element is the clock (media-master L1) and the deck stops at the take's end.
+  // See lessons/page-video.md#video-21
   const deck = createDeck({ items: [], adapters: {}, range: [0, REC_MS] });
   let take = null;                 // { blob, mime, ms, bytes, at, url, fileMs, len, ready }
   let recording = null;            // { r, t0, chunks, mime, timer, iv }

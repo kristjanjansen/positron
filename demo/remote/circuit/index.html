@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
-  /* Play alone at the top left. No status label: what the board says goes to
-     the log (060's rule, asked 2026-10-11). */
+  /* Play alone at the top left. No status label: what the board says goes to the log.
+     See lessons/page-remote.md#remote-1 */
   .cc-top { display: flex; align-items: center; gap: 12px; }
 </style>
 <script type="module">
@@ -35,36 +35,16 @@
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
 
-  // The keyboard and a patch selector playing the Novation Circuit
-  // that is plugged into the Raspberry Pi, the way /away/ reaches it: the Pi
-  // carries the Circuit as an input in a room of its own (`studio-1-circuit`),
-  // takes MIDI bytes there through its gate (rig/board/inputs.mjs `midiVerdict`)
-  // and sends the Circuit's sound back down the same socket while a lease is
-  // held.
-  //
-  // 🔴 NOTHING HERE CAN WRITE THE CIRCUIT'S FLASH. Notes, the eight macro
-  // control changes (CC 80 to 87) and a program change on channel 1, patches 0 to 63, which selects
-  // a synth patch into RAM. One SysEx, the nine byte Current Patch Dump Request,
-  // which asks the Circuit for the patch it is holding and changes nothing. No
-  // session change on 16. The board's gate refuses everything else whatever
-  // this page sends.
-  //
-  // NOTHING OPENS ON A VISIT. The board is made on the play press, never at
-  // load. A check run sends nothing to the Circuit unless ?board=1 is added.
-  // The camera's three cells exist only when the URL carries the camera key, so
-  // a page without it shows nothing of the camera, not even an empty cell.
+  // Keys and a patch selector playing the Circuit on the Pi (room `studio-1-circuit`, gate
+  // rig/board/inputs.mjs `midiVerdict`). Nothing here can write its flash: notes, CC 80 to 87, program
+  // change 0 to 63 (RAM), one dump request SysEx. Board made on Play; a check sends nothing without ?board=1.
+  // See lessons/page-remote.md#remote-2
   const CAM_KEY = new URLSearchParams(location.search).get('cam') || '';
   const d = mount({ name: 'Circuit on Pi', what: '', joined: false,
-    // ⚠️ AN EVEN NUMBER OF CELLS (shell.mjs `createReport` throws on odd).
-    // `path` came in 2026-10-13 with the direct link, so `key to sound` became
-    // the MEDIAN of the last twenty presses and the separate `median` cell went
-    // (the last press alone is `__demo.probe().lags`). The camera's path is a
-    // word in `path` (`direct, camera relay`) rather than a third camera cell.
-    // 🔴 `round trip` IS `network` SINCE 2026-10-13. The owner read `KEY TO SOUND
-    // 141` beside `ROUND TRIP 3` and asked *"i dnot not undestand difference on
-    // there readings"*: two cells in ms side by side read as two answers to one
-    // question. `network` is a message there and back with no sound in it; `key to
-    // sound` is the whole trip, and its hover adds up the parts (`partsLine`).
+    // An even number of cells (`createReport` throws on odd). `key to sound` is the median of the
+    // last twenty presses and its hover adds up the parts; `network` is a message there and back
+    // with no sound in it. The camera's path is a word in `path`.
+    // See lessons/page-remote.md#remote-3
     readout: { 'key to sound': 'ms', network: 'ms', cushion: 'ms', path: '',
       ...(CAM_KEY ? { 'cam fps': '', 'cam lag': 'ms' } : {}) }, index: '/', indexLabel: 'positron' });
   conceptNav('remote/circuit');
@@ -74,29 +54,20 @@
   const INPUT = 'circuit';
   const INPUT_ROOM = `${ROOM}-${INPUT}`;
   const MAY_PLAY = !SELFCHECK || q.get('board') === '1';
-  // ── relay or direct ─────────────────────────────────────────────────────
-  // Asked 2026-10-13: *"can https://positron.studio/concepts/remote/010/?cam= go
-  // direct too?"*, then *"can we go direct with circuit?"*. As on
-  // /remote/piano/: the relay unless `?path=direct`, and the choice at
-  // the top. Direct is two WebRTC data channels to the Circuit's input on the
-  // Pi (rig/board/rtc.mjs, inputs.mjs), signalled in `studio-1-circuit`:
-  // notes, CC, the patch questions and the lease on `ctl`, the Circuit's
-  // sound on `pcm`, the macros turned by hand back on `ctl`, and with the
-  // camera key the camera's frames on a third channel `cam` (below). No
-  // channel within 3 s, or one that drops, and the relay carries everything.
+  // Relay or direct, as /remote/piano/: the relay unless `?path=direct`. Direct is data channels to
+  // the Pi (rig/board/rtc.mjs): `ctl` for notes, CC, patch questions and the lease, `pcm` for sound,
+  // `cam` with the camera key. No channel within 3 s, or one that drops, and the relay carries all.
+  // See lessons/page-remote.md#remote-4
   let mode = q.get('path') === 'direct' ? 'direct' : 'relay';
   // 10 ms frames on the direct path, as 030 (plan-away-webrtc.md section 9 P3).
   const DIRECT_FRAME_MS = q.get('frame') === '20' ? 20 : 10;
   // Synth 1 is channel 1 (plans/plan-circuit-model12.md §3.1). The gate allows
   // program change on 1 and 2 only, patches 0 to 63.
   const CH = 1;
-  // Only the patch a synth is HOLDING can be read (a dump request answers for
-  // the current patch, never for a slot), so the cell shows the name the
-  // Circuit sends back, as it stores it, once a patch has been picked.
-  // The names the Circuit sent back for each slot, READ OFF THIS DESK'S CIRCUIT
-  // 2026-10-13 with `__demo.scanNames()` (slot 1 answered with no name). A label
-  // until the patch is picked; the name read back then replaces it, so a slot
-  // renamed on the Circuit shows its new name the first time it is played.
+  // Only the patch a synth is holding can be read, so the cell shows the name the Circuit sends back
+  // once picked. These are slot labels read off this desk's Circuit with `__demo.scanNames()`; a
+  // renamed slot shows its new name the first time it is played.
+  // See lessons/page-remote.md#remote-5
   const SCANNED = ['Aciiid', '', 'LFO disko', 'Meeelow', 'Not FM', 'Filth Sense', 'Filthres', 'Flamed', 'Good Lead',
     'Filtered Lead', 'Saw Striker', 'Alive', 'Aggie', 'Frosted Glass', 'Gaston', 'K-plunk', 'Smooth Pad', 'Twins',
     'Weird Pad', 'Vel FilterFun', 'Movt4', 'Frog Steps', 'Organ-to-ring', 'Ringy Patch', 'Wobber Blobber', 'Sick Lead',
@@ -106,14 +77,10 @@
     'SpooKey', 'Unstable Pad', 'Talk to Me', 'Eskimo', 'Betanmoan', 'Siney Tinez', 'Woo-z', 'SpaceRadio', 'Kick!',
     'Space Perc', 'Sawdet', 'Breathe', 'Fading Pulse', 'Alien X Talk'];
   const PATCHES = Array.from({ length: 64 }, (_, i) => SCANNED[i] || `Patch ${i + 1}`);
-  // 🔴 THE STARTING PATCH IS GASTON, BY NUMBER. Asked 2026-10-13: *"gaston as
-  // std patch"*. A name can only be read back for the patch Synth 1 is
-  // holding, so the page does not look it up at play time: the slot is written
-  // here and the name is its label, and on play Synth 1 is sent there.
-  // Slot 14 (0 based, "Patch 15" on the Circuit), READ 2026-10-13 by the
-  // session with `await __demo.scanNames()` against this desk's Circuit, which
-  // steps Synth 1 through program changes 0 to 63 (RAM only) and returns every
-  // slot's name. If the owner moves Gaston, scan again and change the number.
+  // The starting patch is Gaston, by number: slot 14 (0 based, "Patch 15" on the Circuit). Names
+  // are readable only for the patch held, so it is written here; if Gaston moves, rescan with
+  // `await __demo.scanNames()` and change the number.
+  // See lessons/page-remote.md#remote-6
   const START_PATCH = { at: 14, name: 'Gaston' };
   if (START_PATCH.at != null) PATCHES[START_PATCH.at] = START_PATCH.name;
 
@@ -129,16 +96,9 @@
   // `node:port`; the Circuit's is boardGraph's, so it is drawn here.
   addNodes(bay, S, ['keys', 'patch'], { portLabel: 'node:port' });
   bay.addNode({ id: `${BOARD_SITE}:${INPUT}`, kind: 'device', label: 'Circuit on the Pi', place: ROOM });
-  // ── the eight macro knobs, each a node of its own ──────────────────────
-  // Asked 2026-10-13: *"can https://positron.studio/concepts/remote/010/ ahve
-  // separate control knobs in patchbay to alter chricuit c1-c8 ? allow cc ?"*.
-  // The Circuit's macro knobs 1 to 8 are CC 80 to 87 on the synth's own
-  // channel, Synth 1 on 1 and Synth 2 on 2 (demo/shell/circuit-cc.mjs, rows
-  // `macro knob N position`; MEASURED off the Circuit's own knobs, a full 0 to
-  // 127 sweep each, research/measured-devices-2026-09-20.md "Circuit macro 7
-  // is CC 86"). This page plays Synth 1, so the knobs move Synth 1's macros.
-  // The board's gate already lets these through (rig/board/inputs.mjs
-  // `SYNTH_CC`, the `1/2` rows of the same table).
+  // The eight macro knobs, each a node: CC 80 to 87 on the synth's channel (Synth 1 on 1, measured
+  // off the Circuit; circuit-cc.mjs). The board's gate already lets these through (`SYNTH_CC`).
+  // See lessons/page-remote.md#remote-7
   const MACROS = CIRCUIT_CC.filter((r) => r.ch === '1/2' && r.sec === 'Macro Knob')
     .map((r, i) => ({ n: i + 1, cc: r.cc, name: `macro ${i + 1}`, pos: `MacroKnob${i + 1}_Position` }));
   if (MACROS.length !== 8 || MACROS.some((m, i) => m.cc !== 80 + i)) throw new Error('the macro knobs are CC 80 to 87 and the table says otherwise');
@@ -148,11 +108,9 @@
   let board = null, armed = false, lease = null;
   let sent = { note: 0, cc: 0, program: 0 }, refused = 0, lastRefusal = '', lastProgram = null;
   const midi = (bytes) => (armed && board ? board.send({ type: 'midi.send', bytes }) : false);
-  // ── control changes: three bytes, Bn cc vv, and nothing else ─────────────
-  // The board's gate decides what reaches the Circuit whatever a page sends;
-  // this page refuses on its own side too, so a bug here is a log line and
-  // never a byte on the wire. A CC is exactly three bytes, a status of 0xB0 on
-  // this page's channel, and two data bytes of 0 to 127.
+  // Control changes: the board's gate decides what reaches the Circuit, and this page refuses too:
+  // a CC is exactly three bytes, 0xB0 on this page's channel and two data bytes of 0 to 127.
+  // See lessons/page-remote.md#remote-8
   const isPlainCc = (b) => Array.isArray(b) && b.length === 3 && (b[0] & 0xF0) === 0xB0 && (b[0] & 0x0F) === CH - 1
     && Number.isInteger(b[1]) && b[1] >= 0 && b[1] <= 127 && Number.isInteger(b[2]) && b[2] >= 0 && b[2] <= 127;
   let ccRefusedHere = 0;
@@ -220,14 +178,9 @@
     if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
   }
 
-  // ── the scope: an analyser on the board's playout, full width ────────────
-  // The picture scales to the sound. It was a fixed 0.25 of full scale, set
-  // for Yoshimi's quiet output, and the Circuit's line out runs well past it,
-  // so the scope drew every note flattened at its edges while the sound was
-  // whole. The span widens at once to the loudest sample of the frame (held
-  // at 90% of the height) and narrows back slowly, about a 2 s fall, so a
-  // note does not pump the picture. Real clipping is a separate fact: a
-  // sample at full scale is counted and logged once per stretch.
+  // The scope scales to the sound: the span widens at once to the frame's loudest sample (at 90% of
+  // the height) and narrows over about 2 s. Clipping is separate: a full scale sample is logged once.
+  // See lessons/page-remote.md#remote-9
   const WINDOW = 512, SPAN_MIN = 0.02, SPAN_FALL = 0.992;
   let span = 0.25, clipped = 0, clipSaid = 0;
   const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
@@ -250,17 +203,10 @@
     requestAnimationFrame(frame);
   }
 
-  // ── the lags: what came back, against when the key went down ────────────
-  // The four cells /remote/piano/ carries, measured the same way,
-  // asked 2026-10-11: *"add readouts to all pi-driven synths. 4"*. Key to sound is measured
-  // per press: the first 1 ms block after the press that is over ONSET and
-  // three times what the 30 ms before it held, on the speaker's clock
-  // (`getOutputTimestamp`, so the browser's own output latency is inside it).
-  // The other cells are the parts this page can name: the network round trip
-  // to the Pi, the playout cushion, and the path; the browser's output latency
-  // is read off the context and shown in the hover. What is left
-  // over is the Pi's capture block and frame (JACK 512 x 3 at 48 kHz, 20 ms
-  // frames), which the page cannot see on its own.
+  // The lags. Key to sound per press: the first 1 ms block over ONSET and three times the 30 ms
+  // before it, on the speaker's clock. Also network, cushion and path; the Pi's capture (JACK 512 x 3
+  // at 48 kHz, 20 ms frames) is what is left over.
+  // See lessons/page-remote.md#remote-10
   const KEEP_MS = 200, ONSET = 0.02, WAIT_MS = 1500;
   const env = [];          // { at, peak } per 1 ms block, performance time
   const pending = [];      // presses still waiting for their sound
@@ -313,11 +259,9 @@
     cell('cushion', st?.bufferedMs == null ? '' : Math.round(st.bufferedMs));
     hint('key to sound', `key down to sound out of the speaker\nmedian of the last 20 presses\n${partsLine(med, st)}`);
   }
-  // What each cell measures, on hover: two or three short lines (positron-ui).
-  // `key to sound` adds up its parts from the other cells. The Pi's part is what
-  // is left over: one way out and back is about `network`, the cushion and the
-  // speaker are this browser's own, so the rest is the Pi hearing the note (MIDI
-  // to the Circuit, its sound, the card, JACK's period, a 10 ms frame).
+  // Each cell's hover: two or three short lines. `key to sound` adds up its parts; the Pi's part is
+  // what is left after `network`, the cushion and the speaker.
+  // See lessons/page-remote.md#remote-11
   function partsLine(med, st) {
     const c = board?.ctx();
     const out = c ? ((c.outputLatency || 0) + (c.baseLatency || 0)) * 1000 : null;
@@ -338,10 +282,9 @@
   }
   setInterval(() => { if (board) lagCells(); }, 250);
 
-  // ── the patch selector, its own node ─────────────────────────────────────
-  // It opens empty. On play, and after each patch change, the page asks the
-  // Circuit for the patch Synth 1 is holding (Current Patch Dump Request,
-  // plans/plan-circuit-patches.md §5) and shows its name.
+  // The patch selector, its own node. It opens empty; on play and after each change the page asks
+  // for the patch Synth 1 holds (Current Patch Dump Request) and shows its name.
+  // See lessons/page-remote.md#remote-12
   let patchAt = null, patchName = '', nameReads = 0, nameMisses = 0, lastDump = null;
   let nameBusy = false, nameAgain = false;
   // Every name the Circuit has sent, by slot, so a patch shows its name the
@@ -366,11 +309,9 @@
     try { p = readPatch(Uint8Array.from(r.bytes)); }
     catch (e) { nameMisses++; showName(''); d.log(`The Circuit's answer did not read as a patch, ${e.message}`, 'warn'); return; }
     if (p.command !== 0x00 || p.writesFlash || p.slot !== CH - 1) { nameMisses++; showName(''); d.log(`The answer was ${p.commandName} for ${p.slotName}, not Synth 1's patch`, 'warn'); return; }
-    // The Circuit can answer before the program change has landed, with the
-    // patch it held before. An answer byte for byte the last one, right after
-    // a change, is asked again, up to three times 60 ms apart. Two slots can
-    // hold the same patch (an initial patch copied about), so after that it is
-    // believed.
+    // The Circuit can answer with the previous patch before the change lands: an answer identical to
+    // the last one right after a change is asked again, up to three times 60 ms apart, then believed.
+    // See lessons/page-remote.md#remote-13
     if (asked !== lastDump?.at && same(p.bytes, lastDump?.bytes) && tries < 3) {
       stale++;
       await wait(60);
@@ -410,29 +351,10 @@
   patchPick.show(START_PATCH.at != null ? START_PATCH.name : '', START_PATCH.at ?? undefined);
   patchPick.disabled(true);
 
-  // ── the macro knobs ─────────────────────────────────────────────────────
-  // 🔴 A KNOB TURNS ON SCREEN WHEREVER ITS VALUE CAME FROM, AND ONLY A DRAG
-  // SENDS. Asked 2026-10-13: *"make all concept knobs \"invisible-handed\"
-  // start from remote 010"*. Three sources reach these knobs with
-  // `knob.receive()`, which glides the dial, marks it, and never calls
-  // `onInput`, so none of them is ever sent back to the Circuit:
-  //   device  a macro turned BY HAND on the Circuit on the desk. The Circuit
-  //           sends it as CC 80 to 87 on channel 1 (MEASURED,
-  //           research/measured-devices-2026-09-20.md), and the board reads its
-  //           MIDI out while this page holds the lease and tells the room
-  //           `midi.cc` (rig/board/midi-back.mjs), at most 30 a second a knob.
-  //   patch   the patch dump this page asks for after play and after every
-  //           patch change carries each macro's Position (circuit-patch.mjs
-  //           `MacroKnobN_Position`, addresses 204 + 17 per knob).
-  //   midi    a controller plugged into this machine sending CC 80 to 87; its
-  //           own wire sends it to the Circuit, once.
-  // ⚠️ Whether the dump's Position follows a macro turned on the Circuit by
-  // hand, or only the stored patch, has not been measured.
-  // ⚠️ Whether the Pi's raw MIDI input carries those hand turns as the Mac's
-  // USB did is not measured either; `__demo.probe().fromCircuit` counts them.
-  // And every knob has the kit's invisible hand (`hand: true`, the button on
-  // the ring, as every other concept knob has), which turns it from HERE and
-  // sends, through the same 30 a second queue a drag uses.
+  // A knob turns on screen wherever its value came from and only a drag (or its invisible hand)
+  // sends. `knob.receive()` takes a hand turn on the Circuit (CC 80 to 87 via midi-back.mjs), a
+  // patch dump's macro Positions and a local controller, and never sends them back.
+  // See lessons/page-remote.md#remote-14
   let knobsRead = 0;
   const knobs = new Map(MACROS.map((m) => [m.name, createKnob({
     label: `M${m.n}`, title: `macro ${m.n}, CC ${m.cc} on channel ${CH}`, min: 0, max: 127, step: 1, value: 64,
@@ -456,21 +378,10 @@
     onUp: (note, how) => { if (how === 'midi') return; bay.send(id('keys', 'midi-out'), { cls: 'note', ch: CH, d1: note, d2: 0 }); },
   });
 
-  // ── MIDI in: keyboards and controllers plugged into this machine ────────
-  // Asked 2026-10-13: *"add midi in to https://positron.studio/concepts/remote/010"*.
-  // The kit's createMidiDevices, as /code/plaits/ uses it: every input is a
-  // node, `web:midi`, `web:midi-2`, ..., with a midi wire into
-  // `pi-1:circuit:midi-in`, the path the on-screen keys take,
-  // so its notes land on Synth 1's channel like theirs.
-  // 🔴 ASKED FOR ON THE PLAY PRESS, NEVER ON LOAD, AND WITH `sysex: false`.
-  // 🔴 WHAT PASSES: note on, note off, and a control change whose number is
-  // one of the Circuit's synth controls (circuit-cc.mjs, the `1/2` rows, the
-  // same table the Pi's gate allows). Everything else a device sends is
-  // dropped here and counted: SysEx (which `sysex: false` never delivers
-  // anyway), program change, pitch bend, aftertouch, clock, and any CC the
-  // Circuit's synth does not take. A CC that is a macro (80 to 87) turns that
-  // macro's knob on screen (`receive`, which sends nothing), so it is sent
-  // once, by the device's wire.
+  // MIDI in: each input a `web:midi` node wired to `pi-1:circuit:midi-in`. Asked for on Play, never
+  // on load, with `sysex: false`. Only notes and the Circuit's synth CCs pass; everything else is
+  // dropped and counted. A macro CC turns its knob by `receive` and is sent once, by its wire.
+  // See lessons/page-remote.md#remote-15
   const SYNTH_CCS = new Set(CIRCUIT_CC.filter((r) => r.ch === '1/2').map((r) => r.cc));
   const devIn = { note: 0, cc: 0, dropped: 0 };
   const droppedSaid = new Set();
@@ -536,10 +447,9 @@
     if (!circuitIn.said.has(mac.n)) { circuitIn.said.add(mac.n); d.log(`Macro ${mac.n} was turned on the Circuit itself, and its knob here follows it`); }
   }
 
-  // Asked for the patch number of a name (see START_PATCH). Steps Synth 1
-  // through every patch, reading each name, and returns them. Program change
-  // only: it changes the patch Synth 1 holds in RAM and writes nothing. Run by
-  // a person from the console, never by a check.
+  // Steps Synth 1 through every patch by program change (RAM only, writes nothing) and returns the
+  // names, for START_PATCH. Run by a person from the console, never by a check.
+  // See lessons/page-remote.md#remote-16
   async function scanNames({ from = 0, to = 63 } = {}) {
     if (!armed) throw new Error('press play with ?board=1 first');
     const out = {};
@@ -674,11 +584,9 @@
   }
   const pathChoice = createChoice({ label: 'path', options: [['relay', 'relay'], ['direct', 'direct']],
     at: mode === 'direct' ? 1 : 0, onPick: (v) => setMode(v) });
-  // 🔴 THE LINKS SAY WHICH WIRE CARRIES THEM, as on 030: every link between
-  // this page and the Pi is made again with `via` when the path changes,
-  // `datachannel` while direct (or through TURN), `relay` otherwise. The
-  // camera's link follows the camera's own path (`cam path`), which can stay
-  // on the relay while the sound is direct.
+  // Every link to the Pi is remade with `via` when the path changes: `datachannel` while direct,
+  // `relay` otherwise. The camera's link follows its own `cam path`.
+  // See lessons/page-remote.md#remote-17
   const wiredVia = new Map();
   function rewire(path, which = (l) => l.from !== CAM_OUT) {
     const via = path === 'direct' || path === 'turn' ? 'datachannel' : 'relay';
@@ -701,21 +609,10 @@
     d.set('path', cp && cp !== (via === 'relay' ? 'relay' : 'direct') ? `${via}, camera ${cp}` : via);
   }, 500);
 
-  // ── the Pi's camera, for holders of the key only ────────────────────────
-  // Asked 2026-10-13: *"add pi camera to https://positron.studio/concepts/remote/010/.
-  // url secret parameter to enable (key in cf secrets)"*.
-  // 🔴 WITHOUT `?cam=` NOTHING BELOW EXISTS: no panel, no module loaded, no
-  // request, no cell. With it, nothing opens on a visit either; the press of
-  // play opens it, as it opens the Circuit.
-  // 🔴 THE KEY IS NEVER COMPARED HERE. The page hands it to the relay, which
-  // compares it with the Cloudflare secret PI_CAM_KEY (workers/relay/src/index.js
-  // `CAM_ROOM`): `POST /room/<room>-cam/key` answers 204 or 403, and only after
-  // a 204 is the keyed room opened, with the key as its first message (in the
-  // message and not the URL, so it is not in the relay's request log). The Pi
-  // joins the same room with its own copy and starts its camera only for a
-  // viewer there (rig/board/camera.mjs), so only a holder of the key can turn
-  // it on. It stops on this page's `cam.bye`, or 25 s after the last
-  // `cam.watching`, which this page sends every 10 s while it is visible.
+  // The Pi's camera: without `?cam=` nothing below exists, and with it Play opens it. The key is
+  // never compared here: the relay checks it against PI_CAM_KEY (`POST /room/<room>-cam/key`, 204 or
+  // 403), then gets it as the first message, not the URL. The Pi films only for a viewer there.
+  // See lessons/page-remote.md#remote-18
   const CAM_ROOM = `${ROOM}-cam`;
   const CAM_OUT = `${BOARD_SITE}:camera:video-out`, SCREEN_IN = id('screen', 'video-in');
   const cam = CAM_KEY ? await buildCamera() : null;
@@ -737,19 +634,10 @@
     const say = (state, why) => panel.presence?.set(state, why);
     let on = false, keyed = false, beat = null, shape = null, lastFrameAt = 0;
     const said = { refused: '', stopped: '' };
-    // The lag: the board stamps its clock once a second with the counter of the
-    // next frame it will send (`cam.tick`), and this page notes when that frame
-    // arrives. Pi to this screen through the relay, against two NTP set clocks,
-    // so it is worth what their agreement is worth; the camera's own exposure
-    // and encode time is not in it.
-    // ⚠️ THE TICK AND ITS FRAME CAN ARRIVE IN EITHER ORDER. On the relay they
-    // share one socket and the tick comes first; on the direct link a frame can
-    // beat a tick that went through the relay, so both sides are kept and the
-    // lag is taken when the second of the two arrives. Since 2026-10-13 the
-    // board also sends the tick on the `cam` channel.
-    // The board's clock is corrected by the offset `rtc.pong` measures on a
-    // direct link (board.mjs `clockOffsetMs`), once there has been one; before
-    // that the lag is against two NTP set clocks, as it always was.
+    // The camera lag: the board stamps its clock with the next frame's counter (`cam.tick`); tick and
+    // frame may arrive in either order, so the lag is taken on the second. Against two NTP clocks,
+    // corrected by `rtc.pong`'s offset once a direct link has measured one.
+    // See lessons/page-remote.md#remote-19
     const ticks = new Map(), arrived = new Map(), lags = [], raw = [];
     const lagOf = (wall, at) => {
       const off = board?.stats().clockOffsetMs;
@@ -829,22 +717,10 @@
       say('coming');
       d.log(`Asking the Pi for its camera in ${CAM_ROOM}`);
     }
-    // ── the camera on the direct link ─────────────────────────────────────
-    // 🔴 THE SAME TWO GATES AS THE RELAY, AND ONE MORE. The relay's key check
-    // first (`POST .../key` answered 204 and the keyed room said `cam.key.ok`),
-    // then the board's: `cam.direct` carries the key and this page's viewer
-    // name over `ctl` ONLY (board.askDirect, never the tokenless relay room),
-    // and the board attaches the `cam` channel only when the key is its own
-    // AND that viewer is one the relay let into the keyed room
-    // (rig/board/camera.mjs `attachDirect`). A direct link alone opens nothing.
-    // WHY A THIRD CHANNEL ON THE CIRCUIT'S LINK, NOT A LINK OF ITS OWN: the
-    // link is already open, so the camera costs no second ICE and DTLS
-    // handshake and falls back with the sound; and not on `ctl` or `pcm`,
-    // because a picture wants ORDERED and RELIABLE delivery (a decoder fed a
-    // frame with a hole is broken to the next keyframe), which `pcm` (no
-    // retransmits) and `ctl` (unordered) are not. The board cuts a frame into
-    // 16 KB pieces, so a keyframe cannot hold a note on `ctl` behind it for
-    // longer than one piece.
+    // The camera direct: the relay's key check first, then `cam.direct` with key and viewer over
+    // `ctl` only; the board attaches `cam` only for its own key and an admitted viewer. A third
+    // ordered, reliable channel on the Circuit's link: no second handshake, falls back with the sound.
+    // See lessons/page-remote.md#remote-20
     let dcam = null, camPath = 'relay', tries = 0, nextTry = 0, pieces = [], pieceSeq = -1, directFrames = 0;
     const camSaid = new Set();
     function onDirect(data) {

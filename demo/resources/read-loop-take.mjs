@@ -1,28 +1,7 @@
-// demo/resources/read-loop-take.mjs. Does a loop keep time.
-//
-//   node demo/resources/read-loop-take.mjs ~/Downloads/nola-take-*.json
-//
-// 🔴 WHAT THE QUESTION IS. Asked 2026-09-23: *"tap. loops do not sound right
-// (timings)"*. A loop is a list of movements and a lap, replayed with timers, and
-// there are exactly three ways that can sound wrong:
-//
-//   DRIFT      every lap starts a little later than the one before, so the phrase
-//              walks away from itself. The tell is that the error GROWS with the
-//              lap number rather than scattering around zero.
-//   JITTER     each lap starts on time but individual notes wander inside it. The
-//              tell is a spread that does not grow.
-//   THE WRONG LAP  the loop keeps perfect time at a length nobody played, usually
-//              because the take was closed at a different moment than it felt.
-//
-// ⚠️ AND THEY NEED DIFFERENT REPAIRS, WHICH IS WHY THE SCRIPT SEPARATES THEM
-// RATHER THAN PRINTING ONE NUMBER. Drift is a scheduling bug and is fixed in the
-// code. Jitter is the platform and has a floor. A wrong lap is a capture
-// question and no amount of scheduling will help it.
-//
-// ⚠️ IT READS `plays`, NOT `events`. `events` is what arrived on the WIRE, and a
-// looped note never touches the wire, so a recording of what arrived says nothing
-// about what came back. `plays` is what the page SOUNDED, with `how` saying
-// whether a finger or a lap did it.
+// Does a loop keep time: separates drift (error grows per lap), jitter, and a wrong lap.
+// Reads `plays` (what sounded), not `events` (the wire, which loops never touch).
+// Run: node demo/resources/read-loop-take.mjs ~/Downloads/nola-take-*.json
+// See lessons/page-resources.md#resources-21
 
 import { readFileSync } from 'node:fs';
 
@@ -62,10 +41,8 @@ for (const e of byLoop) {
   runs.get(key).push(e.t);
 }
 
-/* 🔴 THE LAP IS MEASURED FROM THE SOUND, NOT READ OFF THE TAKE, or this would be
-   grading the page against its own intention. Each note that came back more than
-   twice gives an interval per turn; the median across all of them is what the
-   loop actually ran at. */
+/* The lap is the median per-turn interval of notes heard more than twice, not the take's.
+   See lessons/page-resources.md#resources-22 */
 const gaps = [];
 for (const [, ts] of runs) for (let i = 1; i < ts.length; i++) gaps.push(ts[i] - ts[i - 1]);
 if (!gaps.length) {
@@ -105,9 +82,8 @@ console.log(`\nnote ${worst.key.split(':')[0]} came back ${worst.n} times. Error
   + `perfect grid, per turn:`);
 console.log(`  ${worst.errs.join(', ')} ms`);
 
-/* 🔴 THE TEST IS WHETHER THE ERROR GROWS, NOT WHETHER IT IS LARGE. A steady 6 ms
-   is inaudible and a 6 ms that becomes 60 over ten turns is the phrase walking
-   away. Compare the first half's mean against the last half's. */
+/* The test is whether error grows: first half's mean against the last half's.
+   See lessons/page-resources.md#resources-23 */
 const half = Math.floor(worst.errs.length / 2);
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
 const early = mean(worst.errs.slice(0, half)), late = mean(worst.errs.slice(half));

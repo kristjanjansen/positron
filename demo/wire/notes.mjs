@@ -1,35 +1,7 @@
-// demo/wire/notes.mjs: the NOTES tab of `/wire/`, which is the old
-// `/instrument/` moved into a module (plans/plan-demo-structure.md §3.3,
-// decided 2026-10-04). A keyboard over the relay, with the sound made in this
-// page or on another machine, and the two delays that says how late.
-//
-// 🔴 ITS OWN ROOM, NEVER BYTES'S. `/wire/`'s manifest row is `room: 'fixed'`
-// because BYTES's shared history is its subject, so the harness passes NO
-// `?room=` to this page. If this tab read `?room=` it would land every harness
-// run of NOTES in one room, and two runs at once would play into each other,
-// which is the shared-room defect `verify.mjs` exists to prevent. So:
-//   - `?notes=<room>` names it, for a person who wants two browsers to meet;
-//   - under `?selfcheck=` with no `?notes=`, it is `wire-notes-test-<6>`, one
-//     per run, in the harness's own `<demo>-test-<hash>` shape;
-//   - otherwise `instrument-demo`, the room `/instrument/` used, so a person
-//     with that page still open in another tab meets this one.
-//
-// 🔴 NOTHING IS JOINED UNTIL A PRESS IN THIS TAB. `build` draws the keys and
-// the strip and opens no socket and no audio; `Start audio and join` does both.
-// The check asserts it as a count.
-//
-// 🔴 AND THE OTHER MACHINE IS GRADED NOW, ONCE, WITH A SECOND PEER IN THIS TAB.
-// `/instrument/`'s `Hear the other machine` asserted nothing in any run: there
-// was never a second machine in a harness room, and the handler read
-// `ws.readyState`, which the `openWire` handle does not have, so it answered
-// `offline` to every press for as long as it existed. The check here starts a
-// stand-in peer under `?selfcheck=` only: its own socket in the same room, its
-// own AudioContext, an oscillator per note it is sent, and a WebRTC answer
-// carrying that sound back. It also plays one note INTO the room, so the other
-// delay, a note arriving from somebody else, has something to measure. It
-// stands in for `rig/m1/synth.html`, and it is honest about the difference:
-// that file listens for `note`, not the `on` this page sends, and defaults to
-// the room `proinst`, so the real one does not answer this page today.
+// The NOTES tab of /wire/: a keyboard over the relay, sound here or on another
+// machine. Room: `?notes=`, else `wire-notes-test-<6>` under selfcheck, else
+// `instrument-demo`. Joins only on a press; the check stands in a second peer.
+// See lessons/page-wire.md#wire-15
 
 import { createVoices } from '/proto/looper/synth.mjs';
 import { createKeyboard } from '/shell/keyboard.mjs';
@@ -44,10 +16,9 @@ import { howIn, gradeHow } from './how.mjs';
 // What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
 export const about = 'Play the keyboard and every note travels through the relay to anyone else in the room. Open this tab in a second browser to play into this one and see how late the notes land.';
 
-// ⚠️ THE KEYS WERE `midi`, `sound`, `sent`, `received`, `note in` and
-// `sound back` UNTIL 2026-10-05, when a review found none of them said what
-// they counted or timed. Each one now names its thing in a visitor's words.
-// `readCell` reads two of them by key text, so a rename here moves it there.
+// Each readout key names its thing in a visitor's words. `readCell` reads two of
+// them by key text, so a rename here moves it there.
+// See lessons/page-wire.md#wire-16
 export const readout = {
   'midi keyboard': '', 'sound from': '', 'notes out': '', 'notes in': '',
   'arrived after': 'ms', 'round trip': 'ms',
@@ -91,11 +62,9 @@ export function build({ panel, log, set, d }) {
   const on = (id, fn) => handlers.set(id, fn);
   panel.add(acts);
 
-  // ⚠️ THE KEYBOARD LISTENS FOR LETTERS ON `window`, and so it hears them while
-  // this tab is closed. A note nobody can see being played is a sound nobody
-  // chose, so a letter does nothing while the tab is hidden. A press of a drawn
-  // key cannot happen in a hidden panel; MIDI and the loop still play, because
-  // a device or a loop that was started is somebody's choice.
+  // Letters are heard on `window`, so a letter does nothing while the tab is hidden;
+  // MIDI and a started loop still play, since starting them was somebody's choice.
+  // See lessons/page-wire.md#wire-17
   let visible = true;
 
   const kb = createKeyboard(panel.el, {
@@ -131,8 +100,8 @@ export function build({ panel, log, set, d }) {
   let pc = null, remoteAudio = null;
   const ears = [];                  // key press -> sound arriving, one clock
   let earPending = null;
-  // ⚠️ NO `from` AND NO `sent` IN A PAYLOAD. `wire.mjs` stamps both and throws
-  // on a payload that carries either.
+  // No `from` and no `sent` in a payload: wire.mjs stamps both and throws on either.
+  // See lessons/page-wire.md#wire-18
   const send = (o) => {
     if (!ws || ws.state() !== 1) return null;
     const out = ws.send(o);
@@ -140,8 +109,9 @@ export function build({ panel, log, set, d }) {
   };
 
   /**
-   * THE POINT: what crosses the wire is {note, vel}, a note NUMBER, stamped by
-   * the sender. Raw MIDI bytes never leave the page that owns the device.
+   * What crosses the wire is {note, vel}, a note number stamped by the sender.
+   * Raw MIDI bytes never leave the page that owns the device.
+   * See lessons/page-wire.md#wire-19
    */
   function press(note, how = 'key') {
     kb.lightNote(note, true);
@@ -174,8 +144,8 @@ export function build({ panel, log, set, d }) {
   on('start', async () => {
     if (ctx) return;
     ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
-    // ⚠️ NOT AWAITED BEFORE THE WORK. `resume()` waits on a gesture and never
-    // rejects, so awaiting it first is a hang in a browser that is strict.
+    // Not awaited before the work: `resume()` waits on a gesture and never rejects.
+    // See lessons/page-wire.md#wire-20
     ctx.resume().catch(() => {});
     voices = createVoices(ctx, { dest: ctx.destination, gain: 0.14 });
     joins++;
@@ -218,13 +188,9 @@ export function build({ panel, log, set, d }) {
   });
 
   /**
-   * HEAR THE OTHER MACHINE. With nobody offering it says so in words rather
-   * than failing, because a page whose subject needs a second machine must
-   * still be true on one.
-   * 🔴 `ws.state()`, NOT `ws.readyState`. The `openWire` handle has no
-   * `readyState`, so `/instrument/` read `undefined !== 1` and answered
-   * `offline` to every press, which no run ever saw because nothing asserted
-   * after the press.
+   * Hear the other machine. With nobody offering it says so in words. Reads
+   * `ws.state()`: the openWire handle has no `readyState`.
+   * See lessons/page-wire.md#wire-21
    */
   on('remote', async () => {
     if (!ws || ws.state() !== 1) { set('sound from', 'offline', 'bad'); return; }
@@ -252,9 +218,9 @@ export function build({ panel, log, set, d }) {
   });
 
   /**
-   * How late the sound is, timed as a ROUND TRIP ON ONE CLOCK: pressed here,
-   * heard here. A one-way stamp across two machines carries their clock offset,
-   * MEASURED at about 57 ms between two Macs on network time.
+   * How late the sound is, as a round trip on one clock: pressed here, heard here.
+   * A one-way stamp across two machines carries their offset, about 57 ms.
+   * See lessons/page-wire.md#wire-22
    */
   let onsetsReady = null;
   async function listenForOnsets(stream) {
@@ -322,7 +288,8 @@ export function build({ panel, log, set, d }) {
     const a = view.strip.lanes().find((l) => l.id === 'here');
     const b = view.strip.lanes().find((l) => l.id === 'there');
     if (a) a.subLabel = ['pressed on this page,', 'sounded at once'];
-    // ⚠️ AN HONEST BLANK, NOT A ZERO, while nobody else is in the room.
+    // A blank, not a zero, while nobody else is in the room.
+    // See lessons/page-wire.md#wire-23
     if (b) b.subLabel = ['nothing yet', 'needs a second machine'];
   }
 
@@ -332,17 +299,14 @@ export function build({ panel, log, set, d }) {
   log(`room ${ROOM}: open /wire/?notes=${ROOM}#notes in another browser to play into this one`);
 
   // ── how it works, last in the tab, drawn on its first showing ─────────────
-  // Read off this file: `press` and `play` here, `openWire` to the relay, and
-  // `remote`'s offer and answer over the same room with the sound coming back
-  // as a WebRTC track (`startStandIn` speaks the other machine's half).
+  // Read off this file: `press` and `play`, `openWire` to the relay, and `remote`'s
+  // offer and answer with the sound back as a WebRTC track (`startStandIn`).
+  // See lessons/page-wire.md#wire-24
   const SPEC = {
     caption: 'Notes go through the relay as numbers, and sound from another machine comes back peer to peer.',
-    // ⚠️ THE ORDER IS LAYOUT, SEARCHED OVER ALL 72 ARRANGEMENTS RATHER THAN
-    // GUESSED. A return path runs under the row and climbs into its box from
-    // below, so it has to leave and land on the BOTTOM box of each machine or it
-    // is drawn behind the box above (`notes` ran behind audio into voices, and
-    // the WebRTC line behind the far keyboard). The far machine on the left
-    // leaves exactly two return paths, both bottom to bottom.
+    // Order is layout, searched over all 72 arrangements: return paths must land on
+    // each machine's bottom box. The far machine on the left leaves two, bottom to bottom.
+    // See lessons/page-wire.md#wire-25
     nodes: [
       { id: 'far', label: 'Browser', sub: 'second machine', tech: 'browser', join: false,
         children: [
@@ -528,13 +492,10 @@ function gathered(pc, ms = 3000) {
 }
 
 /**
- * 🔴 THE OTHER MACHINE, STANDING IN, AND ONLY UNDER A CHECK. Its own socket in
- * the same room, its own AudioContext, and the same three verbs
- * `rig/m1/synth.html` speaks (`here`, `offer` to `answer`), plus `on` and `off`,
- * which is what this page sends. A note it is sent becomes a short tone on the
- * track it answers with, which is what lets a press here be timed back as sound.
- * ⚠️ A TONE AND NOT SILENCE: an onset detector over silence never fires, and a
- * stand-in that cannot be heard would grade nothing.
+ * The other machine, stand-in, only under a check: own socket and AudioContext,
+ * speaks rig/m1/synth.html's `here`, `offer`, `answer` plus `on`/`off`. A note
+ * becomes a short tone, since an onset detector over silence never fires.
+ * See lessons/page-wire.md#wire-26
  */
 async function startStandIn(room, log) {
   const ac = new AudioContext();

@@ -1,62 +1,7 @@
-// demo/resources/fetch-salamander.mjs. The Salamander Grand Piano for the sampler.
-//
-//   node demo/resources/fetch-salamander.mjs           # fetch what is missing, encode what is missing
-//   node demo/resources/fetch-salamander.mjs --check   # print the state, touch nothing and nobody
-//   node demo/resources/fetch-salamander.mjs --encode  # re-encode every output from tmp/, fetch nothing
-//   node demo/resources/fetch-salamander.mjs --force   # re-encode even outputs that already exist
-//
-// Built from plans/plan-piano-samples.md (sections 1, 4, 5 and 7), which chose
-// this set after measuring why the FluidR3 piano sounds metallic and thin.
-//
-// IT FETCHES ABOUT 185 MB FROM SOMEBODY ELSE'S GITHUB EXACTLY ONCE, AND EVERY
-// LATER RUN ASKS THAT HOST FOR NOTHING. `CLAUDE.md`: *"super careful with
-// external sources, better avoid"*. The sources land in `tmp/salamander/src/`,
-// which is gitignored. A run that fetches says how many bytes it is about to
-// ask for BEFORE it asks (the sizes are in GitHub's tree listing, cached as
-// `tree.json` beside the sources), and waits a second between files.
-//
-// NO PAGE EVER FETCHES FROM THAT HOST. The outputs go to R2 by hand:
-//   tmp/salamander/web/  -> positron-station/sampler/salamander/web/  (the browser)
-//   tmp/salamander/pi/   -> positron-station/sampler/salamander/pi/   (the board)
-//
-// ── WHAT IT IS ──────────────────────────────────────────────────────────────
-//
-// Salamander Grand Piano V3 by Alexander Holm: a Yamaha C5, two AKG C414 about
-// 12 cm over the strings, 16 velocity layers, 30 notes a minor third apart from
-// A0 (21) to C8 (108), 48 kHz 24 bit stereo FLAC, plus 88 key-off release
-// samples. The 30 notes are exactly the 30 MIDI numbers the sampler already
-// uses, so the nearest-note rule does not change.
-//
-// FOUR OF THE SIXTEEN LAYERS, v1, v6, v11 AND v16, HARD SWITCHED. The plan's
-// section 4.1: Salamander's own SFZ does not crossfade either (`Data/notes.txt`,
-// 16 groups with lovel/hivel and no xfin), and four bands keep one voice per
-// note.
-//
-// ── THE LICENCE ─────────────────────────────────────────────────────────────
-//
-// CC BY 3.0 in the mirror's LICENSE and on archive.org; the author's own page
-// says public domain since 4.3.2022. Treated as CC BY 3.0 with credit to
-// Alexander Holm, which satisfies both readings (plan section 6.1).
-// `LICENSE-salamander` and `PROVENANCE-salamander.json` go in BOTH output
-// folders, so each upload carries its own attribution.
-//
-// ── THE ENCODE ──────────────────────────────────────────────────────────────
-//
-// Notes: trimmed to 2 ms before the onset (the first 1 ms window reaching 1 per
-// cent of the file's peak, measured on both channels), a 2 ms fade in, capped
-// at 8 s with a 1.5 s fade out. A note that ends by itself before the cap gets
-// an 8 ms fade at its real end instead, so the top notes keep their natural
-// decay. Releases are NOT trimmed: Salamander's SFZ plays them from sample 0
-// with no offset, and the key-off noise has no attack for a trim to find.
-//
-// Web: AAC in m4a, 96 kbps, 48 kHz, stereo, Apple's `aac_at` encoder (see
-// fetch-jrhodes3d.mjs for the measured +4.1 dB overshoot of ffmpeg's own).
-// Pi: FLAC 16 bit, 48 kHz, MONO, because the board's capture sums out_1 and
-// out_2 anyway (`rig/board/norns/possampler-defs.scd`).
-//
-// Names carry the MIDI number and the band, never a `#`: `p060-v11.m4a`,
-// `rel060.m4a`, `p060-v11.flac`, `rel060.flac`. Release `relN` in the source is
-// key 20 + N (`Data/hammer.txt`: `key=21 sample=rel1`).
+// Fetches Salamander Grand Piano V3 once (~185 MB) into tmp/salamander/ and encodes web m4a
+// and Pi mono FLAC (layers v1 v6 v11 v16, CC BY 3.0). Flags: --check, --encode, --force.
+// Outputs go to R2 by hand; no page fetches from GitHub. Plan: plans/plan-piano-samples.md.
+// See lessons/page-resources.md#resources-6
 
 import { mkdirSync, existsSync, readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';

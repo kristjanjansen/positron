@@ -23,11 +23,10 @@
   useMediumColours();
 
   /**
-   * kit/patchbay, 2026-10-10: what was `/concepts/21/`, asked as *"move 21 to
-   * kit, patchbay card"*. Every link the concept pages hold and the links the
-   * demos announce today, each drawn by `createBayView` from a bay-shaped
-   * object built from a list of links, with stand-in traffic shaped like the
+   * Every link the concept pages hold and the demos announce, each drawn by
+   * createBayView from a bay-shaped object, with stand-in traffic shaped like the
    * medium. Nothing here is a real bay and a visit opens nothing.
+   * See lessons/page-kit-patchbay.md#kit-patchbay-1
    */
   const { d, section, land, checkPage } = createKitPage({
     part: 'patchbay',
@@ -39,8 +38,8 @@
   const CHAT = [['web:chat:value-out', '*:chat:value-in'], ['*:chat:value-out', 'web:chat:value-in']];
   const ADMIN = [['web:admin:value-out', '*:notice:value-in'], ['*:admin:value-out', 'web:notice:value-in']];
   const KEYS = ['web:keys:midi-out', 'web:synth:midi-in'], SOUND = ['web:synth:audio-out', 'web:speaker:audio-in'];
-  // A concept page by its /<group>/<slug>/ address (2026-10-13, the numbered
-  // /concepts/<n>/ addresses are 404s); an archived one by its note.
+  // A concept page by its /<group>/<slug>/ address; an archived one by its note.
+  // See lessons/page-kit-patchbay.md#kit-patchbay-2
   const concept = (id) => `<a href="/${id}/">/${id}/</a>`;
   const note = (md) => `<a href="/archive/concepts/${md}">/archive/concepts/${md}</a>`;
   const demo = (slug) => `<a href="/${slug}/">/${slug}/</a>`;
@@ -66,8 +65,9 @@
         ['web:keys:midi-out', 'web:midi:midi-in'], ['web:rec:midi-out', 'web:midi:midi-in'], ['web:midi:value-out', 'web:shader:value-in'],
         ['web:shader:video-out', 'web:screen:video-in'], ['web:keys:midi-out', 'web:pico:midi-in'], ['web:rec:midi-out', 'web:pico:midi-in'],
         ['web:pico:video-out', 'web:oled:video-in']] },
-    // Real demos, with the ids they announce today. The Pi's and /patchbay/'s are
-    // <medium>-<dir> since 2026-10-10; the other pages' own ports are not yet.
+    // Real demos, with the ids they announce. The Pi's and /patchbay/'s are
+    // <medium>-<dir>; the other pages' own ports are not yet.
+    // See lessons/page-kit-patchbay.md#kit-patchbay-3
     { title: 'PATCHBAY DEMO', note: `${demo('patchbay')}: the desk example.`,
       links: [['web:keys:midi-out', 'pi-1:circuit:midi-in', 'channel 1'],
         ['pi-1:circuit:audio-out', 'web:screen:audio-in'], ['web:editor:program-out', 'pi-1:gpu:program-in'],
@@ -77,7 +77,7 @@
     { title: 'MIRROR DEMO', note: `${demo('mirror')}: the ids it announces today.`,
       links: [['web:webgl:video', 'web:left:video'], ['web:webgl:program', 'pi-1:gpu:program-in'],
         ['pi-1:gpu:video-out', 'web:screen:video']], labels: { 'web:screen': 'right pane' } },
-    // KNOBS DEMO left 2026-10-13 with Yoshimi (archive/yoshimi/README.md).
+    // See lessons/page-kit-patchbay.md#kit-patchbay-4
     { title: 'AWAY DEMO', note: `${demo('away')}: keys to the Circuit from another building.`, links: [['away:keys:out', 'pi-1:circuit:midi-in']] },
     { title: 'FAU DEMO', note: `${demo('fau')}: keys to a Faust engine in the page.`, links: [['web:keys:out', 'fau:fau:midi']] },
     { title: 'NOLA DEMO', note: `${demo('nola')}: keys to the nola engine.`, links: [['web:keys:out', 'nola:nola:midi']] },

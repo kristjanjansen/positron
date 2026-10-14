@@ -1,48 +1,7 @@
-// demo/csound/score.mjs: the SCORE tab of /csound/, the page as it was until
-// 2026-10-05, when *"merge click and und, no need for 'mobile screen' /
-// theme"* made `/click/` its second tab (`./click.mjs`).
-//
-// WHAT CHANGED ON THE WAY IN, AND WHY:
-//   1  The checks moved from load into the page's one SELFCHECK pass
-//      (`tab-page.mjs` rule 3). They are the same checks, word for word, and
-//      still all on data compiled in the page, plus the typing and the seek.
-//   2  🔴 THE READOUT IS DRAWN NOW, AND TWO CELLS LEFT SO IT COULD BE. The old
-//      page published six cells with `showReadout: false`, because `rows` and
-//      `uses` repeat what the part and event lanes already say in their
-//      gutters. A tab's report draws what it declares, so those two went and
-//      the four the strip does not say stayed.
-//   3  `hide()` pauses the deck, so leaving for CLICK stops the notes.
-//
-// A WRITTEN SCORE, MADE SEEKABLE: demo/notes/uuu-positron.md §3, on the
-// container 04 introduces. vClick conducts an ensemble from a Csound score,
-// and the format has two gaps that only appear when someone asks to start in
-// the middle:
-//
-//   1  The tempo map is the INTEGRAL of 60/tempo, because Csound interpolates
-//      tempo linearly in BEAT. The lane below draws bpm against time, and the
-//      check compares the integral against the mean-tempo shortcut, which
-//      looks fine and puts every later note early by a growing amount.
-//   2  `m`/`n` is a repeat, and a repeat is a REFERENCE. It compiles to a use
-//      in the document, not to four more lines of notes.
-//
-// THE DOCUMENT AND THE DECK ARE DIFFERENT THINGS, and this tab is where the
-// difference bites. plan-timeline C10: the timeline is a TRACE format, never
-// an AUTHORING one. A score is a program, the timeline is what a performance
-// of it leaves behind. So the document keeps the repeat as ONE use, and the
-// deck is built from the EXPANDED compile with every note at its real time.
-//
-// It has to be. Under a changing tempo "that passage again" is not the same
-// passage in time: the second pass here spans 4.75 beats of a ramp and comes
-// out 578 ms longer than the first. Playing it as a quotation at rate 1
-// replays the FIRST pass's millisecond spacing, shifted, which is what this
-// page did until it was measured against `compileCsound(expand: true)`, and
-// the last note landed 578 ms early. A single `rate` on the quotation cannot
-// fix that either: a scalar is a constant speed and the tempo is moving
-// inside the span, so it would match the ends and drift through the middle.
-//
-// And the seek is the claim nothing else here makes: a score file cannot
-// answer "what is in force at bar 9". It carries events, not state.
-// `deck.reduceAt(kind, pos)` answers it at any position.
+// The SCORE tab of /csound/: a typed Csound score compiled to a document, played from
+// a deck built off the EXPANDED compile, since a repeat under a tempo ramp is different
+// material in time (578 ms off at the end if quoted). `deck.reduceAt` answers a seek.
+// See lessons/page-csound.md#csound-23
 
 import { el } from '/shell/shell.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
@@ -78,9 +37,9 @@ const DEFAULT_SCORE = [
 export function build({ panel, d, assert, log, set }) {
   const host = panel.el;
 
-  // ── ink: the part is slate in the strip and in the document (since
-  // 2026-09-30, it was yellow), and yellow is kept for a note that has
-  // SOUNDED, with its dim twin for one that has not yet ─────────────────────
+  // Ink: the part is slate in strip and document; yellow is a note that has sounded,
+  // its dim twin one that has not yet.
+  // See lessons/page-csound.md#csound-24
   const INK = { on: '#ffd400', off: '#6b5a12' };
   const DERIVED = '#6f7d94';        // 02 and 03's slate: shown, never measured
 
@@ -110,20 +69,16 @@ export function build({ panel, d, assert, log, set }) {
   const warnEl = el('div', 'warn');
   host.append(warnEl);
 
-  /* 🔴 THE BAR'S PLAY IS THE SOUND'S GESTURE SINCE 2026-09-30. `command.play`
-     runs inside the click (or the space bar), so the AudioContext is made and
-     resumed in the gesture a browser asks for, and then the deck plays. The
-     resume is NOT awaited: a context resumed outside a gesture neither
-     resolves nor rejects, it waits, and awaiting it left the deck unbuilt
-     while the page looked fine. The sound may be late; the timeline is not.
-     ⚠️ THIS IS THE PAGE'S ONE PUBLISHED BAR. CLICK's is `publish: false`. */
+  /* `command.play` runs in the gesture, so the AudioContext is made there. The resume is
+     not awaited: outside a gesture it never settles and left the deck unbuilt.
+     This is the page's one published bar; CLICK's is `publish: false`.
+     See lessons/page-csound.md#csound-25 */
   let playOpened = false;
   const bar = createTransportBar(host, parent, { scrub: false,
     command: { play: () => {
       openAudio();
-      /* ⚠️ GRADED ON THE FIRST PRESS, INSIDE IT. Before 2026-09-30 a
-         `Play with sound` button did this and the harness pressed it; that
-         control is gone, so the claim is read where it now lives. */
+      /* Graded on the first press, inside it.
+         See lessons/page-csound.md#csound-26 */
       if (!playOpened) {
         playOpened = true;
         assert('the transport’s own play opens the sound inside its press, with no second button',
@@ -156,16 +111,13 @@ export function build({ panel, d, assert, log, set }) {
   const view = createStripView(host, parent, {
     size: 'auto', follow: false, gutter: 150,
     lanes: [
-      /* 🔴 SLATE, NOT YELLOW, SINCE 2026-09-30: *"make pat lane less yellow,
-         use same color as csound score in other demo"*, which is CLICK's
-         `words` lane, `#6f7d94`, already this tab's DERIVED. Yellow stays on
-         what is lit NOW: a sounded note and the current line. */
+      /* Slate (#6f7d94, this tab's DERIVED, CLICK's words lane). Yellow stays on what is
+         lit now: a sounded note and the current line.
+         See lessons/page-csound.md#csound-27 */
       { id: 'deck-span', kind: 'deck-span', label: 'part', height: 46, barPad: 7,
         as: 'spans', stack: false, barGap: 3, terse: true, color: DERIVED,
-        // Each use measured THROUGH THE TEMPO MAP, so a part that falls under
-        // the ramp draws wider than the one that does not, which is the whole
-        // point and used to be invisible, because both were drawn from the
-        // same un-stretched material.
+        // Each use measured through the tempo map, so a part under the ramp draws wider.
+        // See lessons/page-csound.md#csound-28
         rows: () => {
           if (!doc || !tm) return [];
           return doc.uses.map((u) => {
@@ -198,11 +150,9 @@ export function build({ panel, d, assert, log, set }) {
           return [`line ${line}, beat ${Math.round(p.beat * 100) / 100}`,
                   n ? `played ${n}x` : 'not played yet'];
         } },
-      // THE TEMPO, AND IT IS DERIVED. The map is a function; sampling it into
-      // rows to draw it is deriving a picture, not observing one. So it takes
-      // the slate 02 and 03 use for "shown, never measured" and the gutter says
-      // so. The lane is REMOVED, not flattened, when the tempo does not vary:
-      // a flat line is a constant dressed as a measurement.
+      // The tempo lane is derived (sampled from a function), so it is slate and the gutter says
+      // so. It is removed, not flattened, when the tempo does not vary.
+      // See lessons/page-csound.md#csound-29
       { id: 'tempo', kind: 'note', label: 'tempo', height: 46, as: 'continuous',
         color: DERIVED, terse: true, dots: false, show: false,
         value: (p) => p.bpm,
@@ -253,19 +203,10 @@ export function build({ panel, d, assert, log, set }) {
   }
 
   /**
-   * 🔴 A WARMER VOICE SINCE 2026-09-30, AND THE ONSET IS STILL A CLICK'S.
-   * Asked as *"make und nicer-sounding"*. It was one triangle, 8 ms up and gone
-   * by 280 ms, straight into the speakers. Now two sawtooths 7 cents either
-   * side of the note, through a lowpass that opens bright and closes over the
-   * note, a decay of about a second, and a short room made in the page.
-   * ⚠️ THE ATTACK STAYS 4 ms. This tab's claim is WHERE each note lands under
-   * a changing tempo, and a soft attack would smear exactly the instant being
-   * claimed, so everything warmer happens after the onset.
-   * ⚠️ THE ROOM IS NOISE WITH A DECAY WRITTEN INTO A BUFFER, NO FETCH. An
-   * impulse off a server would be a visit costing somebody a request.
-   * ⚠️ QUIET ON PURPOSE: 0.09 a voice into a bus at 0.7 and a compressor at
-   * -10 dB, because the repeat under the ramp overlaps notes and eight
-   * sawtooths summed at the old 0.2 would clip.
+   * Two sawtooths 7 cents apart through a closing lowpass, about 1 s decay, and a room from
+   * a noise buffer (no fetch). The attack stays 4 ms because the onset is the claim.
+   * Quiet: 0.09 a voice into a 0.7 bus and a -10 dB compressor, so overlaps do not clip.
+   * See lessons/page-csound.md#csound-30
    */
   let bus = null;
   function openAudio() {
@@ -317,9 +258,8 @@ export function build({ panel, d, assert, log, set }) {
     }
     sounded++;
     set('sounded', sounded, 'ok');
-    // Asserted WHEN THE EVIDENCE ARRIVES, not at load: at load nothing has
-    // sounded and the claim would be false, and waiting for it with a tolerant
-    // "sounded > 0 || not started" is how 03 spent its life not looping.
+    // Asserted when the evidence arrives, not at load, when nothing has sounded yet.
+    // See lessons/page-csound.md#csound-31
     if (!soundAsserted) {
       soundAsserted = true;
       assert('notes actually sounded', sounded > 0, `${sounded} voices`);
@@ -348,13 +288,10 @@ export function build({ panel, d, assert, log, set }) {
   parent.sched.registerAdapter('note', noteAdapter);
 
   /**
-   * CSOUND'S m/n INTO THE CONTAINER'S `uses`.
-   *
-   * A repeat spans mark to here and LANDS here, so the written material and the
-   * replay never overlap in parent time, which matters, because rule 7g says
-   * one deck has one position and two uses of it may not be present at the same
-   * instant. So the score is partitioned: everything up to the repeat, then the
-   * quoted span again, then whatever follows, each placed end to end.
+   * Csound's m/n into the container's `uses`. A repeat lands where it is written, so the
+   * score is placed end to end (before, the quoted span, after) and no two uses of one
+   * deck overlap in parent time (rule 7g).
+   * See lessons/page-csound.md#csound-32
    */
   function usesFor(cp, lastBeat) {
     const uses = [];
@@ -383,9 +320,9 @@ export function build({ panel, d, assert, log, set }) {
   }
 
   /**
-   * The textarea is editable, so a compile failure is a normal thing for a
-   * human to cause and not a page fault. Keep the last good document, say what
-   * was wrong, and let them fix the line.
+   * A compile failure is a normal human error here, not a page fault: keep the last good
+   * document, say what was wrong, and let them fix the line.
+   * See lessons/page-csound.md#csound-33
    */
   function compile() {
     let cp, exp, str;
@@ -421,7 +358,8 @@ export function build({ panel, d, assert, log, set }) {
     lineEls = LINES.map((text, i) => {
       const rec = JSON.parse(text);
       const row = el('span', 'sc-l');
-      // the part's hue, the same as its lane in the strip (slate since 2026-09-30)
+      // the part's hue, the same as its lane in the strip
+      // See lessons/page-csound.md#csound-34
       if (rec.t === 'row' || rec.t === 'part' || rec.t === 'use') row.style.borderLeftColor = DERIVED;
       if (rec.t === 'row') lineOfRow.set(rec.id, i);
       else if (rec.t === 'use' && rec.id) lineOfUse.set(rec.id, i);
@@ -431,15 +369,9 @@ export function build({ panel, d, assert, log, set }) {
       return row;
     });
 
-    // ── THE TRACE. Every note the expanded compile produces, at the time the
-    // tempo map puts it. A repeat under a ramp is genuinely different material
-    // in time, which is why Csound expands it and why quoting the first pass at
-    // rate 1 was wrong by 578 ms at the end.
-    //
-    // The join back to the document is the SOURCE LINE: an expanded note keeps
-    // the line it was written on, so the second pass lights the same seven
-    // lines the first one did. Expanding for playback is what preserves the
-    // one-line repeat, not what breaks it.
+    // The trace: every note of the expanded compile at its tempo-map time. An expanded note
+    // keeps its source line, so the second pass lights the same lines the first one did.
+    // See lessons/page-csound.md#csound-35
     const rowIdByLine = new Map(cp.part.rows.map((r) => [r.line, r.id]));
     const useSpans = doc.uses.map((u) => ({
       id: u.id, from: Number(u.at), to: Number(u.at) + (Number(u.out) - Number(u.in)),
@@ -460,10 +392,9 @@ export function build({ panel, d, assert, log, set }) {
     const endBeat = Math.max(...doc.uses.map((u) => Number(u.at) + (Number(u.out) - Number(u.in))));
     parent.setRange([0, Math.ceil(tm.msAt(endBeat) + 300)]);
 
-    // THE BEND, against the shortcut. Seconds-per-beat is linear in beat, so
-    // the true curve is the trapezoid of 60/tempo; averaging the tempo gives a
-    // straight line. The difference is the error a mean-tempo compiler ships:
-    // every note lands, slightly early, and nothing in the output shows it.
+    // The bend against the shortcut: the true curve is the trapezoid of 60/tempo; averaging
+    // the tempo gives a straight line and every note lands slightly early.
+    // See lessons/page-csound.md#csound-36
     const pts = doc.tempo;
     const meanBpm = pts.reduce((a, p) => a + p[1], 0) / pts.length;
     bendMs = tm.msAt(lastBeat) - (60000 * lastBeat) / meanBpm;
@@ -495,15 +426,10 @@ export function build({ panel, d, assert, log, set }) {
     return true;
   }
 
-  // ── compiling what was typed, once the typing stops ─────────────────────
-  // 🔴 THE KIT'S IDLE COMPILE SINCE 2026-09-30, the same module `/fau/` uses
-  // (*"unify compilation in ui logic on this and fau"*). It waits `IDLE_MS`
-  // after the last keystroke, never runs two at once, and breathes
-  // `Compiling` in the box's bottom right corner, then leaves `Did not
-  // compile` standing if the score is refused. The full reason is still this
-  // tab's to print, in the warning line under the box.
-  // ⚠️ NO `notNow`. A compile here pauses the deck and rebuilds it, which is
-  // what it always did; there is no held note to take away.
+  // The kit's idle compile (shared with /fau/): waits IDLE_MS after the last keystroke,
+  // never runs two at once; the full refusal reason prints in the line under the box.
+  // No `notNow`: a compile pauses and rebuilds the deck, with no held note to take away.
+  // See lessons/page-csound.md#csound-37
   const idle = createCompileIdle({
     input: ta,
     host: editor,
@@ -523,17 +449,10 @@ export function build({ panel, d, assert, log, set }) {
   }, 200);
 
   /**
-   * 🔴 HOW IT WORKS, LAST IN THE TAB, ADDED 2026-10-05 on *"add how it works
-   * diagrams to all tenchilogies"*. Read off this file: nothing here talks to
-   * any server, so the picture has ONE machine, the Browser.
-   * ⚠️ NO `speakers` BOX. It was drawn and MEASURED at 1280 px: the drawer gives
-   * every top-level box the container's height, so a speaker beside a Browser
-   * of four boxes was a 300 px empty slab. The output is in the AudioContext's
-   * note instead. Drawn on the first showing, the way `/sync/`'s
-   * AFTER tab does it, because a diagram laid out in a closed panel is laid out
-   * for a width nobody has, and because by then the tab's report is already in
-   * place above it. CLICK carries its own picture: it makes no sound and its
-   * score is carried in the page, so the two tabs do not share one.
+   * How it works, last in the tab: one machine, the Browser. No speakers box, since the
+   * drawer gives every top-level box the same height (a 300 px empty slab at 1280 px).
+   * Drawn on first showing, so it is laid out at a real width.
+   * See lessons/page-csound.md#csound-38
    */
   const DIAGRAM = {
     caption: 'Everything happens in the page: the score is compiled, scheduled and played without a request to any server.',
@@ -586,13 +505,10 @@ export function build({ panel, d, assert, log, set }) {
       A('no warnings from a score this simple', compiled.warnings.length === 0,
         compiled.warnings.join(' | ') || 'none');
 
-      // THE INTEGRAL, and the number this project paid for. Tempo 120 -> 72
-      // over 16 beats is the TRAPEZOID of seconds-per-beat (Csound
-      // interpolates 60/tempo linearly in beat, verified against csound 6.18);
-      // the mean-tempo shortcut is a straight line through the same endpoints.
-      // Until 2026-09-09 this said "closed form" and meant a logarithmic
-      // integral of a linearly-interpolated TEMPO, which was a third, also
-      // wrong answer. See timeline/lab/csound-oracle.mjs.
+      // Tempo 120 -> 72 over 16 beats is the trapezoid of seconds-per-beat (Csound interpolates
+      // 60/tempo linearly in beat, checked against csound 6.18), not the mean-tempo line.
+      // See timeline/lab/csound-oracle.mjs.
+      // See lessons/page-csound.md#csound-39
       const bend = Math.round(bendMs);
       A('the tempo map bends away from the mean-tempo line', Math.abs(bend) > 20,
         `${bend} ms by the end`);
@@ -603,11 +519,9 @@ export function build({ panel, d, assert, log, set }) {
           && part.rows.length === structural.items.length,
         `${structural.repeats.length} repeat, ${doc.uses.length} uses, ${part.rows.length} rows written`);
 
-      // THE GUARD FOR THE BUG THIS PAGE SHIPPED WITH. Every note has to be
-      // scheduled where the tempo map puts it, not where the same material
-      // landed on its first pass. Quoting the first pass at rate 1 satisfies
-      // "the repeat is one use" and every structural check, and still plays the
-      // second pass 578 ms early.
+      // Every note must sit where the tempo map puts it. Quoting the first pass at rate 1
+      // passes every structural check and still plays the second pass 578 ms early.
+      // See lessons/page-csound.md#csound-40
       {
         let worst = 0;
         for (const t of traceItems) worst = Math.max(worst, Math.abs(t.at - tm.msAt(t.payload.beat)));
@@ -648,14 +562,9 @@ export function build({ panel, d, assert, log, set }) {
           `${probes} probes, ${wrong} wrong`);
       }
 
-      // ── the idle compile, graded by typing into the real box ────────────
-      // 🔴 BEFORE `ready` AND AWAITED, AND THAT IS NOT CAUTION. A compile
-      // pauses the deck, and `demo/verify.mjs` presses the transport's play
-      // after the page says it is ready and asserts the position moved. A
-      // compile landing inside that drill would stop it and take the drill red
-      // on a page doing what it should.
-      // ⚠️ TWO EDITS CLOSER THAN `IDLE_MS`, then ONE compile, and the rows it
-      // produced are the SECOND edit's: the count is what says the last text won.
+      // Before `ready` and awaited: a compile pauses the deck and would break verify.mjs's play
+      // drill. Two edits closer than IDLE_MS give one compile, with the second edit's rows.
+      // See lessons/page-csound.md#csound-41
       {
         const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const typeInto = (text) => { ta.value = text; ta.dispatchEvent(new Event('input', { bubbles: true })); };
@@ -680,9 +589,9 @@ export function build({ panel, d, assert, log, set }) {
         // Put the score back the way a visitor finds it, without the note.
         code.set(DEFAULT_SCORE);
         compile();
-        // 🔴 THE CODE BOX'S ONE INVARIANT, READ OFF THE RENDERED ELEMENTS: the
-        // coloured layer holds exactly the textarea's text at its metrics, after
-        // two typed edits and a set(). A statement letter on every note line.
+        // The code box's invariant: the coloured layer holds exactly the textarea's text at its
+        // metrics, after two typed edits and a set(). A statement letter on every note line.
+        // See lessons/page-csound.md#csound-42
         const cs = (e) => getComputedStyle(e);
         const PROPS = ['font-size', 'line-height', 'padding-top', 'padding-left', 'white-space'];
         const differ = PROPS.filter((p) => cs(code.ink).getPropertyValue(p) !== cs(ta).getPropertyValue(p));
@@ -693,10 +602,9 @@ export function build({ panel, d, assert, log, set }) {
           + `${letters} statement letters`);
       }
 
-      // A seek that lands inside the repeat: the position the score cannot
-      // describe. 🔴 AND IT DOES NOT PUT THE PLAYHEAD BACK, which is why it
-      // lives here, under SELFCHECK: the harness plays from here and
-      // `notes actually sounded` needs a note in that half second.
+      // A seek inside the repeat, the position a score cannot describe. It leaves the playhead
+      // there, so the harness's `notes actually sounded` needs a note in the next half second.
+      // See lessons/page-csound.md#csound-43
       {
         const rep = structural.repeats[0];
         const use = rep && [...doc.uses]
@@ -704,9 +612,8 @@ export function build({ panel, d, assert, log, set }) {
                       && Math.abs(Number(u.out) - rep.outBeat) < 1e-9)
           .sort((a, b) => Number(b.at) - Number(a.at))[0];
         let mid = use ? tm.msAt(Number(use.at) + (Number(use.out) - Number(use.in)) / 2) : null;
-        /* 🔴 JUST AHEAD OF A NOTE INSIDE THE REPEAT, NOT ON THE BARE MIDPOINT,
-           SINCE 2026-09-30. 120 ms before the next note, and only where that
-           note is still inside the repeat, so the claim below is unchanged. */
+        /* 120 ms before the next note, only where that note is still inside the repeat.
+           See lessons/page-csound.md#csound-44 */
         const end = use ? tm.msAt(Number(use.at) + (Number(use.out) - Number(use.in))) : null;
         const next = mid !== null && traceItems.find((x) => x.at > mid && x.at < end);
         if (next) mid = Math.max(mid, next.at - 120);

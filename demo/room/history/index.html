@@ -8,21 +8,13 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* concepts room/004, ROOM/003 WITH ONE BROADCAST ON SHOW, 2026-10-11. Asked:
-     *"copy 003 to 004. broadcast message is a horiz vertycally centered and
-     balance wrapped and supports text wrapping in the left area (not chat
-     log)"*. The left area shows the latest broadcast alone, as a sign; the
-     chat on the right is unchanged.
+  /* /room/broadcast/ with the room's history: the left area shows the latest broadcast
+     alone, as a sign; the chat is on the right. room/030's chat, notice, admin and store
+     links, without its camera.
+     See lessons/page-room.md#room-9 */
 
-     Was room/003, THE CHAT WINDOW WITH A BROADCAST COLUMN, 2026-10-11.
-     Asked: *"do room 003. move members chat the 1/3 col right. in left area
-     have admin chat for broadcast messages. first in the room becomes admin.
-     next ones only see broadcast messages, no composer in left"*, then *"use
-     030 room wiring"*: room/030's chat, notice, admin and store links, without
-     its camera. */
-
-  /* The chat's pieces are the kit's, demo/shell/chat-ui.mjs (asked 2026-10-11,
-     *"(make it reusable) as all chat ui elements"*). Only the footer row is the page's. */
+  /* The chat's pieces are the kit's, demo/shell/chat-ui.mjs. Only the footer row is the page's.
+     See lessons/page-room.md#room-10 */
   .rc-foot { display: flex; gap: var(--ctl-gap, 8px); }
 </style>
 <script type="module">
@@ -52,12 +44,10 @@
   const AOUT = `${SITE}:admin:value-out`, NOTICE = `${SITE}:notice:value-in`;
   const KEEP = 'cf-store:history:value-in', KEPT = 'cf-store:history:value-out';
 
-  // FIRST IN THE ROOM IS ADMIN. A tab stamps its graph with `since`, the
-  // moment it joined, and every tab reads the same registry, so every tab
-  // picks the same one: the live site with the earliest `since`, ties by id.
-  // When that tab leaves (its graph goes stale), the next earliest takes over.
-  // ⚠️ NOTHING PROVES IT, as on room/030: a clock that runs early wins, and the
-  // bay checks that ports fit, not who holds them.
+  // First in the room is admin: every tab picks the live site with the earliest `since`,
+  // ties by id, and the next earliest takes over when it leaves. Nothing proves it: an
+  // early clock wins, and the bay checks that ports fit, not who holds them.
+  // See lessons/page-room.md#room-11
   let since = 0, admin = false, adminSite = '';
   const selfGraph = () => ({
     v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser', ...(since ? { since } : {}),
@@ -83,13 +73,9 @@
     ],
   };
 
-  // ── the links, room/030's without the camera ─────────────────────────────
-  //   chat     <me>:chat:value-out -> *:chat:value-in        (speaker)
-  //            *:chat:value-out -> <me>:chat:value-in        (listener)
-  //   admin    <me>:admin:value-out -> *:notice:value-in     (admin only)
-  //            *:admin:value-out -> <me>:notice:value-in     (every tab)
-  //   store    chat and admin lines -> cf-store:history:value-in, and
-  //            cf-store:history:value-out -> chat and notice (the replay)
+  // The links, room/030's without the camera: chat speaker and listener, admin to every
+  // notice, and chat and admin lines into cf-store:history, whose value-out replays them.
+  // See lessons/page-room.md#room-12
   const isNotice = (src) => /:admin:value-out$/.test(String(src));
   function bay() {
     const b = node.registry.fill(createBay());
@@ -148,8 +134,8 @@
   const clock = (at = Date.now()) => new Date(at).toTimeString().slice(0, 5);
   const short = (site) => (site === SITE ? 'you' : site === 'cf-store' ? 'CF Store' : site);
 
-  // The broadcast area is one broadcast on show, a sign (asked 2026-10-11,
-  // *"copy broadcast message rendering to 003"*); the chat is a log.
+  // The broadcast area shows one broadcast, as a sign; the chat is a log.
+  // See lessons/page-room.md#room-13
   const casts = createChatSign();
   const chats = createChatLog();
 
@@ -171,11 +157,9 @@
     if (!replay) casts.add({ who: mine ? 'you as admin' : short(by.split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || ''), me: mine });
   }
 
-  // THE HISTORY IS READ ON LOAD (asked 2026-10-11, *"load history on load.
-  // when not joined, history can be played back (add trasport button
-  // play/pause)"*). One GET of what positron-store kept, our own worker; the
-  // recorder is only woken (the POST) on a press of Join. Before Join the
-  // timeline plays the history back; Join shows all of it and goes live.
+  // The history is read on load: one GET of what positron-store kept (our own worker); the
+  // recorder is woken (POST) only by Join. Before Join the timeline plays the history back.
+  // See lessons/page-room.md#room-14
   async function loadPast() {
     try {
       const h = await fetch(`${STORE_URL}/room/${ROOM}/history?last=50`);
@@ -231,8 +215,8 @@
   const chatCol = createChatColumn({ title: 'CHAT', body: chats, compose: chatBox });
 
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
-  // Clear, as on room/030 (asked 2026-10-11, *"003 add clear button to footer"*, kept on 004):
-  // the store forgets the room, and every tab in it empties both columns.
+  // Clear: the store forgets the room, and every tab in it empties both columns.
+  // See lessons/page-room.md#room-15
   function wipe() { replay = false; casts.clear(); chats.clear(); lines.length = 0; deck.sched.clear(); }
   async function clearAll() {
     try {
@@ -254,27 +238,18 @@
     detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : n.id.startsWith('cf-store') ? 'Cloudflare' : n.label, sans: true }],
   });
 
-  // ── the timeline: a broadcast lane and a chat lane ───────────────────────
-  // Asked 2026-10-11, *"add timeline with broacast and chat lanes, properly
-  // coloured"*. The kit's transport bar and strip glued, as on synth/020. Every
-  // line is a tick at the moment it was said, a store replay at its own time.
-  // Before Join the bar plays the history back: each line is an item on the
-  // deck, the broadcast area shows the latest broadcast before the playhead
-  // and the chat the lines before it, on play and on every seek. On Join the
-  // page shows all of it and the clock runs in real time from the earliest
-  // line; play after Join replays the room the same way (see `replay`).
-  // Broadcast is the admin's violet, chat the yellow of `you`.
+  // The timeline: broadcast and chat lanes (admin violet, `you` yellow), transport bar and
+  // strip glued. Before Join the bar plays the history back into both areas on play and
+  // seek; after Join the clock runs from the earliest line (see `replay`).
+  // See lessons/page-room.md#room-16
   const CAST_INK = '#c39af0', CHAT_INK = '#ffd400', AIR_MS = 60000;
   const lines = [];             // { lane, sent, text, who }
   let origin = 0;
   let live = false;
-  // PLAYBACK AFTER JOIN (asked 2026-10-12, *"004room. on playback clear the
-  // contents in chat ui and add them back as playback happens"*). Play while
-  // live is a replay: both columns empty to the playhead and refill as it
-  // passes each line, and a seek rebuilds them to the new position. Lines that
-  // arrive meanwhile are kept and land on the timeline, not in the columns.
-  // Playing to the end, or saying something yourself, goes back to live.
-  // Before Join the columns follow the playhead anyway.
+  // Play after Join is a replay: both columns empty to the playhead and refill as it
+  // passes, a seek rebuilds them, and new lines go to the timeline only. Reaching the end,
+  // or saying something, goes back to live.
+  // See lessons/page-room.md#room-17
   let replay = false;
   const follows = () => !live || replay;
   let seq = 0;
@@ -312,12 +287,9 @@
     if (!origin) origin = Date.now();
     settle();
   }
-  // While live the strip is typist/030's: it does not run on the clock. Each
-  // line refits it to the whole take, from the first line to the last plus
-  // TAIL_MS, and the playhead parks at the end, so nothing scrolls and nothing
-  // moves until somebody writes (asked: *"timelines are very nervous when
-  // recording. the moving cursor adds stress"*, then *"typist already
-  // compresses timeline and no autocroll. 030. so do same for chat rec"*).
+  // While live the strip does not run on the clock, as on /typist/: each line refits it to
+  // the whole take plus TAIL_MS and the playhead parks at the end, so nothing scrolls.
+  // See lessons/page-room.md#room-18
   const TAIL_MS = 2000;
   function settle() {
     const end = lines.length ? Math.max(...lines.map((r) => r.sent)) - origin : 0;

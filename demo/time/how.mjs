@@ -1,24 +1,7 @@
-// demo/time/how.mjs: the "How it works" picture at the foot of each /time/ tab.
-//
-// Asked 2026-10-05: *"add how it works diagrams to all tenchilogies"*. The five
-// tabs are five different mechanisms built on one deck, so each tab draws its
-// own picture in its own panel, read off that tab's code.
-//
-// 🔴 DRAWN ON THE TAB'S FIRST SHOWING, NEVER AT BUILD. `createDiagram` measures
-// its own words when it is made, and a picture made inside a closed panel is
-// laid out for 320 px inside a panel twice that wide (`/kit/` paid for this
-// with seven pictures at once). `tab-page.mjs` builds a tab into an open
-// panel, but a tab's `show()` is also the moment its report has been added
-// under its blocks, so drawing there puts the picture LAST in the tab, under
-// the log, which is where `positron-diagram` says reference goes.
-// ⚠️ `how: true` AND NOT `atEnd`. `atEnd` appends to `document.body`, which on
-// a tabbed page is under every tab at once.
-//
-// ✅ THE CHECK IS ONE FUNCTION FOR ALL FIVE, so the five tabs grade their
-// pictures the same four ways: drawn into this tab and last in it, laid out at
-// the width it is shown at with measured type, nothing cut, and every box
-// naming something the tab really runs (`facts`, each a live reading of the
-// tab's own objects rather than a sentence about them).
+// The "How it works" picture at the foot of each /time/ tab, read off its code.
+// Drawn on the tab's first showing (a closed panel lays out for 320 px), with
+// `how: true`, not `atEnd`, which would put it under every tab at once.
+// See lessons/page-time.md#time-3
 
 import { el } from '/shell/shell.mjs';
 import { createDiagram } from '/shell/diagram.mjs';

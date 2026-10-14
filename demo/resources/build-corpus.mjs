@@ -1,88 +1,7 @@
-// demo/resources/build-corpus.mjs — the corpus `/resources/` reads.
-//
-//   node demo/resources/build-corpus.mjs           # ask every source, write corpus.json
-//   node demo/resources/build-corpus.mjs --offline # rebuild from the cache, ask nothing
-//   node demo/resources/build-corpus.mjs --only zenodo,commons
-//
-// Steps, for `--only`: zenodo · fng · commons · musicbrainz · wikidata ·
-// archive · europeana · digi · vandal · lahteilla · crossref · discogs ·
-// openalex · byname.
-//
-// NODE ONLY. Never shipped to a browser, never imported by the page.
-//
-// 🔴 THE WORD `kurenniemi` IN THIS FILE IS A SUBJECT, A HOST PATH AND A FILTER,
-// AND A RENAME ONCE TURNED TWELVE OF THEM INTO `resources`. MEASURED on
-// e5a8ad9, which renamed the DEMO from `kurenniemi` to `resources` and matched
-// bare words: three filters became `/resources/i.test(…)`, which no archive
-// record on earth satisfies, and two live hosts became `lahteilla.fi/resources/`
-// and `vandal.ist/kurenniemi/`, which do not exist. The corpus in git was built
-// before the rename and looked perfect, so the damage was invisible until
-// something re-ran the build: 285 rows instead of 334, with Zenodo keeping 0 of
-// 28 and archive.org 0 of 15. LAYOUT.md's rule is the one that was broken here,
-// a second time: match a class name or a path, never a bare identifier, and
-// syntax-checking proves nothing about a string.
-//
-// 🔴 REFS, NOT CONTENT. Every row is a POINTER — a title, a date, who holds it,
-// its identifier there, one URL, a licence and who asserts it. Nothing is
-// mirrored: no audio, no images, no PDFs, no page text. Six of these sources
-// send no `access-control-allow-origin` at all — including the Internet
-// Archive, which is where a third of this corpus now lives, so the temptation
-// to "just keep a copy so the page can read it" is real and is refused here on
-// purpose. The page says where a thing lives; the institution keeps it.
-//
-// 🔴 AND WHERE THE DIARIES ARE IS THE QUESTION THIS FILE WAS ASKED SECOND.
-// The first pass had 122 rows and not one of them was a diary, notebook,
-// päiväkirja or dagbok, which is a hole in the middle of the subject: the
-// whole "In 2048" project is built on them. They exist and they are these,
-// in descending order of how much of them you can actually see:
-//   · FIVE PAGES, PHOTOGRAPHED — 1975-01-09, 1975-06-30 twice (the original and
-//     the version he typed up), and two from 1986. On `lahteilla.fi`, which is
-//     DNS-dead; four thumbnails and one 2.6 MB readable page survive in the
-//     Internet Archive.
-//   · `Audio Diary C4008-1 (1971)` — printed in full as a chapter of the 2015
-//     MIT Press volume, DOI 10.7551/mitpress/10014.003.0008. Paywalled.
-//   · The PAPER VOLUMES, "from the early 1970s to 2005" — described by the
-//     holder and NOT DIGITISED. The description is itself only in the Wayback
-//     Machine now.
-//   · 100 DIGITISED CASSETTES of his spoken diary, 1970–1975 — counted by
-//     Constant for dOCUMENTA (13) and published by nobody.
-//   · An APPLE NEWTON diary, each entry stamped with a date and time — read by
-//     Constant's scripts, never published.
-//   · 3986 timestamped photo files, which is the same project in pictures.
-// The three National Gallery fonds records list `diaries / päiväkirjat /
-// dagböcker` among their subjects and describe the contents in a sentence, and
-// that was in the bulk dump from the first run — unread, because nothing
-// printed the keywords. The item-level finding aid is behind the API key: the
-// twenty child records the fonds point at are not in the open dump and
-// `GET /api/v1/objects/{id}` answers 403 for every id including ones that are.
-//
-// ⚠️ EVERY STATUS IN THE OUTPUT WAS OBSERVED, NOT ASSUMED. `ask()` records the
-// code and the `access-control-allow-origin` header of the request that
-// actually produced each row, and a source that could not be reached is written
-// into the file WITH ITS STATUS rather than dropped. A dropped source and a
-// source with nothing in it look identical in a finished list, and only one of
-// them is a finding. `httpFrom` says which request the code belongs to:
-// `listing` (the query that returned this row among others) or `url` (this
-// row's own address, asked for by name).
-//
-// ⚠️ AND A COUNT THAT IS TOO TIDY IS A BROKEN COLLECTOR. Five of these
-// endpoints will answer 200 with a result that is silently wrong if you ask
-// them slightly wrong — the National Library's search returns ALL 2.6 million
-// bindings when `queryTargetsOcrText` is left out, Europeana's unquoted
-// `Kurenniemi` returns a guitarist and a building, archive.org's search returns
-// a bicycle bell, OpenAlex's returns a paper on fungi growing in a Karelian
-// nature reserve that happens to be CALLED Kurenniemi, and the Wayback capture
-// of the timeline page this whole archive was built around is an empty frame,
-// because its contents load with JavaScript the crawler never ran. Each of
-// those is filtered or worked around here BY A STATED RULE, and the rule is in
-// a comment beside it, so a future run that returns a different number can be
-// told apart from a future run that asked a different question.
-//
-// The cache lives OUTSIDE the repo (`$TMPDIR/positron-kurenniemi-cache`, or
-// `$KUR_CACHE`): the National Gallery's dump is 29 MB gzipped and 275 MB
-// expanded, and a 29 MB blob in git to save a one-second download is a bad
-// trade. `--offline` re-reads it and asks nothing, which is how the shape of
-// the output gets iterated on without hammering anybody's archive.
+// Builds corpus.json for /resources/: pointers to Kurenniemi material, never copies. Every
+// status and CORS header is observed and unreachable sources are kept. Cache: $KUR_CACHE.
+// Run: node demo/resources/build-corpus.mjs [--offline] [--only zenodo,commons,...]
+// See lessons/page-resources.md#resources-141
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
@@ -107,36 +26,24 @@ const ONLY = (() => {
 // asking. Every request here carries it.
 const UA = 'positron-corpus/1.0 (+https://positron.studio; kristjan.jansen@gmail.com)';
 
-// 🔴 AND AN `Origin` HEADER, BECAUSE WITHOUT ONE THIS IS NOT A CORS TEST.
-// MEASURED 2026-09-15, the same URL, one header apart: `api.europeana.eu`
-// answers with NO `access-control-allow-origin` to a bare GET and with
-// `access-control-allow-origin: *` when an Origin is sent — it says
-// `vary: Access-Control-Request-Method` and means it. The first run of this
-// script recorded Europeana as browser-unreadable, which is the exact shape of
-// measuring the quantity next to the one in question: a browser ALWAYS sends
-// Origin on a cross-origin fetch, so a probe that does not is answering a
-// question nobody asked. Every request below carries it, and `cache-v2` in the
-// keys exists to throw away the answers gathered before it did.
+// Every request sends an Origin header, or it is not a CORS test (Europeana answers ACAO
+// only with one); `cache-v2` discards answers gathered without it.
+// See lessons/page-resources.md#resources-142
 const ORIGIN = 'https://positron.studio';
 
 // ── the record of what was asked ────────────────────────────────────────────
 
-// 🔴 THE PAGE'S OWN CAP, TYPED HERE SO THE TWO CANNOT DISAGREE. `index.html`
-// passes this number to `createTable` and this file refuses to write a corpus
-// larger than it. A table drawing fewer rows than the file holds is a page
-// reporting a smaller archive than was found, with nothing on screen saying so.
+// The page's createTable cap, mirrored here; the build refuses a larger corpus.
+// See lessons/page-resources.md#resources-143
 const PAGE_CAP = 600;
 const sources = [];
 const items = [];
 const log = (...a) => console.error(...a);
 
 /**
- * One request, and a record of how it went.
- *
- * The status is a NUMBER when the host answered and a STRING when it did not
- * (`DNS ENOTFOUND`, `NETWORK ECONNRESET`). Both are written into the output as
- * they are: "the host does not exist" and "the host said 403" are different
- * facts, and flattening them to `null` loses the one that is interesting.
+ * One request, and a record of how it went. Status is a number when the host answered and a
+ * string (`DNS ENOTFOUND`) when it did not, kept distinct rather than flattened to null.
+ * See lessons/page-resources.md#resources-144
  */
 async function ask(url, o = {}) {
   const key = `cache-v2-${o.key || url}`;
@@ -146,11 +53,8 @@ async function ask(url, o = {}) {
     if (existsSync(meta)) {
       const m = JSON.parse(readFileSync(meta, 'utf8'));
       if (OFFLINE || m.at > Date.now() - (o.maxAgeMs ?? 6 * 3600e3)) {
-        // ⚠️ A FAILURE IS CACHED TOO, AND ONLY ITS META. A host that does not
-        // resolve returns no body, so a cache keyed on the body having arrived
-        // would forget the one thing that happened — and the offline rebuild
-        // would print `NOT CACHED` where the live run had measured
-        // `DNS ENOTFOUND`. Not reached and not asked are different answers.
+        // A failure is cached too (meta only), so --offline reports what the live run saw.
+        // See lessons/page-resources.md#resources-145
         const body = existsSync(file) ? (o.binary ? readFileSync(file) : readFileSync(file, 'utf8')) : null;
         return { ...m, body, cached: true };
       }
@@ -158,11 +62,8 @@ async function ask(url, o = {}) {
     if (OFFLINE) return { url, status: 'NOT ASKED — nothing cached', cors: null, body: null, cached: false };
   }
   let out;
-  // ⚠️ RETRY ONLY WHAT SAYS "COME BACK LATER". MusicBrainz answers 503 with a
-  // plain `{"error":"…server is currently busy…"}` under load and 200 on the
-  // third try, measured 503/503/200 today — so a single attempt reports "this
-  // source has nothing" about a source that has five releases in it. A 403 or a
-  // 404 is an answer, not a wobble, and is never retried.
+  // Retry only 503-style "come back later" (MusicBrainz under load); a 403 or 404 is an answer.
+  // See lessons/page-resources.md#resources-146
   for (let attempt = 0; attempt < (o.tries ?? 1); attempt++) {
     if (attempt) await new Promise((r) => setTimeout(r, 1500 * attempt));
     try {
@@ -172,12 +73,8 @@ async function ask(url, o = {}) {
         body: o.body,
       });
       const body = o.binary ? Buffer.from(await res.arrayBuffer()) : await res.text();
-      // ⚠️ `content-length` IS THE ONLY WAY TO SEE WHAT CROSSED THE WIRE.
-      // `fetch` decompresses gzip and drops `content-encoding`, so
-      // `body.length` is the EXPANDED size — which is how the first run of this
-      // script recorded the National Gallery's dump as "274 MB gzipped", nine
-      // times its actual 29 MB, from a number that was perfectly real and was
-      // measuring the other end of the same pipe.
+      // `content-length` is the wire size; fetch decompresses gzip, so `body.length` is expanded.
+      // See lessons/page-resources.md#resources-147
       const seen = (h) => {
         const v = res.headers.get(h);
         return v ? [...new Set(v.split(',').map((s) => s.trim()))].join(', ') : null;
@@ -209,14 +106,9 @@ const corsOf = (r) => (r.cors == null ? false : r.cors === '*' || r.cors.startsW
 function source(row) { sources.push({ items: 0, ...row }); return row.name; }
 
 /**
- * A licence's NAME, and separately the string the source gave.
- *
- * ⚠️ THIS IS A LOOKUP, NOT A SHORTENING, and the difference matters enough to
- * say: `https://creativecommons.org/publicdomain/mark/1.0/` IS called Public
- * Domain Mark 1.0, so writing that is faithful, while cutting
- * `CC BY-NC-SA 4.0` down to fit a column would produce the name of a DIFFERENT
- * licence with different terms. Anything unrecognised is passed through
- * untouched rather than guessed at — `not stated` and `unknown` are answers.
+ * A licence's name by lookup, never by shortening, plus the string the source gave;
+ * anything unrecognised passes through untouched.
+ * See lessons/page-resources.md#resources-148
  */
 function licenceName(raw) {
   const s = String(raw || '').trim();
@@ -234,13 +126,9 @@ function licenceName(raw) {
 }
 
 /**
- * ⚠️ A CATALOGUE THAT ALLOWS CORS AND A FILE HOST THAT DOES NOT ARE THE SAME
- * SOURCE AND DIFFERENT ANSWERS. Zenodo's API and Zenodo's file endpoint are
- * two hosts' worth of policy; archive.org serves audio with `ACAO: *` and
- * redirects video to a node that has none. A page that can read the LIST and
- * not the FILE looks broken in a way the catalogue's headers cannot predict, so
- * one file per source gets a real Range request and the answer is written into
- * the ledger beside the catalogue's.
+ * One file per source gets a real Range request: a catalogue's CORS does not predict its
+ * file host's (archive.org redirects video to a node without ACAO).
+ * See lessons/page-resources.md#resources-149
  */
 async function mediaCheck(url) {
   if (!url) return null;
@@ -254,18 +142,9 @@ async function mediaCheck(url) {
   };
 }
 
-// ── dates ───────────────────────────────────────────────────────────────────
-//
-// ⚠️ THE DATE IS WRITTEN THE WAY THE SOURCE WROTE IT, AND THE BRACKET IS
-// COMPUTED FROM IT. A bare `1966` becomes the whole of 1966, not 1 January
-// 1966 — the difference between those two is the whole reason this corpus
-// carries `precision` at all, and a source that pads a year to a day silently
-// (ERR does; the National Library's `k` rows do, which is why its own flag is
-// the only thing that saves them) is the failure this is written against.
-//
-// `latest` is EXCLUSIVE: the first instant the thing is already over. A year
-// that runs to 1974-01-01T00:00 covers 1973, and a reader that wants the last
-// year it touches subtracts a millisecond first.
+// Dates: written as the source wrote them, bracket computed from that (a bare `1966` is the
+// whole year). `latest` is exclusive: the first instant the thing is over.
+// See lessons/page-resources.md#resources-150
 const Y = (y) => Date.UTC(y, 0, 1);
 const none = (how, note) =>
   ({ edtf: null, earliest: null, latest: null, precision: 'none', how, ...(note ? { note } : {}) });
@@ -297,11 +176,9 @@ function whenYears(from, to, how) {
 }
 
 /**
- * Wikimedia's date field carries a literal QuickStatements qualifier —
- * `+1971-01-00T00:00:00Z/10` — where the trailing integer is Wikidata's
- * precision ladder (11 day / 10 month / 9 year). It is the same ladder
- * `proto/deck/ingest.mjs` already decodes, arriving through a different
- * door, and it is DECLARED rather than inferred, which is the whole point.
+ * Wikimedia's date carries a QuickStatements precision suffix (`/10`: 11 day, 10 month,
+ * 9 year), declared rather than inferred; proto/deck/ingest.mjs decodes the same ladder.
+ * See lessons/page-resources.md#resources-151
  */
 function whenQS(raw, how) {
   const m = /([+-]\d{4})-(\d{2})-(\d{2})T[^/]*\/(\d+)/.exec(raw || '');
@@ -318,28 +195,10 @@ function whenQS(raw, how) {
 }
 
 /**
- * A FINNISH ARCHIVIST'S DATE, WHICH IS NOT ISO AND IS NOT ALWAYS A POINT.
- *
- * The Central Art Archives' own catalogue text dates its Kurenniemi items in
- * eleven distinct written forms, counted rather than remembered: `1953`,
- * `1953-04-07`, `30-06-1975` (day first), `1976-11`, `1950-luku` (the 1950s),
- * `1950-luvun puoliväli` (mid-1950s), `1960-luvun alku` / `1970-luku,
- * alkupuoli` (early), `1960-luvun loppu` / `1960-luku, loppupuoli` (late),
- * `1975 jälkeen` (after 1975), `1963-2005` (a span) and `1992-00-00` — a zero
- * month and a zero day, which is an explicit "not known", the same honest-null
- * shape the Constant mirror uses.
- *
- * 🔴 THE QUALIFIER IS RECORDED AND THE BRACKET IS NOT NARROWED BY IT.
- * `1950-luvun puoliväli` really does say something `1950-luku` does not — but
- * "mid" has no defined width, and choosing one (1953–1957? 1954–1956?) would
- * put a number in the file that the archivist never wrote. The bracket stays
- * the whole decade, `precision` says `decade`, and the qualifier goes into the
- * note in the archivist's own words. A wider bracket is a weaker claim; a
- * narrower one made up here is a wrong claim that reads as a measurement.
- *
- * `jälkeen` ("after") closes at 2018 — the January after he died — because a
- * thing in his personal archive cannot be from after him. That IS an
- * inference, so it is stated in the note rather than hidden in the number.
+ * A Finnish archivist's date in its eleven written forms (`1950-luku`, `30-06-1975`,
+ * `1992-00-00`...). A qualifier like "mid" goes into the note, never narrows the bracket;
+ * `jälkeen` closes at 2018, after his death, an inference stated in the note.
+ * See lessons/page-resources.md#resources-152
  */
 function whenFinnishArchive(text, how) {
   const s = String(text || '').trim();
@@ -359,8 +218,8 @@ function whenFinnishArchive(text, how) {
   // `1963-2005` — a span of whole years. Told from `1976-11` by the width of
   // the second number.
   if ((m = /^(\d{4})-(\d{4})$/.exec(s))) return whenYears(+m[1], +m[2], how);
-  // `1994, 2003-09-30` — two dates, which the archivist wrote because both are
-  // true of the object. The bracket spans them.
+  // `1994, 2003-09-30`: two dates, the bracket spans them.
+  // See lessons/page-resources.md#resources-153
   if ((m = /^(\d{4})\s*,\s*(\d{4})-(\d{2})-(\d{2})$/.exec(s))) {
     return { edtf: `${m[1]}–${m[2]}-${m[3]}-${m[4]}`, earliest: Y(+m[1]),
              latest: Date.UTC(+m[2], +m[3] - 1, +m[4]) + 86400e3, precision: 'range', how,
@@ -397,25 +256,9 @@ const unent = (s) => String(s || '')
   .replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 
-// ── 0. what is already gathered: proto/deck/corpus.json ─────────────────
-//
-// ⚠️ ONE GATHERING, NOT TWO. The 22 rows the deck plays from are not
-// re-researched here — their dates carry evidence this script has no way to
-// re-derive (a filename year, a compilation's span, Wikidata's declared
-// precision, a page of Ojanen's thesis) and a second opinion about them would be
-// a second opinion that drifts. They are read in, converted to this file's
-// shape, and their source file is recorded in `inputs` with ITS generation date,
-// so a stale fold is visible in the output rather than invisible in it. The page
-// checks the same thing from the other end: it fetches both files and asserts
-// every id in the deck's list is in this one.
-//
-// 🔴 AND IT CARRIES THE TWO SENTENCES, WHICH IT DID NOT UNTIL 2026-09-15.
-// `when.note` (why the bracket has this width) and the row's own `note` (what
-// the record is) were both dropped on the way through, so eleven readings of a
-// named source arrived here as bare numbers with a slug. That is how fourteen
-// corrections ended up hand-written into this generated file: there was nowhere
-// upstream for the prose to ride. Both fields fold now, and `/resources/` shows
-// them.
+// 0. proto/deck/corpus.json is folded in, not re-researched, with `when.note` and `note`
+// carried; its generation date goes into `inputs`, and the page checks every deck id is here.
+// See lessons/page-resources.md#resources-154
 function foldDeck() {
   const path = 'proto/deck/corpus.json';
   const deck = JSON.parse(readFileSync(join(REPO, path), 'utf8'));
@@ -462,26 +305,10 @@ function foldDeck() {
   return { deck, out };
 }
 
-// ── the thesis pass, and where its other half lives ─────────────────────────
-//
-// 🔴 FOURTEEN DATES IN THIS FILE REST ON A BOOK, AND A BOOK HAS NO API.
-// Mikko Ojanen's PhD reads eleven of these tapes off named pages and corroborates
-// three museum objects against its instrument table. Nothing above can harvest
-// that: there is no field at archive.org, no statement at Wikidata and no
-// literal at Europeana that carries a printed page number. The values were once
-// hand-edited into this generated file and would have been erased by the next
-// run of it.
-//
-// They arrive by TWO DOORS now, and each value lives in exactly one place.
-// TWELVE fold in from the deck, where `proto/deck/ingest.mjs` holds them beside
-// the rule that made every other bracket in that file. TWO are National Gallery
-// rows, harvested here from a bulk dump with no hand-editable upstream at all,
-// so they are here. The count is checked at the end: a build that assembles any
-// other number than fourteen refuses to write.
-//
-// ⚠️ THESE TWO MOVE NO DATE. Table 3 (printed p. 81) agrees with the year the
-// catalogue already states, and a value that did not change with a confidence
-// that did is the only kind of corroboration worth recording.
+// Thesis pass: fourteen dates rest on Ojanen's PhD pages. Twelve fold in from
+// proto/deck/ingest.mjs and two National Gallery rows are here; any total but 14 refuses.
+// These two move no date; they corroborate the catalogue's year (Table 3, p. 81).
+// See lessons/page-resources.md#resources-155
 const THESIS_ROWS = 14;
 const THESIS_SOURCE = 'Mikko Ojanen, "User Stories of Erkki Kurenniemi\'s Electronic Musical '
   + 'Instruments, 1961-1978" (PhD, University of Helsinki, 2020), 10.5281/zenodo.4306056, '
@@ -498,13 +325,9 @@ async function zenodo() {
   const asked = 'https://zenodo.org/api/records?q=Kurenniemi&size=25&page=1';
   let page = 1, total = null, http = null, cors = null;
   const out = [];
-  // ⚠️ ZENODO SEARCHES THE FULL TEXT, SO FOUR OF THE TWENTY-EIGHT HITS ARE NOT
-  // ABOUT HIM — two copies of a paper called `Memory in the digital age`, one on
-  // student sport in harsh weather, and one M.Sc thesis on train weighbridges.
-  // The rule is that the record's own metadata has to name him; what it costs is
-  // NAMED in the ledger rather than quietly dropped, because the thesis is by
-  // Risto Rautee, who co-founded Digelius with him, and a reader may well want
-  // it back.
+  // Zenodo searches full text: the record's own metadata must name him; the four that do not
+  // are named in the ledger (one is Risto Rautee's thesis).
+  // See lessons/page-resources.md#resources-156
   const dropped = [];
   while (page < 10) {
     const url = `https://zenodo.org/api/records?q=Kurenniemi&size=25&page=${page}`;
@@ -524,10 +347,8 @@ async function zenodo() {
       }
       const files = h.files || [];
       const bytes = files.reduce((n, f) => n + (f.size || 0), 0);
-      // A record with exactly one file gets a direct address for it; a record
-      // with several gets its own page, because picking one of thirty-seven
-      // TIFFs to be "the" file would be a choice nobody made. `count` says how
-      // many are behind the row either way, so nothing is hidden by the rule.
+      // One file gets a direct address; several get the record page. `count` says how many.
+      // See lessons/page-resources.md#resources-157
       const one = files.length === 1 ? files[0] : null;
       const type = (h.metadata?.resource_type?.type || 'text').toLowerCase();
       const ext = (one?.key.match(/\.([a-z0-9]+)$/i) || [])[1]?.toLowerCase();
@@ -541,10 +362,8 @@ async function zenodo() {
         sourceId: String(h.id),
         url: h.links?.self_html || `https://zenodo.org/records/${h.id}`,
         file: one ? one.links.self : null,
-        // The extension, not the header: Zenodo answers `application/octet-stream`
-        // for every file it holds, which is honest about how it stores them and
-        // useless for deciding whether a browser can play one. `mediaCheck`
-        // records what the header actually said, once, in the ledger.
+        // Decide by extension: Zenodo answers application/octet-stream for every file.
+        // See lessons/page-resources.md#resources-158
         fileType: ext ? ({ pdf: 'application/pdf', csv: 'text/csv', mp4: 'video/mp4',
                            mpg: 'video/mpeg', tif: 'image/tiff', jpg: 'image/jpeg',
                            png: 'image/png', zip: 'application/zip' }[ext] || null) : null,
@@ -575,13 +394,9 @@ async function zenodo() {
   return out;
 }
 
-// ── 2. Finnish National Gallery ─────────────────────────────────────────────
-//
-// ⚠️ A BULK DUMP, NOT A QUERY ENDPOINT. `?limit=2` is ignored and the whole
-// collection comes back — 89,072 records, 29 MB gzipped, 275 MB expanded — so
-// the Kurenniemi rows are filtered HERE. That is also why this one is cached:
-// asking a national museum for a quarter of a gigabyte to re-render a table is
-// not a thing to do twice.
+// 2. Finnish National Gallery: a bulk dump (89,072 records, 29 MB gzipped), filtered here
+// and cached.
+// See lessons/page-resources.md#resources-159
 async function fng() {
   const asked = 'https://kokoelma.kansallisgalleria.fi/api/v1/objects';
   const r = await ask(asked, { cache: true, binary: true, key: 'fng-objects', maxAgeMs: 30 * 86400e3,
@@ -598,10 +413,8 @@ async function fng() {
   let text;
   try { text = gunzipSync(r.body).toString('utf8'); } catch { text = r.body.toString('utf8'); }
   const all = JSON.parse(text);
-  // The rule: a record whose JSON mentions the name anywhere. It catches the
-  // fonds, the films, the instruments, the concert recordings AND the portrait
-  // of him painted by somebody else — which belongs here, because the question
-  // is what the institution holds about him, not what he made.
+  // Rule: the record's JSON mentions the name anywhere, including works about him by others.
+  // See lessons/page-resources.md#resources-160
   const hits = all.filter((x) => JSON.stringify(x).includes('urenniemi'));
   const out = hits.map((x) => {
     const t = x.title || {};
@@ -633,13 +446,9 @@ async function fng() {
       http: r.status, httpFrom: 'listing',
       cors: false,
       note: [metres ? `${metres} shelf metres` : null,
-             // ⚠️ WHAT THE FONDS SAYS IT CONTAINS IS THE ANSWER TO "ARE THE
-             // DIARIES IN THIS?" — and it was in the dump all along, unread.
-             // The keyword list on 101, 5690185 and 6092302 carries `diaries /
-             // päiväkirjat / dagböcker` in three languages, and the description
-             // spells it out. Naming the material groups here is what turns
-             // three rows that stand for 33 shelf metres into rows a reader can
-             // interrogate.
+             // The fonds' material groups, from the keyword lists on 101, 5690185 and 6092302, which
+             // include `diaries / päiväkirjat / dagböcker`.
+             // See lessons/page-resources.md#resources-161
              kws.length ? `what is in it, in the catalogue's own words: ${kws.join(', ')}` : null,
              (x.children || []).length
                ? `${x.children.length} child records (${(x.children || []).join(', ')}) — NOT ONE of them `
@@ -649,20 +458,9 @@ async function fng() {
              x.acquisitionYear ? `acquired ${x.acquisitionYear}` : null].filter(Boolean).join(' · ') || null,
     };
   });
-  // 🔴 THE HIERARCHY IS BROKEN IN BOTH DIRECTIONS, AND SAYING SO IS THE ROW.
-  // `6092302` (AV materials, series 11 of the fonds) declares `parents:
-  // [5690185]`; `5690185` does NOT list it among its eight children. So the
-  // open dump disagrees with itself about what is inside the archive, and the
-  // series numbering — `KG-ARK-THAA106-S-11` — says there are at least eleven
-  // series of which exactly one is published. Counting the dangling ids is the
-  // only measurement of how much is described and unreachable.
-  //
-  // ⚠️ THE TWO FONDS' CHILDREN, NOT EVERY DANGLING CHILD ON EVERY RECORD. The
-  // first version of this row counted 28 and called them "series and item
-  // records inside the two fonds" — but eight of those belong to the artwork
-  // `Winterreise` and to `Dimi-O`, which are objects in Kiasma and not part of
-  // the archive at all. A count that sweeps up whatever matches is a count that
-  // describes something other than its own title.
+  // The hierarchy disagrees with itself (6092302 names 5690185 as parent, not vice versa).
+  // Counts only the two fonds' dangling children; artworks' children are excluded.
+  // See lessons/page-resources.md#resources-162
   const fondsIds = new Set([101, 5690185, 6092302]);
   const dangling = hits.filter((x) => fondsIds.has(x.objectId))
     .flatMap((x) => (x.children || []))
@@ -708,14 +506,9 @@ async function fng() {
   return out;
 }
 
-// ── 3. Wikimedia Commons ────────────────────────────────────────────────────
-//
-// ⚠️ THE CATEGORY, NOT THE SEARCH. A free-text search for `Kurenniemi` in the
-// file namespace returns eleven files, of which five are him: the others are
-// his relative Marjatta, a guitarist called Mikko, a lighthouse, an 1878
-// newspaper and a divisibility lattice. Filtering those out by reading the
-// titles would be this script's editorial opinion; asking for the members of
-// Commons' own `Category:Erkki Kurenniemi` is the institution's.
+// 3. Wikimedia Commons: members of Category:Erkki Kurenniemi, not a free-text search (which
+// returns six unrelated files of eleven).
+// See lessons/page-resources.md#resources-163
 async function commons() {
   const API = 'https://commons.wikimedia.org/w/api.php';
   const asked = `${API}?action=query&list=categorymembers&cmtitle=Category:Erkki Kurenniemi&origin=*`;
@@ -817,9 +610,8 @@ async function musicbrainz() {
         url: `https://musicbrainz.org/recording/${t.recording.id}`,
         file: null, fileType: null, bytes: null,
         count: 1,
-        // ⚠️ NOT THE RELEASE DATE. MusicBrainz reports 2002 for all eleven,
-        // which is when the CD came out, not when the tape was made. Writing
-        // 2002 here would be a confident wrong answer where none is a true one.
+        // Not the release date: MusicBrainz gives 2002 (the CD) for all eleven tapes.
+        // See lessons/page-resources.md#resources-164
         when: none('musicbrainz-has-no-recording-date',
           'the catalogue dates the 2002 CD, not the tapes on it'),
         licence: 'CC0-1.0',
@@ -831,10 +623,8 @@ async function musicbrainz() {
       });
     }
   }
-  // The WORK is the composition, which is a different thing from a recording of
-  // it and from the disc it came out on — MusicBrainz keeps all three and only
-  // the work has a stable identity across the eleven tapes, the 2002 CD and the
-  // 2013 reissue. Three of them exist.
+  // The work is the composition, stable across the tapes, the 2002 CD and the 2013 reissue.
+  // See lessons/page-resources.md#resources-165
   const r3 = await ask(`https://musicbrainz.org/ws/2/work?artist=${ARTIST}&fmt=json&limit=100`,
     { cache: true, key: 'mb-works', tries: 4 });
   const j3 = json(r3);
@@ -859,13 +649,9 @@ async function musicbrainz() {
       note: 'the composition, as distinct from any one recording of it',
     });
   }
-  // ⚠️ THE 60 RECORDINGS ARE NOT ENUMERATED, AND THE REASON IS IN THE NUMBERS.
-  // `ws/2/recording?artist=` answers 60, of which 27 are `[Sähkö-shokki-ilta,
-  // part N]` — one 2013 live set chopped into parts by whoever entered it — and
-  // most of the rest are second and third catalogue entries for the same eleven
-  // tapes already listed above from the compilation's tracklist. Enumerating
-  // them would treble MusicBrainz's share of this file with duplicates. The
-  // count is stated instead, which is the honest form of "there is more here".
+  // The 60 recordings are counted, not enumerated: 27 are parts of one 2013 live set and most
+  // of the rest duplicate the eleven tapes above.
+  // See lessons/page-resources.md#resources-166
   const r4 = await ask(`https://musicbrainz.org/ws/2/recording?artist=${ARTIST}&fmt=json&limit=1`,
     { cache: true, key: 'mb-recording-count', tries: 4 });
   const recCount = json(r4)?.['recording-count'] ?? null;
@@ -883,20 +669,9 @@ async function musicbrainz() {
   return out;
 }
 
-// ── 5. Wikidata ─────────────────────────────────────────────────────────────
-//
-// The deck already carries six works and the two life events. This asks the
-// query service for everything Wikidata attributes to him by any of seven
-// properties, which finds three more — `Computer Music`, `On-Off` and the
-// compilation album itself. Rows the deck already has are dropped by id later.
-//
-// ⚠️ THE PROPERTY LIST IS A CHOICE AND THE THINGS LEFT OUT ARE NAMED. A query
-// for EVERY inbound direct claim returns 14 items rather than 10, and the four
-// extra are `Madhar Abol Naga` (property: DIFFERENT FROM — a statement that
-// something is not him), his mother, his father and his wife. People are not
-// things an archive holds, and "different from" is the opposite of a link.
-// `P710`, participant in, IS in the list, because dOCUMENTA (13) is where the
-// archive project that produced half of this corpus happened.
+// 5. Wikidata: everything attributed to him by seven properties (P710 included); rows the
+// deck has are dropped by id later. Left out: `different from` and family members.
+// See lessons/page-resources.md#resources-167
 async function wikidata() {
   const q = `SELECT ?item ?itemLabel ?typeLabel ?when WHERE {
   VALUES ?p { wdt:P170 wdt:P57 wdt:P86 wdt:P175 wdt:P50 wdt:P287 wdt:P710 }
@@ -908,13 +683,8 @@ async function wikidata() {
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en,fi" }
 } LIMIT 200`;
   const asked = 'https://query.wikidata.org/sparql';
-  // 🔴 THE KEY CARRIES THE QUERY'S VERSION, BECAUSE THE URL DOES NOT.
-  // `ask()` caches on `key` when one is given, and the key was a constant while
-  // the SPARQL underneath it changed — so adding P710 to the property list
-  // re-ran nothing and the output was byte-identical to the run before it. It
-  // looked like Wikidata simply has no P710 statement about him; the same query
-  // asked by hand returned dOCUMENTA (13) in one request. A cache key that does
-  // not move when the question moves answers the old question forever.
+  // The cache key carries the query's version, because the URL does not change with the SPARQL.
+  // See lessons/page-resources.md#resources-168
   const r = await ask(`${asked}?query=${encodeURIComponent(q)}`,
     { cache: true, key: 'wd-sparql-p710-p580', headers: { accept: 'application/sparql-results+json' } });
   const rows = json(r)?.results?.bindings || [];
@@ -947,16 +717,9 @@ async function wikidata() {
     cors: corsOf(r),
     note: b.typeLabel?.value || null,
   }));
-  // 🔴 THE ITEM'S OUTBOUND STATEMENTS ARE WHERE THE NEXT DIG STARTS, AND THEY
-  // ARE NOT ROWS. Wikidata carries 82 statements about him, and about forty of
-  // them are external catalogue identifiers — each one a claim that some
-  // institution has a record under that number. They are not holdings, so
-  // putting them in the list would pad it with pointers to pointers; they are
-  // a map of where to look next, so they go in the ledger where somebody
-  // planning the next session will read them. Two of them are already load-
-  // bearing here: `P1953` gave the Discogs artist id this file harvests from
-  // rather than a name search, and `P2977` names Elonet record 117760 — which
-  // is the Finnish film catalogue sitting behind the Finna 403 two rows down.
+  // His outbound statements (about forty external ids) go in the ledger, not rows. P1953 gives
+  // the Discogs id and P2977 the Elonet record behind the Finna 403.
+  // See lessons/page-resources.md#resources-169
   const q2 = `SELECT ?p ?pLabel ?v WHERE { wd:Q3056683 ?pr ?v . ?p wikibase:directClaim ?pr .
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en" } } LIMIT 300`;
   const r2 = await ask(`${asked}?query=${encodeURIComponent(q2)}`,
@@ -984,23 +747,16 @@ async function wikidata() {
   return out;
 }
 
-// ── 6. archive.org ──────────────────────────────────────────────────────────
-//
-// ⚠️ THE SEARCH RETURNS A BICYCLE BELL. `q=Kurenniemi` finds fifteen items and
-// ten of them are other people's podcasts, because the word appears in a
-// description somewhere. The rule: the identifier or the title must contain the
-// name. It keeps exactly the five Kurenniemi items and no judgement of mine is
-// involved in which five.
+// 6. archive.org: keep items whose identifier or title contains the name (five of fifteen).
+// See lessons/page-resources.md#resources-170
 async function archiveOrg() {
   const asked = 'https://archive.org/advancedsearch.php?q=Kurenniemi&rows=100&output=json';
   const r = await ask(asked + '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=mediatype'
     + '&fl%5B%5D=licenseurl&fl%5B%5D=uploader&fl%5B%5D=date', { cache: true, key: 'ia-search' });
   const docs = json(r)?.response?.docs || [];
   const mine = docs.filter((d) => /kurenniemi/i.test(`${d.identifier} ${d.title}`));
-  // ⚠️ FIVE ITEMS IS THE WHOLE OF IT, AND THAT IS ASKED RATHER THAN ASSUMED.
-  // The free-text query is the widest one there is; the four field queries are
-  // the narrow ones. If the collection grew, the field queries would find it
-  // first. Each returns its own count into the ledger.
+  // Four narrow field queries beside the free-text one, each count into the ledger.
+  // See lessons/page-resources.md#resources-171
   const FIELDS = ['"Erkki Kurenniemi"', 'subject:Kurenniemi', 'creator:Kurenniemi',
                   'title:Kurenniemi', 'description:Kurenniemi'];
   const sweep = [];
@@ -1059,20 +815,9 @@ async function archiveOrg() {
   return out;
 }
 
-// ── 7. Europeana ────────────────────────────────────────────────────────────
-//
-// ⚠️ QUOTE THE NAME. Unquoted, `Kurenniemi` returns eight records and seven are
-// a guitarist, a building and a photographer's surname. The phrase query
-// returns one, and it is the right one: the surviving DIMI-A in Stockholm.
-//
-// ⚠️ AND THE THINNESS IS A MEASUREMENT, NOT AN UNDER-QUERY. One row out of an
-// aggregator of 50-odd million looks like a badly-asked question, so it was
-// asked six ways: the quoted name (1), the bare surname (8), `DIMI Kurenniemi`
-// (1), Europeana's own `who:` person field (1), `proxy_dc_creator:Kurenniemi`
-// (1) and `Sähkökvartetti` (0). The most any form returns is eight, seven of
-// which are a guitarist called Mikko and a Helsinki building. Europeana really
-// does hold one Kurenniemi object. The counts are in the ledger so the next
-// person does not have to re-run the sweep to believe it.
+// 7. Europeana: quote the name. Asked six ways (counts in the ledger); it holds one
+// Kurenniemi object, the DIMI-A in Stockholm.
+// See lessons/page-resources.md#resources-172
 async function europeana() {
   const asked = 'https://api.europeana.eu/record/v2/search.json?wskey=api2demo&query=%22Erkki+Kurenniemi%22';
   const r = await ask(asked + '&rows=50', { cache: true, key: 'europeana' });
@@ -1118,16 +863,9 @@ async function europeana() {
   return out;
 }
 
-// ── 8. the National Library of Finland press index ──────────────────────────
-//
-// 🔴 THE FIELD THAT MAKES THIS WORK IS `queryTargetsOcrText`. Without it the
-// endpoint answers 200 with `totalResults: 2621824` — every binding it has —
-// and a collector that believed it would have written "2.6 million Kurenniemi
-// mentions" into this file. Measured both ways on 2026-09-15.
-//
-// The counterpart measurement is the one that matters editorially:
-// `includeUnauthorizedResults: false` returns ZERO. Every row is a citation
-// with no readable page behind it, and the row says so.
+// 8. National Library press index: `queryTargetsOcrText` is required, else every binding
+// (2,621,824) comes back. `includeUnauthorizedResults: false` returns zero readable rows.
+// See lessons/page-resources.md#resources-173
 async function digi() {
   const asked = 'https://digi.kansalliskirjasto.fi/rest/binding-search/search/binding';
   const body = (a, b, auth) => JSON.stringify({
@@ -1137,24 +875,10 @@ async function digi() {
     startDate: a, endDate: b,
     includeUnauthorizedResults: auth,
   });
-  // 🔴 ONE WINDOW WAS NOT A MEASUREMENT, IT WAS A SAMPLE — AND IT HID THE
-  // THING THAT MAKES THIS SOURCE HONEST. The old row asked 1960–1979 only,
-  // reported 1279 citations and 0 readable, and read as "the press index is
-  // shut". Asked across its whole range the same endpoint answers 7549, of
-  // which 2640 CAN be read — and 2622 of those readable ones are from BEFORE
-  // HE WAS BORN. That is not a bonus: it is the proof that this is a SURNAME
-  // search over OCR text and not a person search, which no single window could
-  // show. His mother Marjatta was a well-known children's author and his father
-  // Tauno a physicist; the name is in the Finnish papers for a century before
-  // him. One row per window, each with its own two numbers, is the only shape
-  // in which that is visible rather than averaged away.
-  //
-  // ⚠️ THE FIRST WINDOW STARTS AT 1900 AND NOT AT THE INDEX'S OWN START. The
-  // binding search goes back to 1771, the first Finnish newspaper, and asking
-  // it that way is a true measurement — but the ROW would then bracket
-  // 1771–1940, which is a claim about a corpus rather than about a person, on
-  // a page whose other 334 rows are about one. The whole-range figure is asked
-  // for separately and quoted in the ledger, where prose can say what it is.
+  // One row per window, each with total and readable counts: it is a surname search over OCR,
+  // and readable hits from before his birth show it. Windows start at 1900; the whole-range
+  // figure goes in the ledger.
+  // See lessons/page-resources.md#resources-174
   const WINDOWS = [
     ['1900-01-01', '1940-12-31', 'before he was born'],
     ['1941-01-01', '1959-12-31', 'his childhood — the name is mostly his parents\''],
@@ -1162,10 +886,8 @@ async function digi() {
     ['1980-01-01', '1999-12-31', 'Dimensio, Datart and the computer years'],
     ['2000-01-01', '2026-12-31', 'the archive, the documentary and the obituaries'],
   ];
-  // ⚠️ A JSON POST NEEDS A PREFLIGHT, SO THE POST'S OWN HEADERS ARE NOT THE
-  // ANSWER. A browser asks OPTIONS first and never sends the POST if that is
-  // refused — measured 403 here — so this endpoint is unreachable from a page
-  // even though the POST itself answers 200 to a script.
+  // A JSON POST needs a preflight, which answers 403, so a page cannot reach this endpoint.
+  // See lessons/page-resources.md#resources-175
   const pre = await ask(`${asked}`, { cache: true, key: 'digi-preflight', method: 'OPTIONS',
     headers: { 'access-control-request-method': 'POST',
                'access-control-request-headers': 'content-type' } });
@@ -1232,11 +954,8 @@ async function digi() {
   return out;
 }
 
-// ── 9. the Constant / KURATOR mirror ────────────────────────────────────────
-//
-// 3986 rows of one file each, and the pixels are not in the mirror. One row
-// here, with the count read off the page rather than remembered — the page
-// prints `N total, starting on record 1` and that N is what goes in `count`.
+// 9. Constant / KURATOR mirror: one row, `count` read off the page's `N total` line.
+// See lessons/page-resources.md#resources-176
 async function vandal() {
   const asked = 'https://vandal.ist/kurenniemi/sampledata/index.html';
   const r = await ask(asked, { cache: true, key: 'vandal' });
@@ -1249,14 +968,9 @@ async function vandal() {
     note: m ? `${m[1]} file records, each with an EXIF timestamp; the originals are not here`
             : 'the total could not be read off the page on this run',
   });
-  // 🔴 THE PROJECT'S OWN PAGE ABOUT THE TAPES IS THE ONLY PLACE ANYBODY SAYS
-  // HOW MANY AUDIO DIARIES THERE ARE. The mirror kept the sample data and
-  // dropped the Data Radio — `vandal.ist/kurenniemi/dataradio/material.html`
-  // answers 404, measured — so the page survives only on the dead
-  // `kurenniemi.activearchives.org` in the Wayback Machine, where it reads:
-  // "Kurenniemi's archive contains 100 digitized cassettes of a period that
-  // ranges from 1970 to 1975." That sentence is a finding aid nobody else
-  // publishes, and it is two rows below: the cassettes and the Newton diary.
+  // The cassette count (100, 1970 to 1975) comes from the Wayback copy of the project page;
+  // the mirror's dataradio page is a 404.
+  // See lessons/page-resources.md#resources-177
   const DR = 'http://kurenniemi.activearchives.org/dataradio/';
   const gone = await ask('https://vandal.ist/kurenniemi/dataradio/material.html',
     { cache: true, key: 'vandal-dataradio-404' });
@@ -1334,29 +1048,10 @@ async function vandal() {
   }];
 }
 
-// ── 9b. lahteilla.fi, through the Internet Archive ──────────────────────────
-//
-// 🔴 THIS IS WHERE THE DIARIES ARE, AND THE SITE THAT HOLDS THEM IS DEAD.
-// `lahteilla.fi/kurenniemi/` was the Finnish National Gallery's own public
-// presentation of the fonds — *Erkki Kurenniemi, Mies tulevaisuudesta* — and it
-// does not resolve (`DNS ENOTFOUND`, measured, and already a row in this file).
-// The Wayback Machine holds 545 of its URLs, and inside them is the item-level
-// digitisation nothing else publishes: photographs of the PAGES OF HIS DIARIES,
-// scans of his manuscripts and drafts, his 2003 correspondence with Leena
-// Krohn, and a hundred captioned photographs — each with a date an archivist
-// typed.
-//
-// ⚠️ THE ITEMS ARE ON THE KEYWORD PAGES, NOT THE TIMELINE PAGES. The timeline
-// the site was built around fills itself with JavaScript the crawler never ran,
-// so a capture of `/timelinepage/8` is an empty frame and reads as "the content
-// is gone". The 48 `/thing-tags/<keyword>` pages are server-rendered and
-// complete, and every item is on at least one of them. Harvesting those and
-// de-duplicating on the site's own `thingid` recovers the set.
-//
-// ⚠️ AND WEB.ARCHIVE.ORG SENDS NO `access-control-allow-origin`. Measured with
-// an Origin header on both an HTML page and a JPEG: 200, and no ACAO on either.
-// So these rows are `<img>`-able from a page and not readable by `fetch` — the
-// same posture as the National Gallery's own API, reached from the other side.
+// 9b. lahteilla.fi through the Wayback Machine (the host is DNS-dead): items harvested from
+// the 48 server-rendered `/thing-tags/` pages, de-duplicated on `thingid`. web.archive.org
+// sends no ACAO, so rows are img-able, not fetchable.
+// See lessons/page-resources.md#resources-178
 const LAHTEILLA = 'http://www.lahteilla.fi/kurenniemi';
 const LAHTEILLA_TAGS = ['1940-luku', '1950-luku', '1960-luku', '1970-luku', '1980-luku',
   '1990-luku', '2000-luku', '3d', 'datart', 'digelius-electronics-finland', 'dimensio', 'dimi-0',
@@ -1367,10 +1062,8 @@ const LAHTEILLA_TAGS = ['1940-luku', '1950-luku', '1960-luku', '1970-luku', '198
   'teknillinen-korkeakoulu', 'teknologia', 'tekstit', 'teoriat', 'tiede', 'tietokoneet',
   'tietokonepelit', 'tietokonetaide', 'tietotekniikka', 'tietoyhteiskunta', 'tulevaisuus',
   'valokuvat', 'videot'];
-// The seven sections the site divides the archive into. Each carries the
-// institution's own prose about that part of the fonds, and
-// `muistiin-kirjoitettu-elämä` — "a life written down into notes" — is the
-// diaries one.
+// The site's seven sections; `muistiin-kirjoitettu-elämä` is the diaries.
+// See lessons/page-resources.md#resources-179
 const LAHTEILLA_SECTIONS = [
   ['muistiin-kirjoitettu-elämä', 'A documented life'],
   ['ihminen-teknologia-ja-tulevaisuus', 'Man, technology and the future'],
@@ -1382,24 +1075,15 @@ const wb = (u, ts) => 'https://web.archive.org/web/' + (ts || '2024') + '/' + u;
 
 async function lahteilla() {
   const asked = wb(LAHTEILLA + '/fi/used-keywords');
-  // The CDX index says which of the site's images the crawler actually kept. It
-  // is asked ONCE and matched against the img src on each tag page, because the
-  // timestamp baked into a rewritten src belongs to the HTML capture and not to
-  // the image — following one of those verbatim is a 404, measured.
+  // The CDX index is asked once and matched by file; a rewritten src's timestamp 404s.
+  // See lessons/page-resources.md#resources-180
   const cdx = await ask('http://web.archive.org/cdx/search/cdx?url=lahteilla.fi/kurenniemi/'
     + 'sites/default/files*&output=json&collapse=urlkey&limit=5000'
     + '&fl=original,timestamp,statuscode,mimetype,length',
     { cache: true, key: 'lahteilla-cdx-files', tries: 3, maxAgeMs: 30 * 86400e3 });
-  //
-  // 🔴 KEY ON THE FILE, NOT ON THE RENDERING — AND THE DIARIES ARE WHY. Drupal
-  // serves one original through several image styles, and the tag pages all
-  // link `styles/keyword_thumb/`, which is 150 px square. Matching that path
-  // exactly found four of the five diary pages and missed the fifth, because
-  // the crawler never took its thumbnail — while it DID take
-  // `styles/very_big/public/EK0000056.jpg`, 2.6 MB, which is a diary page you
-  // can actually read. Keying on everything after `public/` and keeping the
-  // LARGEST capture of each file recovers it, and upgrades several photographs
-  // from a thumbnail to the 400 kB rendering beside it.
+  // Keyed on everything after `public/`, keeping the largest capture of each file, so a
+  // missed 150 px thumbnail falls back to a larger rendering.
+  // See lessons/page-resources.md#resources-181
   const caps = new Map();
   for (const row of (json(cdx) || []).slice(1)) {
     if (row[2] !== '200') continue;
@@ -1426,10 +1110,8 @@ async function lahteilla() {
       const prev = things.get(id);
       if (prev) { prev.tags.push(tag); continue; }
       const src = /<img src="([^"]+)"/.exec(li)?.[1] || null;
-      // The name of the underlying file, which is what `caps` is keyed on. The
-      // timestamp in a rewritten src belongs to the HTML capture and not to the
-      // image — following one verbatim is a 404, measured — so only the file
-      // part of it is used.
+      // The underlying file name, which `caps` is keyed on; the src's timestamp is not used.
+      // See lessons/page-resources.md#resources-182
       const file = src
         ? /\/public\/(.+?)(\?|$)/.exec(decodeURI(src))?.[1] ?? null
         : null;
@@ -1440,10 +1122,9 @@ async function lahteilla() {
   const out = [];
   let withFile = 0, diaries = 0;
   for (const t of things.values()) {
-    // The site's OWN tags decide what kind of object each is — no reading of
-    // titles here. `tekstit` (texts), `päiväkirjat` (diaries) and
-    // `kirjeenvaihto` (correspondence) are documents, `videot` is a video, and
-    // everything else on this site is a photograph.
+    // The site's own tags decide the kind: tekstit, päiväkirjat, kirjeenvaihto are documents,
+    // videot a video, anything else a photograph.
+    // See lessons/page-resources.md#resources-183
     const kind = t.tags.some((x) => /^(tekstit|päiväkirjat|kirjeenvaihto)$/.test(x)) ? 'text'
       : t.tags.includes('videot') ? 'video' : 'image';
     const cap = t.file ? caps.get(t.file) : null;
@@ -1487,24 +1168,15 @@ async function lahteilla() {
     const u = wb(LAHTEILLA + '/en/content/' + encodeURIComponent(slug));
     const r = await ask(u, { cache: true, key: 'lahteilla-section-' + slug,
                              maxAgeMs: 30 * 86400e3, tries: 3 });
-    // ⚠️ THE PROSE IS ONE DIV, AND TAKING THE WHOLE PAGE GETS THE FURNITURE.
-    // Stripping the tags off the document and cutting at the menu produced
-    // `"Erkki Kurenniemi A documented life Erkki Kurenniemi Muistiin
-    // kirjoitettu elämä A documented life Kurenniemen arkisto sisältää…"` —
-    // the site name twice and the section title three times, in two languages,
-    // ahead of the sentence that matters. Drupal wraps the description in
-    // `.timeline-front-content` inside the `<article>`; that div, minus the
-    // preview image, IS the description. The English section label opens it and
-    // is already in this row's own title, so it comes off the front.
+    // The prose is `.timeline-front-content` in the `<article>`, minus the preview image and the
+    // leading section label.
+    // See lessons/page-resources.md#resources-184
     const art = /<div class="timeline-front-content">([\s\S]*?)<\/article>/.exec(r.body || '');
     const txt = unent((art?.[1] || '')
       .replace(/<div class="preview_image"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/, ' ')
       .replace(/<[^>]+>/g, ' '));
-    // ⚠️ THE LABEL TO STRIP IS THE PAGE'S OWN, NOT THE ONE IN THE TABLE ABOVE.
-    // The site calls this section "Photographs from Erkki Kurenniemi's
-    // archives" and the table above calls it "Photographs from his archives";
-    // matching on the second left the first standing at the head of the quote.
-    // Read it out of `.page-title` and take that off instead.
+    // Strip the label from `.page-title`, the page's own wording, not the table's.
+    // See lessons/page-resources.md#resources-185
     const pageLabel = unent(/<div class="page-title">[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/
       .exec(r.body || '')?.[1] || label);
     const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1527,11 +1199,9 @@ async function lahteilla() {
       url: u,
       file: null, fileType: null, bytes: null,
       count: 1,
-      // 🔴 THE SPAN COMES OUT OF THE SENTENCE, NOT OUT OF A GUESS. The diaries
-      // page says "1970-luvun alusta vuoteen 2005" — from the start of the
-      // 1970s to 2005 — so that is the bracket, and `how` says where it was
-      // read. The other six section pages describe material with no span in
-      // them and get NO date rather than the fonds dates borrowed.
+      // The span comes from the sentence ("1970-luvun alusta vuoteen 2005"); sections without one
+      // get no date.
+      // See lessons/page-resources.md#resources-186
       when: isDiaries
         ? whenYears(1970, 2005, 'the-span-stated-in-the-holders-own-description-of-the-diary-series')
         : none('the-section-page-states-no-span',
@@ -1547,10 +1217,8 @@ async function lahteilla() {
           + 'all that was ever put online, and each of those is its own row here. In the holder\'s '
           + 'words: '
         : '') + (body ? '"' + body.slice(0, 400) + (body.length > 400 ? '…"' : '"')
-        // ⚠️ AN EMPTY DESCRIPTION IS SAID IN WORDS, NEVER AS AN EMPTY QUOTE.
-        // Two of the seven section pages carry a heading and no text at all,
-        // and a bare `""` beside them reads as a collector that dropped
-        // something rather than as a page that was always blank.
+        // An empty description is said in words, never as an empty quote.
+        // See lessons/page-resources.md#resources-187
         : r.status === 200
           ? 'the section page carries a heading and no description — the institution never wrote '
             + 'one, which is a different thing from this run failing to read it'
@@ -1583,11 +1251,8 @@ async function lahteilla() {
       fileType: 'application/pdf',
       bytes: +row[4] || null,
       count: 1,
-      // 🔴 NO DATE, AND THE REASON IS THE RULE THIS FILE IS BUILT ON. The PDF
-      // is not opened — this corpus points at files and never reads them — so
-      // the only date available is the crawl timestamp, which dates the COPY
-      // and not the publication. Writing that year here would be the
-      // archive.org upload-date mistake in a second costume.
+      // No date: the PDF is not opened, and the crawl timestamp dates the copy.
+      // See lessons/page-resources.md#resources-188
       when: none('the-pdf-is-not-opened-here',
         'the crawl timestamp dates the copy, not the publication, and the file itself is not read'),
       licence: 'not stated',
@@ -1622,30 +1287,10 @@ async function lahteilla() {
   return out;
 }
 
-// ── 9c. Crossref — the book that IS the documentary evidence ────────────────
-//
-// 🔴 THE MIT PRESS VOLUME WAS ONE ROW SAYING "PAYWALLED", AND INSIDE IT ARE
-// TWENTY OF HIS OWN TEXTS, EACH DATED. *Writing and Unwriting (Media) Art
-// History: Erkki Kurenniemi in 2048* prints his diaries, essays, drafts and
-// interviews as chapters, and the editors put the year of the ORIGINAL document
-// in each chapter title — `Audio Diary C4008-1 (1971)`, `Message Is Massage
-// (1971)`, `Computer Eats Art (1972–1982)`, `Relative Life (2003)`. Crossref
-// registers every one with a DOI and an author list, keyless, `ACAO: *`. So the
-// book's table of contents is a dated list of primary sources and it is
-// machine-readable — which is the opposite of what "paywalled" suggested.
-//
-// ⚠️ THE DATE IS THE ONE IN THE TITLE, NOT THE ONE CROSSREF GIVES. Crossref
-// says 2015-09-11 for all 36 chapters, which is the day the book came out; a
-// row that carried that would date a 1971 diary entry to 2015. The year in the
-// parentheses is an editorial statement about the document, made by the
-// editors who had the manuscript, and it is the better evidence. Where a title
-// has no year the chapter is a modern essay ABOUT him, and it keeps the book's
-// date, because for those two facts are the same.
-//
-// ⚠️ AND SIX ROWS ARE DROPPED BY A NAMED RULE. `Index`, `Contributors`,
-// `[ Front Matter ]`, `[ Opening ]`, `Acknowledgments` and `Series Foreword`
-// are the apparatus of a book rather than anything held anywhere. They are
-// named in the ledger rather than quietly binned.
+// 9c. Crossref: the MIT Press Kurenniemi volume's chapters, each with a DOI. The date is the
+// year in the chapter title (the original document), else the book's; apparatus chapters
+// (Index, Front Matter...) are dropped and named in the ledger.
+// See lessons/page-resources.md#resources-189
 const BOOK = 'Writing and Unwriting (Media) Art History';
 const APPARATUS = /^(index|contributors|\[ ?front matter ?\]|\[ ?opening ?\]|acknowledgments|series foreword)$/i;
 
@@ -1709,18 +1354,8 @@ async function crossref() {
   return out;
 }
 
-// ── 9d. Discogs ─────────────────────────────────────────────────────────────
-//
-// MusicBrainz has five releases; Discogs has thirty-four credits on twenty-nine
-// distinct releases, keyless and with `ACAO: *`. It is the discography the
-// other one is a subset of — the 1967 `Information Explosion`, the 1970 `DIMI 1`
-// on Musica, the bootlegs, and the compilations he turns up on.
-//
-// ⚠️ ONE RELEASE CAN CARRY THREE CREDITS AND IS STILL ONE OBJECT. `Perspectives
-// '68` comes back as `Appearance` and as `TrackAppearance`; `Tombstone
-// Valentine` as `Appearance` and as `UnofficialRelease`. De-duplicating on the
-// release id and keeping the roles in the note is the difference between a
-// discography and a padded one.
+// 9d. Discogs: the fuller discography, de-duplicated on release id with the roles in the note.
+// See lessons/page-resources.md#resources-190
 async function discogs() {
   const ARTIST = 60504;   // wd:Q3056683 P1953 — declared on Wikidata, not guessed
   const asked = 'https://api.discogs.com/artists/' + ARTIST + '/releases?per_page=100';
@@ -1769,26 +1404,9 @@ async function discogs() {
   return out;
 }
 
-// ── 9e. OpenAlex ────────────────────────────────────────────────────────────
-//
-// The scholarly literature, including the things neither Zenodo nor Crossref
-// carries: the 2023 Hatje Cantz monograph, the Leonardo review, the Nordic
-// journal pieces — and `Spontaneous Impulse Activity in Immature Rabbit Brain`
-// (Acta Physiologica Scandinavica, 1966), which is the paper he wrote as a
-// neurophysiologist and which nothing else in this corpus knew about.
-//
-// ⚠️ TWO NARROW QUERIES, NOT ONE WIDE ONE. `search=Kurenniemi` returns 243
-// works, because it covers the full text of everything. The union of
-// `title.search:Kurenniemi` (19) and `author.id:` his own OpenAlex id (16) is
-// 33 — and two of those still are not his, for reasons worth reading below the
-// filter.
-//
-// ⚠️ AND DE-DUPLICATED AGAINST WHAT IS ALREADY HERE, BY DOI. Seventeen of the
-// 33 are MIT Press chapters Crossref already returned and four are Zenodo
-// deposits; emitting them again would put the same text in this file three
-// times under three ids. The DOI is the join key and the count of collisions
-// goes in the ledger, because a de-duplication nobody is told about cannot be
-// told apart from a source that found nothing.
+// 9e. OpenAlex: union of `title.search` and his author id, filtered below, de-duplicated by
+// DOI against what is already here, with the collision count in the ledger.
+// See lessons/page-resources.md#resources-191
 async function openalex(have) {
   const M = '&mailto=kristjan.jansen@gmail.com';
   const asked = 'https://api.openalex.org/works?filter=title.search:Kurenniemi';
@@ -1804,26 +1422,16 @@ async function openalex(have) {
   for (const w of seen.values()) {
     const title = unent(w.display_name || w.title || '');
     const authors = (w.authorships || []).map((x) => x.author?.display_name).filter(Boolean);
-    // 🔴 KURENNIEMI IS ALSO A PLACE, AND THE FULL-TEXT INDEX WILL RETURN IT
-    // FOREVER. One hit is `New data on aphyllophoroid fungi (Basidiomycota) of
-    // the protected areas of the Leningrad Region. XI. Planned protected area
-    // «Kurenniemi»` — a Karelian headland, which is where the surname comes
-    // from, written in guillemets the way a Russian-language paper names a
-    // nature reserve. It is part XI of a series, so parts XII and XIII are
-    // coming. Filtering on the topic does not separate them: OpenAlex files the
-    // Leonardo review of the Kurenniemi BOOK under Neuroscience, so "drop the
-    // natural sciences" would drop a real row and keep the fungi. What DOES
-    // separate them is the punctuation — a place is quoted, a person is not.
-    // Strip the quoted form and require the name to survive somewhere else.
+    // Kurenniemi is also a place, written in guillemets: strip the quoted form and require the
+    // name elsewhere. Topic filters would drop real rows.
+    // See lessons/page-resources.md#resources-192
     const unquoted = title.replace(/[«"“”'‘’‹›]\s*Kurenniemi\s*[»"“”'‘’‹›]/gi, ' ');
     if (!/kurenniemi/i.test(unquoted + ' ' + authors.join(' '))) {
       dropped.push(`${title} — the name is a place here, not him`);
       continue;
     }
-    // ⚠️ AND A RECORD WITH NEITHER A DOI NOR A YEAR IS AN INDEX STUB. OpenAlex
-    // holds a second, empty copy of the MIT Press volume with no identifier and
-    // no date; a row for it would show the same book twice, once with a dash
-    // where its date should be, which reads as a date this collector lost.
+    // A record with neither DOI nor year is an index stub and is dropped.
+    // See lessons/page-resources.md#resources-193
     if (!w.doi && !w.publication_year) {
       dropped.push(`${title} — an index stub with no identifier and no date`);
       continue;
@@ -1874,13 +1482,8 @@ async function openalex(have) {
   return out;
 }
 
-// ── 10. one-by-one: pages that are their own row ────────────────────────────
-//
-// Each of these is asked for BY NAME, so its `http` is its own rather than a
-// listing's. The four Yle articles are the reason this block exists: they are
-// the only Kurenniemi broadcast material anywhere that is known to exist, they
-// load, and their media cannot be fetched from outside Finland without a key —
-// which is a fact worth a row each rather than a footnote.
+// 10. Pages asked for by name, so `http` is their own; includes the four Yle articles.
+// See lessons/page-resources.md#resources-194
 const BY_NAME = [
   { id: 'yle:20-89298', url: 'https://yle.fi/a/20-89298', kind: 'article', source: 'Yle',
     title: 'Erkki Kurenniemi, digitaalisten näkyjen näkijä',
@@ -1914,10 +1517,8 @@ const BY_NAME = [
     holder: 'MIT Press', when: () => whenFrom('2015', 'the-publisher'),
     licence: 'all rights reserved', licenceBy: 'MIT Press',
     note: 'the book the dOCUMENTA(13) project produced; paywalled, no open chapter found' },
-  // ⚠️ THE STATUS THAT BELONGS TO THIS ROW IS THE DEAD HOST'S, NOT THE WAYBACK
-  // COPY'S. `url` is where you can still read it; `probe` is the thing whose
-  // answer the row is about, and writing the cache's 200 here would have said
-  // the opposite of what happened.
+  // The row's status is the dead host's (`probe`); `url` is the Wayback copy.
+  // See lessons/page-resources.md#resources-195
   { id: 'lahteilla:kurenniemi', url: 'https://web.archive.org/web/2024/http://lahteilla.fi/kurenniemi/',
     probe: 'http://lahteilla.fi/kurenniemi/',
     kind: 'collection', source: 'lahteilla.fi', title: "the National Gallery's own Kurenniemi site — dead",
@@ -1934,15 +1535,9 @@ const BY_NAME = [
     note: 'a Cloudflare managed challenge answers this host. Everything downstream of it — '
         + 'the Music Archive\'s 60 TB, Elonet\'s film records — is unreachable from here, '
         + 'including whether it holds anything at all' },
-  // 🔴 THE DOCUMENTED, KEYLESS REST API IS BLOCKED TOO, AND THAT IS WORTH ITS
-  // OWN ROW. "Finna 403s" could have meant "the search page has a bot check and
-  // the API is fine" — that is the obvious next thing to try and it is why this
-  // was re-attacked. It is not fine. `api.finna.fi/v1/search` answers the same
-  // Cloudflare managed challenge, and it does so with this script's user agent,
-  // with a desktop Chrome one and with NO user agent at all — three forms, one
-  // answer. `elonet.finna.fi` is the same edge and the same 403. So the whole
-  // Finnish national discovery layer is shut to this machine, and nobody should
-  // spend another hour finding out.
+  // Finna's keyless REST API and elonet.finna.fi answer a Cloudflare challenge (403) for any
+  // user agent, so it gets its own row.
+  // See lessons/page-resources.md#resources-196
   { id: 'finna-api:search', url: 'https://api.finna.fi/v1/search?lookfor=Kurenniemi&limit=100',
     kind: 'collection', source: 'Finna', title: "Finna's documented REST API — the same 403 as its web page",
     holder: 'the Finnish national discovery service',
@@ -1973,18 +1568,9 @@ async function byName() {
       note: b.probe ? `${b.probe} answers ${r.status} · ${b.note}` : b.note,
     });
   }
-  // These hosts are one row each rather than a harvest, so their ledger entries
-  // are written from the rows themselves — with the code each one answered.
-  //
-  // 🔴 ONE LEDGER ENTRY PER SOURCE NAME, AND THIS IS WHERE THAT BROKE. When
-  // `lahteilla()` was added, this loop kept writing a SECOND `lahteilla.fi`
-  // entry from the dead-host probe, and the two disagreed: one said 200 and one
-  // said `DNS ENOTFOUND`, both claiming the same 129 rows. The output looked
-  // fine and the page's own check — every source's `items` summing to the row
-  // count — would have gone red with the totals off by exactly one source's
-  // worth. An entry that already exists is EXTENDED with what the probe found
-  // rather than duplicated, because "the host is dead" and "the Internet
-  // Archive still has it" are two halves of one fact about one place.
+  // Ledger entries for one-row hosts come from the rows. An existing entry for the same source
+  // name is extended, never duplicated (lahteilla.fi).
+  // See lessons/page-resources.md#resources-197
   for (const name of ['Yle', 'AV-arkki', 'MIT Press', 'lahteilla.fi', 'Finna']) {
     const rows = out.filter((x) => x.source === name);
     if (!rows.length) continue;
@@ -2009,12 +1595,8 @@ async function byName() {
   return out;
 }
 
-// ── run ─────────────────────────────────────────────────────────────────────
-//
-// ⚠️ ORDER MATTERS FOR EXACTLY ONE STEP AND IT IS DECLARED HERE RATHER THAN
-// IMPLIED. `openalex` de-duplicates against the DOIs already gathered, so it
-// runs after `crossref` and `zenodo` and is handed the id set. Everything else
-// is independent; a step is free to move.
+// Run order: openalex runs after crossref and zenodo and gets their DOIs; the rest is free.
+// See lessons/page-resources.md#resources-198
 const STEPS = [
   ['zenodo', zenodo], ['fng', fng], ['commons', commons], ['musicbrainz', musicbrainz],
   ['wikidata', wikidata], ['archive', archiveOrg], ['europeana', europeana],
@@ -2039,11 +1621,8 @@ for (const [name, fn] of STEPS) {
   log(`  ${kept} rows${dup ? `, ${dup} already in the deck's list` : ''}`);
 }
 
-// 🔴 A DUPLICATE ID IS A ROW THAT SILENTLY REPLACES ANOTHER ONE IN EVERY MAP
-// DOWNSTREAM, AND THE PAGE WOULD STILL READ GREEN. Two harvesters can reach the
-// same object by different doors — Crossref and OpenAlex both key on the DOI —
-// so the collision is checked for rather than assumed away, and it is a hard
-// failure because there is no sensible thing to do with the second copy.
+// A duplicate id fails hard: it would silently replace a row in every map downstream.
+// See lessons/page-resources.md#resources-199
 {
   const seen = new Set(), clash = [];
   for (const it of items) { if (seen.has(it.id)) clash.push(it.id); seen.add(it.id); }
@@ -2067,26 +1646,19 @@ for (const it of items) {
              what: 'read out of the deck\'s list, not re-harvested on this run', note: null });
   }
 }
-// ONE PASS, ONE PLACE. Every harvester above writes the licence down exactly as
-// its source stated it — a URL, a slug, a sentence — and the name is resolved
-// here rather than in ten functions that would drift apart. `licenceRef` keeps
-// what was actually said, so nothing is lost by naming it.
+// Licence names are resolved here in one pass; `licenceRef` keeps what the source said.
+// See lessons/page-resources.md#resources-200
 for (const it of items) {
   it.licenceRef = it.licence;
   it.licence = licenceName(it.licence);
-  // ⚠️ THERE IS NO SUCH THING AS HIGH CONFIDENCE IN A LICENCE NOBODY STATED.
-  // Four rows read `unknown · HIGH`, which is a confident measurement of
-  // nothing — the same defect as a readout cell pre-set to 0.
+  // A licence nobody stated gets no high confidence.
+  // See lessons/page-resources.md#resources-201
   if (/^(unknown|not stated)$/i.test(it.licence)) it.licenceConfidence = 'n/a — nobody states one';
 }
 for (const s of sources) s.items = items.filter((x) => x.source === s.name).length;
 
-// 🔴 THE PAGE ASSERTS THAT THE LEDGER'S COUNTS ADD UP TO THE LIST, SO THE
-// BUILDER PROVES IT BEFORE WRITING. Two ledger entries with the same name each
-// count all of that source's rows, and the sum silently doubles — which is
-// exactly what happened the first time `lahteilla` ran alongside the by-name
-// probe of the same host. Failing here costs a rebuild; failing in the browser
-// costs somebody's afternoon working out which of eighteen numbers is wrong.
+// The page asserts the ledger counts sum to the list, so the builder checks it first.
+// See lessons/page-resources.md#resources-202
 {
   const seen = new Set(), clash = [];
   for (const s of sources) { if (seen.has(s.name)) clash.push(s.name); seen.add(s.name); }
@@ -2095,22 +1667,16 @@ for (const s of sources) s.items = items.filter((x) => x.source === s.name).leng
   if (summed !== items.length) {
     throw new Error(`the ledger counts ${summed} rows and the list has ${items.length}`);
   }
-  // And the page's table is capped: over the cap it draws fewer rows than the
-  // corpus holds and its own count check goes red on a file that is otherwise
-  // correct. The cap is 400 and it lives in `index.html`; this is the only
-  // place that can see the total before it is written.
+  // Over PAGE_CAP the page's table draws fewer rows and its count check fails, so refuse here.
+  // See lessons/page-resources.md#resources-203
   if (items.length > PAGE_CAP) {
     throw new Error(`${items.length} rows — the page's table caps at ${PAGE_CAP} and would draw fewer`);
   }
 }
 
-// ── the thesis pass ─────────────────────────────────────────────────────────
-// The two rows with no upstream, then the count of all fourteen. See the block
-// beside `CORROBORATED` for why this is a pass and not a harvester.
-//
-// ⚠️ `--only` BUILDS A PARTIAL CORPUS ON PURPOSE, so these refusals are for a
-// full run. Under `--only` a missing row means the step that would have brought
-// it was not asked for, which is not a defect and must not read as one.
+// The thesis pass: the two rows with no upstream, then the count of fourteen (see
+// CORROBORATED). Under --only a partial corpus is expected.
+// See lessons/page-resources.md#resources-204
 {
   const missing = [];
   for (const [id, note] of Object.entries(CORROBORATED)) {
@@ -2123,11 +1689,9 @@ for (const s of sources) s.items = items.filter((x) => x.source === s.name).leng
   }
   if (missing.length) log(`  --only: ${missing.length} corroborated rows not in this partial build`);
 }
-// 🔴 DERIVED FROM THE DECK, NOT RE-TYPED HERE. `ingest.mjs` marks every row its
-// own thesis pass touched with `dateEvidence.replaces` — what the date used to
-// rest on — so the twelve are counted off the file they came from. A stale deck
-// makes this number fall and the build refuses, which is the alarm that did not
-// exist when the corrections were sitting in a generated file.
+// The twelve deck rows are counted by `dateEvidence.replaces` from ingest.mjs; a stale deck
+// lowers the count and the build refuses.
+// See lessons/page-resources.md#resources-205
 const amendedIds = new Set([
   ...deck.items.filter((i) => i.dateEvidence?.replaces !== undefined).map((i) => i.id),
   ...Object.keys(CORROBORATED),
@@ -2144,19 +1708,9 @@ if (amended.length !== THESIS_ROWS && !ONLY) {
   if (mute.length) throw new Error(`amended with no reason given: ${mute.map((x) => x.id).join(', ')}`);
 }
 
-// ── how long each recording runs ────────────────────────────────────────────
-//
-// 🔴 MEASURED BY A SEPARATE SCRIPT AND MERGED HERE, WHICH IS THE ONLY WAY A
-// LENGTH GETS INTO THIS FILE. Asked for as *"just measure file lengths"* and
-// *"and write to corpus json"*. `demo/resources/measure-durations.mjs` asks each
-// media file once, gently, and writes `durations.json`; this reads that file. It
-// is not done inline because a length is a fact about a MEDIA HOST and the rest
-// of this build is facts about catalogues: folding them together would mean
-// re-asking archive.org for headers every time somebody wanted to change a date.
-//
-// ⚠️ A ROW THAT WAS ASKED AND WOULD NOT SAY GETS `durationMs: null` RATHER THAN
-// NOTHING. A page can then tell "nobody has measured this" from "this file does
-// not carry its length", which are different things to say in a gutter.
+// Durations come from durations.json (measure-durations.mjs), merged here. A row asked with
+// no answer gets `durationMs: null`.
+// See lessons/page-resources.md#resources-206
 const durations = (() => {
   const p = join(HERE, 'durations.json');
   if (!existsSync(p)) return null;
@@ -2172,9 +1726,8 @@ const durations = (() => {
     it.durationMs = d.ms ?? null;
     if (d.ms) put++; else empty++;
   }
-  // ⚠️ NAMED, NOT COUNTED AWAY. A length written down for a row that is no
-  // longer in the corpus means the two files have drifted, and the way that
-  // shows up otherwise is a page quietly drawing one fewer tape.
+  // A length for a row no longer in the corpus is named: the two files have drifted.
+  // See lessons/page-resources.md#resources-207
   const orphans = Object.keys(rows).filter((id) => !items.some((x) => x.id === id));
   if (orphans.length && !ONLY) {
     log(`  ${orphans.length} measured length(s) for rows that are not in this corpus: `
@@ -2192,11 +1745,8 @@ const doc = {
       + 'who holds it, its identifier there, one URL and a licence. Nothing is copied. '
       + 'Statuses and CORS were observed on the date above, not assumed.',
   inputs: [{ path: 'proto/deck/corpus.json', generated: deck.generated, items: deck.items.length }],
-  // 🔴 THE ROWS THAT REST ON A BOOK, NAMED SO A REBUILD CAN BE CHECKED.
-  // This used to be a hand-written warning saying that running the generator
-  // would erase everything under it. It is generated now, and what it records is
-  // the opposite: these values come out of the same run that writes this file.
-  // `/resources/` reads it and goes red if a row named here has lost its bracket.
+  // The rows that rest on a book, named so /resources/ goes red if one loses its bracket.
+  // See lessons/page-resources.md#resources-208
   amended: {
     source: THESIS_SOURCE,
     recordedIn: 'research/corpus-from-thesis-2026-09.md',
@@ -2206,11 +1756,8 @@ const doc = {
     heldIn: ['proto/deck/ingest.mjs', 'demo/resources/build-corpus.mjs'],
     rows: amended.map((x) => ({ id: x.id, edtf: x.when.edtf, how: x.when.how })),
   },
-  // 🔴 WHERE THE LENGTHS CAME FROM, BESIDE THE LENGTHS. `/tapes/` draws every
-  // recording as wide as it is long, so a duration is load-bearing on a
-  // picture: this says which program read them, when, and how many rows have
-  // one. A page can print that instead of implying the numbers were always
-  // there.
+  // Where the lengths came from, beside them: /tapes/ draws recordings as wide as they are long.
+  // See lessons/page-resources.md#resources-209
   durations: durations ? {
     source: durations.generator,
     how: durations.how,

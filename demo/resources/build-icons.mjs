@@ -1,31 +1,7 @@
-// demo/resources/build-icons.mjs, writes demo/shell/icons.mjs from the Feather
-// set as Iconify publishes it.
-//
-//   node demo/resources/build-icons.mjs                     # fetch the pinned package from npm, then write
-//   node demo/resources/build-icons.mjs path/to/icons.json  # write from a copy already on disk
-//
-// NODE ONLY, AND IT IS THE ONLY THING THAT EVER ASKS NPM. Asked 2026-10-10:
-// *"see ../eccm icon system. We need one from icones. Make a sample sheet in
-// one of kit pages called icons."* eccm picked Feather on 2026-10-02 over six
-// other sets (eccm `archive/icon-sets.md`) and vendors it into one sprite with
-// `tools/feather.mjs`; positron uses the same set and vendors it too, as a
-// plain ES module, because pages here import `/shell/*.mjs` with no bundler
-// and a page must not ask the Iconify API, or anybody else's server, for a
-// picture at visit time.
-//
-// ⚠️ TO ADD AN ICON: find its Feather name on https://icones.js.org/collection/feather,
-// add `[positron name, feather name]` to a group below, run this, and add the
-// name to nothing else. `/kit/icons/` draws every name in `NAMES`.
-// ⚠️ WHAT CHANGES FROM THE PUBLISHED BODY, AND IT IS ONLY PAINT: every
-// `fill`, `stroke`, `stroke-width`, `stroke-linecap` and `stroke-linejoin` is
-// taken off the shapes and a `<g>` wrapper Iconify adds to carry them is
-// unwrapped, so `icon()` sets them once on the `<svg>` and a caller can change
-// the weight. The geometry is Feather's, untouched (eccm squares Feather's
-// small corners for a site with no radius; positron's controls are rounded at
-// 4 px, so the corners stay).
-// ⚠️ TWO NAMES MAY NOT SHARE ONE FEATHER ICON. A second name for the same
-// picture is a synonym the reader of the sheet cannot tell apart, so this
-// throws, and `/kit/icons/` asserts the bodies are all different.
+// Writes demo/shell/icons.mjs from Feather as Iconify publishes it; no page asks npm.
+// Run: node demo/resources/build-icons.mjs [path/to/icons.json]. Add [name, feather] below.
+// Paint attributes are stripped so icon() sets them; two names may not share one icon.
+// See lessons/page-resources.md#resources-1
 
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';

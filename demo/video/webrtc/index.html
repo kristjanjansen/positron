@@ -28,49 +28,22 @@
   import { fetchIceServers, camWhipPublish, camWhep, whepPlay, CAM_WHIP_PROXY } from '/shell/live.mjs';
   import { createLoopCamera, createPicture, returnVideo, meter, median, delayText, warm, fadeAt } from '/video/loopback.mjs';
 
-  // /video/camera/ with one round trip through Cloudflare beside it. The
-  // camera, with a clock burned into it, feeds two pictures: the original as
-  // it leaves the page, and a WebRTC loopback, camera -> Stream WebRTC input
-  // by WHIP -> back by WHEP. The returned picture carries the clock row, so
-  // its footer reads the glass to glass delay off the frames actually shown.
-  // The publish goes through the worker, so no input key reaches this page.
-  // Until 2026-10-12 this page also held the LL-HLS round trip; that is
-  // /video/llhls/ now (*"Split hls and webrtc loopbacks"*), and what the
-  // two share is /video/loopback.mjs.
-  //
-  // 🔴 EACH PRESS IS REAL CLOUDFLARE STREAM MINUTES, AND THE CAP IS 30 SECONDS
-  // FROM WHEN THE WHIP PUBLISH IS ACCEPTED. Billed by the minute delivered
-  // whatever the protocol (positron-streaming). Asked for: "limit to 10 sec.
-  // just fade out", then "limit to 20sec. fade out sloowly", then (2026-10-12)
-  // "extend to 30s". Thirty seconds after that both pictures have faded to the
-  // ground over their last three and the page stops itself exactly as a stop
-  // press does. WHIP records nothing, so there is nothing left to delete.
-  //
-  // 🔴 THE WebRTC LEG SHARES /cam/'s ONE WHIP INPUT. The worker allows one
-  // camera on it at a time, so a publish answered 409 means /cam/ is on air.
-  // That is said in words, and nothing is retried.
-  //
-  // ⚠️ A VPN PASSES THE HANDSHAKE AND DROPS THE MEDIA. With the Check Point
-  // tunnel up, WHIP and WHEP both answer 201 and no frame ever arrives (CLAUDE.md,
-  // measured 2026-09-25). So when the play side has signalled and no frame has
-  // been decoded after a while, the log names that as one possibility, never as
-  // the cause.
-  //
-  // NOTHING OPENS ON A VISIT. The camera, the relay servers, the publish and
-  // the play are all made on the start press.
+  // /video/camera/ with a WebRTC round trip: WHIP to Stream and back by WHEP via the worker, so
+  // no input key reaches this page. Each press is Stream minutes, capped at 30 s; it shares /cam/'s
+  // one WHIP input (409 means /cam/ is on air). A VPN can pass the handshake and drop the media.
+  // See lessons/page-video.md#video-25
 
   const S = 'web';
   const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
   const LIVE_IN = 'cf-stream:live:video-in', LIVE_OUT = 'cf-stream:live:video-out';
   const LOOP = `${S}:loopback:video-in`;
-  // 30 s a press from the accepted publish, the last 3 of them a fade (asked
-  // 2026-10-10, *"fade out bit faster, both videopanels"*; 2026-10-12, *"extend
-  // to 30s (all 20s limits)"*). BACKSTOP_MS arms the cap anyway if the publish
-  // has not started it by then.
+  // 30 s a press from the accepted publish, the last 3 a fade. BACKSTOP_MS arms the cap if the
+  // publish has not started it by then.
+  // See lessons/page-video.md#video-26
   const NO_MEDIA_MS = 7000, CAP_MS = 30000, FADE_MS = 3000, BACKSTOP_MS = 45000;
 
-  // No readout: every number is in the footer of the picture it is about
-  // (asked 2026-10-12, *"move readout data to videpanel footers"*).
+  // No readout: every number is in the footer of the picture it is about.
+  // See lessons/page-video.md#video-27
   const d = mount({ name: 'WebRTC loopback', what: '', index: '/', indexLabel: 'positron',
     readout: null });
   conceptNav('video/webrtc');
@@ -113,13 +86,9 @@
   let rtc = null;   // the delay meter on the returned picture
   const camera = createLoopCamera({ log, start: () => start(), stop: () => stop(), render: () => render(), extra: [back] });
 
-  // The footer: the delay read off the clock, then what getStats() of the
-  // WHEP connection measured, each cell empty until it has been read. The
-  // word at the left is where the round trip has got to.
-  // ⚠️ THREE CELLS, BECAUSE THE STATE WORD AND THREE IS WHAT FITS ONE LINE OF
-  // A HALF PANEL AT 1280 (MEASURED in a 1280 shot, 2026-10-12: with four the
-  // state was cut to `playin` and the rtt to one digit). The size and the rtt
-  // are in the row's hover beside the codec and the decoded and dropped counts.
+  // The footer: the clock delay, then WHEP getStats() cells, empty until read. Three cells,
+  // because the state word and three is what fits a half panel at 1280; the rest are in the hover.
+  // See lessons/page-video.md#video-28
   const R = createPicture();
   const state = el('span', 'cc-say', '');
   const leftW = el('span', 'cc-left'); leftW.append(el('span', 'cc-say cc-proto', 'WebRTC '), state);
@@ -129,12 +98,9 @@
     { key: 'rate', label: 'kbit/s', reserve: 4 },
   ] });
   const V = loopPanel.values;
-  // 🔴 THE PICTURE SAYS WEBRTC, ALWAYS, EVEN STOPPED. Reported 2026-10-12:
-  // *"not clear that this is webrtc"*. On the panel's own tag plate, top left
-  // of the picture, where it stays in full screen.
-  // The protocol's name is the footer's first word, not a plate over the picture
-  // (asked 2026-10-13: *"rm labels on top of videos in loopback demos. move them
-  // to videopanel fooers"*).
+  // The protocol's name is the footer's first word, not a plate over the picture, so it says
+  // WebRTC always, even stopped.
+  // See lessons/page-video.md#video-29
 
   const pair = el('div', 'cc-pair');
   pair.append(camera.panel.el, loopPanel.el);

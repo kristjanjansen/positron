@@ -19,10 +19,9 @@
      ends are named inside the lane (the kit's `ends`). */
   .cc-dial { display: flex; flex-direction: column; gap: 6px; width: 100%; font: 400 12px/1 var(--mono); }
   .pos-stack > .pos-bgroup { align-self: flex-start; width: auto; }
-  /* The dial scale: each station's name centred on the point the engine tunes
-     it at. The point is a share of the handle's TRAVEL, not of the lane, which
-     is how slider.mjs places its handle, so a name sits under the handle when
-     the handle sits on that station. */
+  /* The dial scale: each station's name centred on its tuning point, a share of the handle's
+     travel rather than of the lane (as slider.mjs places the handle).
+     See lessons/page-radio.md#radio-60 */
   .cc-scale { position: relative; height: 14px; }
   .cc-mark { position: absolute; top: 0; font-size: 11px; transform: translateX(-50%); color: var(--dim2);
     white-space: nowrap; transition: color .12s; }
@@ -41,20 +40,10 @@
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
   import { createMix, pinkNoise } from '/shell/tuner-mix.mjs';
 
-  // An AM tuner as a patchbay: /radio/blend/ with four stations and a noise
-  // source, all into one tuner effect, whose dial picks which station is clear
-  // and lets the neighbours bleed in as echoes. `?base=` points the page at
-  // demo/fake-station.mjs instead of the relay.
-  //
-  // NOTHING OPENS ON A VISIT. No AudioContext and no fetch until play. The
-  // whole patch is held from load, so the picture does not change with play.
-  //
-  // 🔴 PLAY OPENS FOUR CONNECTIONS TO OTHER PEOPLE'S SERVERS PER LISTENER,
-  // through the relay: three ERR mounts and one Ida mount. So ERR counts THREE
-  // listeners for every person who presses play here, not one, and its
-  // audience figures are what it reports to its board. They open only on the
-  // press, because that is a person asking to listen. Never probe them; test
-  // against the stand-in.
+  // /radio/blend/ with four stations and noise into one tuner effect; `?base=` for fake-station.mjs.
+  // Play opens four upstream connections per listener (three ERR, one Ida), counted as ERR listeners:
+  // only on the press, never probed, tested against the stand-in. Nothing opens on a visit.
+  // See lessons/page-radio.md#radio-61
   const BASE = new URLSearchParams(location.search).get('base') || 'https://shout.positron.studio';
   const S = 'web';
   // `at` is the station's point on the dial, 0 to 1, and the scale under the
@@ -115,12 +104,10 @@
   hold(TUNER_OUT, WAVE_IN);
   hold(TUNER_OUT, SPEAKER_IN);
 
-  // ── how the dial maps to sound ──────────────────────────────────────────
-  // d is the distance from the dial to a station's point. Clear is a narrow
-  // bell on the station; echo is a wide bell, faint, and only what clear
-  // leaves; noise fills what no station holds; the whistle is the beat of a
-  // carrier slightly off tune, silent dead on and gone far away, its pitch
-  // rising with the distance.
+  // How the dial maps to sound, by d, the distance to a station's point: clear is a narrow bell,
+  // echo a wide faint one of what clear leaves, noise fills the gaps, and the whistle is an
+  // off-tune carrier's beat, silent dead on, rising with the distance.
+  // See lessons/page-radio.md#radio-62
   let tune = 0.4;
   // The maths is demo/shell/tuner-mix.mjs, shared with /social/radio/.
   const mix = createMix(STATIONS);
@@ -288,8 +275,8 @@
     const m = mix(tune);
     marks.forEach((el, i) => el.classList.toggle('on', m.st[i].clear > 0.5));
   }
-  // No labels on the dial since 2026-10-13 (*"rm labels"*): no 531 / 1602 ends
-  // and no station names under it; the marks still exist for paintScale, unshown.
+  // No labels on the dial; the marks still exist for paintScale, unshown.
+  // See lessons/page-radio.md#radio-63
   const fade = el('div', 'cc-dial');
   fade.append(dial.el);
   paintScale();

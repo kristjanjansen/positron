@@ -1,23 +1,7 @@
-// demo/remote/path.mjs: the relay or direct choice of a remote
-// instrument page, written once for remote/020, 040 and 050.
-//
-// Asked 2026-10-13: *"add direct option to all remote instruments."* (BACKLOG).
-// remote/010 Circuit on Pi and remote/030 Pi piano carry this inline; these
-// three pages take it from here so they cannot drift from each other, and it is
-// the same control, the same URL and the same fall back as those two:
-//
-//   - `createChoice` labelled `path`, `relay` and `direct`, relay the default.
-//   - `?path=direct` opens on direct, and the URL follows the choice.
-//   - `connecting()` sweeps the `direct` segment while the link is being made
-//     (board.mjs `goDirect`, which gives up after 3 s).
-//   - `fellBack()` lights `relay` and drops `?path=direct` when direct did not
-//     open or dropped, so the choice shows the path in use, not the one asked.
-//   - `rewire(bay, path, isPi)` re-lays every link between the page and the Pi
-//     with `via: 'datachannel'` while direct (or through TURN) and `via: 'relay'`
-//     otherwise, so the patchbay draws the wire that carries it.
-//
-// A change of choice calls `onPick(mode)`; the page tears its board down and,
-// if it was playing, plays again on the new path, as 030 does.
+// The relay or direct choice of a remote page, one copy so the pages cannot drift: `path` choice,
+// `?path=direct`, `connecting()`, `fellBack()` (direct gave up after 3 s or dropped), and `rewire`
+// laying Pi links with `via: 'datachannel'` or `'relay'`. A change calls `onPick(mode)`.
+// See lessons/page-remote.md#remote-33
 import { createChoice } from '/shell/choice.mjs';
 
 /** `datachannel` for a direct or TURN path, `relay` for everything else. */
@@ -61,6 +45,7 @@ export function createPathChoice({ log = () => {}, onPick = () => {} } = {}) {
      * Lay every link that touches the Pi again with the wire that carries it.
      * `isPi(link)` says which links are the board's; a file link to R2 is not.
      * Answers whether anything changed.
+     * See lessons/page-remote.md#remote-34
      */
     rewire(bay, path, isPi, warn = log) {
       const via = viaOf(path);

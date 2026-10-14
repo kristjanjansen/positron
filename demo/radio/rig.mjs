@@ -1,9 +1,7 @@
-// demo/radio/rig.mjs: what /radio/tempo/ and /radio/live/ share, one copy
-// since 2026-10-14 (they carried it line for line). The wave with its beat
-// lines, the tempo detector and its scope, the fx box with its click and mix
-// knob, the station picker, Play, and the links between them. A page brings
-// its source: the stations, the nodes up to the player's `audio-out`, the
-// links into it, and how a station starts and stops.
+// What /radio/tempo/ and /radio/live/ share: the wave with beat lines, the tempo detector and
+// its scope, the fx box, the station picker, Play, and their links. A page brings its source:
+// stations, nodes up to the player's `audio-out`, links into it, and start and stop.
+// See lessons/page-radio.md#radio-40
 import { el } from '/shell/shell.mjs';
 import { createPatchbay } from '/shell/patchbay.mjs';
 import { addNodes } from '/shell/nodes.mjs';
@@ -103,10 +101,9 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
   }
   const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', right: false, left: pick.el });
 
-  // The beats on the wave: a canvas over the scope, drawn on the scope's own
-  // seconds (4 across, the newest at the right edge), so a mark scrolls left
-  // with the sound it was placed on. Each is as bright as the reading that
-  // placed it was sure.
+  // The beats on the wave: a canvas over the scope on its own seconds (4 across, newest at the
+  // right), so a mark scrolls with its sound; each as bright as its reading was sure.
+  // See lessons/page-radio.md#radio-41
   const WAVE_S = 4;
   const beatCanvas = el('canvas', 'cc-beats');
   waveHost.append(beatCanvas);
@@ -117,21 +114,16 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
     if (!steady(ev)) return;
     for (const b of ev.beats) if (Number.isFinite(b)) beats.push({ at: b, c: ev.confidence ?? 1 });
   }
-  /** Where now sits on the tempo scope: fixed at 5/6 of the width. Following
-   *  where new beat lines appear was tried and taken back the same day (*"move
-   *  dot to 5/6 of w. keep it steady"*). */
+  /**
+   * Where now sits on the tempo scope: fixed at 5/6 of the width, steady.
+   * See lessons/page-radio.md#radio-42
+   */
   const nowAt = () => 5 / 6;
 
-  // The tempo scope: every reading that arrived on the display's in-port, time
-  // across (the last TEMPO_S seconds, the newest at nowAt() of the width) and bpm up, the
-  // detector's whole range. Asked 2026-10-11: *"show all condidences"*, *"same
-  // h as waveform . no horiz grid"*, *"zoom in time, show less hsitoric"* and
-  // *"show bpm and conf on all times"*. So nothing is withheld: the chosen
-  // tempo is the line, each segment as bright as its confidence, every
-  // candidate the detector weighed is a dot as bright as its score, and the
-  // pointer reads any moment out in full. The labels on the line and the
-  // vertical lines came off the same day (*"no need for annotations"*, *"rm
-  // radio 020 vert line on viz"*). The range is the corner label. 15 s across is a quarter of the 60 it was.
+  // The tempo scope: every reading, the last TEMPO_S seconds across and bpm up over the detector's
+  // range. The chosen tempo is the line, each segment as bright as its confidence, every candidate
+  // a dot as bright as its score; the pointer reads any moment out in full.
+  // See lessons/page-radio.md#radio-43
   const TEMPO_S = 15;   // now is at nowAt(), 5/6 of the width
   const tempoCanvas = el('canvas', 'cc-tempo');
   const tempoHost = el('div', 'cc-tempo-host');
@@ -152,9 +144,9 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
     const c = Number.isFinite(ev.confidence) ? ev.confidence : 0;
     history.push({ at: ctx ? +ctx.currentTime.toFixed(2) : 0, v: ev.v, confidence: c, beatAt: ev.beatAt ?? null,
       candidates: Array.isArray(ev.candidates) ? ev.candidates : [] });
-    // Under STEADY the reading is not a fact, so no number is shown: readings
-    // at 0.5 or more were 92% within 4% of the reference tools, under it 54%
-    // (research/tempo-key-eval-2026-10-12.md 4.2). The line still draws, dimmed.
+    // Under STEADY no number is shown: readings at 0.5 or more were 92% within 4% of the reference
+    // tools, under it 54% (research/tempo-key-eval-2026-10-12.md 4.2). The line still draws, dimmed.
+    // See lessons/page-radio.md#radio-44
     tempoPanel.values.set('bpm', c >= STEADY ? `${ev.v.toFixed(1)} bpm` : 'no steady beat');
     tempoPanel.values.set('conf', c.toFixed(2));
   }
@@ -167,10 +159,9 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
     requestAnimationFrame(frame);
   }
 
-  // ── the tempo detector: /radio/tempo.mjs, shared by both pages since
-  // 2026-10-12. Every step of it, every constant and every measurement behind
-  // them is written there. It hears the player's sound on its own link and
-  // sends each reading out on BPM_EV.
+  // The tempo detector is /radio/tempo.mjs, with every constant and measurement behind it. It
+  // hears the player's sound on its own link and sends each reading out on BPM_EV.
+  // See lessons/page-radio.md#radio-45
   let det = null;
   const detBuild = () => createTempoDetector(ctx, { pull, playing: () => playing, onReading: (ev) => bay.send(BPM_EV, ev) });
 
@@ -207,8 +198,8 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
     g.globalAlpha = 1;
   }
 
-  // The tempo scope. No grid lines and no time label (*"rm 15sc label"*). The
-  // range in the top left corner.
+  // The tempo scope: no grid lines, no time label, the range in the top left corner.
+  // See lessons/page-radio.md#radio-46
   let stoppedAt = 0;
   const clock = () => (ctx ? (playing ? ctx.currentTime : stoppedAt) : 0);
   function drawTempo() {
@@ -219,9 +210,8 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
     const pad = 8 * dpr, top = pad, bot = H - pad;
     const y = (v) => bot - ((v - LO) / (HI - LO)) * (bot - top);
     const now = clock();
-    // Now sits at nowAt() of the width, the last TEMPO_S seconds to its left,
-    // and no lines up the scope. Asked 2026-10-11: *"rm radio 020 vert line on
-    // viz. make yellow dot around 2/3 of w"*.
+    // Now sits at nowAt() of the width, the last TEMPO_S seconds to its left, no lines up the scope.
+    // See lessons/page-radio.md#radio-47
     const xNow = W * nowAt();
     const x = (at) => xNow - ((now - at) / TEMPO_S) * xNow;
     while (history.length && history[0].at < now - TEMPO_S - 1) history.shift();
@@ -239,9 +229,9 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
       g.globalAlpha = shade(q.confidence);
       g.beginPath(); g.moveTo(x(p.at), y(p.v)); g.lineTo(x(q.at), y(q.v)); g.stroke();
     }
-    // The dot is NOW and stays at xNow (*"can yellow dot just steady on lover
-    // wiz"*): the line runs on from the last reading to it, so the dot never
-    // drifts left between readings and jumps back when one arrives.
+    // The dot is now and stays at xNow: the line runs on from the last reading to it, so the dot
+    // never drifts left between readings.
+    // See lessons/page-radio.md#radio-48
     const last = history[history.length - 1];
     if (last) {
       g.strokeStyle = last.confidence >= STEADY ? k.fg : k.dim;
@@ -251,8 +241,8 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
     g.globalAlpha = 1;
     if (last) { g.fillStyle = last.confidence >= STEADY ? k.hi : k.dim; g.beginPath(); g.arc(xNow, y(last.v), 3 * dpr, 0, 2 * Math.PI); g.fill(); }
     g.font = `${11 * dpr}px ${k.mono}`;
-    // No labels on the line since 2026-10-11 (*"no need for annotations"*):
-    // the footer says the bpm and confidence, the pointer reads any moment.
+    // No labels on the line: the footer says the bpm and confidence, the pointer reads any moment.
+    // See lessons/page-radio.md#radio-49
     g.fillStyle = k.dim;
     g.textBaseline = 'top'; g.textAlign = 'left';
     g.fillText(`${LO} to ${HI} bpm`, 6 * dpr, 6 * dpr);
@@ -326,23 +316,10 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
     face();
   }
 
-  // ── the fx box ──────────────────────────────────────────────────────────
-  // in -> dry gain (1 - mix) -------------------------------------------> out
-  // in -> two high passes (12 dB each) -> music gain (mix * MUSIC_AT_1) -> out
-  //       drum voices -> saturation -> drum gain (mix) -----------------> out
-  // At mix 0 the output is the input through a gain of exactly 1. Turning up,
-  // the low cut rises from CUT_LO to CUT_HI (geometrically, so the middle of
-  // the knob is the middle of the octaves) and the drum comes up, so the
-  // middle is a blend and the top is thin music under a dominant drum. Asked
-  // 2026-10-11: *"max mix make music whay thinner and bd dominent"*.
-  //
-  // 🔴 AND THE LOUDNESS STAYS WHERE THE DRY RADIO IS AT EVERY MIX, asked the
-  // same day as *"keep volume the same in all mix settings"*. The music and the
-  // drum go through one makeup gain, and every LEVEL_MS a loop compares the
-  // output's loudness with the input's (both K weighted, as a loudness meter
-  // weighs them: a high shelf of +4 dB above 1.7 kHz and a cut below 38 Hz,
-  // mean squares eased over LEVEL_TAU_S) and nudges that gain toward equal. It
-  // touches only the wet side, so at mix 0 the output is still the input.
+  // The fx box: dry (1 - mix) plus two 12 dB high passes rising CUT_LO to CUT_HI with mix, plus
+  // the drum. Mix 0 is the input at gain 1. A makeup gain on the wet side keeps the K weighted
+  // loudness equal to the dry radio's at every mix, nudged every LEVEL_MS.
+  // See lessons/page-radio.md#radio-50
   const CUT_LO = 120, CUT_HI = 900, MUSIC_AT_1 = 0.45, DRUM_GAIN = 0.85, AHEAD_S = 0.12, TICK_MS = 25;
   const LEVEL_MS = 100, LEVEL_TAU_S = 1.5;
   let fx = null, fxTap = null, fxBuf = null, mix = 0.5, fxGrid = null, fxLast = -Infinity, fxTimer = 0;
@@ -398,23 +375,18 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
     mix = Math.max(0, Math.min(1, ev.v));
     fxMixApply();
   }
-  // A tempo the detector is sure of sets the grid; one under DRUM_FLOOR takes
-  // the grid away and the drum stops. The pictures show every reading; only
-  // the drum waits for a sure one, because a kick on a wrong grid is heard.
-  // 0.5: MEASURED offline 2026-10-11, the steady stretches of both recordings
-  // read 0.6 to 0.9 and Raadio 4's last minute, which has no steady beat,
-  // reads under 0.3.
+  // A tempo at DRUM_FLOOR or above sets the grid; under it the drum stops, since a kick on a wrong
+  // grid is heard. Steady stretches read 0.6 to 0.9, a stretch with no steady beat under 0.3.
+  // See lessons/page-radio.md#radio-51
   const DRUM_FLOOR = 0.5;
   function fxTempo(ev) {
     if (ev?.of !== 'param' || ev.name !== 'bpm') return;
     const sure = Number.isFinite(ev.v) && Number.isFinite(ev.beatAt) && (ev.confidence ?? 0) >= DRUM_FLOOR;
     fxGrid = sure ? { bpm: ev.v, beatAt: ev.beatAt } : null;
   }
-  // A click, not a bass drum, since 2026-10-11 (*"is bd sound laggy? make click
-  // isntead"*). The drum was on its grid to 2.5 ms (MEASURED by the agent that
-  // built it), but a sine falling to a 52 Hz body puts its weight 20 to 70 ms
-  // after the onset, so it is heard late. A click has all its energy in its
-  // first 2 ms: a burst of white noise and a 2.5 kHz tick, gone in 15 ms.
+  // A click, not a bass drum: a sine falling to a 52 Hz body puts its weight 20 to 70 ms late,
+  // so it sounds late. White noise and a 2.5 kHz tick have all their energy in 2 ms, gone in 15.
+  // See lessons/page-radio.md#radio-52
   let noise = null;
   function kick(at) {
     if (!noise) {

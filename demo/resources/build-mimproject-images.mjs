@@ -1,45 +1,7 @@
-// Builds `demo/resources/mimproject-images.json`, which is a THIRD corpus.
-//
-// 🔴 WHAT IT IS AND WHY IT IS NOT IN EITHER OF THE OTHER TWO. `corpus.json`
-// holds pointers to things somebody else holds, so its rules are "never copy,
-// never re-probe". `mimproject.json` holds the videos, which we hold. This file
-// holds PICTURES recovered from a site that no longer exists: every one of the
-// four mimproject.org hosts stopped resolving, so the Wayback Machine was the
-// only remaining copy, and what came back is ours to hold in the same sense the
-// videos are.
-//
-// 🔴 THE CLAIM THIS WORK REFUTED. The standing note said mimproject.org was
-// down and *archive.org has nothing of it*, so the YouTube channel and the
-// bucket were what survived. MEASURED 2026-09-19 from the CDX index: **2843
-// captures, 778 unique URLs, 421 HTML pages, spanning 2009-10-30 to
-// 2026-02-09.** The claim was wrong about pages and pictures. It was RIGHT
-// about video: zero mp4, mov, webm, mp3, wav or pdf in the whole index, so the
-// videos really do survive only on YouTube and Vimeo.
-//
-// ⚠️ MEASURED AND EDITORIAL ARE SPLIT, the same way `build-mimproject.mjs`
-// splits them. `mimproject-images-measured.json` holds what was read off the
-// bytes and off the index and nothing else. The prose, the site descriptions
-// and the naming are here.
-//
-// 🔴 KEYED BY `id`, NEVER BY FILE NAME. The id is a hash of the picture's
-// source URL after its crop suffix and its Drupal imagecache preset are taken
-// off, so the 1024x1024 crop and the original are ONE picture with one id. A
-// name is a thing a re-encode changes, which this project has already paid for
-// once: a lookup keyed by file name silently re-credited somebody else's
-// recording when a re-encode renamed it.
-//
-// ⚠️ A DATE IS STATED ONLY WHERE THE PATH CARRIES ONE. WordPress writes
-// `/uploads/2017/09/`, which is the month somebody uploaded the file and is NOT
-// the date of the work. It is carried as `uploadedPath` and never as `when`,
-// for exactly the reason the video corpus keeps `uploaded` and `when` apart.
-//
-// ⚠️ THIRTY OF THE SIXTY-SEVEN ARE 145x145 THUMBNAILS and say so in
-// `thumbnail`. The originals behind them were never captured. A thumbnail is
-// worth holding because it is the only surviving picture of that work, and it
-// must never be mistaken for a picture somebody can use.
-//
-//   node demo/resources/build-mimproject-images.mjs          # writes the json
-//   node demo/resources/build-mimproject-images.mjs --check  # prints, writes nothing
+// Builds mimproject-images.json, pictures recovered from the Wayback Machine (no video there).
+// Measured facts are in mimproject-images-measured.json, keyed by id (a hash of the source URL
+// without crop or preset). Run with no flag, or --check to print only.
+// See lessons/page-resources.md#resources-67
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -49,11 +11,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const MEASURED = join(HERE, 'mimproject-images-measured.json');
 const OUT = join(HERE, 'mimproject-images.json');
 
-// The station worker serves any object in its bucket at `/media/<key>` with
-// Range and `access-control-allow-origin: *`.
-// ⚠️ It also serves them `immutable` for a year, so a replacement needs a NEW
-// NAME rather than an overwrite. And its five-minute `sweep()` lists and
-// deletes under `live/` ONLY, which is why this prefix is safe there.
+// The station worker serves the bucket at `/media/<key>`, immutable for a year, so replace
+// by new name; its sweep() deletes under `live/` only.
+// See lessons/page-resources.md#resources-68
 const BASE = 'https://positron-station.kristjan-jansen.workers.dev/media/mimproject-images/';
 
 /** What each host was. Four sites lived on that one domain and they are not
@@ -66,22 +26,8 @@ const SITES = {
 };
 
 /**
- * 🔴 WHAT WAS TAKEN OUT AND WHY, CARRIED IN THE CORPUS RATHER THAN DELETED
- * QUIETLY. Four pictures were pulled on 2026-09-19: every one of them is
- * advertising for the same Thai online casino, uploaded to
- * `/wp-content/uploads/2025/01/` AFTER the domain had lapsed. They are what a
- * SQUATTER put on mimproject.org.
- *
- * ⚠️ THIS IS A FACT ABOUT THE SURVEY'S QUESTION, NOT A SLIP. The Wayback index
- * was asked what the DOMAIN had held, and a domain outlives the people who had
- * it. Captures from 2009 to 2023 are MIMproject's; the 2025 and 2026 ones are
- * somebody else's business on the same name. Nothing in a CDX row says which,
- * and a build that just counted images would have shipped all four for ever.
- *
- * ⚠️ AND THE ENTRY NEXT DOOR CALLED IT A `2025 revival`, WHICH IS EXACTLY THE
- * WRONG READING and was written here, in `mimproject-images.json` and in two
- * notes before anybody looked at the pictures. A site coming back and a site
- * being taken are the same shape in an index of URLs.
+ * Removed pictures: four casino adverts a squatter uploaded after the domain lapsed.
+ * See lessons/page-resources.md#resources-69
  */
 const m = JSON.parse(readFileSync(MEASURED, 'utf8'));
 
@@ -111,10 +57,8 @@ const items = m.items.map((r) => {
 	};
 }).sort((a, b) => (a.site === b.site ? a.file.localeCompare(b.file) : a.site.localeCompare(b.site)));
 
-// 🔴 THE FILE NAMES HAVE TO BE UNIQUE AND THIS THROWS RATHER THAN WARNS. Two
-// pictures landing on one bucket key would put one of them on top of the other,
-// and the bucket serves `immutable`, so the loser would be unrecoverable
-// without a rename nobody would know to make.
+// File names must be unique; this throws, since an immutable overwrite cannot be undone.
+// See lessons/page-resources.md#resources-70
 const seen = new Set();
 for (const it of items) {
 	if (seen.has(it.key)) throw new Error(`two pictures claim one key: ${it.key}`);
@@ -122,14 +66,9 @@ for (const it of items) {
 }
 
 /**
- * 🔴 AND THE BUILD REFUSES ANYTHING FROM AFTER THE DOMAIN LAPSED. The four
- * casino adverts all came from `/uploads/2025/01/`, and the only thing that
- * separated them from MIMproject's own pictures was somebody opening them. A
- * date cannot prove authorship, but it can carry the one fact that is known:
- * nothing on that domain after 2024 is MIMproject's.
- * ⚠️ IT THROWS RATHER THAN FILTERING. A build that silently dropped rows would
- * hide a real picture with a late upload path just as quietly as it hid these,
- * and the person re-running a survey is the one who should decide.
+ * Refuses anything uploaded after 2024 (the domain lapsed); throws rather than filters,
+ * so whoever reruns the survey decides.
+ * See lessons/page-resources.md#resources-71
  */
 const late = items.filter((r) => r.uploadedPath && r.uploadedPath >= '2025');
 if (late.length) {
@@ -160,13 +99,8 @@ const doc = {
 		withAPageThatShowedThem: items.filter((r) => r.shownOn.length).length,
 		bySite,
 	},
-	// 🔴 WHAT IS GONE IS PART OF THE RECORD. 196 pictures are referenced by an
-	// archived page and were never captured, and the biggest single loss is the
-	// opera production photography. A corpus that listed only what it has would
-	// read as though that were everything there was.
-	// What was ingested and then taken out, so the next survey does not put it
-	// back. Keyed by the source URL, which is the thing that identifies a
-	// squatter's upload.
+	// What was ingested then removed, keyed by source URL, and the 196 pictures never captured.
+	// See lessons/page-resources.md#resources-72
 	removed: m.removed,
 	notRecovered: {
 		note: 'Referenced by an archived page and never captured, so gone.',

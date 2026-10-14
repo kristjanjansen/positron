@@ -1,0 +1,2092 @@
+# Page comments: shape
+
+The full comments cut from the code under demo/ for shape, verbatim. Each heading is the id a pointer in the code names, then the file, the block and the line it stood on before the cut.
+
+<a id="shape-1"></a>
+## shape-1: demo/shape/index.html, style, line 10
+
+````css
+  /* 🔴 EVERYTHING THAT CAN REACH THE INSTRUMENT, AND NOTHING ELSE. The part
+     chooser and the two controls live here rather than in `.pos-controls`,
+     because `demo/verify.mjs` clicks every button in that row on every run: a
+     `move everything` in there would be the suite putting a random patch on
+     somebody's synth dozens of times a day.
+
+     🔴 THREE CONTROLS IN TWO GROUPS, AND THE ROW IS JUSTIFIED SINCE 2026-09-29.
+     Asked as a sketch of one line on 2026-09-25: *"[circuit connected]
+     [Synth1|Synths] [⇄] <- square button, makes all buttons `invisible hand`
+     staeting from random positions"*. The row carried a FOURTH, `put back`, as
+     a departure that was written up as one, and *"rm put back button"* took it
+     out. The stop it carried did not go with it: the glyph is a toggle now and
+     its second state IS the way back, which is written out beside the button.
+     Then *"fix invisuble hand button"* arrived with a screenshot of the glyph
+     standing clear of the chooser wearing a rounded ring of its own and it
+     became the chooser's LAST SEGMENT, and *"sents to right align (justify), rm
+     label, invisible hand is a separat e button not a radio group"* took it
+     back out. It is a sibling of the chooser now, GROUPED with it rather than
+     parented to it, which is what keeps the row at two flex children.
+
+     🔴 SO IT IS `space-between` OVER EXACTLY TWO CHILDREN, AND THE COUNT IS THE
+     RULE RATHER THAN AN ACCIDENT OF THIS PAGE. `space-between` justifies every
+     WRAPPED LINE on its own, so a line holding two or more items comes back
+     right-aligned under a left-aligned one, which is the shape that reads as
+     broken and which `positron-compose` measured on `/nola/` at 375. With one
+     item per wrapped line the browser parks each at the START, which is the
+     phone behaviour this project asks for anyway: a desktop row that justifies
+     goes left aligned on a phone with gaps between the elements rather than
+     squished. So the status is one end, `.shape-bar-end` is the other, and
+     there is no media query and no threshold anywhere in this.
+     ⚠️ AND THE ROW HAS A WIDTH TO SPREAD ACROSS, WHICH IS THE HALF THAT MAKES
+     `between` REAL RATHER THAN A LONGER NAME FOR `start`. MEASURED 2026-09-29:
+     `.shape-bar` is 688.0 px at both 756 and 1280 because it is a stack child
+     filling the column, against 466.2 of control, so there are 221.8 px for the
+     justification to spend. This project has measured three glued surfaces
+     where `between` did nothing at all, two children 8 px apart against an 8 px
+     gap, because a shrink-to-fit surface has no width of its own to give away.
+
+     🔴 MEASURED OFF REAL RECTS AT THREE WIDTHS, 2026-09-29, AFTER THE SPLIT AND
+     AFTER THE CAPTION WENT, with a throwaway probe. The status is 195.1, the
+     chooser is 227.1 on a desktop and 215.1 in its phone layout, and the glyph
+     is 34.0 with the row's own 10.0 between them:
+
+       375 px    column 343.0   TWO LINES   status, then the chooser and glyph
+       756 px    column 688.0   ONE LINE    466.2 of control, 221.8 between them
+      1280 px    column 688.0   ONE LINE    the same 466.2, the column is fixed
+
+     🔴 AND THE TWO EARLIER ARRANGEMENTS ARE KEPT AS DATED MEASUREMENTS RATHER
+     THAN AS A DESCRIPTION OF THIS PAGE. Before the join the three boxes were
+     195.1, 288.4 and 34.0 with two 10 px gaps, which is 537.5 packed; the join
+     made them 195.1 and 321.4 with one gap, 526.5, because a joined segment
+     overlaps its neighbour by a pixel and spends no gap. This is 476.2 packed,
+     and the 50.4 it gave back is the CAPTION rather than the seam: losing
+     `sends to` took 61.4 off the chooser and undoing the seam cost 11.0 of it
+     straight back.
+     ⚠️ WRAPPING IS MEASURED AS THE ROW'S OWN HEIGHT AGAINST ITS TALLEST CHILD,
+     which is the only reading that answers it: the bar is `align-items: center`
+     and a count of distinct tops says two where a reader sees one whenever two
+     children are different heights. 78.0 against 34.0 at 375, and 34.0 against
+     34.0 at 756 and at 1280. It was 91.5 at 375 while the caption was there,
+     because `.pos-choice` puts a caption on its own line at that width and
+     stood 47.5 tall for it.
+     ⚠️ AND AT 375 NOTHING FITS HOWEVER MANY THERE ARE: 464.2 against a 343 px
+     column, so it breaks 1 and 1, the status on its own line and then the
+     chooser and the glyph together on the next, both parked at the page's own
+     16 px inset. A row that scrolled sideways instead is already recorded in
+     this project as a thing nobody reads.
+     ⚠️ 375 IS THE PHONE, the iPhone mini, which is what `demo/shot.mjs` opens
+     and the narrowest current iPhone, so what fits it fits every iPhone.
+     ⚠️ AND NO SIDEWAYS DRAG AT ANY OF THE THREE, measured as
+     `documentElement.scrollWidth - clientWidth` and 0 every time, with the
+     chooser's own segment scroller measuring 0 of overflow as well. That one is
+     worth saying: `.pos-choice .step` is `overflow-x: auto`, so a longer part
+     name could push the row into scrolling and hide an option behind an edge,
+     and at no width does it. The assert below re-checks the page at the one
+     width the harness runs. */
+````
+
+<a id="shape-2"></a>
+## shape-2: demo/shape/index.html, style, line 92
+
+````css
+  /* 🔴 THE FAR END OF THE JUSTIFIED ROW, AND IT IS ONE ELEMENT SO THAT THE ROW
+     IS TWO. The chooser and the glyph are one group because they are the pair a
+     reader works together: pick a part, then set it moving. Without the wrapper
+     `space-between` would have THREE children to spread and would park the
+     chooser in the middle, at whatever offset the difference between its two
+     neighbours happened to leave, which is the same reason an optically centred
+     control here is a grid rather than a flex row.
+     ⚠️ THE GAP IS READ, NOT TYPED TWICE. `--shape-bar-gap` is declared on
+     `.shape-bar` above and a custom property inherits downward, so the air
+     between the status and this group and the air inside it are one
+     measurement. `shell.css` has repaired this exact defect twice, as
+     `--sld-col` and as `--ctl-gap`, and CLAUDE.md calls a number typed twice
+     this project's most repeated defect in its cheapest form.
+     ⚠️ AND IT WRAPS FOR THE SAME REASON THE ROW DOES: it holds exactly two
+     children, so a wrapped line here also holds one item and parks at the
+     start. MEASURED 2026-09-29 it is 259.1 wide against a 343 px column at 375,
+     so it does not wrap today, and what the declaration buys is that a longer
+     part name folds rather than dragging the page sideways. */
+````
+
+<a id="shape-3"></a>
+## shape-3: demo/shape/index.html, style, line 114
+
+````css
+  /* 🔴 A SECTION IS A GLUED ROW'S ONLY CHILD, AND IT NEEDS THE TWO DECLARATIONS
+     EVERY FLEX ITEM IN A FLEX ROW NEEDS. `.pos-rows-r` is `display: flex`, and
+     a flex item's automatic minimum size is its CONTENT, so without
+     `min-width: 0` a section of twelve sliders sizes its row from its widest
+     lane and the surface drags sideways. `shell.css` writes this down three
+     times already, for `tabs.mjs` at 390 px, for `.pos-tbl-row` and for the
+     card grid.
+     ⚠️ AND `flex: 1 1 auto` IS THE OTHER HALF: the default `0 1 auto` leaves a
+     section at its content width, and `.sld-group`'s lanes are
+     `minmax(0, 1fr)`, so a section that does not take the row's width lays its
+     lanes out against a track that resolved against nothing. This is the same
+     pair the rack carried inside `.panel-strip` until 2026-09-28, moved one
+     container along with the argument unchanged.
+     ⚠️ AND IT IS A PAGE RULE RATHER THAN A KIT ONE, WHICH IS REPORTED RATHER
+     THAN DECIDED HERE. `shell.css` already carries
+     `.pos-rows-r[data-pad="off"] > :only-child { flex: 1 1 auto; min-width: 0 }`
+     for a picture row, and a PADDED row holding one block wants exactly the
+     same two declarations. That is a kit rule this page cannot write. */
+````
+
+<a id="shape-4"></a>
+## shape-4: demo/shape/index.html, style, line 134
+
+````css
+  /* 🔴 ONE LABEL COLUMN ACROSS EVERY SECTION, AND THIS IS WHY IT IS HERE AND
+     NOT IN THE KIT. `.sld-group` sizes its label column `max-content`, so a
+     group sizes it from ITS OWN widest label. This page has NINE groups under
+     nine headings since it took Novation's grouping, and they are NINE GLUED
+     SECTIONS OF ONE PANEL since 2026-09-28, which changes nothing about this
+     rule: a seam between two sections says nothing about where their lanes
+     start. The longest
+     labels in them are 18 characters (`virtual sync depth` under OSC 1,
+     `env 2 to frequency` under FILTER) against five (`level` under DISTORTION
+     and under CHORUS). Left alone, nine sections begin their lanes at nine
+     different x and the panel reads as nine unrelated tables.
+     ⚠️ IT IS `--lab`, WHICH `/archive/radio/` ALREADY INVENTED for the same problem one
+     component over, and the measurement is made in the script rather than
+     guessed here. The assert below reads the real rects, because a rule that
+     lost to another rule is this project's most expensive kind of defect and
+     the source always reads as correct.
+
+     🔴 AND IT SETS A WIDTH ON THE HEAD RATHER THAN OVERRIDING THE GROUP'S
+     COLUMNS, WHICH IS THE ONLY REASON THE SECOND COLUMN BELOW WORKS AT ALL.
+     This rule was `.shape-rack .sld-group { grid-template-columns:
+     var(--lab, max-content) minmax(0, 1fr) }` until 2026-09-21, under the class
+     name the rack carried before it became glued sections, and the kit's
+     two column layout is `.sld-group.pos-pair { grid-template-columns:
+     repeat(2, max-content minmax(0, 1fr)) }` inside a `@media (min-width:
+     720px)`. A MEDIA QUERY ADDS NO SPECIFICITY, and this page's stylesheet
+     comes after `shell.css`, so the page's plain rule would have beaten the
+     kit's paired one at EVERY width and the second column would never have
+     appeared once in its life. That is the `.pos-pick` failure exactly, which
+     sat unnoticed for as long as it existed. Sizing the HEAD instead leaves the
+     kit's columns alone: a grid item with a definite width contributes that
+     width to a `max-content` track, so every label column in the rack resolves
+     to `--lab` whether the grid has two columns or four.
+     ⚠️ `content-box`, BECAUSE THE SEAM IS PADDING. `shell.css` puts
+     `padding-left: var(--sld-seam, 32px)` on the right hand slider's head so
+     the gap between two sliders is bigger than the gaps inside one. Under the
+     global `border-box` that padding would eat into `--lab` and squeeze the
+     label; under `content-box` it is added outside it, which is what makes it a
+     seam rather than a crop.
+     ⚠️ AND THE MEASUREMENT STILL READS THE LABEL AND THE VALUE, NEVER THE HEAD.
+     `shareLabelColumn` measures `.sld-l` and `.sld-v`, which are flex items in
+     a `flex-start` column and keep their natural widths however wide the head
+     around them is. Measuring the head would read back the answer instead of
+     the question and the number could only ever grow. */
+````
+
+<a id="shape-5"></a>
+## shape-5: demo/shape/index.html, style, line 179
+
+````css
+  /* 🔴 TWO SLIDERS ACROSS ON A DESKTOP, AND THIS COMMENT USED TO ARGUE THE
+     OPPOSITE. Asked for 2026-09-21 as *"can we get 2 col sliders in desktop?"*.
+     What stood here said the rack is a column and is allowed to be tall, that
+     fifty two parameters stacked is what an editor for a synth with fifty two
+     parameters looks like, and that two across would take the shared column
+     with it. The last of those was the load bearing claim and it is wrong: the
+     kit's paired grid is `repeat(2, max-content minmax(0, 1fr))`, so BOTH label
+     columns are sized the same way and `--lab` fixes both of them. What is true
+     is that the claim gets one word longer, because a lane now lines up with
+     every other lane in its own column rather than with every lane on screen,
+     and the assert below says which of the two it just measured.
+     🔴 AND NOT ONE MEASUREMENT IS TYPED IN THIS FILE. The breakpoint, the seam
+     and the column gap are all `shell.css`'s, reached by passing `pair: true`
+     to `createSliderGroup`. A `720` typed here would be a shared measurement in
+     two files, which is the defect `--sld-col` exists to stop. */
+````
+
+<a id="shape-6"></a>
+## shape-6: demo/shape/index.html, inline script, line 213
+
+````js
+  /**
+   * 🔴 EDITING A NOVATION CIRCUIT WHILE IT PLAYS, AND THE ANSWER TO WHETHER
+   * THAT WORKS IS NOW A FACT RATHER THAN A READING. **A person played the
+   * Circuit from this page on 2026-09-21 and reported *"shape works"*.** Until
+   * that morning nobody had ever heard this page, and this comment claimed the
+   * real time behaviour *"was already measured"* on the strength of Novation's
+   * documentation, which is a different kind of claim and a weaker one.
+   * `demo/shell/circuit-cc.mjs` holds **98 control change parameters** parsed
+   * out of Novation's Circuit Programmer's Reference Guide v1.1: 52 for the two
+   * synths, 28 for the drums, 18 for the session. That the device answers a
+   * control change on the LIVE voice, under a note that is already sounding, the
+   * same way it answers its own macro knobs, is what the guide says AND what the
+   * instrument on this desk did.
+   * ⚠️ WHAT IS STILL ONLY DOCUMENTED IS THE OTHER 46. One person moved sliders
+   * on a synth part and heard the sound change; the drum parameters and the
+   * session parameters are still the reference guide's word, and so is every
+   * individual controller number in the table.
+   *
+   * 🔴 NO SysEx. NOT ONE BYTE, AND THAT IS THE WHOLE SAFETY STORY.
+   * `plans/plan-circuit-editor.md` §1 records that `Replace Current Patch` and
+   * `Replace Patch` differ by ONE BYTE at offset 6, and the second overwrites a
+   * patch in flash on a device with **no factory reset**. `New Pack.circuitpack`
+   * in this repository is somebody's only copy of that flash. So this page has
+   * one function that turns an intention into bytes, it can express a control
+   * change and nothing else, and there is an assert that it returns null for a
+   * SysEx, for a program change and for a note.
+   *
+   * ⚠️ AND THE PAGE CANNOT READ THE INSTRUMENT. A control change is write only:
+   * there is no question this page may ask that the Circuit will answer with
+   * what its patch currently holds, because the only thing that would answer it
+   * is a SysEx dump. So a handle here says where THIS PAGE left a parameter and
+   * never what the patch holds, and what this page offers is called `put back`
+   * rather than `reset` for that reason. The real undo is on the instrument:
+   * reloading the session brings the patch back off flash, which control changes
+   * never touch.
+   */
+````
+
+<a id="shape-7"></a>
+## shape-7: demo/shape/index.html, inline script, line 250
+
+````js
+  /**
+   * 🔴 THE CHANNEL IS HALF THE ADDRESS AND IS NEVER DROPPED. Synth 1 listens on
+   * MIDI channel 1, Synth 2 on channel 2, and the session on 16. **CC 74 is the
+   * synth filter on 1 and 2 AND the master filter on 16**, so a page keyed by
+   * controller number alone would merge two different parameters and move the
+   * wrong one. `circuit-cc.mjs` is keyed by the pair and so is everything here.
+   */
+````
+
+<a id="shape-8"></a>
+## shape-8: demo/shape/index.html, inline script, line 263
+
+````js
+  /**
+   * 🔴 READ, NOT TYPED. A lane too coarse to show an invisible hand draws a
+   * staircase instead, because the ends of a sweep wander by `endJit` of the
+   * travel and under one step that wander rounds away. `minSteps()` is the
+   * arithmetic for it and lives beside the movement it describes, so the day
+   * somebody changes how far a hand wanders this page follows.
+   */
+````
+
+<a id="shape-9"></a>
+## shape-9: demo/shape/index.html, inline script, line 272
+
+````js
+  /**
+   * 🔴 THE CIRCUIT ON THE RASPBERRY PI, ASKED 2026-09-30: *"make it work with
+   * pi circuit. test tone button?"*, then *"or keyboard?"*. The Circuit on the
+   * desk now hangs off the board in another building, whose input `circuit`
+   * lives in a room of its own (`rig/board/inputs.mjs`). `/away/` already
+   * reaches it through `createBoard`, and this is that wiring, not a second one.
+   * 🔴 A CIRCUIT ON THIS USB PORT WINS WHEN BOTH ARE THERE. It is the one in
+   * front of the person pressing, it answers all three parts including the
+   * session on channel 16, and a control change reaches it in a USB hop rather
+   * than through a relay and a Pi. The board is tried only when the press found
+   * no local Circuit, for whatever reason: no Web MIDI, MIDI refused, no
+   * outputs, or none named Circuit.
+   * 🔴 THE BOARD DECIDES WHAT REACHES THE INSTRUMENT, NOT THIS PAGE. Its gate
+   * lets notes, all notes off and the 52 synth control changes through on
+   * channels 1 and 2 and refuses the rest, so the session part cannot be
+   * reached that way and is switched off while the board is the route.
+   * ⚠️ HEARING IT IS THE KEYBOARD AND LISTEN, NOT A TEST TONE, because
+   * `/away/` already proves both on this exact input and a held tone is one
+   * note nobody chose. The status control becomes Listen once the board is the
+   * route, the way `/away/` made its badge and its Listen one button.
+   */
+````
+
+<a id="shape-10"></a>
+## shape-10: demo/shape/index.html, inline script, line 297
+
+````js
+  /**
+   * ⚠️ A LOWER CEILING OVER THE RELAY THAN OVER USB. The relay's budget is
+   * about a thousand messages a second for the whole room, and the room also
+   * carries the audio coming back at fifty frames a second, so forty hands at
+   * the USB ceiling would spend most of it. One finger is one message a frame
+   * either way and is never paced.
+   */
+````
+
+<a id="shape-11"></a>
+## shape-11: demo/shape/index.html, inline script, line 323
+
+````js
+    /**
+     * 🔴 NO CONTROL ROW AT ALL SINCE 2026-09-25, AND THIS BLOCK USED TO SAY THE
+     * OPPOSITE. It read *"the one control in `.pos-controls` is the presence
+     * button built below and spliced in, which is where `demo/verify.mjs`
+     * presses, and it is control 0 so it is the one that gets `settleMs`"*.
+     * The status control moved into the page's own row on the ask *"[circuit
+     * connected] [Synth1|Synths] [⇄]"*, so that row is now empty and
+     * `.pos-controls[hidden]` takes it off the page.
+     * 🔴 WHICH MEANS THE HARNESS PRESSES NOTHING AND THE PAGE PRESSES ITS OWN
+     * BUTTON. Everything behind `look`, `drive` included, runs because a press
+     * happens; with no press it would all go silent while the suite stayed
+     * green, which is the exact loss `positron-verify` records twice in one day
+     * on `/mirror/` and `/blocks/`. The press is made at the last line of this
+     * module, behind `SELFCHECK`, the way `/muta/` does it. See `bar.prepend`
+     * below.
+     * 🔴 AND NOTHING THAT SENDS WAS EVER IN THAT ROW, WHICH IS UNCHANGED AND IS
+     * THE HALF THAT MATTERS. The harness presses every button in
+     * `.pos-controls` on every run, dozens of times a day; the hand button in
+     * there would be the suite scattering fifty two parameters on an instrument
+     * on this desk. `slider.mjs` refuses a hand inside that row on its own, and
+     * there is an assert on it below.
+     */
+````
+
+<a id="shape-12"></a>
+## shape-12: demo/shape/index.html, inline script, line 351
+
+````js
+  /**
+   * 🔴 AN INTENTION INTO BYTES, AND THE LIST IS SHORT BECAUSE THE LIST IS THE
+   * SAFETY. There is no branch here for SysEx, for a program change, for a note
+   * or for a clock byte, so **none of them can be expressed**, whatever anything
+   * upstream believes. This is `/bay/`'s `toBytes` with a second wall added: the
+   * pair has to be a parameter the reference guide documents for that channel
+   * group, so a controller number nobody has ever measured on this instrument
+   * cannot be sent either.
+   *
+   * ⚠️ IT IS ARITHMETIC RATHER THAN A DECLARATION. A list of allowed kinds can
+   * be edited by somebody who has not read this comment; a function with no
+   * branch for a thing cannot produce it by accident.
+   */
+````
+
+<a id="shape-13"></a>
+## shape-13: demo/shape/index.html, inline script, line 372
+
+````js
+  /**
+   * 🔴 ONE PLACE A BYTE CAN LEAVE, SO THE AUDIT IS A COUNTER RATHER THAN A
+   * READING. `/reel/` is the page that bought this rule: nine ways out, six of
+   * them media source assignments a grep for `fetch` would have missed, and a
+   * page that opened somebody's stream on every visit for two sessions. Here
+   * every message goes through `emit` and every byte through `toBytes`, so "this
+   * page has only ever sent control changes" is an assert over what went rather
+   * than a claim about the file.
+   */
+````
+
+<a id="shape-14"></a>
+## shape-14: demo/shape/index.html, inline script, line 403
+
+````js
+        /* ⚠️ A STATE CHANGE, SAID ONCE. `cc out` counts what this page PRODUCED
+           and climbs just as fast with nothing plugged in, which is exactly the
+           reading somebody had while the instrument stayed silent. This is the
+           one line that says a byte left the browser. */
+````
+
+<a id="shape-15"></a>
+## shape-15: demo/shape/index.html, inline script, line 412
+
+````js
+    /* ⚠️ `cc out` COUNTS WHAT THIS PAGE PRODUCED, NOT WHAT AN INSTRUMENT HEARD,
+       and the two are separate on purpose. Whether anything was listening is the
+       presence badge's job, and a page with nothing plugged in still has to be
+       readable: the log below says what would have gone, byte for byte.
+       The hex is the fact and the reading is the opinion, which is
+       `midi-log.mjs`'s own rule. What this page can add to the reading is the
+       parameter's NAME, because it is the sender and therefore knows. */
+````
+
+<a id="shape-16"></a>
+## shape-16: demo/shape/index.html, inline script, line 426
+
+````js
+  /**
+   * 🔴 ONE MESSAGE PER PARAMETER PER ANIMATION FRAME, AND THE CONSTRAINT IS THE
+   * DEVICE RATHER THAN A RELAY. `/knobs/` sizes its gate against a Cloudflare
+   * relay whose budget is 1000 messages a second with a 2000 burst, and against
+   * a Raspberry Pi in another building cutting audio into 20 ms frames. **The
+   * Circuit is on USB on this desk**, so neither number applies: there is no
+   * room, no token bucket and no network hop to spend. What is left is the
+   * instrument, and a parameter cannot be heard to change more often than the
+   * page can draw, so the frame is the right grain.
+   * ⚠️ WITHOUT IT A DRAG IS NOT A KNOB. A finger crossing a 127 step lane in a
+   * fifth of a second offers a value on every pointer move, and a browser
+   * coalesces pointer moves at the display rate only for `getCoalescedEvents`,
+   * not for the handler. One per frame is the ceiling this page promises and
+   * there is an assert that forty moves inside one frame leave as one message.
+   *
+   * ⚠️ A GATE PER CHANNEL, NOT ONE GATE. `makeCcSend` keys its pending map by
+   * CONTROLLER NUMBER, which is exactly the merge this instrument punishes: CC
+   * 74 on channel 1 and CC 74 on channel 16 are the synth filter and the master
+   * filter. A gate per channel cannot merge them by construction.
+   * ⚠️ AND `restateMs: Infinity`. The kit's gate restates the whole console
+   * every 500 ms so a lost last value repairs itself, which is right over a
+   * lossy relay and wrong over USB: here it would be a page sending to an
+   * instrument for as long as a tab is open with nobody touching anything.
+   * `gateMs: 0` for the same reason, since the frame is already the grain.
+   */
+````
+
+<a id="shape-17"></a>
+## shape-17: demo/shape/index.html, inline script, line 460
+
+````js
+  /**
+   * 🔴 FORTY HANDS ARE NOT ONE HAND FORTY TIMES, AND THE COALESCER ABOVE CANNOT
+   * HELP WITH IT. MEASURED 2026-09-21, in a real Chrome, with `move everything`
+   * pressed and nothing plugged in: **322, then 1076, then 1289 control changes
+   * a second**, and the `merged` cell EMPTY for the whole run. That empty cell
+   * is the finding. The gate merges by controller number, and forty hands move
+   * forty DIFFERENT controllers, so there is nothing for it to merge: its
+   * promise is one message per parameter per frame, which at sixty frames and
+   * forty lanes is two thousand four hundred a second and is working exactly as
+   * written.
+   * ⚠️ THE ARITHMETIC, SO THE NUMBER IS NOT A TASTE. A 127 step lane swept in
+   * 7000 ms passes through about 18 distinct values a second on average, and
+   * more than twice that through the fast middle of the curve. Forty of those
+   * at once is the measurement above. A ceiling of 600 gives each of forty
+   * lanes a value every 67 ms, which is 15 a second: under the natural average,
+   * so what it takes is the peak rather than the gesture.
+   * ⚠️ ONE HAND IS UNTOUCHED, AND SO IS EVERY FINGER. The gap is zero below two
+   * hands, and it is applied ONLY to a value a hand produced. A pointer drag is
+   * one parameter at pointer rate and is already the thing the frame gate was
+   * written for, so a person dragging a filter still gets a value every frame
+   * however many other lanes are moving.
+   */
+````
+
+<a id="shape-18"></a>
+## shape-18: demo/shape/index.html, inline script, line 495
+
+````js
+    /* ⚠️ THE LAST VALUE OF A GESTURE IS NEVER PACED. `end` is a hand stopping or
+       a pointer lifting, and that value is the one that stays true until
+       somebody moves the control again. */
+````
+
+<a id="shape-19"></a>
+## shape-19: demo/shape/index.html, inline script, line 524
+
+````js
+  /**
+   * How many control changes went out in the last second.
+   *
+   * ⚠️ A TIMER THAT STOPS ITSELF. It starts on the first message and clears when
+   * a whole second passes with nothing in it, so an idle page runs no clock and
+   * the cell is EMPTY rather than holding the last busy number, which would read
+   * as traffic that is not happening.
+   */
+````
+
+<a id="shape-20"></a>
+## shape-20: demo/shape/index.html, inline script, line 547
+
+````js
+  /**
+   * 🔴 THE MIDPOINT OF THE WIRE RANGE, AND IT IS AN INVENTION RATHER THAN A
+   * READING. Several parameters are centred: the guide's `52 - 76` is minus
+   * twelve to plus twelve semitones with 64 in the middle, so the midpoint is
+   * the neutral one for those and an arbitrary one for the rest. Nothing is
+   * sent until somebody moves a handle, so an arbitrary opening position costs
+   * the instrument nothing. What it costs the READER is said in the log the
+   * first time this page is opened: a handle is where this page left it.
+   */
+````
+
+<a id="shape-21"></a>
+## shape-21: demo/shape/index.html, inline script, line 577
+
+````js
+  /**
+   * 🔴 THERE IS NO OUTPUT CHOOSER, AND THERE WAS ONE FOR HALF A DAY. Removed
+   * 2026-09-21 on instruction (*"rm output"*), after a person played the Circuit
+   * from this page and reported *"shape works"*: the name match found the
+   * instrument on its own, so the control was a step between a visitor and a
+   * working page that nobody needed to take.
+   *
+   * 🔴 WHAT THE PICKER WAS FOR IS STILL HERE, WHICH IS THE HALF WORTH KEEPING.
+   * It was added as a diagnostic, because the first build reported **four
+   * different failures as the single word `offline`**: no Web MIDI at all, a
+   * browser that refused, a granted browser with no outputs, and a desk full of
+   * outputs none of which spelled the name this page was looking for. The words
+   * are still distinct, every output is still logged by name, `onstatechange`
+   * still rescans, and one log line still says when a byte first reaches a port.
+   * The chooser was never what made the fault findable. The REPORTING was.
+   *
+   * 🔴 AND WHAT IT COSTS, SO THE NEXT PERSON DOES NOT REDISCOVER IT AS A BUG.
+   * The name match takes the FIRST output whose name has Circuit in it, and
+   * nothing in the interface can say otherwise. **Two Circuits on one desk, or
+   * one Circuit exposing more than one endpoint, therefore has no way out from
+   * this page**: the assert below fixes `Circuit MIDI 1` as the winner over
+   * `Circuit MIDI 2`, and if the parameters have to reach the second one, they
+   * cannot from here. That is a real case and it is unhandled on purpose,
+   * because there is one Circuit on this desk and a control nobody needs is a
+   * control that gets pressed by accident.
+   * ⚠️ IT IS NOT A CASE THE PAGE FAILS QUIETLY. The log names every output it
+   * found, so somebody with two of them can at least see both and know which
+   * one this page took.
+   */
+````
+
+<a id="shape-22"></a>
+## shape-22: demo/shape/index.html, inline script, line 607
+
+````js
+  /**
+   * 🔴 IT IS HERE AND NOT IN `.pos-controls`, WHICH IS THE WHOLE REASON THIS
+   * ROW EXISTS. `demo/verify.mjs` clicks every button in the harness row on
+   * every run, dozens of times a day, so this button in there would be the
+   * suite putting a random patch on somebody's synth and leaving forty sliders
+   * moving by themselves afterwards. `slider.mjs` refuses a HAND inside that
+   * row on its own; nothing in the kit can refuse a BUTTON that starts forty of
+   * them, so the page answers for it and asserts the placement below.
+   */
+````
+
+<a id="shape-23"></a>
+## shape-23: demo/shape/index.html, inline script, line 616
+
+````js
+  /**
+   * ⚠️ A GLYPH SINCE 2026-09-25, ASKED FOR AS A SQUARE: *"[circuit connected]
+   * [Synth1|Synths] [⇄] <- square button, makes all buttons `invisible hand`
+   * staeting from random positions"*. It read `move everything`.
+   * 🔴 A GLYPH IS NOT A NAME, SO THE NAME IS SAID TWICE OVER IN WORDS. Without
+   * `aria-label` this control is announced as the character `⇄`, and
+   * `shell.mjs` already does exactly this for every glyph control it builds
+   * itself. The `title` carries the whole sentence, which is what a reader with
+   * a pointer gets.
+   * ⚠️ `⇄` U+21C4 HAS NO EMOJI FORM, which is the rule this project keeps for
+   * its transport arrows: `⏪ ⏩ ⏹` default to a colour picture at the wrong
+   * size and baseline on some machines, and appending U+FE0E is honoured
+   * inconsistently. A character with no emoji presentation cannot be drawn as
+   * one anywhere.
+   * ⚠️ AND IT IS 34 px SQUARE BY `shell.css`'s OWN RULE, NOT BY A NUMBER TYPED
+   * HERE. `button[data-glyph="1"]` lost its `.pos-controls` scope on
+   * 2026-09-25 precisely so a glyph button outside that row is a square, and
+   * this page is the reason: everything that can reach the instrument is kept
+   * out of the harness row. A page drawing its own button still has to set the
+   * attribute, which is the seam that rule names.
+   * ⚠️ `centreSymbol` PUTS THE INK ON THE MIDDLE OF THE BOX rather than the
+   * advance and the baseline, which `place-items: center` would.
+   */
+````
+
+<a id="shape-24"></a>
+## shape-24: demo/shape/index.html, inline script, line 639
+
+````js
+  /**
+   * 🔴 ONE CONTROL, TWO STATES, AND THE SECOND STATE IS WHERE THE STOP WENT.
+   * Asked 2026-09-28: *"rm put back button"*. The button that left was the only
+   * way out of forty sliders moving by themselves, and this page's own note on
+   * `move everything` says a button that starts forty hands with no button that
+   * stops them is a page somebody has to reload. So the row loses a control and
+   * keeps the way out: while anything is moving by itself, the glyph IS the way
+   * back, and pressing it stops every hand and puts every parameter this page
+   * has moved back to where this page opened it.
+   * ⚠️ THE STATE IS THE PAGE'S OWN FACT, NOT A FLAG THIS CONTROL KEEPS.
+   * `handsRunning` is counted in `handSaid`, which is the one place both edges
+   * of a hand arrive, so a hand that stops on its own at the ten minute ceiling
+   * or because the tab went to the background turns this control back into
+   * `move everything` without anybody telling it to.
+   * ⚠️ AND IT FLIPS ON `running` ALONE, NOT ON `changed()`. A control that
+   * became `put everything back` because somebody nudged one slider would be a
+   * control that changed its mind under a reader's hand, and the next press
+   * would undo the nudge they had just made. What this control is responsible
+   * for is what its own press started.
+   * ⚠️ SO A PARAMETER MOVED BY HAND AND NEVER SCATTERED HAS NO ONE-PRESS WAY
+   * BACK FROM THIS PAGE, AND THAT IS SAID RATHER THAN HIDDEN. The undo for it
+   * is the instrument's: a control change moves the live voice and never writes
+   * flash, so reloading the session on the Circuit brings the patch back, which
+   * is what `putBack` has always said in the log.
+   * ⚠️ `setSymbol` AND NOT `textContent`. `centreSymbol` puts the glyph in a
+   * `<span class="pos-sym">` and translates the SPAN, so writing `textContent`
+   * throws that span away and the new glyph is laid out on its advance and its
+   * baseline again. `symbol.mjs` records that as REPORTED on `/videoradio/`,
+   * whose play control swaps two glyphs of different shapes in a 34 px box.
+   * ⚠️ AND NEITHER GLYPH HAS AN EMOJI FORM. `⇄` U+21C4 was checked when this
+   * button was built; `↺` U+21BA is not in the emoji set either, which is the
+   * rule this project keeps for its transport arrows, where `⏪ ⏩ ⏹` default to
+   * a colour picture at the wrong size and baseline on some machines.
+   */
+````
+
+<a id="shape-25"></a>
+## shape-25: demo/shape/index.html, inline script, line 709
+
+````js
+  /**
+   * 🔴 THE HAND IS A BUTTON OF ITS OWN, BESIDE THE CHOOSER RATHER THAN INSIDE
+   * IT. Asked 2026-09-29: *"invisible hand is a separat e button not a radio
+   * group"*, and it is the right instinct that is already written down twice.
+   * `choice.mjs` says in its own header that its buttons wear `aria-pressed`
+   * rather than `role="radio"` and calls that a real gap left alone across
+   * eleven call sites; yesterday's backlog flagged whether an ACTION sitting
+   * inside a row of options announces correctly as reasoned and never measured,
+   * with no screen reader on it. An action is not an option, so it leaves the
+   * group and the open question stops needing an answer.
+   *
+   * 🔴 AND A BARE REVERT WOULD HAVE REPRODUCED A DEFECT A PERSON REPORTED WITH
+   * A SCREENSHOT, WHICH IS THE WHOLE RISK OF THIS CHANGE. *"fix invisuble hand
+   * button"* arrived on 2026-09-28 against a square standing 10.00 px clear of
+   * `Session` wearing a full ring of its own, and MEASURED at 375 that same
+   * square ALSO sat 6.75 px ABOVE the options, because `.pos-choice` puts its
+   * caption on its own line at that width and a neighbour of it centres itself
+   * on the caption and the segments together. **The caption leaves in the same
+   * breath**, on *"rm label"* from the same ask, so there is nothing left for a
+   * neighbour to centre against. MEASURED 2026-09-29 after the split, at 375,
+   * 756 and 1280: the glyph's top and the last option's top are 0.00 px apart
+   * at all three, and the chooser is 34.0 tall at 375 where it was 47.5. The
+   * assert below reads it rather than trusting this sentence.
+   *
+   * ⚠️ IT IS A SIBLING IN `.shape-bar-end`, NOT A SIBLING IN `.shape-bar`, AND
+   * THAT IS A LAYOUT DECISION RATHER THAN TIDINESS. The row is justified over
+   * exactly two children; a third child of the row would put the chooser in the
+   * middle. The stylesheet carries that argument in full.
+   * ⚠️ NOTHING THE COMPONENT DOES REACHED IT EITHER WAY. `set`, `disabled` and
+   * `pending` all walk the `buttons` array `createChoice` built, so this button
+   * was invisible to them as a fourth child of the segment and is invisible to
+   * them as a sibling, and `aria-pressed` was never written on it. What changes
+   * is what a reader HEARS and what the row LOOKS like: a button inside a
+   * segmented row is announced in the company of three options and wears the
+   * group's outer corner, and this one was never one of them.
+   * ⚠️ AND `parts.el` IS THE PUBLIC WAY IN, WHICH IT ALWAYS WAS. `createChoice`
+   * returns its wrapper and its button list and does not return its segment, so
+   * a page reaching for `.pos-choice-seg` would be keyed on a class name it
+   * does not own. Appending both to a group of this page's own needs neither.
+   * 🔴 IT IS STILL OUT OF `.pos-controls`, WHICH IS THE ONE THING BOTH MOVES
+   * HAD TO NOT BREAK. `.shape-bar` is a stack child, `demo/verify.mjs` presses
+   * `.pos-controls button, .tbar-x`, and this button is in neither. The assert
+   * below reads the harness's own selector rather than this page's memory of
+   * it.
+   */
+````
+
+<a id="shape-26"></a>
+## shape-26: demo/shape/index.html, inline script, line 755
+
+````js
+  /**
+   * 🔴 NO CAPTION, AND THE ROOM IS HELD ANYWAY. Asked 2026-09-25: *"rm move a
+   * slider and what it sends is listed here"*.
+   * 🔴 DROPPING THE OPTION WOULD NOT HAVE DONE IT, WHICH IS WHY THIS IS AN
+   * EMPTY STRING RATHER THAN AN OMISSION. `createMidiLog` defaults `empty` to
+   * `nothing has arrived yet`, so deleting the argument swaps one sentence for
+   * another. `empty: ''` is the component's own way of saying be silent, and
+   * `table.mjs` appends NO ELEMENT for it rather than an empty padded band.
+   * ⚠️ AND `reserve` IS THE HALF WORTH KEEPING, WHICH IS ALREADY WRITTEN DOWN
+   * ONE PAGE OVER. `shell.css` records the same ask on `/circuit/` 2026-09-21,
+   * *"press the status button, then play something - rm just leave room for
+   * midi table"*: the sentence was doing two jobs, telling a visitor what to
+   * press and holding the box open, and only the second is worth keeping. A box
+   * that collapses when the words go rearranges the page the moment the first
+   * message lands, which is this project's reflow rule.
+   * ⚠️ SO THIS IS JOINING A CONVENTION RATHER THAN INVENTING ONE: `/circuit/`,
+   * `/evo/` and `/twelve/` all read `{ empty: '', reserve: 6 }` and this page
+   * was the one outlier.
+   */
+````
+
+<a id="shape-27"></a>
+## shape-27: demo/shape/index.html, inline script, line 776
+
+````js
+  /**
+   * 🔴 THE RACK IS AN INSTRUMENT PANEL WITH SECTIONS SINCE 2026-09-28, ASKED
+   * FOR AS *"shape: apply instument panel with secitons"*. It wore
+   * `createInstrument` over `createPanelLayout` until then, which is a CASE
+   * with a fixed column and one scrolling strip, and this page had neither a
+   * fixed column (`side: null`) nor anything to scroll sideways (`flow:
+   * false`): two options whose whole job was to switch the case's own parts
+   * off. What is left after switching both off is a box with a plate and a
+   * stack of sliders in it, which is `createInstrumentPanel` with no picture
+   * row and no keys row.
+   *
+   * 🔴 AND THE SECTIONS ARE THE GLUED ROWS, WHICH IS WHAT THE ASK NAMES.
+   * `createGlueRows` gives every row a ground, an inset and a 1 px seam of
+   * `--line` between it and the next one, so the nine headings the reference
+   * publishes become nine sections of one object. They were nine blocks in a
+   * `createStack` 40 px apart before, which is `--pos-gap` between things that
+   * are not neighbours so much as parts of one panel.
+   * ⚠️ AND A HEADING IS STILL `stack.titled()`. The seam says where a section
+   * ENDS and the heading says what it IS, and this page already asserts that
+   * the nine names come out in the reference's own order. Dropping them for the
+   * seams would be two channels becoming one, and the one that went carries the
+   * words.
+   *
+   * 🔴 SO THE PLATE MOVED FROM THE CASE'S TOP RIGHT TO THE FOOT, AND THAT IS A
+   * REVERSAL OF *"use nameplate on top right"* (2026-09-25) RATHER THAN A SLIP.
+   * The panel's shape is the sketch it was built from, `viz / controls / keys /
+   * name patch`, and `addRow` inserts above the keyboard and the foot however
+   * late it is called precisely so a panel cannot be assembled in another
+   * order. Applying the component is accepting its order; the alternative is a
+   * page-local plate outside the component, which is the hand-rolled defect the
+   * component exists to end.
+   *
+   * 🔴 THE PLATE READS `SHAPE` SINCE 2026-09-28, AND THIS COMMENT ARGUED THE
+   * OTHER WAY. Asked, verbatim: *"all nameplates are uppercase"*, which
+   * overrules the departure this page carried. The departure was real and is
+   * worth keeping in words: every other plate is upper case (`POSITRON TOM`,
+   * `MODEL 12`, `PLAITS`) under a rule asked for 2026-09-21, *"replica names
+   * always in uppercase"*, that rule is about a shelf of REPLICAS reading as
+   * one shelf, and this page is a replica of nothing. One treatment for every
+   * plate is the plainer rule and it is the one that was asked for twice.
+   * ⚠️ AND THE NAME SITS AT THE START OF THE FOOT, WHICH IS THE COMPONENT'S
+   * DEFAULT AND IS NOT ASKED FOR HERE. `place: 'ends'` is `space-between` and
+   * parks a lone child on the left, which is where the sketch draws the name
+   * and where `/fau/` has `FAU`. There is no patch selector at the far end
+   * because this page's three parts are not patches: a part is which voice the
+   * sliders address, it changes what fifty two controls MEAN, and it belongs
+   * beside the status control in the row above rather than on the foot.
+   *
+   * ⚠️ `full: true`, WHICH IS MEASURED RATHER THAN PREFERRED. `.pos-rows` is
+   * `width: fit-content`, which is right for an instrument that is its own size
+   * and wrong for a rack whose lanes are `minmax(0, 1fr)`: a track that resolves
+   * against a shrink-to-fit box resolves against its own content. The cased
+   * panel this replaces was full width too, and `/kit/`'s own `desk` specimen
+   * is the same shape at its own size because a fader has an intrinsic width
+   * and a lane does not.
+   * ⚠️ AND `place: 'side'` STAYS IN THE KIT. `/knobs/` is its other caller and
+   * keeps it, and `demo/shell/instrument-test.mjs` grades
+   * `plateSpec('', 'shape', 'side')` with no browser at all. That test is about
+   * the FUNCTION rather than about this page, so it is left alone: rewriting it
+   * to match this page would delete `/knobs/`'s only no-browser coverage of
+   * that path.
+   */
+````
+
+<a id="shape-28"></a>
+## shape-28: demo/shape/index.html, inline script, line 838
+
+````js
+  /**
+   * 🔴 THE KEYS, SHOWN ONLY WHILE THE BOARD IS THE ROUTE. A Circuit on this
+   * desk is heard in the room and played on its own pads, and this page sends
+   * that one nothing but control changes; a keyboard there would be a control
+   * bound to nothing. Over the board the keys are how a slider move is heard:
+   * a note on the part the sliders address, through the board's gate.
+   * ⚠️ AND THE COMPUTER'S LETTERS PLAY IT FROM ANYWHERE ON THE PAGE, which
+   * matters because the kit puts the keys row under the last section.
+   */
+````
+
+<a id="shape-29"></a>
+## shape-29: demo/shape/index.html, inline script, line 852
+
+````js
+    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN, asked 2026-09-30 for every
+       keyboard page. A looped note comes back through `onDown` marked `loop`, so
+       it meets the same route gate a finger does and goes to the Circuit on the
+       Raspberry Pi by the same door. */
+````
+
+<a id="shape-30"></a>
+## shape-30: demo/shape/index.html, inline script, line 870
+
+````js
+  /**
+   * ⚠️ A PART'S RACK IS BUILT ONCE AND KEPT. Rebuilding on every press would
+   * leave a detached slider's invisible hand holding an animation frame for the
+   * life of the tab, add a `visibilitychange` listener per slider per press, and
+   * throw away the positions somebody had set. Kept, a switch is a swap and
+   * coming back finds the handles where you left them.
+   * ⚠️ AND IT IS LAZY. A visit builds the 52 parameters of Synth 1 and nothing
+   * else, because the other two parts are a press away and 122 sliders is not a
+   * thing to make somebody's phone lay out before they have asked for it.
+   */
+````
+
+<a id="shape-31"></a>
+## shape-31: demo/shape/index.html, inline script, line 886
+
+````js
+  /**
+   * 🔴 NOVATION'S OWN GROUPING, AND EVERY ROW BELOW HAS A SOURCE. Asked for
+   * 2026-09-21 as *"compare shape and circuit patch editor resaetch. no full ui
+   * but can we at least use same grouping / labels what they have?"*, so this is
+   * the grouping and the labels and nothing else. There is no panel, no tab bar
+   * and no copy of their editor here, and `plans/plan-circuit-synth-editor.md`
+   * §5.4 refuses one in as many words.
+   *
+   * 📄 THE REFERENCE PUBLISHES A GROUPING AND IT IS IN THE PARAMETER NAMES.
+   * Every one of the 340 patch addresses in `demo/shell/circuit-patch.mjs` is
+   * named `Group_Parameter` by the Circuit Programmer's Reference Guide v1.1,
+   * and the groups a control change can reach are `Voice_`, `Osc1_`, `Osc2_`,
+   * `Mixer_`, `Filter_`, `Envelope1_`, `Distortion_`, `Chorus_` and
+   * `MacroKnob1_` through `MacroKnob8_`.
+   * 🌐 AND NOVATION'S OWN EDITOR DRAWS THE SAME SPLIT, read off the live DOM of
+   * components.novationmusic.com on 2026-09-21 and written down in
+   * `plans/plan-circuit-synth-editor.md` §1: its MAIN tab carries `Osc 1`,
+   * `Osc 2`, `Mixer`, `Filter`, `Envelope` and `LFO` as separate panels, and its
+   * EFFECTS tab carries `Chorus//Phaser`, `Equaliser`, `Distortion` and `Voice`.
+   * Two sources that cannot have copied each other, agreeing on the groups.
+   *
+   * 🔴 WHAT WAS HERE BEFORE CAME FROM A THIRD PLACE AND ONE OF ITS NAMES WAS
+   * WRONG. `circuit-cc.mjs` carries a `sec` column parsed out of the SAME guide's
+   * control change table, and that table groups more coarsely: all eighteen
+   * oscillator parameters under one `Oscillator`, the five envelope parameters
+   * under `Envelope`, and distortion and chorus under **`Effects and EQ`, a
+   * heading naming an EQ on a section that holds no EQ parameter**, because not
+   * one equaliser address on this instrument is reachable over a control change
+   * at all. That is a label promising a control that is not there, which is the
+   * reason this table exists rather than it being a tidy-up.
+   * ⚠️ AND `circuit-cc.mjs` IS LEFT ALONE, which is deliberate. Its `sec` values
+   * are asserted against this desk's own measurements in
+   * `demo/shell/circuit-cc-test.mjs` (`CC 74 is the master filter on channel 16
+   * and the synth filter on 1 and 2`), so that column is the wire's own record
+   * and this is a presentation decision sitting on top of it.
+   *
+   * ⚠️ A LABEL LOSES ONLY THE WORD ITS NEW HEADING CARRIES, AND NOTHING IS
+   * REWORDED. `osc 1 wave` under a heading reading OSC 1 says the group twice,
+   * so the label is `wave`; `virtual sync depth`, `Q normalize` and
+   * `env 2 to frequency` keep the reference's own spellings, because
+   * `plans/plan-circuit-synth-editor.md` §5.2 already priced churning them
+   * towards Novation's shorter house style and refused it. The full name stays
+   * in the hover, in the aria label and in every log line, which is the half
+   * that makes the short label safe.
+   */
+````
+
+<a id="shape-32"></a>
+## shape-32: demo/shape/index.html, inline script, line 940
+
+````js
+    /* ⚠️ ONE HEADING OVER THE REFERENCE'S EIGHT `MacroKnob<n>_` GROUPS, WHICH IS
+       A ROLL-UP AND IS THEREFORE MINE RATHER THAN THEIRS. Novation draw the
+       eight macros as one row on all three of their tabs, so the shape is
+       borrowed even though the heading is not a name either source prints.
+       Only the word `macro` goes, because `knob 1` is what the group is. */
+````
+
+<a id="shape-33"></a>
+## shape-33: demo/shape/index.html, inline script, line 948
+
+````js
+  /**
+   * What a parameter is called on this page, and which heading it sits under.
+   *
+   * ⚠️ A PARAMETER WITH NO ROW ABOVE KEEPS BOTH, which is how `Voice`, `Mixer`
+   * and `Filter` stay exactly as the control change table has them: those three
+   * are already the reference's own patch group names. The four session
+   * headings keep theirs for a different reason, and it is worth saying rather
+   * than leaving implied. **Novation's patch editor edits a PATCH, and a
+   * session is not one**, so `Reverb`, `Delay`, `Master Filter` and `Mixer` on
+   * channel 16 have no counterpart in any of the research and there is nothing
+   * to adopt. They are the guide's control change table and nothing else.
+   */
+````
+
+<a id="shape-34"></a>
+## shape-34: demo/shape/index.html, inline script, line 966
+
+````js
+  /**
+   * The headings for a part, in the order the reference's own table runs.
+   *
+   * ⚠️ THE ORDER IS READ, NOT DECLARED, so a heading cannot go missing and a
+   * parameter cannot land under one this page never draws. On the synths it
+   * comes out VOICE, OSC 1, OSC 2, MIXER, FILTER, ENVELOPE 1, DISTORTION,
+   * CHORUS, MACRO KNOBS, which is Novation's MAIN tab order with the panels
+   * they keep on their EFFECTS tab after it.
+   */
+````
+
+<a id="shape-35"></a>
+## shape-35: demo/shape/index.html, inline script, line 981
+
+````js
+  /**
+   * ⚠️ FORTY HANDS SAY ONE LINE BETWEEN THEM. A line per slider was right while
+   * at most one could be moving; `move everything` starts every lane on the
+   * part that has room for one, and forty rows reading `osc 2 cents is moving
+   * by itself` push everything a reader might act on off the top of the log.
+   * The caller that started them says how many, once. `handLines` counts what
+   * actually reached the log, so the page can assert that rather than claim it.
+   */
+````
+
+<a id="shape-36"></a>
+## shape-36: demo/shape/index.html, inline script, line 992
+
+````js
+    /* ⚠️ HOW MANY ARE MOVING, COUNTED HERE BECAUSE THIS IS THE ONE PLACE BOTH
+       EDGES ARRIVE. `start` always raises this and `stop` returns early when
+       there is nothing to stop, so the pair is exact and the pacing above has a
+       number rather than a scan of every row on every offer. */
+````
+
+<a id="shape-37"></a>
+## shape-37: demo/shape/index.html, inline script, line 1003
+
+````js
+    /* ⚠️ HERE AND NOT ONLY IN THE TWO FUNCTIONS THAT STOP THINGS, because a
+       hand also stops on its own at the ten minute ceiling and when the tab
+       goes to the background, and those are exactly the moments nobody is
+       around to press anything. This is the one place both edges arrive. */
+````
+
+<a id="shape-38"></a>
+## shape-38: demo/shape/index.html, inline script, line 1019
+
+````js
+    /**
+     * 🔴 A HAND WHERE A HAND CAN BE SEEN, AND NOWHERE ELSE. Twelve of the fifty
+     * two synth parameters are modes and switches with fewer steps than a sweep
+     * needs: `Polyphony Mode` has three, `filter type` has six, `osc 1 wave` has
+     * thirty. A hand on those draws a staircase and reads as a broken control,
+     * which `slider.mjs` already refuses to pretend about. The others get one.
+     */
+````
+
+<a id="shape-39"></a>
+## shape-39: demo/shape/index.html, inline script, line 1028
+
+````js
+      /* ⚠️ THE SHORT NAME ON THE FACE AND THE FULL ONE EVERYWHERE ELSE. `wave`
+         under a heading reading OSC 1 is unambiguous on screen and is not
+         unambiguous in a log line that has no heading above it, so the hover,
+         the aria label, every `d.log` and the reading in the traffic log all
+         carry `p.name` as the reference guide prints it. */
+````
+
+<a id="shape-40"></a>
+## shape-40: demo/shape/index.html, inline script, line 1034
+
+````js
+      /* ⚠️ THE CONTROLLER NUMBER IS IN THE HOVER AND NOT UNDER THE HANDLE.
+         `/circuit/` and `/twelve/` both took printed CC numbers off their faces
+         on 2026-09-21 (*"rm ccs, also from rack"*) and the argument carries
+         here: a reader moving a filter wants to know which filter, and somebody
+         debugging a binding is somebody who will point at the control. What left
+         is in the log underneath, in bytes, which is where this project puts a
+         wire fact. */
+````
+
+<a id="shape-41"></a>
+## shape-41: demo/shape/index.html, inline script, line 1056
+
+````js
+  /**
+   * A part's sections, as glued rows of the panel, above the foot.
+   *
+   * ⚠️ ONE ROW PER SECTION, WHICH IS WHAT MAKES THE SEAM MEAN SOMETHING. Nine
+   * sections in ONE row would be a glued surface with a single part in it,
+   * which `createGlue` itself says is that part unwrapped.
+   * ⚠️ AND `addRow` PUTS EVERY ONE OF THEM ABOVE THE FOOT whatever order the
+   * parts get built in, which is the component's own contract rather than
+   * something this page has to remember. A part chosen later therefore cannot
+   * land under the nameplate.
+   */
+````
+
+<a id="shape-42"></a>
+## shape-42: demo/shape/index.html, inline script, line 1071
+
+````js
+      /* 🔴 `pair: true` IS THE WHOLE OF THE TWO COLUMN LAYOUT, AND IT IS THE
+         KIT'S. `createSliderGroup` has carried it since `/draw/` needed it, it
+         is demonstrated on `/kit/` as SLIDER GROUP, PAIRED, and the breakpoint,
+         the seam and the column gap all live in `shell.css`. Hand-rolling a
+         second copy of a grid this project already ships is the defect
+         CLAUDE.md names most often. */
+````
+
+<a id="shape-43"></a>
+## shape-43: demo/shape/index.html, inline script, line 1080
+
+````js
+      /* ⚠️ UPPERCASED WHERE THE NAME IS DECIDED, AS WELL AS IN THE STYLESHEET.
+         `.pos-sec-h` renders a heading uppercase whatever is typed, and the
+         kit's rule is to type it uppercase so the source reads like the page.
+         `shown` is where a heading gets its name, so the shout is applied there
+         rather than left for the stylesheet to do silently.
+         ⚠️ AND THE HEADING IS STILL `stack.titled()` RATHER THAN AN `h3` TYPED
+         HERE. It owns the 10 px between a heading and what it labels, MEASURED
+         in `/kit/` at 0.0 px on four captions that each rolled their own. */
+````
+
+<a id="shape-44"></a>
+## shape-44: demo/shape/index.html, inline script, line 1105
+
+````js
+    /* 🔴 HIDDEN, NOT DETACHED, AND THE SEAMS SURVIVE IT. `.pos-rows-r[hidden]`
+       is `display: none`, and a child that is `display: none` takes no gap, so
+       a glued surface with a part's rows hidden draws exactly the seams of the
+       rows that are left rather than a doubled line where one went. `glue.mjs`
+       says so at the top of its rows section and it is why this is a swap
+       rather than a rebuild. */
+````
+
+<a id="shape-45"></a>
+## shape-45: demo/shape/index.html, inline script, line 1116
+
+````js
+  /**
+   * One label column across every section on screen.
+   *
+   * ⚠️ IT MEASURES THE LABEL AND THE VALUE, NEVER THE HEAD THAT HOLDS THEM. A
+   * head sits in the very column being set, so reading its width after `--lab`
+   * is applied reads back the answer rather than the question and the number can
+   * only grow. This is `/archive/radio/`'s note, one page over, and it cost that page
+   * three reports.
+   */
+````
+
+<a id="shape-46"></a>
+## shape-46: demo/shape/index.html, inline script, line 1139
+
+````js
+    /* 🔴 WHETHER A HAND PRODUCED THIS, READ OFF THE COMPONENT RATHER THAN
+       GUESSED. `pointerdown` makes a hand YIELD, so `running && !held` is true
+       exactly while the invisible hand is the thing moving the handle and false
+       for every finger, arrow key and `set()` from this page. That is the line
+       the pacing above needs and there is no other way to draw it: `onInput` is
+       one callback and both paths go through it. */
+````
+
+<a id="shape-47"></a>
+## shape-47: demo/shape/index.html, inline script, line 1148
+
+````js
+    /**
+     * 🔴 WHICH LINK IS BROKEN, IN THE PLACE SOMEBODY IS LOOKING WHEN THEY
+     * NOTICE. Moving a handle and hearing nothing was the first report this page
+     * had, and the page answered it with a badge reading `offline` that meant
+     * four different things. A word per failure is what replaced that, and it is
+     * what the page kept when the output chooser went.
+     */
+````
+
+<a id="shape-48"></a>
+## shape-48: demo/shape/index.html, inline script, line 1172
+
+````js
+  /**
+   * 🔴 `put back`, AND IT IS NOT CALLED `reset` BECAUSE IT IS NOT ONE. It
+   * re-sends, for every parameter this page has moved on every part, the value
+   * that parameter had when this page opened. That is where THIS PAGE started
+   * and it is not the patch as it was saved, because a control change is write
+   * only and nothing here has ever read the instrument.
+   * ✅ THE REAL UNDO IS ON THE INSTRUMENT AND COSTS NOTHING: a control change
+   * moves the live voice and never writes flash, so reloading the session brings
+   * the patch back exactly as it was. That is worth saying in the log rather
+   * than leaving somebody to hope.
+   * 🔴 AND IT HAS NO BUTTON OF ITS OWN SINCE 2026-09-28: *"rm put back
+   * button"*. It is the SECOND PRESS of `move everything`, which is where the
+   * stop had to go and is written out beside that control. Nothing about what
+   * this function does changed, and the assert that it re-sends every moved
+   * parameter on every part is graded off that press rather than off a call.
+   * ⚠️ IT IS NOT DEAD CODE WITH A COMMENT ON IT, WHICH IS WHAT THIS PROJECT
+   * PAYS FOR MOST OFTEN. The only caller is `hand.onclick` in its `back` state,
+   * and the checks reach it by pressing the real button.
+   */
+````
+
+<a id="shape-49"></a>
+## shape-49: demo/shape/index.html, inline script, line 607
+
+````js
+  /**
+   * Stop every hand that is running, anywhere, and say how many in one line
+   * when there is more than one of them.
+   *
+   * ⚠️ IT COUNTS BEFORE IT STOPS, because `stop()` is what raises the line and
+   * a count taken afterwards is always zero.
+   */
+````
+
+<a id="shape-50"></a>
+## shape-50: demo/shape/index.html, inline script, line 628
+
+````js
+    /* 🔴 EVERY PART, NOT THE ONE ON SCREEN. The first build stopped the hands
+       and moved the handles of the visible rack only, so a parameter moved on
+       Synth 2 was put back on the wire and left showing its old number the next
+       time somebody chose Synth 2. A handle that disagrees with what was sent is
+       the defect this page's whole `values` map exists to prevent. */
+````
+
+<a id="shape-51"></a>
+## shape-51: demo/shape/index.html, inline script, line 646
+
+````js
+    /* ⚠️ `quiet`, BECAUSE THE VALUE HAS ALREADY GONE. Without it every handle
+       would queue its own arrival and the console would be sent twice. The glide
+       is the part a person sees: the handles travel home rather than the panel
+       redrawing as if nothing had happened. */
+````
+
+<a id="shape-52"></a>
+## shape-52: demo/shape/index.html, inline script, line 658
+
+````js
+  /**
+   * 🔴 `move everything`, ASKED FOR 2026-09-21 AS *"a global invisible hands
+   * button that sets all sliders to random position and enables their hands"*.
+   * One press puts every slider on the part in front of you somewhere new and
+   * leaves the ones with room to show it moving by themselves.
+   * 🔴 AND THE SAME BUTTON IS THE WAY OUT OF IT SINCE 2026-09-28. While
+   * anything is moving by itself the control reads `put everything back` and
+   * presses `putBack`, which stops every hand on every part and sends every
+   * moved parameter home. A button that starts forty hands with no button that
+   * stops them is a page somebody has to reload, and that sentence is why the
+   * separate `put back` could be removed without the stop going with it.
+   *
+   * 🔴 THE TWELVE COARSE LANES ARE MOVED AND ARE GIVEN NO HAND, AND BOTH HALVES
+   * ARE DELIBERATE. `Polyphony Mode` has three steps, `filter type` has six and
+   * `osc 1 wave` has thirty, which is fewer than a sweep's own wander, so a hand
+   * on one draws a staircase and `slider.mjs` already refuses to pretend
+   * otherwise. That is a statement about the ANIMATION and not about the value:
+   * a wave and a filter type are among the biggest changes this instrument can
+   * be asked for, and a button called `move everything` that left a quarter of
+   * the rack at its opening position would be a control that names one thing and
+   * does another.
+   *
+   * ⚠️ THE VALUE GOES OUT THROUGH `moved`, AND THE HANDLE IS MOVED QUIETLY. This
+   * is `put back`'s shape read the other way: one road to the coalescer, so
+   * fifty two positions leave as fifty two control changes in one frame rather
+   * than as a hundred and four.
+   * ⚠️ AND THE POSITION IS SET BEFORE THE HAND IS STARTED. `set()` makes a hand
+   * yield for over a second, so starting first and placing second would leave
+   * forty lanes standing still with their buttons lit.
+   */
+````
+
+<a id="shape-53"></a>
+## shape-53: demo/shape/index.html, inline script, line 721
+
+````js
+  /**
+   * 🔴 A VISIT OPENS NOTHING, AND THE COUNTERS ARE HOW THAT IS GRADED RATHER
+   * THAN CLAIMED. `opensBeforePress` can only be raised by `open()` running
+   * without a press in front of it, so moving that call to the load path turns
+   * the assert red instead of leaving a green suite about a page that now asks
+   * a browser for MIDI on arrival.
+   */
+````
+
+<a id="shape-54"></a>
+## shape-54: demo/shape/index.html, inline script, line 734
+
+````js
+  /**
+   * 🔴 THE FIRST OUTPUT THAT LOOKS LIKE A CIRCUIT, OR NULL, AND NULL MEANS
+   * NOTHING IS CHOSEN RATHER THAN TAKE THE FIRST ONE. An output nobody named is
+   * somebody's DAW, or the TASCAM Model 12 and the Evolution keyboard that are
+   * on this same desk and in this same list: CC 74 arriving at one of those
+   * moves something real that is not this instrument. A page that guesses wrong
+   * in silence is worse than a page that sends nowhere and says so, and with the
+   * chooser gone there is nobody to correct the guess.
+   * ⚠️ IT RETURNS THE OUTPUT AND NOT AN INDEX, which is the whole of what the
+   * picker's removal changed here. An index needed translating (`-1` into
+   * `nothing`, `n` into `n + 1` past the `none` row), and the translation was a
+   * second place the fall-back-to-the-first-output mistake could be made.
+   * ⚠️ AND IT IS PURE AND IT IS GRADED. The whole of the name guessing is this
+   * one line, so the two checks below hand it five lists between them and read
+   * the answers with no browser, no permission and no device.
+   */
+````
+
+<a id="shape-55"></a>
+## shape-55: demo/shape/index.html, inline script, line 754
+
+````js
+  /**
+   * Take an output, open it, and say so.
+   *
+   * ⚠️ `port.open()` IS REPEATED WITHOUT HARM. An already open port resolves at
+   * once, which is what `/dump/` relies on for the same reason: another client
+   * may have held the device when the page first looked.
+   */
+````
+
+<a id="shape-56"></a>
+## shape-56: demo/shape/index.html, inline script, line 781
+
+````js
+  /**
+   * 🔴 EVERY OUTPUT, BY NAME, INCLUDING THE ONES THAT DO NOT MATCH. An empty
+   * list and a list of three names that are not this instrument are two
+   * different facts and they read identically as the word `offline`. This is the
+   * half of the diagnostic that survived the chooser, and it is the half that
+   * found the fault: a reader can see what the browser reported and what this
+   * page made of it, which is what the picker's list was really showing.
+   */
+````
+
+<a id="shape-57"></a>
+## shape-57: demo/shape/index.html, inline script, line 821
+
+````js
+      /**
+       * ⚠️ `sysex: false`, WHICH IS THE THIRD WALL AND THE ONLY ONE THE BROWSER
+       * ENFORCES. `toBytes` cannot build a SysEx and `emit` is the only way out,
+       * so this asks for a permission the page has no code to use. It costs
+       * nothing and it means a future edit that grew such a code path would be
+       * refused by Chrome rather than by a comment.
+       * ⚠️ OUTPUTS ONLY. This page sends and does not listen, so opening the
+       * inputs would be subscribing to a Circuit's continuous clock for nothing.
+       * `/circuit/` is the page that listens.
+       */
+````
+
+<a id="shape-58"></a>
+## shape-58: demo/shape/index.html, inline script, line 839
+
+````js
+    /* ⚠️ THE INPUT NAMES ARE READ AND NO INPUT IS OPENED. Nothing here sets
+       `onmidimessage`, so the Circuit's clock still arrives nowhere; the names
+       are only how `Loop` learns the Evolution is on this desk. */
+````
+
+<a id="shape-59"></a>
+## shape-59: demo/shape/index.html, inline script, line 850
+
+````js
+  /**
+   * 🔴 WHERE A CONTROL CHANGE GOES, DECIDED IN ONE PLACE. A local output wins,
+   * then a board that answered, then nowhere. The status control, the keys row
+   * and the session option all follow from it, so they cannot disagree.
+   * 🔴 ONLINE MEANS BYTES HAVE SOMEWHERE TO GO, NOT THAT MIDI WAS GRANTED.
+   * Permission is a fact about the browser and presence is a fact about the
+   * desk, and reporting the first as the second is how a page says `online`
+   * about nothing at all. Over the board it is the board's own heartbeat,
+   * read off `createBoard`'s badge, so a Pi that stops answering reads offline.
+   */
+````
+
+<a id="shape-60"></a>
+## shape-60: demo/shape/index.html, inline script, line 899
+
+````js
+        /* 🔴 A REFUSAL IS SAID, ONCE PER REASON. The board answers a refused
+           `midi.send` with `re` naming it, so only this page's own refusals are
+           counted, not another listener's in the same room. */
+````
+
+<a id="shape-61"></a>
+## shape-61: demo/shape/index.html, inline script, line 953
+
+````js
+  /**
+   * Try the board. True when it answered and is now the route.
+   * ⚠️ A HARNESS RUN NEVER REACHES FOR IT. `createBoard` refuses every send
+   * under `?selfcheck=1`, so the question is not even asked, and the page says
+   * so rather than waiting out a timeout.
+   */
+````
+
+<a id="shape-62"></a>
+## shape-62: demo/shape/index.html, inline script, line 1016
+
+````js
+  /* ⚠️ `says: WIRED`, NOT THIS PAGE'S OWN THREE WORDS. Asked 2026-09-21:
+     *"Use connected connecting not connected on all hw demos when applicable"*.
+     `online` and `offline` are network words and suit a board answering over a
+     relay from another building; an instrument on a USB cable on this desk is
+     connected or it is not. The map is one export in `presence.mjs` so that five
+     pages cannot end up with five vocabularies that agree today. */
+````
+
+<a id="shape-63"></a>
+## shape-63: demo/shape/index.html, inline script, line 1028
+
+````js
+  /**
+   * 🔴 THE STATUS CONTROL JOINED THE PAGE'S OWN ROW ON 2026-09-25 AND LEFT
+   * `.pos-controls` EMPTY, WHICH IS A COVERAGE CHANGE AND NOT A LAYOUT ONE.
+   * Asked as a sketch of one line: *"[circuit connected] [Synth1|Synths]
+   * [⇄]"*. It was spliced into `.pos-controls` before that, and the comment on
+   * `controls: []` above said why in as many words: `demo/verify.mjs` drives a
+   * page by clicking every button in that row, this was the only one in it, and
+   * **everything behind `look` runs because the harness presses it** including
+   * the whole of `drive`.
+   * 🔴 SO THE PAGE PRESSES ITS OWN BUTTON, BEHIND `SELFCHECK`, AT THE LAST LINE
+   * OF THE MODULE. That is `/muta/`'s arrangement exactly, written down there
+   * as *"a harness presses the row of controls under a page and this page has
+   * none, so every press it takes is one the page makes for it"*, and
+   * `/mirror/` does the same for headset buttons it can no longer reach.
+   * ⚠️ IT PRESSES THE REAL CONTROL RATHER THAN CALLING `d.run('look')`, because
+   * a check that reaches past the control would pass on a page whose button was
+   * wired to nothing, which is the defect this arrangement could introduce.
+   * ⚠️ AND `settleMs` GOES WITH IT. That number only ever lands on control 0,
+   * and there is no control 0 now; what covers the hand's 7000 ms sweep is
+   * `verify.mjs`'s own growth loop, which tolerates 2.0 s of silence for up to
+   * 24 s. The manifest row still declares 4000 and it is now inert on this
+   * page, which is reported rather than edited from here.
+   * ⚠️ `prepend` BECAUSE THE ROW IS BUILT BEFORE THIS CONTROL EXISTS, and the
+   * sketch puts the status first. The order a reader sees is
+   * `[Circuit …] [Synth 1 | Synth 2 | Session] [⇄]` and there is an assert on
+   * it below. It carried a fourth control, `put back`, until the ask *"rm put
+   * back button"* on 2026-09-28. The glyph became the chooser's last segment on
+   * *"fix invisuble hand button"* the same day and a button of its own again on
+   * 2026-09-29, grouped with the chooser rather than parented to it, so this
+   * row still has two flex children and three things in it.
+   */
+````
+
+<a id="shape-64"></a>
+## shape-64: demo/shape/index.html, inline script, line 1064
+
+````js
+    /* 🔴 NO CIRCUIT HERE, WHATEVER THE REASON, AND THE BOARD IS ASKED NEXT. */
+````
+
+<a id="shape-65"></a>
+## shape-65: demo/shape/index.html, inline script, line 1074
+
+````js
+    /**
+     * 🔴 THE INSTRUMENT IS THE LAST LINK AND THE PAGE CANNOT SEE IT, SO IT SAYS
+     * WHERE TO LOOK. A control change is write only, so an open port, correct
+     * bytes and a silent synth is a state this page cannot tell apart from a
+     * working one. Two things on the Circuit itself produce exactly that:
+     * `MIDI CC Rx` can be switched off in the Settings View, and since firmware
+     * 1.8 each track's MIDI channel can be moved off the one this page uses.
+     */
+````
+
+<a id="shape-66"></a>
+## shape-66: demo/shape/index.html, inline script, line 1105
+
+````js
+  /**
+   * 🔴 THE CHECKS WERE PROVED BY BREAKING THEM, 2026-09-21, WHICH IS THE ONLY
+   * THING THAT SEPARATES A CHECK FROM A DECORATION. Three sabotages in one run:
+   * the parameter membership test taken out of `toBytes`, the coalescer made to
+   * send on every move, and `--lab` left unset. **34/34 went to 27/34**, and
+   * every one of the seven was traceable to one of the three. The layout one
+   * reported `66.70 px apart`, which is the drift seven separately sized label
+   * columns produce and the reason that rule exists.
+   * ⚠️ THAT LAYOUT ASSERT HAS CHANGED SHAPE SINCE, AND THE SABOTAGE WAS RE-RUN
+   * RATHER THAN ASSUMED TO STILL BITE. It counts left edges now instead of
+   * measuring a spread, because the rack is two columns wide on a desktop and
+   * two edges is the correct answer there. MEASURED 2026-09-21 with `--lab`
+   * cleared off every group in a live page at 756 px: **11 edges and 449.36 px
+   * of spread** against the 2 the assert requires, so the check that replaced it
+   * fails on the same defect the old one caught. ⚠️ Eleven rather than nine,
+   * because two columns give a short-labelled section two wrong edges instead of
+   * one.
+   *
+   * 🔴 AND FOUR MORE SABOTAGES ON 2026-09-25, WHEN THE PAGE GAINED THE
+   * INSTRUMENT BOX, THE GLYPH AND THE ROW. The page read **49/49 with 43 page
+   * asserts** that day (it was 45/45 with 39), and it reads **50/50 with 44**
+   * since the plate moved to the top right and its one assert became two.
+   * Three broken at once, each taking exactly its own assert red and nothing
+   * else, **49 to 46**:
+   *   `caps: true`     the plate reads `SHAPE`
+   *   no `data-glyph`  **45.83 by 34.00**, which is the number `shell.css`
+   *                    records from `/wish/` for a glyph button outside
+   *                    `.pos-controls`, reproduced here on the page that
+   *                    prompted the rule losing its scope
+   *   a caption back   `a caption` where the assert wants none
+   * 🔴 AND THE FOURTH IS THE ONE WORTH THE WHOLE EXERCISE, BECAUSE NOTHING WENT
+   * RED. Taking out the `ifSelfcheck` press at the foot of this module left the
+   * page at **28/28 GREEN with 22 page asserts**: twenty-one checks stopped
+   * running, not one of them failed, and only the COUNT said so. That is the
+   * measured cost of moving the status control out of `.pos-controls`, and it
+   * is why that press is not a tidy-up.
+   *
+   * 🔴 AND TWO MORE ON 2026-09-28, WHEN THE RACK BECAME AN INSTRUMENT PANEL AND
+   * `put back` LOST ITS BUTTON. The page reads **53/53 with 47 page asserts**,
+   * against **50/50 with 44** before it: one assert left, four arrived. What
+   * left is the plate's `top of the case` inset, which is a measurement about a
+   * case this page no longer has. What arrived is the panel's own shape, the
+   * part swap being a hide rather than a rebuild, and the two halves of the
+   * toggle that carries the stop.
+   *   `caps: true`     the plate reads `SHAPE`, re-run against the assert that
+   *                    replaced the top-right pair, so the reading above is a
+   *                    measurement again rather than an expectation
+   *   `syncHand` a     **four red at once**, and the four are the argument for
+   *   no-op            the whole arrangement: the control never offers the way
+   *                    back (`announced as "move everything"`), the second
+   *                    press scatters again instead of stopping
+   *                    (**40 still moving**), nothing goes home (**54 left
+   *                    moved**), and the transition never happens. A page with
+   *                    that one line dead is exactly the page the removed
+   *                    button was defending against
+   * 🔴 AND THE FIRST FORM OF THE LAST OF THOSE FOUR CAME BACK GREEN, WHICH IS
+   * WHY IT IS WRITTEN THE WAY IT IS. `and it goes back to offering a move`
+   * originally read only the state AFTER the second press, and a control stuck
+   * on `move everything` forever satisfies that perfectly: it went green in the
+   * same run that took the other three red. A transition is two states and one
+   * of them is the one before, so it reads both, and the re-run takes it red
+   * with the rest.
+   */
+````
+
+<a id="shape-67"></a>
+## shape-67: demo/shape/index.html, inline script, line 1169
+
+````js
+  /**
+   * 🔴 THE FREE HALF, AND IT RUNS FOR EVERYBODY. Everything gradable from data
+   * this page already holds costs a visitor nothing, so it is not behind the
+   * self-check gate: what is behind that gate is the half that moves handles,
+   * starts a hand and puts bytes on a wire.
+   */
+````
+
+<a id="shape-68"></a>
+## shape-68: demo/shape/index.html, inline script, line 1183
+
+````js
+    /* 🔴 THE ONE THAT MATTERS, AND IT IS THE REASON THIS PAGE MAY EXIST AT ALL.
+       A device with no factory reset is one byte away from losing a patch, and
+       that byte lives inside a SysEx message nothing here can build. */
+````
+
+<a id="shape-69"></a>
+## shape-69: demo/shape/index.html, inline script, line 1193
+
+````js
+    // ⚠️ THE NEGATIVE CONTROL. Without it the line above passes on a function
+    // that refuses everything, which is a page that cannot send at all.
+````
+
+<a id="shape-70"></a>
+## shape-70: demo/shape/index.html, inline script, line 1206
+
+````js
+    /**
+     * 🔴 A HAND BUTTON IN `.pos-controls` WOULD BE THE SUITE PLAYING SOMEBODY'S
+     * INSTRUMENT. `slider.mjs` refuses to run one from inside that row and says
+     * so on its own face; this asserts the row is clean on this page, which is
+     * the half a component cannot check for a page it does not know about.
+     * ⚠️ IT READ `=== 1` UNTIL 2026-09-25 AND THE ONE WAS THE STATUS CONTROL.
+     * That control is in the page's own row now, so the harness row is empty and
+     * the number is zero. The claim is the same claim: nothing the suite presses
+     * on this page can reach the Circuit.
+     */
+````
+
+<a id="shape-71"></a>
+## shape-71: demo/shape/index.html, inline script, line 1221
+
+````js
+    /**
+     * 🔴 AND THE CONTROLS THAT CAN REACH AN INSTRUMENT ARE NAMED, NOT COUNTED.
+     * The assert above would still pass if `⇄` were in the harness row and the
+     * status control were not, and that arrangement is the suite starting forty
+     * hands on somebody's synth on every run. Counting buttons cannot see which
+     * button; this names all three.
+     * ⚠️ IT NAMED THREE, THEN TWO WHEN THE OUTPUT CHOOSER WENT, THREE AGAIN WHEN
+     * THE STATUS CONTROL JOINED THEM, AND TWO SINCE `put back` LEFT ON
+     * 2026-09-28. The rule it protects is unchanged and is the one that
+     * matters: nothing that can reach the instrument sits in the row
+     * `demo/verify.mjs` clicks. The list is what changes, and it is named
+     * rather than counted so that a control moving into the harness row is a
+     * red line rather than a number that still adds up.
+     */
+````
+
+<a id="shape-72"></a>
+## shape-72: demo/shape/index.html, inline script, line 1235
+
+````js
+    /**
+     * ⚠️ AND IT READS THE HARNESS'S OWN SELECTOR SINCE 2026-09-28, WHICH IS
+     * WHAT MADE IT SAFE TO MOVE THE GLYPH. `demo/verify.mjs` presses
+     * `.pos-controls button, .tbar-x`, and this line named only the first half,
+     * so a control wearing `.tbar-x` would have passed it while the suite
+     * pressed it on every run. The glyph became a segment of the chooser that
+     * day and a button of its own again on 2026-09-29; both arrangements put it
+     * inside `.shape-bar`, and `.shape-bar` is a stack child, so neither
+     * selector has ever reached either control. This asks the question the way
+     * the harness asks it rather than the way this page remembers it, which is
+     * what made it safe to move the glyph twice.
+     */
+````
+
+<a id="shape-73"></a>
+## shape-73: demo/shape/index.html, inline script, line 1255
+
+````js
+    /**
+     * 🔴 THE ROW IS ONE LINE AND IT IS IN THE ORDER THAT WAS ASKED FOR, WHICH IS
+     * TWO CLAIMS AND THEREFORE TWO HALVES OF ONE MEASUREMENT. Asked as a sketch:
+     * *"[circuit connected] [Synth1|Synths] [⇄]"*. Left edges in ascending order
+     * is the order; every top on one line is the line. A row that wrapped would
+     * still be in order, and a row in the wrong order would still be one line.
+     * ⚠️ IT IS THE RECTS AND NOT THE DOM. `.shape-bar` is `flex-wrap: wrap`, so
+     * source order tells you nothing about what a reader sees, and this project
+     * has paid four times for a layout claim read out of a stylesheet.
+     * ⚠️ AND IT IS TRUE AT THE ONE WIDTH THIS HARNESS RUNS, 756 px. The five
+     * widths in the note above the stylesheet were measured with a throwaway
+     * probe and are not this assert.
+     * ⚠️ AND IT IS THREE SINCE 2026-09-28, WHICH IS THE SKETCH'S OWN COUNT. The
+     * fourth was `put back`, kept as a departure and written up as one until
+     * the ask *"rm put back button"* took it out.
+     * 🔴 AND THIS HALF OF THE CLAIM IS LOAD-BEARING AGAIN SINCE 2026-09-29,
+     * WHICH IS WHY THE SENTENCE THAT STOOD HERE IS GONE. It recorded that the
+     * third control had moved INSIDE the second, so the glyph's left edge was
+     * greater than the chooser's by CONSTRUCTION rather than by layout and this
+     * line could no longer see a row that came apart. The glyph is a sibling
+     * again on *"invisible hand is a separat e button not a radio group"*, so
+     * all three left edges are laid out rather than nested, and an order that
+     * broke would show here. MEASURED at the 756 px this harness runs:
+     * 34, 451 and 688, with the row justified so the last two are pushed to the
+     * far edge rather than packed behind the first.
+     */
+````
+
+<a id="shape-74"></a>
+## shape-74: demo/shape/index.html, inline script, line 1288
+
+````js
+    /**
+     * 🔴 THE GLYPH SITS ON THE OPTIONS' OWN AXIS, WHICH IS THE HALF A PERSON
+     * REPORTED AND THE HALF THIS CHANGE COULD HAVE BROKEN. Reported 2026-09-28
+     * as *"fix invisuble hand button"* with a screenshot: the square stood
+     * 10.00 px clear of `Session` wearing a full ring of its own, and MEASURED
+     * at 375 it ALSO sat 6.75 px ABOVE the options, because `.pos-choice` puts
+     * its caption on its own line at that width and a neighbour centres itself
+     * on the caption and the segments together. Joining it to the segment fixed
+     * both; splitting it out again on *"invisible hand is a separat e button
+     * not a radio group"* would have brought the second one straight back, and
+     * what stops it is that the SAME ask removed the caption, so there is
+     * nothing left for a neighbour to centre against.
+     * 🔴 SO THIS GRADES THE TOP AND NOT THE SEAM, AND THE TOP IS THE ONE NO
+     * DESKTOP SCREENSHOT SHOWS. MEASURED 2026-09-29 with a throwaway probe at
+     * 375, 756 and 1280: the two tops are 0.00 px apart at all three, and the
+     * chooser is 34.0 tall at 375 where it used to be 47.5. This harness runs
+     * at 756 only, so the phone reading is a measurement beside this assert
+     * rather than this assert, and that is said rather than implied.
+     * ⚠️ AND THE GAP IS READ, NOT TYPED. `.shape-bar-end` sets its own
+     * `column-gap` from `--shape-bar-gap`, so this compares the rendered
+     * distance against the rendered gap instead of asserting a 10 this page
+     * decided. A row that lost the wrapper would read 0 or a negative pull
+     * here; the old assert read a negative pull for exactly the same reason,
+     * from the other side of the same question.
+     */
+````
+
+<a id="shape-75"></a>
+## shape-75: demo/shape/index.html, inline script, line 1322
+
+````js
+    /**
+     * 🔴 AND THE GLYPH IS NOT ONE OF THE OPTIONS, WHICH IS WHAT WAS ASKED FOR
+     * AND IS FOUR CHANNELS OF ONE CLAIM. *"invisible hand is a separat e button
+     * not a radio group"*, 2026-09-29. `choice.mjs` says in its own header that
+     * its buttons wear `aria-pressed` rather than `role="radio"` and calls that
+     * a real gap left alone across eleven call sites, and yesterday's backlog
+     * flagged whether an ACTION sitting inside a row of options announces
+     * correctly as reasoned and never measured, with no screen reader on it.
+     * An action is not an option. Taking it out of the group is the answer that
+     * does not need the question settled.
+     * 🔴 SO IT IS ASKED OF THE DOM AND OF THE RENDERED BOXES, NEVER OF A CLASS
+     * NAME. Not in `parts.buttons`, not inside `parts.el`, and carrying no
+     * `aria-pressed` of its own; and the group CLOSED UP behind it, which is
+     * the half a DOM check cannot see. While it was the last segment the kit
+     * zeroed `Session`'s right corners and rounded the glyph's; out of the
+     * group, `Session` rounds its own right corners back and the glyph rounds
+     * all four. A page that put the button back in the segment would pass the
+     * first three and fail the fourth.
+     * ⚠️ AND EVERY RADIUS IS COMPARED AGAINST THE FIRST OPTION'S OUTER LEFT
+     * CORNER RATHER THAN AGAINST A 4. `.pos-seg` writes `4px` and so does
+     * `button`; reading one rendered corner and requiring the others to match
+     * it is the same claim with no number typed here to disagree later.
+     */
+````
+
+<a id="shape-76"></a>
+## shape-76: demo/shape/index.html, inline script, line 1360
+
+````js
+    /**
+     * 🔴 A GLYPH IS A PICTURE, SO IT IS NOT A NAME, AND THE SQUARE IS READ OFF
+     * THE RENDERED BOX RATHER THAN OFF THE ATTRIBUTE. `shell.css` records
+     * exactly this trap on `/wish/`: `data-glyph` correctly set and the button
+     * **45.83 px wide against 34.00 tall**, because the rule was scoped to
+     * `.pos-controls` and this button is deliberately outside it. An assert on
+     * the attribute would have been green through all of that.
+     */
+````
+
+<a id="shape-77"></a>
+## shape-77: demo/shape/index.html, inline script, line 1374
+
+````js
+    /**
+     * 🔴 THE PANEL IS A STACK OF GLUED SECTIONS WITH THE NAMEPLATE AT THE FOOT,
+     * 2026-09-28: *"shape: apply instument panel with secitons"*. This used to
+     * measure the plate against the CASE's top right corner, which is where
+     * `createInstrument` put it; there is no case now and the plate is the
+     * component's last row by construction.
+     * 🔴 **AND IT IS READ OFF THE DOM RATHER THAN OFF THE CALL.** `shape()`
+     * walks the surface's children and reads each row's `data-kind`, which is
+     * what a browser rendered, and the component's own header says why: what a
+     * module remembers and what a page draws are two facts, and `/pack/` shipped
+     * an assert on the first one that passed every run while three headings were
+     * on screen.
+     * ⚠️ AND THE COUNT IS THE REFERENCE'S, NOT A NINE TYPED HERE.
+     * `shownSections` is what built the rows, so a section appearing or
+     * disappearing moves both sides of this line together. What it cannot say is
+     * that the ORDER is right, which is the assert further down that reads the
+     * nine headings against the reference's own sequence.
+     * ⚠️ AND IT IS TRUE OF THE PART ON SCREEN BECAUSE A VISIT BUILDS ONE PART.
+     * Choosing another builds its rows and hides these, so `shape()` grows: this
+     * runs before any press, which is the same reason `a visit opened nothing`
+     * sits in this half.
+     */
+````
+
+<a id="shape-78"></a>
+## shape-78: demo/shape/index.html, inline script, line 1397
+
+````js
+    /* ⚠️ THE KEYS ROW IS IN THE DOM AND HIDDEN SINCE 2026-09-30. It is the
+       board route's, so a visit carries it and draws nothing of it; the next
+       assert reads the computed display rather than the attribute. */
+````
+
+<a id="shape-79"></a>
+## shape-79: demo/shape/index.html, inline script, line 1155
+
+````js
+    /**
+     * 🔴 THE NAME IS AT THE START OF THE FOOT, ONE INSET IN, AND IT READS
+     * `shape` IN LOWER CASE. Two claims, one measurement, because the second
+     * one is what `caps: false` buys and the first is what the sketch puts
+     * there.
+     * 🔴 **THE INK IS MEASURED, NOT THE PLATE.** `.panel-plate` is a flex box
+     * that spans its row's whole content width, so its own rect is right at both
+     * edges whatever the placement does to the name inside it: a check reading
+     * `plate.el` would pass under `ends`, under `mid` and under a placement that
+     * had stopped working. `plate.lines[0]` is the `shape` line itself, which is
+     * the thing a reader is looking at.
+     * ⚠️ **AND THE INSET IS READ OFF THE ROW RATHER THAN TYPED.** `.pos-rows-r`
+     * is `padding: var(--rows-gap) var(--rows-pad)`, so the row's computed
+     * `padding-left` IS the token every other row on this surface uses. A `20`
+     * typed here would be a shared measurement in two files, which is the defect
+     * `--sld-col` exists to stop.
+     * ⚠️ AND THE NAME IS READ THROUGH `shown()`, WHICH ASKS THE BROWSER WHAT IT
+     * RENDERED. `/circuit/` typed `novation` and rendered `NOVATION` on
+     * `text-transform` alone, and a check reading `textContent` graded the
+     * source and stayed green either way. `caps: false` is a claim about the
+     * PICTURE, so it is read off the picture.
+     */
+````
+
+<a id="shape-80"></a>
+## shape-80: demo/shape/index.html, inline script, line 1187
+
+````js
+    /**
+     * 🔴 AN EMPTY TABLE DRAWS NO HEADING AND SAYS NOTHING, AND IT STILL HOLDS
+     * ITS ROOM. Asked as *"rm move a slider and what it sends is listed here"*,
+     * and the caption was doing two jobs: a column name over no rows labels air,
+     * and a box that collapses when the words go moves the log and the end of
+     * the page the moment the first message lands.
+     * 🔴 READ THE COMPUTED `display`, NEVER `head.hidden`. `shell.css` records
+     * `/pack/` carrying this exact assert on the PROPERTY while three headings
+     * were on screen, because `.pos-tbl-row` sets `display: grid` and any author
+     * rule beats the browser's own `[hidden]`. Only the computed value knows
+     * which rule won.
+     */
+````
+
+<a id="shape-81"></a>
+## shape-81: demo/shape/index.html, inline script, line 1199
+
+````js
+    /* ⚠️ AND THE SIX ROWS ARE MEASURED THROUGH THE BROWSER RATHER THAN PARSED.
+       `--tbl-row-h` is a custom property holding a `calc()`, so
+       `getComputedStyle(x).getPropertyValue('--tbl-row-h')` hands back the
+       TOKEN and `parseFloat` on it is `NaN`. This assert went red on its first
+       run for exactly that, on a box that was already the right height. One
+       throwaway element sized by the same property is the browser resolving it,
+       which is the only thing that knows. There is no real row to measure here
+       because the whole claim is about a table with nothing in it.
+       🔴 AND IT IS A `<span>` RATHER THAN A `<div>`, WHICH IS THE SECOND WAY
+       THIS READ ZERO AND COST TWO RUNS. `shell.css` carries `.pos-stack >
+       div:empty { display: none }` for the empty-box rule, a ruler is an empty
+       div by definition, and **`document.body` IS a `.pos-stack`**
+       (`shell.mjs` adopts it), so moving the ruler out of the page and onto the
+       body did not escape it. MEASURED both times: `getBoundingClientRect()`
+       **0.00 px** while `getComputedStyle().height` read **32.4px**, because a
+       computed height is a fact about the cascade and a rect is a fact about
+       the screen. That rule names six container tags one by one and `span` is
+       not among them.
+       ⚠️ ABSOLUTE AND HIDDEN, so it cannot move anything while it is there. */
+````
+
+<a id="shape-82"></a>
+## shape-82: demo/shape/index.html, inline script, line 1233
+
+````js
+    /**
+     * 🔴 A NAME IS A GUESS AND THIS IS THE WHOLE OF IT. Two lists and the
+     * answers read back with no browser, no permission and no device: a match
+     * anywhere in the list wins, and the FIRST match wins where there are
+     * several, which is the case that has no way out from the interface now that
+     * there is no chooser.
+     */
+````
+
+<a id="shape-83"></a>
+## shape-83: demo/shape/index.html, inline script, line 1245
+
+````js
+    /**
+     * 🔴 AND THIS IS THE ONE STANDING BETWEEN THIS PAGE AND A STRAY CC 74 ON THE
+     * TASCAM. It is the negative half and it is a separate assert on purpose: a
+     * page that took the first output would pass the line above unharmed, and
+     * the first output on this desk is a Model 12 or an Evolution keyboard, both
+     * of which move something real when CC 74 arrives. With no chooser left,
+     * this is the only thing choosing, so it is the only thing refusing.
+     */
+````
+
+<a id="shape-84"></a>
+## shape-84: demo/shape/index.html, inline script, line 1259
+
+````js
+    /**
+     * 🔴 WHICH CIRCUIT WINS, AND IT IS THE ONE ON THIS USB PORT. Pure, so the
+     * three answers are read with no device, no relay and no permission, and
+     * the second is the negative control: a page that preferred the board
+     * would still pass the first and the third.
+     */
+````
+
+<a id="shape-85"></a>
+## shape-85: demo/shape/index.html, inline script, line 1279
+
+````js
+    /**
+     * 🔴 ONE HAND IS A FRAME AND FORTY ARE A CEILING, AND BOTH HALVES ARE HERE.
+     * The first two cases are the negative control: a page that paced one hand
+     * would have made the sweep this page exists for worse in order to solve a
+     * problem it does not have. The last is the arithmetic that keeps forty of
+     * them under the ceiling, which was measured at 1289 a second before it
+     * existed.
+     */
+````
+
+<a id="shape-86"></a>
+## shape-86: demo/shape/index.html, inline script, line 1292
+
+````js
+    /**
+     * 🔴 A HAND WHERE ONE CAN BE SEEN AND NOWHERE ELSE, BOTH HALVES. The first
+     * half alone would pass on a page that gave every slider a hand; the second
+     * would pass on a page that gave none.
+     */
+````
+
+<a id="shape-87"></a>
+## shape-87: demo/shape/index.html, inline script, line 1304
+
+````js
+    /**
+     * 🔴 THE GROUPING IS A DECISION WITH A SOURCE, SO IT IS ASSERTED AND NOT
+     * DESCRIBED. Three claims in one, and the third is the negative control: the
+     * nine headings come out in the reference's own order, a parameter this page
+     * regroups loses exactly the word its heading gained, and a parameter this
+     * page does NOT regroup keeps both its heading and its full name. Without
+     * that last one the check would pass on a page that stripped every label
+     * down to nothing.
+     */
+````
+
+<a id="shape-88"></a>
+## shape-88: demo/shape/index.html, inline script, line 1322
+
+````js
+    /**
+     * 🔴 A LAYOUT CLAIM IS A MEASUREMENT. Nine sections are nine separate grids,
+     * each of which would size its label column from its own widest name, so one
+     * left edge A COLUMN across all of them is the whole of what `--lab` is for
+     * and it is exactly the kind of rule this project has watched lose silently
+     * to another rule. Measured off real rects, after re-running the share, so
+     * the measurement and the claim are in the same font state.
+     * 🔴 AND THE NUMBER OF EDGES IS READ OFF THE BREAKPOINT RATHER THAN ASSUMED,
+     * BECAUSE THE HARNESS ONLY EVER SEES ONE OF THE TWO CASES. `demo/verify.mjs`
+     * runs at 756 px with no viewport override, which is ABOVE the kit's 720 px
+     * pair breakpoint, so the case this green line measures is the two column
+     * one. The phone case is one column and one edge and nothing in this suite
+     * can reach it: it was measured with a throwaway probe at 390 px on
+     * 2026-09-21 and that measurement is not this assert.
+     */
+````
+
+<a id="shape-89"></a>
+## shape-89: demo/shape/index.html, inline script, line 1338
+
+````js
+    /* ⚠️ THE ROWS ON SCREEN, NOT EVERY ROW THE SURFACE HOLDS. A part that has
+       been shown once keeps its rows, hidden; a hidden row has no layout at all
+       and every lane in it reads 0, which would report a whole extra edge at
+       x 0 and take this red on a page where nothing is wrong. */
+````
+
+<a id="shape-90"></a>
+## shape-90: demo/shape/index.html, inline script, line 1358
+
+````js
+  /**
+   * 🔴 THE HALF THAT COSTS SOMETHING, BEHIND THE GATE. It moves handles, runs an
+   * invisible hand and produces bytes, and a visitor would see all three happen
+   * in front of them.
+   * ⚠️ AND NOTHING REACHES AN INSTRUMENT WHILE IT RUNS. `sink` takes every
+   * message, so a suite run on the desk this Circuit is plugged into is not a
+   * hand on it. There is an assert on the counter at the end.
+   */
+````
+
+<a id="shape-91"></a>
+## shape-91: demo/shape/index.html, inline script, line 1369
+
+````js
+    // ── the invisible hand, which is what this page is for ───────────────────
+    //
+    // 🔴 IT IS FIRST BECAUSE IT IS SLOW, AND SLOW IS MEASURED RATHER THAN
+    // GUESSED. A sweep is 7000 ms end to end with a Beta(3,4) speed profile, so
+    // the first STEP of a 127 step lane lands about half a second in: the curve
+    // is deliberately gentle at the start, which is the thing that makes it read
+    // as a hand rather than as a ramp. `settleMs` in the manifest covers it.
+````
+
+<a id="shape-92"></a>
+## shape-92: demo/shape/index.html, inline script, line 1380
+
+````js
+    /* 🔴 THREE STEPS, NOT ONE, AND THE NUMBER IS THE POINT. One step proves the
+       handle twitched and would be satisfied by a rounding error; three proves
+       it is travelling, and three is also what makes the assert below about a
+       SEQUENCE of messages rather than about a single one. MEASURED at about
+       800 ms on a 127 step lane, against a 2500 ms deadline. */
+````
+
+<a id="shape-93"></a>
+## shape-93: demo/shape/index.html, inline script, line 1394
+
+````js
+    /* 🔴 A HAND THAT MOVED A CONTROL WITHOUT THE SOUND CHANGING WOULD BE A LYING
+       CONTROL, which is this project's own phrase for the defect. So the claim
+       is not that the handle moved, it is that every position it passed through
+       went out, on this part's own channel and controller, as a sequence of
+       distinct values rather than as one message at the end. */
+````
+
+<a id="shape-94"></a>
+## shape-94: demo/shape/index.html, inline script, line 1408
+
+````js
+    /* ⚠️ THE LAST VALUE OF A GESTURE IS THE ONE THAT STAYS TRUE FOREVER. A hand
+       stopping is a gesture ending, so it has to land, or a filter sits at the
+       second to last position for as long as the instrument is on. */
+````
+
+<a id="shape-95"></a>
+## shape-95: demo/shape/index.html, inline script, line 1426
+
+````js
+    /* 🔴 THE SAME CONTROLLER ON THE WRONG CHANNEL IS THE ONE MISTAKE THIS
+       INSTRUMENT PUNISHES. CC 74 is the synth filter on 1 and the MASTER filter
+       on 16, and a page keyed by controller number alone would move whichever
+       one it happened to remember. */
+````
+
+<a id="shape-96"></a>
+## shape-96: demo/shape/index.html, inline script, line 1446
+
+````js
+    // ── the parts ────────────────────────────────────────────────────────────
+    //
+    // 🔴 DRIVEN HERE BECAUSE THE HARNESS CANNOT REACH IT. The chooser is not in
+    // `.pos-controls` on purpose, and a check only a control can reach is a
+    // check nobody runs.
+````
+
+<a id="shape-97"></a>
+## shape-97: demo/shape/index.html, inline script, line 1455
+
+````js
+    /**
+     * 🔴 AND THE SECTIONS ON SCREEN ARE THE NEW PART'S, WHICH IS A CLAIM ABOUT
+     * THE PANEL RATHER THAN ABOUT THE MODEL. The line above counts sliders in a
+     * list; this counts rows a browser is drawing, and a part switch that left
+     * the old part's sections on screen would satisfy the first one perfectly.
+     * 🔴 READ THE COMPUTED `display`, NEVER `row.hidden`. `shell.css` records
+     * `/pack/` carrying an assert on the PROPERTY while three headings were on
+     * screen, because any author `display` beats the browser's own `[hidden]`.
+     * Only the computed value knows which rule won.
+     * ⚠️ AND THE THIRD CLAUSE IS THE NEGATIVE CONTROL, WHICH IS WHAT SAYS THIS
+     * IS A HIDE AND NOT A REBUILD. A part's rows are built once and kept, so
+     * the surface holds every section of every part that has been chosen and
+     * draws one part's worth. A page that rebuilt would pass the first two and
+     * would leave a detached slider's invisible hand holding an animation frame
+     * for the life of the tab.
+     */
+````
+
+<a id="shape-98"></a>
+## shape-98: demo/shape/index.html, inline script, line 1496
+
+````js
+    // ── how far this page has moved the instrument ───────────────────────────
+    //
+    // ⚠️ THIS IS READ WHILE THREE PARTS ARE STILL MOVED, which is the state the
+    // second press below has to undo. It used to be the setup for a direct
+    // `putBack()` call; that call is gone with the button and the claim it set
+    // up is graded off a press instead.
+````
+
+<a id="shape-99"></a>
+## shape-99: demo/shape/index.html, inline script, line 1506
+
+````js
+    // ── move everything, and the same control putting it back ────────────────
+    //
+    // 🔴 DRIVEN BY PRESSING THE REAL BUTTON, NOT BY CALLING THE FUNCTION. The
+    // button is in `.shape-bar` precisely so the harness never presses it, and a
+    // check that called `moveEverything()` instead would grade the arithmetic
+    // while leaving the control itself untested. `element.click()` is what
+    // `verify.mjs` does to every other button on every other page.
+    // 🔴 AND THE SECOND PRESS IS THE WHOLE REASON THE `put back` BUTTON COULD
+    // GO. Two presses of one control, and between them the control has to have
+    // changed what it offers, or a reader is looking at `move everything` while
+    // pressing it puts everything back.
+````
+
+<a id="shape-100"></a>
+## shape-100: demo/shape/index.html, inline script, line 1532
+
+````js
+    /* 🔴 FORTY HANDS, ONE LINE. A line per slider is the log this page reports
+       real faults in, filled with forty rows nobody needs, and the one thing
+       worth reading gets pushed off the top of it. */
+````
+
+<a id="shape-101"></a>
+## shape-101: demo/shape/index.html, inline script, line 1538
+
+````js
+    /* 🔴 THE COARSE LANES REALLY DO MOVE, AND THIS IS WHERE THAT IS GRADED.
+       Twelve of the fifty two are modes and switches that a hand cannot animate,
+       which is a statement about the ANIMATION: a filter type and an oscillator
+       wave are two of the biggest changes this instrument takes, and a button
+       called `move everything` that skipped a quarter of the rack would be
+       naming one thing and doing another. */
+````
+
+<a id="shape-102"></a>
+## shape-102: demo/shape/index.html, inline script, line 1550
+
+````js
+    /**
+     * 🔴 AND THE CONTROL NOW OFFERS THE WAY OUT, WHICH IS WHERE THE `put back`
+     * BUTTON WENT. A glyph is a picture, so the claim is read off the two
+     * channels that carry words: the accessible name, which is what a screen
+     * reader says and what the check below presses against, and the tooltip,
+     * which is what a reader with a pointer gets.
+     * ⚠️ AND THE GLYPH ITSELF IS READ OFF THE RENDERED SPAN RATHER THAN OFF THE
+     * BUTTON. `centreSymbol` puts it in a `.pos-sym` and `setSymbol` writes into
+     * that span, so a `textContent` on the button would have thrown the centring
+     * away silently, which `symbol.mjs` records as REPORTED on `/videoradio/`.
+     * A check reading the button's own text cannot tell the two apart.
+     */
+````
+
+<a id="shape-103"></a>
+## shape-103: demo/shape/index.html, inline script, line 1569
+
+````js
+    /**
+     * 🔴 AND THE PACING IS CONSULTED ON THE REAL PATH, WHICH IS A DIFFERENT
+     * CLAIM FROM THE ARITHMETIC ABOVE. A formula nothing calls is this
+     * project's most expensive kind of defect, and it reads as correct. Two
+     * offers per lane inside one frame, with forty hands running: the first
+     * sets each lane's clock and the second is inside the 67 ms gap, so forty
+     * positions are held back rather than put on the wire.
+     * ⚠️ THE FIRST ROUND IS NOT A CONTROL, IT IS THE SETUP. Each lane's clock
+     * is empty until something offers, so a single round would pass on a page
+     * with no pacing at all.
+     */
+````
+
+<a id="shape-104"></a>
+## shape-104: demo/shape/index.html, inline script, line 1591
+
+````js
+    /* 🔴 AND THE SECOND PRESS IS THE WAY OUT OF IT. A button that starts forty
+       hands and no button that stops them is a page somebody has to reload, and
+       a reload is how this project's `/weight/` full screen bug was reported.
+       That sentence is the whole defence of the control the ask removed, so the
+       press that replaced it is graded on both halves of what it does. */
+````
+
+<a id="shape-105"></a>
+## shape-105: demo/shape/index.html, inline script, line 1604
+
+````js
+    /* 🔴 AND THE OTHER HALF, WHICH IS A DIFFERENT CLAIM AND THEREFORE A
+       DIFFERENT ASSERT. Stopping forty hands and sending fifty two parameters
+       home are two things one press does, and a page that stopped the hands and
+       left the instrument scattered would pass the line above. The parts moved
+       by hand earlier are in here too: Synth 2 and the session were moved
+       before `move everything` ever ran and nothing has put them back since.
+       ⚠️ AND A HAND STOPPING SENDS ITS OWN LAST POSITION, which is a value that
+       is NOT home. It never leaves: both go into the same per-controller gate
+       inside one frame and the home value is put second, so what drains is one
+       message per parameter at home. If that ordering ever changed this line is
+       what would say so. */
+````
+
+<a id="shape-106"></a>
+## shape-106: demo/shape/index.html, inline script, line 1620
+
+````js
+    /* 🔴 IT READS THE STATE AFTER THE FIRST PRESS TOO, AND WITHOUT THAT HALF IT
+       PASSES ON A CONTROL THAT NEVER MOVED. MEASURED 2026-09-28 with `syncHand`
+       made a no-op: this line came back GREEN while four others went red,
+       because a control stuck on `move everything` forever is announcing `move
+       everything` at the end. A transition is two states and one of them is the
+       one before. */
+````
+
+<a id="shape-107"></a>
+## shape-107: demo/shape/index.html, inline script, line 1639
+
+````js
+    /* 🔴 AND NONE OF IT REACHED AN INSTRUMENT. A suite run on the desk this
+       Circuit is plugged into must not be a hand on it, and this is the counter
+       that says so rather than a comment claiming it. */
+````
+
+<a id="shape-108"></a>
+## shape-108: demo/shape/index.html, inline script, line 1646
+
+````js
+    /* 🔴 THE PRESS DID REACH FOR THE BOARD, AND THE BOARD REFUSED THE HARNESS.
+       `look` found no Circuit on this headless browser, so it built the board
+       and asked nothing, because a suite run may not drive shared hardware in
+       another building. A page whose fallback was never reached would pass the
+       line above with `board` still null, so that is read too. */
+````
+
+<a id="shape-109"></a>
+## shape-109: demo/shape/index.html, inline script, line 1676
+
+````js
+  /**
+   * 🔴 THE PRESS THE HARNESS NO LONGER MAKES, MADE HERE, BEHIND THE GATE.
+   * `.pos-controls` is empty since the status control joined the page's own
+   * row, and `demo/verify.mjs` drives a page by clicking that row, so without
+   * this line `look` never runs, `drive` never runs, and every assert behind
+   * them goes silent while the suite reads green. `/muta/` carries the same
+   * line for the same reason and `/mirror/` drives its headset buttons the same
+   * way.
+   * ⚠️ AFTER `grade()`, NOT BEFORE IT. `a visit opened nothing`, `a visit
+   * chooses no output and opens no port` and `the page knows how far it has
+   * moved the instrument` are all statements about a page nobody has pressed,
+   * so they are read while that is still true.
+   * ⚠️ AND BEFORE `d.ready()`, WHICH IS DELIBERATE AND WAS GOT WRONG ONCE ON
+   * `/muta/`. `verify.mjs` waits 7.4 s for `ready` before it grades anything,
+   * so a page that only says it is ready when its checks have FINISHED is never
+   * graded at all. The flag means this page is up.
+   */
+````

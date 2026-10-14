@@ -4,11 +4,9 @@
 
 import { loadJazz, loadPop, split, count, cases, rowsFor, ranked, pct, f, shipShape }
   from './chord-exp-lib.mjs';
-/* 🔴 THE SHIPPED SAMPLER, IMPORTED RATHER THAN REPRODUCED. The four lines of a
-   sampler are exactly the four lines somebody gets subtly wrong in a second
-   copy, and a temperature measured here that is not the temperature the page
-   draws with is a number about nothing. `rowsForShip` is `suggest.mjs`'s own
-   lookup, backoff included. */
+/* The shipped sampler, imported rather than copied; rowsForShip is suggest.mjs's own lookup,
+   backoff included.
+   See lessons/page-resources.md#resources-13 */
 import { sampleRow, routeOver, mkRandom, rowsFor as rowsForShip }
   from '../shell/suggest.mjs';
 
@@ -49,9 +47,8 @@ function mkSample(T, floor = 3) {
 }
 
 /**
- * A path that has to ARRIVE. Beam search over the trigram for the most likely
- * sequence of `steps` chords ending on `target`. This is the only chooser here
- * that knows where it is going, which is the whole of the third complaint.
+ * Beam search over the trigram for the likeliest `steps` chords ending on `target`.
+ * See lessons/page-resources.md#resources-14
  */
 function pathTo(c, ctx0, target, steps, { beam = 24, floor = 2 } = {}) {
   let live = [{ ctx: [...ctx0], path: [], lp: 0 }];
@@ -150,21 +147,17 @@ function run(label, songs) {
   console.log(`   ${paths.size} distinct four-chord routes, the commonest being:`);
   for (const [p, k] of ranked(paths).slice(0, 6)) console.log(`      ${pct(k, found).padStart(5)}%  ${p}`);
 
-  /* ══ THE SHAPE THAT SHIPS, WHICH IS NOT THE SHAPE ABOVE ══════════════════ */
-  /* ⚠️ THE NUMBERS THIS SECTION PRINTS MOVED ON 2026-09-26 AND THE COMMENTS IN
-     THIS FILE ARE FROM THE DAY BEFORE. `KEEP` went from 3 to 5 and the
-     temperatures were refitted from 3.5 and 1.4 to 1.7 and 0.8, so the sweep
-     below now finds its best fit in a different place. The prune sweep that
-     decided it is `demo/resources/chord-e6-keep.mjs`, and the within take
-     adaptation this file knows nothing about is `chord-e7-take.mjs`. */
+  /* The shape that ships, which is not the shape above.
+     See lessons/page-resources.md#resources-15 */
+  /* KEEP is 5 and temperatures are 1.7 and 0.8 now; the prune sweep is chord-e6-keep.mjs.
+     See lessons/page-resources.md#resources-16 */
   const ship = shipShape(c, { id: label.toLowerCase() });
   console.log(`\n${'-'.repeat(78)}`);
   console.log(`THE SHIPPED TABLE'S SHAPE: top 3 rows a context, ctx>=8, row>=3, 89 steps`);
   console.log(`  ${ship.tri.size} trigram and ${ship.bi.size} bigram contexts survive, against `
     + `${c.tri.size} and ${c.bi.size} counted`);
-  /* 🔴 THE GLOBAL MAX RATE IS THE PLAN'S THIRD MEASURE AND IT IS THE ONE THAT
-     SAYS *cliche* IN A NUMBER. It is how often a generator answers with the
-     single commonest chord in the whole corpus, whatever was played. */
+  /* Global max rate: how often a generator answers with the corpus's single commonest chord.
+     See lessons/page-resources.md#resources-17 */
   const topSym = ranked(c.uni)[0][0];
   console.log(`\n  generator                     cycles  distinct/10  attested  endings  surprisal  ${pretty(topSym)} rate`);
 
@@ -197,12 +190,8 @@ function run(label, songs) {
 
   gradeShip('shipped, the argmax', (cx) => sampleRow(rowsForShip(ship, cx).rows, 0, null));
   const sweep = {};
-  /* 🔴 THE SWEEP RUNS PAST 1.4 BECAUSE THE SHIPPED SHAPE NEEDS IT TO, WHICH IS
-     THE FINDING RATHER THAN A SETTING. The plan swept 0.5 to 1.4 over every row
-     a context had; three rows is a much narrower thing to draw from, so the same
-     variety costs a much flatter dial, and a sweep that stopped at 1.4 would
-     report its own last entry as the answer. `1e6` is uniform over the three and
-     is the ceiling this shape has: nothing hotter can reach further. */
+  /* The sweep runs past 1.4: three rows need a flatter dial. 1e6 is uniform, the ceiling.
+     See lessons/page-resources.md#resources-18 */
   for (const T of [1.0, 1.2, 1.4, 1.6, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6]) {
     sweep[T] = gradeShip(`shipped, sampled at ${T}`,
       (cx, rnd) => sampleRow(rowsForShip(ship, cx).rows, T, rnd));

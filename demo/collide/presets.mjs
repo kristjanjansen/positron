@@ -1,19 +1,7 @@
-// demo/collide/presets.mjs: the programs `/collide/` opens with.
-//
-// 🔴 IN THEIR OWN FILE SO THE NODE TEST COMPILES EXACTLY WHAT THE PAGE SHIPS.
-// `demo/shell/sclang-lite-test.mjs` imports this list and compiles every entry;
-// a copy of the text in the test would be a second set of presets that could
-// drift from the page's and stay green while the page broke.
-//
-// ⚠️ THE COMMENTS ARE ON THEIR OWN LINE WITH A BLANK LINE AFTER, which is
-// `/fau/`'s rule for the same kind of listing (*"add nl after comments"*): a
-// comment says what the line under it does, and a blank line keeps the next
-// statement from reading as part of it.
-//
-// ⚠️ EVERY ONE IS WRITTEN THE WAY SuperCollider's OWN HELP WRITES A SynthDef
-// function, arguments first and `var` lines before anything else, because
-// that is what somebody who knows the language will type and what they should
-// be able to paste back into a real SuperCollider unchanged.
+// The programs /collide/ opens with, in their own file so sclang-lite-test.mjs
+// compiles exactly what the page ships. Each is written as SuperCollider help
+// writes a SynthDef, so it pastes back unchanged; comments sit on their own line.
+// See lessons/page-collide.md#collide-1
 
 export const PRESETS = [
   {

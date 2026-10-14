@@ -45,10 +45,9 @@
     // footer. A row above the grid repeating four of them would be the same
     // facts twice.
     readout: null,
-    // 🔴 NO DECLARED CONTROL: the one control is a status button built below,
-    // asked for 2026-09-30 as *"stat / stop camera: convert to oline status
-    // button: CAMERA ON | CAMERA OFF"*. It is the /llhls/ control with the
-    // camera's words, and it lives in the same row verify.mjs presses.
+    // No declared control: the one control is a CAMERA ON / CAMERA OFF status button built
+    // below, in the same row verify.mjs presses.
+    // See lessons/page-cam.md#cam-1
     controls: [],
   });
   guard(d);
@@ -58,10 +57,9 @@
     press: () => pressCam(),
   });
   /**
-   * ⚠️ `data-busy` BY HAND, BECAUSE THIS IS NOT A DECLARED CONTROL. The shell
-   * marks a declared one busy while its handler runs, and verify.mjs waits on
-   * that mark before it reads the page; without it the harness would walk off
-   * mid check. NOT disabled, unlike the shell's: a press while starting stops.
+   * `data-busy` by hand, since this is not a declared control and verify.mjs waits on that
+   * mark. Not disabled: a press while starting stops.
+   * See lessons/page-cam.md#cam-2
    */
   let pressing = 0;
   async function pressCam() {
@@ -75,15 +73,9 @@
   d.controls.append(camBtn.el);
 
   /**
-   * 🔴 THE LL-HLS LEG IS RETIRED, 2026-10-13. The burned canvas was recorded
-   * with MediaRecorder, sent over `wss://pub.positron.studio/cam` into a
-   * container of the camera's own, rewrapped by ffmpeg to RTMPS on the input
-   * positron-cam and played back through the tuned player /llhls/ used
-   * (plans/plan-cam-llhls.md). That input is deleted and pub answers /cam with
-   * 410, so the panel stays and its footer says the leg is retired, in every
-   * tier and for a visitor alike. The code that ran it is in git at be7737d;
-   * the same publish lives on in /video/llhls/ (LL-HLS loopback), on
-   * that page's own input.
+   * The LL-HLS leg is retired (input deleted, pub answers /cam with 410), so the panel stays
+   * with a footer saying so. The same publish lives on in /video/llhls/.
+   * See lessons/page-cam.md#cam-3
    */
   const HLS_ON = false;
   const HLS = { pub: null, player: null, st: null, err: null, readyAt: null, liveAt: null, uid: null, firstMs: null, rebuilds: 0, starts: [] };
@@ -107,13 +99,9 @@
   const localV = video(), hlsV = video(), rtcV = video();
   const moqC = el('canvas');
 
-  // What kind of latency each footer carries is the LABEL, so the four can be
-  // compared without a legend: the local preview can only say capture to
-  // screen, the three that went out and came back say glass to glass.
-  // 🔴 A PANEL'S STATE IS A FOOTER CELL, NOT A CAPTION ON THE PICTURE. Asked
-  // 2026-09-30: *"do not draw on screen but on videopanel footer (llhls
-  // closed)"*. `state` is the LAST cell, with no reserve, so a line arriving
-  // moves nothing to its left, and it changes only when something happened.
+  // Each footer's label says what kind of latency it carries: capture to screen locally,
+  // glass to glass for the three that went out. `state` is the last cell with no reserve.
+  // See lessons/page-cam.md#cam-4
   const panel = (name, media, values) => {
     const p = createVideoPanel({ media, left: el('span', 'cam-name', name), fullMode: 'hover',
       values: [...values, { key: 'state', label: '' }] });
@@ -154,11 +142,9 @@
   const ms = (x) => (x == null ? '' : `${Math.round(x)} ms`);
 
   /**
-   * Glass to glass off the burned clock, per presented frame. Sender and
-   * receiver are this one page, so one clock stamps the row and one clock reads
-   * it, and the difference is exact rather than an estimate.
-   * ⚠️ PRESENTED FRAMES, via `requestVideoFrameCallback`: a decoded frame nobody
-   * was shown is not a frame the eye sees.
+   * Glass to glass off the burned clock, per presented frame (`requestVideoFrameCallback`).
+   * One page sends and reads, so one clock makes the difference exact.
+   * See lessons/page-cam.md#cam-5
    */
   function meter(v) {
     const m = { samples: [], all: 0, frames: 0, bad: 0, live: true, firstAt: null };
@@ -182,10 +168,9 @@
   }
 
   /**
-   * Capture to screen on the local preview. `requestVideoFrameCallback` hands a
-   * camera frame's `captureTime` and its `expectedDisplayTime`, both on the
-   * `performance.now()` clock. A browser that does not report `captureTime`
-   * leaves the cell empty, which is the honest answer.
+   * Capture to screen on the local preview, from `captureTime` and `expectedDisplayTime`.
+   * Without `captureTime` the cell stays empty.
+   * See lessons/page-cam.md#cam-6
    */
   function localMeter(v) {
     const m = { samples: [], frames: 0, live: true };
@@ -226,14 +211,9 @@
   const oursOpened = () => performance.getEntriesByType('resource').filter((e) => OURS.test(e.name)).length;
 
   const running = () => !!cam;
-  /* 🔴 TWO TIERS, asked 2026-10-04: *"make checks way ligher (2 tiers?)"*,
-     *"i mean these long-running ones"*. The camera, its preview and the frame
-     that would leave the page are this machine's own and stay in an ORDINARY
-     harness run (`selfcheck=1`). What leaves it does not: the relay servers,
-     the UDP probe, the WHIP publish and WHEP play back through Stream, and the
-     MoQ loopback through the relay, each waited on for thirty timed frames.
-     `DEMO_DEEP=1 node demo/verify.mjs cam` runs those. A visitor is never
-     `LIGHT`, so their press is unchanged. */
+  /* Two tiers: camera, preview and outgoing frame run in an ordinary harness run; relays,
+     UDP probe, WHIP/WHEP and MoQ loopback only under `DEMO_DEEP=1`. A visitor is never LIGHT.
+     See lessons/page-cam.md#cam-7 */
   const LIGHT = SELFCHECK && !DEEP;
 
   // A press on `camera off` starts; a press while starting or on stops.
@@ -333,11 +313,9 @@
   }
 
   /**
-   * One frame of what leaves this page: the camera, contained and scrimmed,
-   * with the clock row and the two clocks burned over it. The container's
-   * `black@0.55` box sits behind every label and number (`scrim: true`), so
-   * the words read over a bright room. WebRTC and MoQ both draw with this, so
-   * the two legs carry the same picture and the same row.
+   * One frame of what leaves this page: the camera with the clock row and two clocks burned
+   * over a `black@0.55` scrim. WebRTC and MoQ both draw with this.
+   * See lessons/page-cam.md#cam-8
    */
   function cameraFrame(ctx, w, h, frame) {
     drawCamera(ctx, localV, w, h);
@@ -373,14 +351,10 @@
   }
 
   /**
-   * 🔴 THE HANDSHAKE IS HTTPS AND ANSWERS 201 ON A NETWORK THAT DROPS UDP, and
-   * then not one packet of media arrives. MEASURED 2026-09-30 on a phone
-   * hotspot: Stream answers with one UDP candidate and nothing else, so ICE
-   * fails fifteen seconds later and the WHEP play meets a 409, because the
-   * publish never went live. Said as `could not start` that reads as a broken
-   * page; the cause is the network, and the page can prove it with one STUN
-   * request, so it says so. With a relay from `/ice` this path should not be
-   * reached at all, and if it is, it says the relay did not get through either.
+   * On a network that drops UDP the HTTPS handshake still answers 201 and ICE fails 15 s
+   * later. One STUN request proves the cause, so the page names the network, not itself.
+   * With a relay from `/ice` this should not be reached.
+   * See lessons/page-cam.md#cam-9
    */
   async function rtcFailed(mine, why) {
     if (gen !== mine || P.rtc.said) return;
@@ -570,10 +544,9 @@
     d.assert('no state line is drawn on any picture', Object.values(P).every((p) => !p.slots.caption.textContent),
       Object.entries(P).map(([k, p]) => `${k} "${p.slots.caption.textContent}"`).join(' / '));
 
-    // And the stop, because a camera page that leaves a leg open bills Stream
-    // minutes for as long as it is open. ⚠️ `stop()` and not a click: this runs
-    // inside the press that started it, and a click here would start a second
-    // press inside the first.
+    // Stop too, since an open leg bills Stream minutes. `stop()`, not a click: a click here
+    // would start a second press inside the first.
+    // See lessons/page-cam.md#cam-10
     const tracks = [...cam.getTracks()];
     const pcs = [pub?.pc, sub?.pc].filter(Boolean);
     const camWs = HLS.pub;
@@ -588,13 +561,9 @@
     d.assert('the control reads camera off again', camBtn.state() === 'offline', camBtn.state());
   });
 
-  // ── how it works, one picture per panel ─────────────────────────────────
-  // 🔴 FOUR PICTURES, IN THE PANELS' ORDER, EACH SHOWING ONLY ITS OWN PATH.
-  // Asked 2026-09-30: *"make separate diagrams on each feed (4 total) in cam"*.
-  // One standing `How it works` heading over the first, and each picture named
-  // by its panel in the diagram's own small title. The first cannot be handed a
-  // `title` beside `how` (refused, so two headings never stack), so its name is
-  // written into the same element after it is built.
+  // Four pictures, in the panels' order, each showing only its own path. The first cannot
+  // take a `title` beside `how`, so its name is written in after it is built.
+  // See lessons/page-cam.md#cam-11
   const CAMERA_DG = {
     nodes: [
       { id: 'you', label: 'Browser', sub: 'this page', kind: 'here', tech: 'browser',

@@ -1,26 +1,7 @@
-// demo/sync/after.mjs: the AFTER tab of /sync/, from the old /replay/
-// (plans/plan-demo-structure.md §3.1, step 7).
-//
-// The fourth of the four regimes in plans/plan-routing-time.md: ALIGNED
-// AFTER, ON ONE RECORDING. Nothing travels at all by the time this plays: the
-// show and the cues an operator called during it are both files, and they
-// agree because the picture is the clock and every cue is a moment of the
-// picture's own time.
-//
-// WHAT CAME OVER FROM /replay/: the 190 s show off R2, its eight cues, the
-// media element as transport master, the loop, the watchdog, the diagram.
-// WHAT CHANGED ON THE WAY IN:
-//   1  🔴 THIS TAB OWNS THE PAGE'S ONE PUBLISHED TRANSPORT BAR, so the harness
-//      drills it as `__demo.transport` exactly as it drilled /replay/'s. Every
-//      other bar on /sync/ is `publish: false` and drilled as page asserts.
-//   2  🔴 THE LOOP IS LAID AROUND THE FIRST CUE, so the check that the picture
-//      stays inside a loop also makes a cue fire on every lap, and *cues land
-//      within 250 ms of the picture* is graded on every run. On /replay/ it
-//      ran only when the harness happened to play past 15 s, which it never
-//      did, so the page's headline number was never asserted.
-//   3  The diagram is drawn the first time the tab is shown, into the tab,
-//      after its readout and log. `atEnd` would put it under the whole page,
-//      under every tab.
+// AFTER tab: the show and its cues are both files, aligned because the picture
+// is the clock. Owns the page's one published transport bar. The loop is laid
+// around the first cue, so cue timing is graded on every run.
+// See lessons/page-sync.md#sync-26
 
 import { el, armVideo, playOrPrompt } from '/shell/shell.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
@@ -33,23 +14,21 @@ import { ARCHIVE, CUES, cueItems } from '/shell/archive.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// One lap, and long enough that a picture which ignores the loop is obvious
-// rather than arguable: with the loop working the element never passes `b`,
-// and without it the element is a full second past by the time the sampling
-// stops.
+// One lap, long enough that a picture ignoring the loop is a full second past
+// `b` by the time sampling stops.
+// See lessons/page-sync.md#sync-27
 const LOOP_MS = 900;
 const SAMPLE_MS = 2000;
 // The first cue sits inside the lap, 400 ms after its start.
 const LOOP_LEAD_MS = 400;
-// What the wrap can honestly cost. The bar wraps from its own paint at 60 Hz
-// once the playhead reaches `b`, and the playhead is re-anchored on the
-// picture four times a second, so a third of a second is slack rather than
-// tolerance. A picture that is not being looped at all is a second past this.
+// What the wrap may cost: the bar wraps at 60 Hz and re-anchors on the picture
+// four times a second, so a third of a second is slack, not tolerance.
+// See lessons/page-sync.md#sync-28
 const LOOP_SLACK_MS = 350;
 
-// NATIVE HLS ONLY ON WEBKIT, gated on ManagedMediaSource. `canPlayType(
-// 'application/vnd.apple.mpegurl')` answers "maybe" in Chrome as well as
-// Safari, so it cannot tell them apart. Same rule as src/low-latency-player.js.
+// Native HLS only on WebKit, gated on ManagedMediaSource: `canPlayType` answers
+// "maybe" for HLS in Chrome too. Same rule as src/low-latency-player.js.
+// See lessons/page-sync.md#sync-29
 const NATIVE_HLS = 'ManagedMediaSource' in window
   && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
 
@@ -111,7 +90,8 @@ export function build({ panel, log, set, d }) {
       log('this browser has no way to play HLS', 'bad');
       return;
     }
-    // MEDIA IS THE MASTER: the deck follows currentTime, it does not drive it
+    // media is the master: the deck follows currentTime, it does not drive it
+    // See lessons/page-sync.md#sync-30
     master = mediaMaster(deck, video, {
       anchorMs: 0,
       onCorrection: (c) => log(`correction ${JSON.stringify(c).slice(0, 90)}`),
@@ -122,10 +102,9 @@ export function build({ panel, log, set, d }) {
   }
 
   /**
-   * 🔴 THE PAGE OWNS WHAT IS BEING PLAYED, SO THE BAR ASKS IT RATHER THAN THE
-   * DECK. The bar's loop wraps by SEEKING, and the deck is a FOLLOWER of the
-   * picture, so a seek written to the follower was undone by the master's next
-   * tick. Every verb drives the element; the deck follows.
+   * The bar asks the page, not the deck: the deck follows the picture, so a seek
+   * written to it is undone on the next tick. Every verb drives the element.
+   * See lessons/page-sync.md#sync-31
    */
   const command = {
     play: () => {
@@ -148,10 +127,9 @@ export function build({ panel, log, set, d }) {
     },
   };
 
-  // ONE POSITION SURFACE: the strip seeks on press and on drag, so the bar
-  // has no slider. NO WAY BUTTON: a picture only runs forwards.
-  // ⚠️ IN THE PAGE BEFORE THE STRIP IS MADE, or it fits itself to the 300 px
-  // a detached canvas measures and never fits again.
+  // One position surface: the strip seeks on press and drag; no way button. In the
+  // page before the strip is made, or it fits to a detached 300 px and never refits.
+  // See lessons/page-sync.md#sync-32
   const shelf = el('div');
   panel.add(screen, shelf);
   const bar = createTransportBar(shelf, deck, { scrub: false, command });
@@ -169,10 +147,9 @@ export function build({ panel, log, set, d }) {
     set('worst', errs[errs.length - 1]);
   }
 
-  // WATCHDOG. media-master's own rule: inside jumpMs an error is frame
-  // quantisation; past it the element has MOVED and the timeline must follow.
-  // Nothing is set before there is a picture, and it only pulls while the
-  // show is rolling, so a paused scrub is never taken out of a hand.
+  // Watchdog: inside jumpMs an error is frame quantisation, past it the element
+  // moved and the timeline follows. Only while rolling, never during a paused scrub.
+  // See lessons/page-sync.md#sync-33
   const watch = setInterval(() => {
     if (!master || video.readyState < 2) return;
     const off = video.currentTime * 1000 - deck.position();
@@ -185,9 +162,9 @@ export function build({ panel, log, set, d }) {
   addEventListener('pagehide', () => clearInterval(watch));
 
   /**
-   * THE DIAGRAM, LAST IN THE TAB. Drawn on the first showing, because a
-   * diagram laid out inside a closed panel is laid out for a width nobody has,
-   * and because by then the tab's readout and log are already in place above.
+   * The diagram, last in the tab, drawn on first showing: a closed panel has no
+   * width, and by then the readout and log are in place above.
+   * See lessons/page-sync.md#sync-34
    */
   let fitted = false;
   const how = tabDiagram(panel, () => ({
@@ -322,9 +299,9 @@ export function build({ panel, log, set, d }) {
       A('all eight cues are in the score',
         (deck.reduceAt?.('cue', ARCHIVE.durationMs)?.count ?? 0) === CUES.length,
         `${deck.reduceAt?.('cue', ARCHIVE.durationMs)?.count} of ${CUES.length}`);
-      // BOTH HALVES ARE THE CLAIM, read off this tab's bar and not the page:
-      // a bar that drew nothing would otherwise pass as one that correctly
-      // leaves out a control.
+      // Both halves are the claim, read off this tab's bar, so a bar that drew nothing
+      // cannot pass as one that leaves out a control.
+      // See lessons/page-sync.md#sync-35
       const loopBtn = bar.api.el.querySelector('.tbar-loop');
       const ways = bar.api.el.querySelectorAll('.tbar-loopgrp .tbar-x').length;
       A('a loop, and no way button, because a picture only runs forwards', !!loopBtn && ways === 0,

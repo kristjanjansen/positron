@@ -1,22 +1,7 @@
-// demo/time/loops.mjs: the LOOPS tab of /time/, which was /loops/.
-//
-// One two-second recording placed three times, the last of them looping twice
-// in whichever direction the button shows. The page's body moved here; the
-// history of each decision is in git under `demo/loops/index.html`.
-//
-// 🔴 THE DIRECTION CHOICE IS THIS TAB'S OWN, NOT A `.pos-controls` ONE. The
-// harness pressed it by position on the old page, which is how the old page's
-// count included one direction change. Here the check presses it, inside the
-// open tab, and asserts what the press did.
-// ⚠️ IT IS THREE WORDS NOW, NOT ONE ARROW THAT CYCLES. Reviewed 2026-10-05:
-// a lone `→` under the strip said nothing to a visitor about what it turned or
-// what the other faces were. A cycling glyph is right where it is glued to a
-// LOOP button that already names its subject (`looper.mjs`); out here on its
-// own it was a riddle, and `createChoice` shows all three directions at once.
-// ⚠️ THE DRIFT CHECKS STILL RIDE THE FIRST PLAY. They need the parent's first
-// mark to fire, and the bar drill `createTabPage` runs right after this tab's
-// `check` presses play for 500 ms, which is that mark. So they land during the
-// drill, as they landed during the harness's drill before.
+// LOOPS tab: one two-second recording placed three times, the last looping twice
+// in the chosen direction. The direction is this tab's own `createChoice` of three
+// words; the drift checks ride the first play of the bar drill that follows.
+// See lessons/page-time.md#time-25
 
 import { el } from '/shell/shell.mjs';
 import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -87,12 +72,13 @@ export function build({ panel, assert, log }) {
     onDrift: (rows) => { if (rows.length && !asserted && SELFCHECK) { asserted = true; checkArrangement(assert); } },
   });
 
-  // A WRAP IS A COMMITTED ONE-SHOT, AND WITHOUT A HOST IT IS NOTHING. One host
-  // for every rebuild, or each press of the button would start a worker.
+  // A wrap is a committed one-shot and needs a host: one host for every rebuild,
+  // or each press would start a worker.
+  // See lessons/page-time.md#time-26
   const boundaryHost = workerTickHost();
 
-  // 🔴 DECLARED BEFORE `buildNest`, which reads it: a `const` further down
-  // would be read in its dead zone and throw.
+  // Declared before `buildNest`, which reads it; a later `const` is in its dead zone.
+  // See lessons/page-time.md#time-27
   let view = null;
   let nest = null, loopIds = [], wraps = 0;
   function buildNest(way) {
@@ -106,8 +92,9 @@ export function build({ panel, assert, log }) {
     nest.add(quotation({ id: 'plain', ref: REFS.forward, at: 1000, in: 0, out: CHILD }));
     nest.add(quotation({ id: 'fast', ref: REFS.forward, at: 4000, in: 0, out: CHILD, rate: 2 }));
     if (way === 'pingpong') {
-      // PINGPONG IS TWO QUOTATIONS END TO END, so it has no wrap: its joint is a
+      // Pingpong is two quotations end to end, so it has no wrap: its joint is a
       // presence exit and enter, both logged.
+      // See lessons/page-time.md#time-28
       nest.add(quotation({ id: 'loop', ref: REFS.forward, at: 6000, in: 0, out: CHILD }));
       nest.add(quotation({ id: 'loop-back', ref: REFS.rewound, at: 8000, in: 0, out: CHILD }));
       loopIds = ['loop', 'loop-back'];
@@ -147,9 +134,9 @@ export function build({ panel, assert, log }) {
   view = createStripView(host, parent, {
     size: 'auto', follow: false, gutter: 150,
     lanes: [
-      // ONE SLICE PER PASS, so the loop reads as [ ][ ] rather than one bar.
-      // `part` and `event` are Cubase's words: a part is placed, an event is
-      // one occurrence inside it, and nothing is copied.
+      // One slice per pass, so the loop reads as [ ][ ]. A part is placed, an event is
+      // one occurrence inside it (Cubase's words), and nothing is copied.
+      // See lessons/page-time.md#time-29
       { id: 'deck-span', kind: 'deck-span', label: 'part', height: 52, barPad: 8, as: 'spans',
         stack: false, barGap: 3, terse: true, color: '#c9a0ff', alpha: 0.9,
         rows: () => {
@@ -215,8 +202,8 @@ export function build({ panel, assert, log }) {
         ] },
     ],
   });
-  // 🔴 THE BAR AND THE STRIP ARE ONE SURFACE, and the way button sits under
-  // them in this tab's own row.
+  // The bar and the strip are one surface; the way button sits under them.
+  // See lessons/page-time.md#time-30
   const pair = createGlue(bar.el, view.surface);
   const row = el('div', 'time-row');
   row.append(wayPick.el);
@@ -270,13 +257,10 @@ export function build({ panel, assert, log }) {
       for (let i = 0; i < n; i++) {
         for (const m of itemsOf(sp)) {
           const at = nest.parentPos(id, m.at, i);
-          // 🔴 WHERE IN THE RECORDING, BY THE EVENT'S IDENTITY, NOT BY `srcOf`.
-          // `srcOf` runs a mirrored pass back through `mirror()`, the function
-          // the mirrored copy was built with, so a copy that was never mirrored
-          // still read as backwards and this check stayed green. MEASURED
-          // 2026-10-04 by sabotaging `rewoundItems` to keep the forward
-          // positions: 86/86. `payload.i` names which of the four events it is
-          // whatever deck it sits in, so it is a second source.
+          // Where in the recording, by the event's identity (`payload.i`), not by
+          // `srcOf`, which runs a mirrored pass back through `mirror()` and so cannot
+          // tell a copy that was never mirrored.
+          // See lessons/page-time.md#time-31
           if (Number.isFinite(at)) out.push({ at, src: childItems[m.payload.i].at, pass: `${id}#${i}` });
         }
       }
@@ -303,11 +287,10 @@ export function build({ panel, assert, log }) {
   log(`${PARENT / 1000}s long, one ${CHILD / 1000}s recording of ${childItems.length} marks, used three ways`);
 
   /**
-   * HOW IT WORKS, read off this file and `timeline/nested.mjs`: a parent deck,
-   * a nest quoting one child deck three times, and the mirrored second deck a
-   * backwards pass quotes, because no quotation runs a child at a negative
-   * rate. The Worker that commits the wrap is in the nest's note rather than a
-   * box, so the chain stays one line a reader can follow.
+   * A parent deck, a nest quoting one child three times, and a mirrored deck for
+   * backwards passes, since no quotation runs a child at a negative rate. The
+   * Worker committing the wrap is in the nest's note, keeping the chain one line.
+   * See lessons/page-time.md#time-32
    */
   const how = tabDiagram(panel, () => ({
     caption: 'One recording, placed three times. Every placement quotes the same deck and none '
@@ -345,7 +328,9 @@ export function build({ panel, assert, log }) {
 
   return {
     deck: parent, bar,
-    // ⚠️ TWO FRAMES ON: a strip fitted before its panel has laid out fits its whole range into the width it had then, MEASURED on the first 1280 shot as 20 s drawn in about 160 px.
+    // Two frames on: a strip fitted before its panel lays out fits its range into
+    // the width it had then (20 s in about 160 px at 1280).
+    // See lessons/page-time.md#time-33
     show() {
       how.draw();
       requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit(); view.strip.invalidate(); }));

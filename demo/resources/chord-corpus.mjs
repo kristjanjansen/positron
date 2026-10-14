@@ -1,31 +1,7 @@
-// demo/resources/chord-corpus.mjs. Two corpora into one key-relative alphabet.
-//
-// Read by `demo/resources/bench-chord-suggester.mjs`, which grades suggesters,
-// and by `demo/resources/build-chord-tables.mjs`, which writes the table that
-// ships. It parses nothing at runtime on any page: the corpora live in
-// `tmp/chord-corpora/`, gitignored, fetched once by
-// `demo/resources/fetch-chord-corpora.mjs`.
-//
-// 🔴 THE ALPHABET IS `(DEGREE, CLASS)` AND NOT A ROMAN NUMERAL, AND THAT IS THE
-// WHOLE REASON THIS CAN EXPRESS WHAT THE 173 BYTE RULE CANNOT. A diatonic
-// numeral alphabet has seven slots and every one of them is in the key, so a
-// tritone substitution, a secondary dominant, a backdoor cadence and a borrowed
-// chord are all unsayable in it. A degree is 0 to 11 semitones above the tonic,
-// so `bII7` and `V7/V` and `bVII7` all have somewhere to live.
-//
-// 🔴 AND THE MODE IS NOT A FIELD, WHICH IS DELIBERATE. McGill Billboard states a
-// tonic and never states a mode, and inferring one would be a guess written into
-// the data. It does not need to be inferred: `0maj` and `0min` are different
-// symbols, so a context beginning on a minor tonic is already a different
-// context from one beginning on a major tonic, and the table learns the two
-// separately without anybody declaring which is which.
-//
-// ⚠️ CLASS IS FOR THE MODEL AND SPELLING IS FOR THE DISPLAY, and they are two
-// fields rather than one. `7`, `7b9`, `7alt`, `13` and `7#11` are one functional
-// class, because a suggester suggests a FUNCTION and the alteration is a
-// voicing. But a page that answers `G7` where 1,966 standards wrote `G7b9` has
-// thrown away the thing that makes the answer read as jazz. So every cell also
-// carries the commonest surface spelling counted for it.
+// iRb jazz and McGill Billboard into one key-relative (degree, class) alphabet, so bII7 and
+// V7/V are sayable; mode is not a field (0maj and 0min differ). Class feeds the model,
+// spelling the display. Reads tmp/chord-corpora/ (fetch-chord-corpora.mjs), never a page.
+// See lessons/page-resources.md#resources-31
 
 /** Semitones above C. Humdrum writes a flat `-`; Harte writes it `b`. */
 const LETTER = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
@@ -45,17 +21,9 @@ export function readRoot(s, flatChar = 'b') {
 }
 
 /**
- * 🔴 SEVEN CLASSES, AND EVERY ONE OF THEM IS A DIFFERENT THING TO DO NEXT.
- * This is the list Open Studio's devices are built out of: a ii is `min`, its V
- * is `dom`, a minor ii is `hdim`, a tritone sub is a `dom` on another degree, a
- * backdoor is a `dom` on bVII, a passing chord is `dim`.
- * ⚠️ `sus` IS KEPT APART FROM `dom` RATHER THAN FOLDED INTO IT. It resolves the
- * same way and it is a different sound, and iRb writes 543 `7sus` and 115 `9sus`
- * against 13,211 plain `7`, which is enough to count separately.
- * ⚠️ AND `min6` AND `minmaj7` ARE FOLDED INTO `min`, WHICH LOSES SOMETHING REAL.
- * They are the tonic-minor colour and `min7` is the ii colour, and on degree 0
- * they mean different things. That is a known limitation of this alphabet and it
- * is named in the benchmark's report rather than hidden.
+ * Seven classes, each a different thing to do next. sus stays apart from dom (iRb has 658
+ * sus against 13,211 plain 7); min6 and minmaj7 fold into min, a known limitation.
+ * See lessons/page-resources.md#resources-32
  */
 export const CLASSES = ['maj', 'min', 'dom', 'hdim', 'dim', 'sus', 'aug'];
 
@@ -92,10 +60,9 @@ const DEGREE = ['I', 'bII', 'II', 'bIII', 'III', 'IV', 'bV', 'V', 'bVI', 'VI', '
 const LOWER = new Set(['min', 'hdim', 'dim']);
 
 /**
- * A symbol as a reader sees it. `2min` -> `ii`, `7dom` -> `V7`, `1dom` -> `bII7`.
- * ⚠️ IT FOLLOWS `chords.mjs`'s `roman()` RATHER THAN INVENTING A SECOND
- * SPELLING: lower case is a minor third, a half diminished carries the slashed
- * circle, a diminished the circle, an augmented the plus.
+ * A symbol as a reader sees it: `2min` -> `ii`, `7dom` -> `V7`, `1dom` -> `bII7`.
+ * Follows chords.mjs's roman() spelling.
+ * See lessons/page-resources.md#resources-33
  */
 export function say(s) {
   const m = /^(\d+)(.+)$/.exec(s);
@@ -114,16 +81,9 @@ export function say(s) {
 /* ── iRb, the Humdrum `**jazz` spine ───────────────────────────────────────── */
 
 /**
- * One `.jazz` file into a chord sequence.
- *
- * 🔴 THE EXPANSION LIST IS HONOURED, WHICH IS WHAT MAKES A TURNAROUND EXIST.
- * `*>[A,N1,A,N2,B,A2]` is the order the sections are played in, and the
- * transition from the last chord of A back to its first chord is the turnaround
- * this benchmark is asked to test for. A parser that read the file top to bottom
- * would never see one, because in the file A appears once.
- * ⚠️ IT ALSO REPEATS EVERY OTHER TRANSITION IN A SECTION AS MANY TIMES AS THE
- * SECTION IS PLAYED, which is a weighting decision rather than a neutral one.
- * The benchmark reports the counts both ways.
+ * One `.jazz` file into a chord sequence, honouring the `*>[A,N1,...]` expansion list so
+ * turnarounds exist; transitions repeat as often as their section is played.
+ * See lessons/page-resources.md#resources-34
  */
 export function parseIrb(text, { expand = true } = {}) {
   const lines = text.split(/\r?\n/);
@@ -172,9 +132,8 @@ function irbChord(t) {
   if (!r) return null;
   s = s.slice(r.used);
   if (s.startsWith(':')) s = s.slice(1);
-  /* ⚠️ THE SLASH IS A BASS AND IS DROPPED, WHICH IS THE RULE `chords.mjs`
-     ALREADY MADE: *"A SLASH IS A BASS, NOT A CHORD TONE"*, and `roman()` in that
-     file ignores it for exactly this reason. `Dmin7/G` is still a ii. */
+  /* The slash is a bass and is dropped, as roman() in chords.mjs does: Dmin7/G is a ii.
+     See lessons/page-resources.md#resources-35 */
   const slash = s.indexOf('/');
   if (slash >= 0) s = s.slice(0, slash);
   const cls = classOf(s);
@@ -185,14 +144,9 @@ function irbChord(t) {
 /* ── McGill Billboard, the SALAMI chord text ───────────────────────────────── */
 
 /**
- * One `salami_chords.txt` into a chord sequence.
- *
- * ⚠️ THE TONIC MOVES AND THE FILE SAYS SO. 83 of 890 files declare more than one
- * `# tonic:`, up to nine of them, so the tonic is tracked as the file is walked
- * rather than read once from the head. Reading it once would put every chord
- * after a modulation on the wrong degree.
- * ⚠️ `N` AND `X` BREAK THE SEQUENCE rather than being counted. A silence is not
- * a chord and a transition across one is not a transition.
+ * One `salami_chords.txt` into a chord sequence. The tonic is tracked as the file is walked
+ * (83 of 890 files modulate); `N` and `X` break the sequence.
+ * See lessons/page-resources.md#resources-36
  */
 export function parseBillboard(text) {
   const out = [];             // arrays of chords, one per unbroken run
@@ -244,14 +198,9 @@ function billboardChord(tok, tonic) {
 /* ── Chords into symbols ───────────────────────────────────────────────────── */
 
 /**
- * 🔴 AN IMMEDIATE REPEAT IS ONE HARMONIC EVENT AND IS COLLAPSED, AND THIS IS THE
- * SINGLE BIGGEST DECISION IN THIS FILE. `| A:min | A:min | C:maj |` is a chord
- * held for two bars, not a progression that goes to itself. Counted raw, a self
- * transition is the commonest transition in both corpora by a wide margin, and a
- * suggester trained on that learns to answer *the chord you are already playing*,
- * which is the most predictable answer there is and the least useful.
- * ⚠️ IT IS COLLAPSED ON `(DEGREE, CLASS)` RATHER THAN ON THE SPELLING, so
- * `Cmaj7` following `C6` is also one event. They are the same function.
+ * An immediate repeat is one harmonic event and is collapsed on (degree, class), else self
+ * transitions dominate and the suggester answers the chord already playing.
+ * See lessons/page-resources.md#resources-37
  */
 export function toSymbols(chords, tonic, { collapse = true } = {}) {
   const out = [];

@@ -1,24 +1,7 @@
-// demo/floor/build-tiles.mjs — the tiles `/floor/` stands on.
-//
-//   node demo/floor/build-tiles.mjs            # fetch what is missing, politely
-//   node demo/floor/build-tiles.mjs --limit 40 # a slice, for a quick look
-//
-// WHY A FIXTURE AND NOT A LIVE CALL. The floor needs a thumbnail path per film,
-// and the archive publishes it only inside each film's own content record — one
-// request per film. Doing that from the page would be ~300 requests on load, to
-// somebody else's archive, every time anybody opens it. So it is fetched ONCE,
-// here, spaced, with a user agent that says who we are, and the result is a
-// static file the page reads in a single GET.
-//
-// ⚠️ RESUMABLE ON PURPOSE. It reads whatever it wrote last time and only asks
-// about films it has no photo for, so an interrupted run costs nothing and a
-// re-run is nearly free. An archive is not a thing to hammer because a script
-// crashed halfway.
-//
-// ⚠️ AND IT DOES NOT INVENT A MISS. A film with no thumbnail is written with
-// `photo: null` rather than left out, so the next run knows it was ASKED and
-// answered nothing — otherwise "missing" and "not yet fetched" are the same
-// state and every run re-asks the same hopeless items forever.
+// Fetches each film's thumbnail path once, spaced, into tiles.json for /floor/ to read in one GET.
+// Usage: node demo/floor/build-tiles.mjs [--limit 40]. Resumable: asks only about unknown films.
+// A film with no thumbnail is written as photo: null, so the next run does not ask again.
+// See lessons/page-floor.md#floor-1
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -63,10 +46,9 @@ for (const it of films) {
     if (r.ok) {
       const j = await r.json();
       const info = j?.data?.info || j?.info || {};
-      // ⚠️ `info.photoUrl` is the RELATIVE path the resizer takes —
-      // `thumbnails/<year>/<file>.jpg` — and `videoPhotoUrl` is the same file
-      // as an absolute URL on a host that sends no CORS. The relative one is
-      // what travels, because the page asks our own origin for it.
+      // photoUrl is the relative path the resizer takes (thumbnails/<year>/<file>.jpg); videoPhotoUrl
+      // is the same file on a host with no CORS. The relative one travels, via our own origin.
+      // See lessons/page-floor.md#floor-2
       const rel = String(info.photoUrl || '').trim();
       photo = /^thumbnails\/\d{4}\/[A-Za-z0-9_.-]+\.jpg$/.test(rel) ? rel : null;
     }

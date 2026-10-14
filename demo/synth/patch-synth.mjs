@@ -1,23 +1,7 @@
-// demo/synth/patch-synth.mjs: a mono WebAudio synth whose modules are bay
-// nodes, and the router that wires the WebAudio graph from the links the bay
-// holds. plans/plan-synth-patch.md §1 to §4. It was
-// demo/concepts/synth/040/modules.mjs until 2026-10-13, when 040 was split into
-// one page per module (*"can split https://positron.studio/concepts/synth/040/
-// apart to different conecepts, do not dupe with existing ones (so only some
-// last steps?). rm 040 later."*). It sits beside the pages that use it, as
-// radio/tempo.mjs does. /synth/sound/ Sound design is its one page since
-// 2026-10-13 (*"combine filter+envelope+lfo to single sound design concept"*),
-// when the filter, envelope and LFO pages (050, 060, 070) became that one;
-// module-page.mjs builds it.
-//
-// A module is a node with ports. An audio link is a `connect()` made by
-// `route()`, a MIDI link carries notes through `bay.send`, and a value link
-// carries a knob turn as `{ of: 'param', name, v }`, which the module's own
-// `value-in` sets with `setTargetAtTime`. Nothing here draws anything.
-//
-// NOTHING OPENS ON IMPORT. The modules keep their parameters as plain state
-// until `start(ctx)` is handed an AudioContext, which the page makes on the
-// first key press.
+// A mono WebAudio synth whose modules are bay nodes, and the router that wires the
+// graph from the bay's links (plans/plan-synth-patch.md). Audio links are connect(),
+// MIDI goes by bay.send. Nothing opens on import: start(ctx) gets the AudioContext.
+// See lessons/page-synth.md#synth-11
 
 import { createBay, parsePatch } from '/shell/bay.mjs';
 import { addNodes } from '/shell/nodes.mjs';
@@ -40,9 +24,9 @@ const kit = (name, owner, raw) => {
 };
 
 /**
- * Every knob a module has. `owner` is the module whose `value-in` takes the
- * name; `raw` is what the dial shows (0 to 127 for an exponential one) and
- * `value(raw)` is what travels along the link. A page offers some of them.
+ * Every knob a module has. `owner` takes the name on its `value-in`; `raw` is what the
+ * dial shows (0 to 127 when exponential), `value(raw)` is what travels on the link.
+ * See lessons/page-synth.md#synth-12
  */
 export const KNOBS = [
   { name: 'freq', owner: 'osc', min: 0, max: 127, raw: F.from(220), value: F.to, format: (r) => hzText(F.to(r)) },
@@ -54,10 +38,9 @@ export const KNOBS = [
   { name: 'sustain', owner: 'amp', min: 0, max: 1, step: 0.01, raw: 0.55, value: (r) => r, format: (r) => `${Math.round(r * 100)}%` },
   kit('release', 'amp', R.from(0.45)),
   { name: 'rate', owner: 'lfo', min: 0, max: 127, raw: L.from(0.35), value: L.to, format: (r) => `${L.to(r).toFixed(2)} Hz` },
-  // Depth is in octaves and travels as cents, because the LFO moves the
-  // filter's detune rather than its frequency. A swing in Hz below a low
-  // cutoff drove the frequency to 0 and the wave went flat for half of
-  // every cycle (asked 2026-10-10, *"lfo just flattens osc"*).
+  // Depth is in octaves and travels as cents, because the LFO moves the filter's detune:
+  // a swing in Hz below a low cutoff drove the frequency to 0 for half of every cycle.
+  // See lessons/page-synth.md#synth-13
   { name: 'depth', owner: 'lfo', min: 0, max: 4, step: 0.1, raw: 1.5, value: (r) => r * 1200, format: (r) => `${r.toFixed(1)} oct` },
 ];
 export const knobRaw = (name, v) => {
@@ -81,9 +64,9 @@ const NAMES = {
   lfo: ['rate', 'depth'],
 };
 
-// One node per knob, eurorack style (*"Per knob. Lets go eurorack :)"*): each
-// knob a page offers is a box of its own, `web:knob-<name>`, with a cable into
+// One node per knob: each knob a page offers is `web:knob-<name>`, with a cable into
 // the module it moves.
+// See lessons/page-synth.md#synth-14
 export const withKnobs = (patch, names) => [patch,
   ...names.map((k) => `web:knob-${k}:value-out -> web:${KNOBS.find((x) => x.name === k).owner}:value-in`)].join('\n');
 
@@ -177,10 +160,9 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
     }
   }
 
-  // ── the bay ─────────────────────────────────────────────────────────────
-  // The shapes are /shell/nodes.mjs's, among them `filter:cutoff-in`, the
-  // named exception to `<medium>-<dir>` (plans/plan-synth-patch.md §3 option A).
-  // A port's label is its own `node:port`, which is what a refusal names.
+  // The bay. Shapes are /shell/nodes.mjs's, with `filter:cutoff-in` the named exception
+  // to `<medium>-<dir>` (plans/plan-synth-patch.md §3). A port's label is `node:port`.
+  // See lessons/page-synth.md#synth-15
   const knobNodes = KNOBS.map((k) => `knob-${k.name}`);
   addNodes(bay, S, ['keys', ...knobNodes, 'osc', 'filter', 'amp', 'lfo', 'scope', 'speaker'], {
     portLabel: 'node:port',
@@ -191,9 +173,9 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
   });
 
   /**
-   * Replace the whole patch with `text`. Returns the lines the bay refused,
-   * each with its reason, or throws the parser's own sentence for a line it
-   * cannot read at all.
+   * Replace the whole patch with `text`. Returns the refused lines with reasons, or
+   * throws the parser's sentence for a line it cannot read.
+   * See lessons/page-synth.md#synth-16
    */
   function load(text) {
     const lines = parsePatch(text);
@@ -254,11 +236,10 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
   }
 
   /**
-   * THE ROUTER. Reads `bay.links()` and connects exactly what is held: a
-   * module's audio out to the far module's input, which is a node or, for
-   * `cutoff-in`, the filter's detune AudioParam. Every out is disconnected
-   * first, so an unlinked edge goes silent. Called after every link change.
-   * The wiring is the kit's routeAudio (audio-router.mjs), lifted from here.
+   * The router: connects exactly the held links (audio out to the far input, or the
+   * filter's detune for `cutoff-in`) after disconnecting every out, so an unlinked edge
+   * goes silent. Called after every link change; the wiring is audio-router.mjs.
+   * See lessons/page-synth.md#synth-17
    */
   function route() {
     if (!ctx) return;

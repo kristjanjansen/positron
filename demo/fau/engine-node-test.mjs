@@ -1,18 +1,7 @@
-// node demo/fau/engine-node-test.mjs: the engine node `/nola/` and `/fau/` announce.
-//
-// No browser, no socket, no MIDI device: an in-memory relay (`memoryRelay`) and a
-// stand-in MIDIAccess (`standInAccess`), the same ones the two pages' check passes
-// use. What is NOT graded here: the Join button, the badge's drawing, and whether a
-// real browser delivers one keyboard's messages to two MIDIAccess objects. The
-// pages assert the first two; nothing here can answer the third.
-//
-// NEGATIVE CONTROLS, written so the bug they name fails them: 8, marked `NEG`.
-//
-// SABOTAGE, MEASURED 2026-10-06 on scratch copies of `engine-node.mjs`, each one
-// alone against 30 checks: `omni` always true 29/30; no `allOff` on the first link
-// 28/30; any target accepted 27/30; the sound not refused 29/30; velocity 0 read
-// as a note on 28/30; a closed link keeping its listener 29/30; an absent keyboard
-// opened 27/30; `transports` dropped from the audio out 29/30. None stayed green.
+// node demo/fau/engine-node-test.mjs: the engine node /nola/ and /fau/ announce, against an
+// in-memory relay and a stand-in MIDIAccess, no browser. Not graded here: the Join button,
+// the badge's drawing, and two MIDIAccess objects in one tab. Negative controls are marked NEG.
+// See lessons/page-fau.md#fau-1
 
 import { createEngineNode, memoryRelay, standInAccess, dispatchMidi, MIDI_STALL_MS, ENGINE_TAKES } from './engine-node.mjs';
 import { createBayNode } from '../shell/bay-node.mjs';

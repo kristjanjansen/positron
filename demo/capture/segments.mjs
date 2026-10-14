@@ -1,26 +1,7 @@
-// SEGMENTS, from the old `/capture/` and the retired `/record/` (2026-10-04,
-// `plans/plan-demo-structure.md` §3.5). Both were MediaRecorder in 2 s
-// segments: `record` proved that what is held never grows past two segments
-// however long the show runs, with the hand-off stood in for, and `capture`
-// really uploaded each segment to R2 with `?r2=1` and played the result back on
-// a deck. One recorder now gives both readings.
-//
-// THE MODEL, WHICH IS `record`'s: a closed segment is HELD until it is handed
-// off and then dropped from what is held. The hand-off is a real PUT to the
-// ingest worker with `?r2=1`, and a 300 ms stand-in without it, where the
-// segment goes to a local pile that plays the part of the far side. Playback
-// assembles from that far side: R2 fetched back with `?r2=1`, the pile without.
-//
-// WHAT CHANGED IN THE MOVE:
-//   - `capture`'s three R2 asserts sat inside `if (useR2)`, so its count moved
-//     with the mode. Here they are two slots that always run and say which mode
-//     they graded, the way `keep` already did it.
-//   - `record` ran until Stop; this records a fixed 6 s show (three segments),
-//     which is still more than the two the claim says is the most ever held.
-//   - The readout is six cells: `record`'s four (segments, holding, worst, sent)
-//     and `capture`'s where and length. `capture`'s `source` (canvas or camera,
-//     which the log already says), `biggest` and `total` (which is `sent` once
-//     the show is over) are gone.
+// SEGMENTS: MediaRecorder in 2 s segments over a fixed 6 s show. A closed segment
+// is held until handed off (a PUT to ingest with `?r2=1`, a 300 ms stand-in
+// without), then dropped. Playback assembles from the far side.
+// See lessons/page-capture.md#capture-31
 
 import { recorderMime, el, armVideo, playOrPrompt, createShipper } from '/shell/shell.mjs';
 import { hueFor } from '/shell/pattern.mjs';
@@ -93,8 +74,9 @@ export function build({ panel, assert, log, set }) {
   }
 
   /**
-   * THE HAND-OFF, and then the drop: the disk high-water is two segments, the
-   * one being written and the one being shipped, however long the show runs.
+   * The hand-off, then the drop: at most two segments are held, the one being
+   * written and the one being shipped, however long the show runs.
+   * See lessons/page-capture.md#capture-32
    */
   function handedOff(s) {
     if (s.shipped) return;
@@ -177,9 +159,9 @@ export function build({ panel, assert, log, set }) {
   let deck = null, bar = null, lastDur = null;
 
   /**
-   * Timeslice chunks concatenate into one playable WebM: the first carries the
-   * header, the rest are continuation clusters. Assembled from the FAR SIDE,
-   * never from what was held, which is gone by now.
+   * Timeslice chunks concatenate into one playable WebM (the first carries the
+   * header). Assembled from the far side, never from what was held.
+   * See lessons/page-capture.md#capture-33
    */
   async function assemble() {
     let parts = pile;
@@ -209,11 +191,9 @@ export function build({ panel, assert, log, set }) {
     source.canvas.hidden = true;
     if (!deck) {
       deck = createDeck({ items: [], adapters: {}, range: [0, Math.round(dur * 1000)] });
-      // THE PICTURE IS THE MASTER (media-master L1), so somebody has to apply a
-      // seek to the picture or the vector snaps back a tick later. Every seek
-      // path, the bar's keyboard table and the check below, goes through
-      // `deck.seek()`, so wrapping it once is the whole of it. `show`'s fix,
-      // which the old `/capture/` never had: its seek check read the vector.
+      // The picture is the master: every seek goes through `deck.seek()`, so wrapping
+      // it once applies the seek to the picture before the vector snaps back.
+      // See lessons/page-capture.md#capture-34
       mediaMaster(deck, video, {});
       const seek = deck.seek.bind(deck);
       deck.seek = (p, opts) => {
@@ -235,9 +215,9 @@ export function build({ panel, assert, log, set }) {
     get bars() { return bar ? [{ name: 'segments', bar }] : []; },
     hide() { if (!video.paused) video.pause(); },
     /**
-     * Presses Record, then Play it back, as a person would, and grades what
-     * they produced. With `?r2=1` that is a real upload and five ingest
-     * requests per run, which is why the suite never sets it.
+     * Presses Record, then Play it back, and grades the result. `?r2=1` makes it a
+     * real upload and five ingest requests per run, so the suite never sets it.
+     * See lessons/page-capture.md#capture-35
      */
     async check({ A }) {
       A('building this tab opened nothing: no ingest request, no camera, no recording',
@@ -278,9 +258,8 @@ export function build({ panel, assert, log, set }) {
           && Math.abs(video.currentTime * 1000 - mid) < 400,
           `deck ${Math.round(deck.position())} ms, picture ${Math.round(video.currentTime * 1000)} ms, asked ${mid}`);
       }
-      // BACK TO THE START, so the bar drill that follows has to move the
-      // playhead to land its seek: left at the middle, its `5` key would land
-      // where the check above already put it and could not fail.
+      // Back to the start, so the bar drill's `5` key has to move the playhead to land.
+      // See lessons/page-capture.md#capture-36
       deck?.pause?.();
       deck?.seek(0);
       video.pause();

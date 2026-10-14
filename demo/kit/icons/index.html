@@ -35,22 +35,19 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
 
   /**
-   * kit/icons, THE KIT'S ICONS, 2026-10-10. Asked: *"see ../eccm icon system.
-   * We need one from icones. Make a sample sheet in one of kit pages called
-   * icons."* The set is Feather, the one eccm chose, vendored into
-   * `demo/shell/icons.mjs` by `demo/resources/build-icons.mjs` from the
-   * Iconify package, so a visit asks nobody's server for a picture.
-   * ⚠️ A VISIT OPENS NOTHING. Every check is behind `?selfcheck=1`.
+   * The Feather set, vendored into demo/shell/icons.mjs by
+   * demo/resources/build-icons.mjs, so a visit asks no server for a picture.
+   * Every check is behind ?selfcheck=1.
+   * See lessons/page-kit-icons.md#kit-icons-1
    */
   const { d, section, out, land, checkPage } = createKitPage({
     part: 'icons',
     what: 'Every icon in the kit, drawn from the Feather set in the ink of the text around it.',
   });
 
-  // the blocks, newest first
-  // ICON BUTTON, 2026-10-10: *"Use transport icons on all our concepts. Keep
-  // them square. Kit iconbutton (group?)"*. One square button per icon, at
-  // both sizes, a play that becomes stop, a toggle, and a group of two.
+  // The blocks, newest first. ICON BUTTON: one square button per icon at both
+  // sizes, a play that becomes stop, a toggle, and a group of two.
+  // See lessons/page-kit-icons.md#kit-icons-2
   const ib = [];                       // every icon button on this block
   let swap = null, swapSm = null, loopB = null, grp = null;
   section('ICON BUTTON',
@@ -321,7 +318,8 @@ createButtonGroup({ buttons: [{ id: 'play', icon: 'play', label: 'Play' }] })
       bad.length ? `stroke not the text colour: ${bad.join(', ')}` : INKS.map(([t], i) => `${t} ${cols[i]}`).join(', '));
   }
 
-  // 8. NOTHING LEFT THIS ORIGIN: the icons are vendored, not fetched
+  // 8. Nothing left this origin: the icons are vendored, not fetched.
+  // See lessons/page-kit-icons.md#kit-icons-3
   {
     const off = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => new URL(u).origin !== location.origin);
     d.assert('the page fetched nothing from another origin',

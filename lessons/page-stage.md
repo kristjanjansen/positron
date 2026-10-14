@@ -1,0 +1,4125 @@
+# Page comments: stage
+
+The full comments cut from the code under demo/ for stage, verbatim. Each heading is the id a pointer in the code names, then the file, the block and the line it stood on before the cut.
+
+<a id="stage-1"></a>
+## stage-1: demo/stage/index.html, style, line 11
+
+````css
+  /* The control room's form: the question and its options in a row that wraps,
+     with the send controls under it. Nothing here is a component because
+     nothing else on the site asks a question yet; when a second page does, this
+     is what gets lifted. */
+````
+
+<a id="stage-2"></a>
+## stage-2: demo/stage/index.html, inline script, line 44
+
+````js
+  /**
+   * 🔴 ONE LEG, THE REAL ONE, AND THE ORDINARY HARNESS TIER NEVER STARTS IT.
+   * This comment described an in-page loopback (`pcOut` and `pcIn` in one tab)
+   * and a `?live=1` opt in until 2026-10-05. Both went on 2026-09-25 (*"rm
+   * loopback"*, *"go both real leg"*), and the comment stayed behind
+   * describing a default that no longer existed. What is true now: the page
+   * only RECEIVES. Start holds the stage publisher's socket, which wakes its
+   * container (about 22 s cold), waits for its WHIP leg and subscribes over
+   * WHEP. `plans/plan-stage-live.md` §7.1's cost argument still decides who
+   * may press it: an ordinary run (`?selfcheck=1`, see `LIGHT` below) says so
+   * in the log and starts nothing, and only `DEMO_DEEP=1` runs the show.
+   *
+   * 🔴 R2 IS ON FOR A PERSON AND OFF FOR THE HARNESS, SINCE 2026-09-30. Asked:
+   * *"i want so see local storaage -> r2 -> playback"*. It was `?r2=1`, opt in,
+   * so a person pressing Start saw a recording that never left the tab. The
+   * reason it was opt in still holds and now decides the OTHER side: the
+   * upload route allows five sessions an hour per address, so two suite runs
+   * an hour would eat a person's cap and a working page would read red.
+   * ⚠️ SO THE SWITCH IS `SELFCHECK`, WHICH IS THE FLAG THE HARNESS ALREADY
+   * APPENDS TO EVERY PAGE. A run with `?selfcheck=1` records into this
+   * browser and plays that copy back, and says in the log that R2 was
+   * skipped. `?r2=1` still forces the upload (for a probe that wants the whole
+   * chain under selfcheck) and `?r2=0` turns it off for a person.
+   * ⚠️ NOTHING HAPPENS ON LOAD EITHER WAY. The upload runs when a show is
+   * stopped, which is a press.
+   * ⚠️ BOTH MODES ASSERT THE SAME NUMBER OF TIMES. A check that exists only in
+   * one mode is the shape CLAUDE.md bans, so what changes with the mode is what
+   * each assert CLAIMS, never whether it runs.
+   */
+````
+
+<a id="stage-3"></a>
+## stage-3: demo/stage/index.html, inline script, line 74
+
+````js
+  /**
+   * 🔴 A ROOM OF THIS TAB'S OWN, INVENTED PER LOAD. THE DEFAULT WAS `stage-demo`
+   * AND THAT IS WHERE A STRANGER'S QUESTION CAME FROM. Reported 2026-09-25:
+   * *"when I load it, I get some kind of stale question. Where is it coming
+   * from? Who entered it?"*, naming a question nobody here ever wrote. Nothing
+   * replays it: the relay is verbatim fan out with no storage and no retained
+   * last message, the accept path sends a joiner nothing, this page keeps no
+   * `localStorage`, `sessionStorage` or `indexedDB`, and `fetchBack` is only
+   * called on the stop and upload path. So a question on screen at load was
+   * typed by a PERSON, live, into a control room joined to the same room while
+   * this page was open.
+   * 🔴 ONE FIXED NAME PUT EVERY VISITOR, EVERY PROBE AND EVERY HARNESS RUN IN
+   * ONE ROOM WITH THE PUBLIC, so anybody's question landed on anybody's screen
+   * and anybody could send one into anybody else's show. That is CLAUDE.md's
+   * rule about one shared resource with everything around it partitioned,
+   * arriving in the same shape as the `FCM_TOPIC` bug: the default has to be
+   * silence.
+   * ⚠️ AND A RENDEZVOUS IS NOT AN ADDRESS, which is the distinction that
+   * decides this. `room: 'fixed'` in `manifest.mjs` means the name is where a
+   * machine LIVES, `studio-1` for the Raspberry Pi and `m1-1` for the studio
+   * Mac, and randomising one of those points it at nothing. `stage-demo` was
+   * the opposite: a name this page invented, where nothing lives and everybody
+   * who arrives is a peer. An address is fixed and a rendezvous must never be.
+   * `stage` carries no `room: 'fixed'`, so `demo/verify.mjs` already gave every
+   * run its own room and only a visitor was left sharing.
+   * ⚠️ IT CANNOT REFUSE THE WAY `rig/board/setup.sh` DOES. That installer calls
+   * a default room pointing every installation at our room *"a footgun with a
+   * friendly face"* and refuses rather than guesses, which is right for a box
+   * that has somewhere real to point. Here the control room and the audience
+   * are two tabs of ONE page, so a room private to this load demonstrates the
+   * whole thing by itself and refusing would leave a visitor with nothing.
+   * 🔴 A REAL SHOW WANTS THE OPPOSITE, AND `?room=` IS IT. An audience on their
+   * own phones has to be handed the same name, so the log prints the whole URL
+   * to send them rather than the name to retype.
+   */
+````
+
+<a id="stage-4"></a>
+## stage-4: demo/stage/index.html, inline script, line 112
+
+````js
+  /**
+   * 🔴 THERE IS ONE LEG NOW AND IT IS THE REAL ONE, OVER WebRTC ONLY. Asked
+   * 2026-09-30: *"can you have just webrtc transport?"*, which removed the
+   * `Start HLS` leg and everything that existed only for it. Asked 2026-09-25:
+   * *"go both real leg. we build gate later"* and *"rm loopback"*. This page used to
+   * default to two peer connections talking to each other inside the same tab,
+   * which is the right default for a harness and the wrong one for somebody who
+   * was sent a link, and it meant the thing a visitor saw was not the thing the
+   * page is about.
+   * ⚠️ **THE GATE IS COMING AND IS NOT HERE.** Said in the same breath, so this
+   * is a known temporary state rather than a decision that cost does not
+   * matter: pressing start now holds a Cloudflare live input open, Stream bills
+   * by the minute DELIVERED with buffering counted, and `/stage/` is
+   * `built: true` so a full suite pays it too.
+   */
+````
+
+<a id="stage-5"></a>
+## stage-5: demo/stage/index.html, inline script, line 128
+
+````js
+  /* 🔴 TWO TIERS, asked 2026-10-04: *"make checks way ligher (2 tiers?)"*,
+     *"i mean these long-running ones"*. The show is the long part: a held
+     publisher, a cold container's WHIP leg (about 22 s), a WHEP handshake, a
+     recording and its playback. An ORDINARY harness run (`selfcheck=1`)
+     starts none of it, so its press of `Start WebRTC` says so and does nothing,
+     and `checks()` grades the page at rest and stops before the drill.
+     `DEMO_DEEP=1 node demo/verify.mjs stage` runs the show. A visitor is never
+     `LIGHT`, so their press is unchanged. */
+````
+
+<a id="stage-6"></a>
+## stage-6: demo/stage/index.html, inline script, line 143
+
+````js
+  /**
+   * 🔴 THE PICTURE IS GENERATED HERE AND COMES FROM NOBODY'S SERVER. CLAUDE.md
+   * is explicit and it has been broken twice: *"super careful with external
+   * sources, better avoid"*, said about a harness that pulled recordings from
+   * archive.org on every run. A test picture that a page draws itself costs no
+   * bandwidth, needs no network, cannot 403, and is the same on every run.
+   *
+   * `pattern.mjs` is the one generated test picture in this project and nothing
+   * else draws one. It carries a clock, a frame counter and a burned-in check
+   * pattern that `readBurned` can read back, so a panel showing it is a panel
+   * whose picture can be GRADED rather than merely looked at.
+   *
+   * ⚠️ AND SINCE *"rm video overlay"* ON 2026-09-18 IT IS NOT DRAWN ON SCREEN
+   * AT ALL. The canvas that paints it is a monitor nobody sees, kept for the
+   * pixel checks below, and it holds one flat colour.
+   * 🔴 **NO LOCAL FILM SINCE 2026-10-05, ASKED AS *"drop"*.** This page used to
+   * play the 253 MB church scene from R2 into that canvas on every Start show,
+   * a leftover from when it published its own picture. As a pure receiver it
+   * sent nobody that picture, so every press downloaded the film a second time
+   * for a canvas nobody could see, and the mute button unmuted that copy while
+   * the live picture stayed silent. The film now reaches this page once, from
+   * the container, over WHEP.
+   */
+````
+
+<a id="stage-7"></a>
+## stage-7: demo/stage/index.html, inline script, line 167
+
+````js
+    /**
+     * 🔴 ONE PLAIN SENTENCE PER TAB, ASKED 2026-10-05 FOR THE TABBED PAGES:
+     * one sentence a tab, no long description at the top, plain words. The
+     * audience tab was an empty box reading OFF AIR with nothing saying why or
+     * where the show comes from, and the control room's one press opens a real
+     * stream without the page ever saying so.
+     */
+````
+
+<a id="stage-8"></a>
+## stage-8: demo/stage/index.html, inline script, line 176
+
+````js
+    // 🔴 TWO WORDS SINCE 2026-09-25: *"control room is 2 words"*. THIS REVERSES
+    // THE ASK BELOW AND THE ASK BELOW IS KEPT, because a rule that loses its
+    // reason comes back: on 2026-09-17 it was *"controlroom -> single word"*,
+    // on the argument that a tab row scrolls sideways rather than wrapping, so
+    // a two-word name spends a whole word's width of a phone's screen on a
+    // space, and these names are navigation rather than prose.
+    // ⚠️ WHAT CHANGED IS THE CASE, WHICH IS WHY THE ARGUMENT NO LONGER HOLDS.
+    // `CONTROLROOM` in tracked caps was one legible token. `Controlroom` in
+    // sentence case reads as a typo, because English does not join those two
+    // words. The width argument was true and is now the smaller cost.
+````
+
+<a id="stage-9"></a>
+## stage-9: demo/stage/index.html, inline script, line 189
+
+````js
+    /**
+     * 🔴 NO ARCHIVE TAB SINCE 2026-09-25: *"rm archive for now. add play
+     * recording button to transport what is enabled when shows have ended and
+     * control room should be able to play everything back"*. A third tab for a
+     * thing you only ever want AFTER a show is a place to go rather than a
+     * thing to do, and the control room is where somebody already is when the
+     * show ends. Everything the tab held is in the control room now.
+     */
+````
+
+<a id="stage-10"></a>
+## stage-10: demo/stage/index.html, inline script, line 201
+
+````js
+    // ⚠️ ONE LINE, AND IT IS THE INDEX'S OWN. A page with a diagram gets a
+    // one line `what`: a paragraph and a picture of the same machinery are two
+    // explanations and the paragraph is the weaker one, and using the `one`
+    // line verbatim stops a visitor arriving from the index being told the same
+    // thing twice in two wordings that can drift apart.
+    // 🔴 AND IT HAD DRIFTED FROM IT, WHICH IS THE THING THE NOTE ABOVE WARNS
+    // ABOUT. The `one` line was rewritten on 2026-09-25 when the two presses
+    // stopped meaning picture and show, and this string was left behind, so the
+    // index and the page described the same demo two different ways for an hour.
+    // ⚠️ IT WAS ALSO THREE CLAUSES BOLTED TOGETHER, which CLAUDE.md forbids in
+    // as many words: a description is ONE SENTENCE and may not be stretched
+    // with a comma buying a second fact or an `and` buying a third. It read
+    // *"Pick how the show reaches its audience, over WebRTC or over low latency
+    // HLS, ask them something, and keep every answer on the recording's own
+    // timeline."*, which is three descriptions in a coat.
+    // 🔴 REWRITTEN 2026-09-30 WITH THE HLS LEG GONE. It said *"over whichever
+    // transport you press"*, which stopped being true when there was one, and
+    // the owner's ask for the day was the recording's path, so that is the
+    // second half of the sentence now.
+    // 🔴 REWRITTEN 2026-10-05 ON *"review and fix all"*. It said the show
+    // *"goes out live over WebRTC and its recording travels from this browser
+    // to R2 to playback"*: two facts joined by an `and`, three insider words
+    // (WebRTC, R2, playback), and nothing about where a visitor should go. The
+    // transport and the recording's path are the diagram's job, and each tab
+    // now carries its own sentence, so this names the thing and the tab to
+    // open. ⚠️ `manifest.mjs`'s `one` line still carries the old wording and
+    // is not this agent's to edit this round, so the two disagree until it is.
+````
+
+<a id="stage-11"></a>
+## stage-11: demo/stage/index.html, inline script, line 230
+
+````js
+    /**
+     * 🔴 ONE BUTTON, AND IT IS ITS OWN STOP. There were two, `Start HLS` and
+     * `Start WebRTC`, from 2026-09-25 (*"no 2 transports in same time"*) to
+     * 2026-09-30 (*"can you have just webrtc transport?"*). Everything that
+     * existed only for the HLS leg went with it: hls.js on demand, the low
+     * latency player, the second publisher hold, the frame watcher that
+     * corrected a badge the HLS wait had given up on, and the array order that
+     * kept the harness from switching a live show to the other leg.
+     * ⚠️ **AND THAT LAST ONE CHANGES WHAT THE HARNESS PRESSES FIRST.**
+     * `demo/verify.mjs` presses `.tbar-x` in order and gives `settleMs` to
+     * control 0, which is now `Start WebRTC`. So the harness's own press can
+     * land on a cold container, and `startShow` waits for the publisher itself
+     * rather than failing, which is also what a person pressing it cold needs.
+     */
+````
+
+<a id="stage-12"></a>
+## stage-12: demo/stage/index.html, inline script, line 244
+
+````js
+    // ⚠️ NO CONTROLS ROW. The start is on the control room's transport
+    // bar, because starting a show is a transport verb and a page-level row
+    // also showed them on the Audience tab, where they are nobody's business.
+````
+
+<a id="stage-13"></a>
+## stage-13: demo/stage/index.html, inline script, line 248
+
+````js
+    /**
+     * 🔴 NO READOUT. Asked 2026-09-17 as *"rm 3 frames"*, and both cells deserved
+     * it for the same reason: `panels` read 3 on every visit and `frames` read
+     * 60.0, which is the rule this project already has in writing. A cell showing
+     * a structural constant reads as a measurement and teaches a reader to skip
+     * the row. The shell hides the box when a page declares none, so there is no
+     * empty surface painting its own edges either.
+     */
+````
+
+<a id="stage-14"></a>
+## stage-14: demo/stage/index.html, inline script, line 259
+
+````js
+  /**
+   * ONE SOURCE, THREE PANELS. Asked for as *"use theee panels on stage tabs
+   * each as same testvideo playing"*, and the word that matters is SAME: one
+   * canvas is drawn once a frame and all three panels show it.
+   *
+   * ⚠️ A CANVAS CANNOT BE IN THREE PLACES, so the three panels each get their
+   * own `<canvas>` and one drawing loop paints the master and blits it to each.
+   * The alternative is `captureStream()` into three `<video>` elements, which
+   * is one encode and three decodes for a picture nobody is sending anywhere.
+   */
+````
+
+<a id="stage-15"></a>
+## stage-15: demo/stage/index.html, inline script, line 269
+
+````js
+  /**
+   * 🔴 THE STAGE IS 16:9, ASKED 2026-09-19: *"video win to 16:9"*, in the same
+   * message that replaced the film.
+   * ⚠️ **AND THE SHAPE BEFORE IT WAS RIGHT FOR THE FILM IT WAS ABOUT.** Three
+   * messages on 2026-09-18 bought a box 5% taller than 4:3 (*"add moer height
+   * (cut from sides)"*, a frame with *"i need this cut"*, *"make video 5% higher
+   * and crop left rihht sides a bit"*), because a 16:9 box was showing 75% of a
+   * 4:3 film's height and throwing away the top of the cannon and the dancers'
+   * feet. That argument retires with the film: the church scene is 1280x720,
+   * so 16:9 IS its own shape and a taller box would letterbox it. Settled, not
+   * to be re-argued from the old messages.
+   * ⚠️ **IT IS ONE CONSTANT AND NOTHING ELSE IS TYPED TWICE.** The panel's box,
+   * the empty-state card, the canvas and every check that reads a pixel derive
+   * from `STAGE_W` and `STAGE_H`, so moving the shape again is these two lines.
+   */
+````
+
+<a id="stage-16"></a>
+## stage-16: demo/stage/index.html, inline script, line 293
+
+````js
+    /**
+     * 🔴 TWO STATES AND TWO WORDS: `on air` AND `off air`. Asked 2026-09-18:
+     * *"rm soon. off air / on air"*. It had three, with `coming` reading `soon`
+     * for a control room that had joined and not pressed Start.
+     * ⚠️ **THE MIDDLE STATE WAS A PROMISE RATHER THAN A MEASUREMENT.** `soon`
+     * says a show is about to begin, and the fact behind it was only that a
+     * socket existed: somebody could sit in the control room for an hour, or
+     * close the tab, and the badge would have stood there saying soon. A badge
+     * answers whether the thing feeding this picture is delivering, and that has
+     * two answers.
+     * ⚠️ **AND THE PAIR NOW READS AS ONE OPPOSITION.** `live` against `off air`
+     * was two different vocabularies in one slot, so the two states could not be
+     * read as the two halves of one fact.
+     */
+````
+
+<a id="stage-17"></a>
+## stage-17: demo/stage/index.html, inline script, line 309
+
+````js
+      // ⚠️ `coming` SAYS `starting`, ASKED 2026-09-25: *"coming online =>
+      // starting"*. `presence.mjs` names this override in its own docs and uses
+      // this very word as the example, so it is the supported path rather than
+      // a new state: the five states are fixed and only the wording is a page's
+      // to choose. `coming online` was two words describing a wait; `starting`
+      // is what the operator just did.
+````
+
+<a id="stage-18"></a>
+## stage-18: demo/stage/index.html, inline script, line 315
+
+````js
+      /**
+       * 🔴 `checking` AND `coming` SAY THE SAME WORD, ASKED 2026-09-25: *"what
+       * is started and what is checking. in ui it should be same for user"*.
+       * They ARE different facts and `presence.mjs` is right to keep them
+       * apart: its colour says what is KNOWN and its motion says something is
+       * HAPPENING, so `checking` means probably there and unconfirmed while
+       * `coming` means a start is under way. That distinction earns its keep on
+       * a badge for a machine in another building.
+       * ⚠️ IT EARNS NOTHING HERE, AND TWO WORDS FOR ONE MOMENT IS WORSE THAN
+       * ONE. On this page both states happen inside a single action: you press
+       * a transport, the publisher wakes, frames may or may not have been
+       * confirmed yet. To the person who pressed the button that is one state
+       * with one name, and showing them two implies a difference they can act
+       * on. **The page keeps the two states, because the checks and the log
+       * read them; it just stops making a visitor learn the difference.**
+       */
+````
+
+<a id="stage-19"></a>
+## stage-19: demo/stage/index.html, inline script, line 338
+
+````js
+      /**
+       * ⚠️ EVERY PANEL TAKES THE DEFAULTS, which is the point of the block: a
+       * page that wants a picture with a status and a way to make it big writes
+       * none of either. The centre is left empty because there is no answer
+       * that is right for every panel, and `/kit/` shows one filled.
+       */
+````
+
+<a id="stage-20"></a>
+## stage-20: demo/stage/index.html, inline script, line 344
+
+````js
+      /**
+       * 🔴 IT SAYS `LIVE`, NOT NOTHING. Asked 2026-09-17 with a photograph of a
+       * lone green dot: *"add \u201cLIVE\u201d next to dot"*. The panel's own
+       * default left slot is a DOT, which is right for a footer holding several
+       * small things and wrong when it is the only thing there: a coloured dot
+       * with no word beside it is a mark whose whole meaning is its hue, and
+       * this project already has that rule written down about the badge.
+       * ⚠️ `says`, RATHER THAN A LABEL BESIDE IT. The component reserves the
+       * width of the widest phrase it can ever show and fades the word through
+       * on a change, so a word supplied from outside would twitch and a word
+       * given to the badge cannot.
+       */
+````
+
+<a id="stage-21"></a>
+## stage-21: demo/stage/index.html, inline script, line 357
+
+````js
+        /**
+         * 🔴 THE AUDIENCE GETS NO `<video>` UNTIL THERE IS A SHOW, AND NO EMPTY
+         * ONE EITHER. `plans/plan-stage-live.md` §2. A black 16:9 box with a
+         * transport under it is the shape of a thing that could be played and
+         * cannot: this page already deleted a `live` badge from the archive
+         * rather than re-word it, on exactly that argument. An element that
+         * exists also costs something, because `armVideo` and `playOrPrompt`
+         * exist for the way a media element and a user gesture interact, and
+         * one sitting through a twenty minute wait invites an autoplay prompt
+         * and, on iPhone, a fullscreen control over nothing.
+         * ⚠️ AND THERE IS A REAL THING TO SAY. Somebody arriving early wants
+         * one fact: when. That is a `createCard` job, in the panel's own
+         * picture area, swapped for the video when the show starts.
+         */
+````
+
+<a id="stage-22"></a>
+## stage-22: demo/stage/index.html, inline script, line 373
+
+````js
+        /**
+         * 🔴 ONE FOOTER. ASKED 2026-09-25: *"remove the count time counter from
+         * the video panel, from a footer, and remove a footer as well. So video
+         * panel only should have single footer, which looks and behaves like
+         * the audience one."* The control room had TWO: its own, and the film's
+         * whole transport bar glued underneath carrying `22:11.850`.
+         * ⚠️ AND THIS REVERSES A DECISION THAT IS STILL WRITTEN DOWN BELOW. The
+         * film bar's own comment argued **THE BAR STAYS, BECAUSE IT IS NOT A
+         * PLAY BUTTON**, on the grounds that the clock shows a length before the
+         * file is fetched. That was a real argument and the owner has overruled
+         * it, reported twice and photographed on a phone with `PLAY RECORDING`
+         * clipped beside it. The reason is kept rather than deleted, because a
+         * rule that loses its reason comes back.
+         * ⚠️ `soloFooter` MAKES A LATER `glue()` THROW rather than silently
+         * stacking a second footer, which is how the doubling survived two
+         * reports: `createTransportBar(parent, ...)` APPENDS to that parent, so
+         * deleting a `createGlue` line removed nothing.
+         */
+````
+
+<a id="stage-23"></a>
+## stage-23: demo/stage/index.html, inline script, line 392
+
+````js
+        /**
+         * 🔴 THE BOX HAS TO BE TOLD THE SHAPE, NOT ONLY THE CANVAS. The
+         * stylesheet's box is 16:9 and the canvas inside it is `object-fit:
+         * contain`, so a canvas of any other shape gets letterboxed by CSS one
+         * level out, where the page cannot measure it. That is what the
+         * *"looks wrong"* screenshot caught mid-edit. The box and the picture
+         * have to agree or one of them is lying.
+         */
+````
+
+<a id="stage-24"></a>
+## stage-24: demo/stage/index.html, inline script, line 401
+
+````js
+        // Every tab carries the badge since the Archive tab went on 2026-09-25.
+        // It took `false` here on 2026-09-18 (*"Rm live badge from arcive
+        // videofooter"*), because a recording has no liveness to report.
+````
+
+<a id="stage-25"></a>
+## stage-25: demo/stage/index.html, inline script, line 405
+
+````js
+        /**
+         * 🔴 EVERY SCREEN GOES FULL, AND KEEPS A FOOTER WHILE IT IS. Asked
+         * 2026-09-18: *"all stage videoscreens need to go to fullscreeen with
+         * footer variats"*. It used to rotate all three modes, one per tab, so
+         * that the page demonstrated `bare` as well — and `bare` is the one
+         * that takes the footer AWAY, which on this page takes the LIVE badge
+         * with it. A screen showing a live room, full, with nothing saying it
+         * is live is the thing the badge exists to prevent.
+         * ⚠️ BOTH REMAINING VARIANTS ARE STILL SHOWN, and which tab gets which
+         * is a reason rather than a rotation: the audience and the archive keep
+         * the footer up (`footer`), because the badge and the transport are
+         * what you are there to read, and the control room hides it until you
+         * move (`hover`), because an operator wants the picture clean and the
+         * controls on demand.
+         */
+````
+
+<a id="stage-26"></a>
+## stage-26: demo/stage/index.html, inline script, line 421
+
+````js
+        /**
+         * 🔴 THE PING AND THE ROUTE IT TOOK, ON THE TWO PANELS THAT CAN SHOW
+         * THE LIVE PICTURE, SINCE 2026-09-30. `direct` or `relay` off the
+         * selected candidate pair, beside the network round trip it qualifies,
+         * because a ping through Cloudflare's TURN relay is not comparable to a
+         * direct one. The kit hides the row until a cell is written, so a room
+         * with no show in it says nothing. The archive plays a file and has no
+         * route to report.
+         */
+````
+
+<a id="stage-27"></a>
+## stage-27: demo/stage/index.html, inline script, line 431
+
+````js
+          // `ping`, not `network ping`: MEASURED at 360 px the longer label ran
+          // the row 8 px past its slot and cut the route word off.
+````
+
+<a id="stage-28"></a>
+## stage-28: demo/stage/index.html, inline script, line 440
+
+````js
+  /**
+   * 🔴 IS A PICTURE ACTUALLY ARRIVING: A TAG ON THE PICTURE, DRIVEN BY FRAMES.
+   * Asked 2026-10-05: *"perhaps just visual indication of picture happening"*.
+   * The footer badge says the SHOW is on air, and it went `on air` once, on the
+   * first frame, and never looked again: a picture that froze a minute later
+   * went on reading `on air` under a still. This tag answers the other
+   * question, whether frames are reaching THIS screen now.
+   * ⚠️ OUTCOME, NEVER INTENT. The press only makes it `starting`; `receiving`
+   * comes from `requestVideoFrameCallback`, once per frame the compositor
+   * actually showed, and `stalled` is two seconds without one while the show
+   * is meant to be live. The rule is `presenceOf`, the kit's own pure function
+   * (`node demo/shell/presence-test.mjs`): a frame is a heartbeat, `everyMs`
+   * is the stall window and one miss is gone. It is not a second rule typed
+   * here.
+   * ⚠️ HIDDEN WHEN THERE IS NOTHING TO RECEIVE. The footer already says `off
+   * air`, and a second phrase for the same moment on the same panel is the
+   * thing this page refused once already for `checking` and `coming`.
+   * ⚠️ `starting`, THE FOOTER'S OWN WORD FOR THE WAIT, for the same reason.
+   */
+````
+
+<a id="stage-29"></a>
+## stage-29: demo/stage/index.html, inline script, line 497
+
+````js
+  /**
+   * ⚠️ `createTabs` BUILDS ITS OWN PANELS AND HANDS THEM BACK. A page fills
+   * them; it does not supply them. That is what keeps the tab's own markup, its
+   * `role="tabpanel"` and its hidden state in one place rather than half here.
+   * ⚠️ AND THIS IS THAT COMPONENT'S FIRST REAL USE. It has been in `/kit/` and
+   * on no page since it was written: it went on `/items/` for one commit and
+   * came off, because three names over one list and one form is furniture.
+   * Three genuinely different views of one show is the case it was built for.
+   */
+````
+
+<a id="stage-30"></a>
+## stage-30: demo/stage/index.html, inline script, line 507
+
+````js
+  /**
+   * 🔴 THE AUDIENCE DOES NOT GET A LOG. Asked 2026-09-18: *"rm logs from stage
+   * audience"*. This page's three tabs have two different readers, and that is
+   * the whole reason: the control room and the archive are worked by the person
+   * running the show, who is exactly who a log is for, and the audience tab is
+   * the one surface here that a room full of other people looks at. A log is
+   * where this project puts faults, build stamps and timings. None of those are
+   * an audience's to read and none are theirs to act on.
+   *
+   * ⚠️ THE TABS ARE `#links` ON ONE PAGE, SO THERE IS ONE LOG AND IT IS THE
+   * SHELL'S. It is not per-panel and must not become so: a second log box inside
+   * a panel is a second surface saying what one already says, and `mount()`
+   * hides the shell's when a page wants none at all.
+   *
+   * ⚠️ AND THE FIRST `go()` IS QUIET, so `onPick` does NOT fire on load. The
+   * page opens on the audience tab, so leaving the initial state to the callback
+   * would show the log to precisely the reader it is being taken from, until
+   * they touched a tab. It is applied once, by hand, below.
+   */
+````
+
+<a id="stage-31"></a>
+## stage-31: demo/stage/index.html, inline script, line 527
+
+````js
+  /**
+   * 🔴 AND THE BOX AROUND THE LOG GOES WITH IT. MEASURED 2026-10-05: hiding
+   * only the `<pre>` left its `.pos-glue.pos-report` on the audience tab with
+   * both children hidden, painting its own two edges as a 2 px full-width line
+   * 40 px under the picture. That is the empty-box-is-a-line defect, arriving
+   * because the log is hidden after `mount()` decided the box was worth drawing.
+   * The kit could hide a glue whose children are all hidden; until it does,
+   * the page hides the box it emptied.
+   */
+````
+
+<a id="stage-32"></a>
+## stage-32: demo/stage/index.html, inline script, line 544
+
+````js
+  /**
+   * 🔴 A STRIP IN A HIDDEN PANEL HAS NO WIDTH, SO ITS OPENING VIEW IS NOT THE
+   * ONE IT WAS GIVEN. MEASURED on the control room: `fit(0, 30s)` at build time
+   * ran against a canvas of zero width, and by the time anybody looked the axis
+   * read **30 to 55 seconds** on a page where nothing had happened. It was
+   * mistaken for follow chasing a creeping playhead twice before the panel's
+   * width was suspected, which is the same family of bug as the diagram that
+   * measured every string as fitting inside a hidden tab.
+   * ⚠️ SO THE FIT IS RE-APPLIED WHEN THE PANEL IS SHOWN, which is the first
+   * moment the number it depends on exists. `refit` is filled in further down,
+   * after the strips are built.
+   */
+````
+
+<a id="stage-33"></a>
+## stage-33: demo/stage/index.html, inline script, line 559
+
+````js
+    /**
+     * 🔴 THE PICTURE FOLLOWS THE TAB, BECAUSE THERE IS ONLY ONE OF IT. Asked
+     * 2026-09-25, after the control room showed nothing while the audience
+     * showed a picture: *"why control room has canvas?"* It should not, and the
+     * question is the answer. This page composited a film into a canvas when it
+     * did its own picture; as a PURE RECEIVER the canvas has no job, and the
+     * live `<video>` was appended to the audience panel only.
+     * ⚠️ ONE ELEMENT, MOVED, RATHER THAN TWO PLAYERS. Stream bills by the
+     * minute DELIVERED, so a second `<video>` on the same source is a second
+     * meter for one picture. The tabs are mutually exclusive, so exactly one
+     * panel is ever on screen and moving the element costs nothing.
+     * ⚠️ AND `appendChild` ON A PLAYING ELEMENT DOES NOT RESTART IT. Reparenting
+     * keeps the media state, which is the whole reason this is cheaper than
+     * rebuilding a player per tab.
+     */
+````
+
+<a id="stage-34"></a>
+## stage-34: demo/stage/index.html, inline script, line 577
+
+````js
+  /**
+   * 🔴 EACH TAB'S SENTENCE, IN ONE CELL, THE OPEN ONE VISIBLE. This is the
+   * markup `tab-page.mjs` builds (its rule 6) and the kit's own classes, so the
+   * look is the kit's and nothing is typed here. All the sentences share one
+   * grid cell and the hidden ones keep their room, so the picture under them
+   * sits at the same height on every tab instead of jumping when a longer
+   * sentence wraps to another line.
+   * ⚠️ NOT `createTabPage`, on instruction: this page keeps `tabs.mjs`.
+   */
+````
+
+<a id="stage-35"></a>
+## stage-35: demo/stage/index.html, inline script, line 603
+
+````js
+  // ══ the show ══════════════════════════════════════════════════════════════
+  //
+  // 🔴 EVERYTHING BELOW IS `plans/plan-stage-live.md` §7, THE FIRST STEP. What it
+  // proves is a list of things that could each be false: that the picture the
+  // audience sees is the picture that was recorded (by object identity, not by
+  // a name), that a question sent in one tab arrives in another, that when Stop
+  // returns the bytes are in R2 AND readable, and that the archive's playhead
+  // moves the burned clock in the picture.
+  // ⚠️ WHAT IT DELIBERATELY DOES NOT DO: no second source, no switch, no long
+  // show, no seekable-without-download playback. Those are §8's open questions
+  // and pretending otherwise here would bury them.
+````
+
+<a id="stage-36"></a>
+## stage-36: demo/stage/index.html, inline script, line 618
+
+````js
+  /**
+   * 🔴 NO WAITING CARD. Asked 2026-09-18, quoting both its lines back: *"rm A
+   * show is coming / Nothing is playing yet. When the control room starts, the
+   * picture appears here."* It said in two sentences what the presence badge
+   * beside it says in one word and what an empty stage says by being empty, and
+   * it was the first thing a visitor read on a page whose subject is a picture.
+   * ⚠️ **WHAT IT WAS FOR IS STILL TRUE AND IS HANDLED ELSEWHERE.** The reason
+   * written here was that a visitor must not meet a black box with a transport
+   * under it. The panel keeps its 16 by 9 picture area and the audience has no
+   * transport at all, so there is no black box to explain; the badge already
+   * reads `offline`, `coming` or `online`, which is the same fact in the place
+   * a reader looks for it.
+   * ⚠️ **AND THE CHECK THAT GUARDED IT CHANGED RATHER THAN GOING.** It read
+   * `.pos-card`, so deleting the card alone would have taken the page red, and
+   * deleting the assert alone would have dropped the claim it exists to make.
+   * The claim was never about a card: it is that the audience is shown no
+   * `<video>` before there is anything in one.
+   */
+````
+
+<a id="stage-37"></a>
+## stage-37: demo/stage/index.html, inline script, line 640
+
+````js
+  /**
+   * 🔴 NO BACKGROUND PICTURE OF THIS PAGE'S OWN SINCE 2026-10-05, ASKED AS
+   * *"drop"*. What stood here was the church scene read off
+   * `/resources/mimproject.json` by id and played from R2 on Start show, plus
+   * an opt-in `?bg=` that could put an ERR archive clip in its place. Both
+   * drew into a canvas a pure receiver shows nobody, so a press cost a second
+   * download of a 253 MB film and `?bg=` cost a broadcaster a listener for a
+   * picture nobody saw. The container plays the same film and this page
+   * receives it over WHEP, which is the only copy anybody watches.
+   */
+````
+
+<a id="stage-38"></a>
+## stage-38: demo/stage/index.html, inline script, line 651
+
+````js
+  /**
+   * 🔴 ONE ORIGIN FOR EVERY MARK ON THE STRIP, AND IT IS THE RECORDER'S FIRST
+   * DATA. `plans/plan-stage-live.md` §5.1. Not when the page loaded, not when the
+   * WHIP handshake finished. A mark is a position IN THE RECORDING, so anything
+   * measured from another origin is on the wrong axis.
+   * ⚠️ AND AN ANSWER ARRIVES WITH THE ANSWERING DEVICE'S CLOCK ON IT, WHICH IS
+   * NEVER TRUSTED. The control room's own receive time is used, because that is
+   * ONE clock for every mark. The difference is the network, it is tens of
+   * milliseconds, and the page says in words that a mark is when an answer
+   * ARRIVED rather than when it was pressed.
+   */
+````
+
+<a id="stage-39"></a>
+## stage-39: demo/stage/index.html, inline script, line 666
+
+````js
+  /**
+   * 🔴 RELAY SERVERS ARE ASKED FOR ON THE PRESS, NEVER ON LOAD. A visit opens
+   * nothing. `iceLoadAsks()` reads resource timing, so it counts every request
+   * the browser made to the relay route before the first press, not the ones
+   * this page remembered to count.
+   */
+````
+
+<a id="stage-40"></a>
+## stage-40: demo/stage/index.html, inline script, line 713
+
+````js
+  /**
+   * The shimmer on a transport button while its leg is coming up. Asked
+   * 2026-09-25: *"do shimmering on start button until on air"*.
+   * ⚠️ AN ATTRIBUTE, NOT A CLASS, so the stylesheet owns what it looks like and
+   * this page owns only when it is true. `aria-busy` beside it, because a
+   * shimmer says nothing to a screen reader and the wait is real either way.
+   */
+````
+
+<a id="stage-41"></a>
+## stage-41: demo/stage/index.html, inline script, line 731
+
+````js
+  /**
+   * The picture tag's three verbs. `pictureStart` at the press, `pictureWatch`
+   * on the element the frames will land in, `pictureReset` when there is
+   * nothing to receive any more. See `PIC_STALL_MS` for the rule.
+   * ⚠️ `follow()` IS THE BADGE'S OWN CLOCK (a tick every 500 ms here), so a
+   * stall is noticed between 2.0 and 2.5 s after the last frame, and nothing
+   * runs at all while the tag is hidden.
+   */
+````
+
+<a id="stage-42"></a>
+## stage-42: demo/stage/index.html, inline script, line 762
+
+````js
+      // ⚠️ AN ENGINE WITHOUT IT GETS THE CLOCK OF THE ELEMENT, which advances
+      // only while it is playing something. Weaker, and named in `__stage`.
+````
+
+<a id="stage-43"></a>
+## stage-43: demo/stage/index.html, inline script, line 777
+
+````js
+  /**
+   * Put the one live `<video>` in the panel that is showing. Called on every
+   * tab change and by both legs the moment they have an element.
+   * ⚠️ THE ARCHIVE IS NOT A LIVE PANEL and must keep its own recording, so it
+   * is left alone: its picture comes from wherever its transport is, which is
+   * what makes scrubbing visible.
+   */
+````
+
+<a id="stage-44"></a>
+## stage-44: demo/stage/index.html, inline script, line 784
+
+````js
+  /**
+   * Which tab is on screen. `tabs.mjs` exposes `el`, `buttons`, `panels`,
+   * `panel(id)` and `go`, and NO accessor for the current one, so this reads
+   * `aria-selected` off the buttons, which the component sets and which is
+   * therefore right even on the first quiet `go()` that fires no `onPick`.
+   */
+````
+
+<a id="stage-45"></a>
+## stage-45: demo/stage/index.html, inline script, line 796
+
+````js
+  /**
+   * 🔴 SWAP A PANEL'S PICTURE AND KEEP THE PANEL'S OWN PARTS. Reported
+   * 2026-09-30: *"i can not see questions sent nor in audiene nor in control
+   * room"*. The question lands in `panel.slots.caption`, which `video-panel.mjs`
+   * builds INSIDE the stage, next to the full screen way out. This page emptied
+   * the stage with `textContent = ''` to put a picture in, four times, and one
+   * of them ran at load on the control room. So the caption slot was a detached
+   * element: the question rendered into it, the relay round trip was real, the
+   * check reading the slot passed, and nobody could see it.
+   * ⚠️ `video-panel.mjs` HAS NO WAY TO REPLACE ITS PICTURE, which is the real
+   * gap. This is the page's way round it until the kit has one.
+   */
+````
+
+<a id="stage-46"></a>
+## stage-46: demo/stage/index.html, inline script, line 823
+
+````js
+    /**
+     * 🔴 NOT OVER A RECORDING. Reported 2026-09-25: *"in webrtc i see not
+     * recording lane nor playback does anyting"*, with `Play recording`
+     * enabled. This function caused it, and `plans/plan-stage-hls-record.md`
+     * §3 had predicted it before it was reported.
+     * THE COLLISION: since the Archive tab was removed, the archive panel IS
+     * the control room panel. `openArchive` empties that stage and puts the
+     * RECORDING in it, while `audVideo` still points at the finished live
+     * element. The next tab change then failed the parent check, emptied the
+     * stage again and re-appended the DEAD live element over the recording. So
+     * `archiveMedia` was set, `Play recording` was enabled, and it played an
+     * element that was no longer in the document.
+     * ⚠️ AND IT READ AS TWO SEPARATE FAULTS, WHICH IS WHY IT IS WORTH THE
+     * WORDS: a strip with no recording lane, and a button that does nothing.
+     * One cause, two symptoms, neither of them where the cause was.
+     */
+````
+
+<a id="stage-47"></a>
+## stage-47: demo/stage/index.html, inline script, line 846
+
+````js
+  // ── the relay ─────────────────────────────────────────────────────────────
+  //
+  // 🔴 A QUESTION IS SENT, NOT CALLED. Before this, `ask()` rendered the same
+  // question into both panels of one page, which works only because they are
+  // one page. An audience is a different device, so a question travels the
+  // relay and is RENDERED BY THE MESSAGE ARRIVING, which makes the local case
+  // and the remote case the same code path: the relay echoes to the sender.
+  // ⚠️ `openWire` AND NOT A HAND-ROLLED SOCKET, because it is the thing that
+  // can tell a FULL ROOM from a DEAD RELAY. A browser cannot read the status of
+  // a refused upgrade, so without it a 503 reads as a network fault, which is
+  // how `/keys/` was down for everybody while the board looked broken.
+````
+
+<a id="stage-48"></a>
+## stage-48: demo/stage/index.html, inline script, line 859
+
+````js
+    /**
+     * ⚠️ THE WHOLE URL, NOT THE ROOM NAME, AND ONLY WHEN THE ROOM WAS INVENTED
+     * HERE. CLAUDE.md's rule about handing over a page: a name is the answer to
+     * *which room is this* and a link is the answer to *how do I bring an
+     * audience*, and the second is the one somebody wants when they want it.
+     * Anybody who arrived on a `?room=` link is already holding the link.
+     */
+````
+
+<a id="stage-49"></a>
+## stage-49: demo/stage/index.html, inline script, line 874
+
+````js
+  /**
+   * 🔴 A MESSAGE SENT BEFORE THE SOCKET IS OPEN IS SILENTLY DROPPED, AND THAT
+   * IS A PRODUCT BUG BEFORE IT IS A TEST ONE. `wire.send` returns `null` when
+   * the socket is not in state 1, with no throw and no log, so an operator who
+   * presses Send in the first second after opening the page loses the question
+   * and has no way to know. MEASURED here on the page's own check: the log read
+   * `asked the audience: ...` BEFORE `in room ...`, so the question that check
+   * exists to grade never left the tab, and the lane assert quietly stopped
+   * running rather than going red.
+   *
+   * ⚠️ THE QUEUE IS BOUNDED AND DROPS THE OLDEST. An unbounded outbox on a page
+   * whose relay is down is a memory leak that presents as a slow tab, and the
+   * only thing worth keeping is the most recent state anyway.
+   */
+````
+
+<a id="stage-50"></a>
+## stage-50: demo/stage/index.html, inline script, line 900
+
+````js
+  /**
+   * 🔴 A LATE JOINER HAS TO LEARN THE STATE AND THE RELAY HAS NO BACKLOG. It
+   * relays and does not parse; nothing is stored. So the control room repeats
+   * itself every 2 s while the room is open: about 0.5 msg/s against a budget
+   * of 1000/s, which is 0.05% of it, and a page that joins mid-show is correct
+   * within two seconds.
+   * ⚠️ THE TWO REJECTED ANSWERS ARE WORTH KEEPING. `workers/cues` already
+   * stores a 500-cue backlog and hands it to a joiner, and is token-gated, so
+   * an audience page cannot use it. Polling WHEP and reading a 409 as "not yet"
+   * is a request to Cloudflare per page per interval, which is the shape of
+   * cost this project keeps refusing.
+   */
+````
+
+<a id="stage-51"></a>
+## stage-51: demo/stage/index.html, inline script, line 916
+
+````js
+    /**
+     * ⚠️ `atMs`, NEVER `at`. `at` is an ENVELOPE field: `wire.mjs` writes it
+     * after the payload and throws rather than let a page lose its own value
+     * silently. This is the SECOND time this exact collision has been paid for
+     * in this project, the first being `board.ping`, which replied with an `at`
+     * and so answered `board.error` to every caller for weeks. The throw is the
+     * fix working.
+     */
+````
+
+<a id="stage-52"></a>
+## stage-52: demo/stage/index.html, inline script, line 941
+
+````js
+      /**
+       * ⚠️ THE CONTROL ROOM'S RECEIVE TIME, NOT THE SENDER'S STAMP. See T0
+       * above. `sinceT0()` is null before the recorder has produced anything,
+       * and an answer given before the show is recorded at 0 rather than
+       * dropped, because it happened.
+       */
+````
+
+<a id="stage-53"></a>
+## stage-53: demo/stage/index.html, inline script, line 953
+
+````js
+  /**
+   * 🔴 THE CONTROL ROOM ASKS THE AUDIENCE SOMETHING, AND THE QUESTION LANDS IN
+   * THE PANEL'S FOOTER. Asked 2026-09-17: a message *"about upcoming interaction
+   * to the audience that the viewer parses as interactive thing audience can
+   * do... like radiobuttons"*, with the shape given as
+   * `Meaning of life [Be | Not to be]`.
+   *
+   * ⚠️ IT GOES IN THE CENTRE SLOT, WHICH THE PANEL LEFT EMPTY ON PURPOSE. That
+   * component ships a status on the left and a way to go full on the right and
+   * nothing in the middle, because no answer is right for every page. This is
+   * what a middle is for.
+   * ⚠️ AND IT IS `createChoice`, NOT A ROW OF BUTTONS. One of these and the
+   * others are not, with a label in front, is exactly that component, and this
+   * project already has three hand-built copies of it in its history.
+   */
+````
+
+<a id="stage-54"></a>
+## stage-54: demo/stage/index.html, inline script, line 590
+
+````js
+  /**
+   * 🔴 THE ARCHIVE IS A RECORDING, SO NOTHING IN IT MOVES BY ITSELF. Asked
+   * 2026-09-17: *"in archive video is stopped. transport (playpause / loop /
+   * rates) below it. usersubmitted answers appear in lanes as marks... top lane
+   * is video block. scrubbing moves video back and forth."*
+   *
+   * ⚠️ ITS PICTURE IS DRAWN FROM THE PLAYHEAD, NOT FROM THE CLOCK. The other two
+   * panels blit whatever the live loop last painted; this one paints the frame
+   * that belongs to wherever the transport is, so dragging the strip really does
+   * move the picture. `pattern.mjs` burns a clock into the frame, which is what
+   * makes that visible rather than something to take on trust.
+   * ⚠️ THE ANSWERS ARE INVENTED FOR NOW, on instruction: *"you can simulate it
+   * atm"*. They are generated once from a fixed seed so the picture is the same
+   * on every visit, and the seam where real ones would arrive is named below.
+   */
+````
+
+<a id="stage-55"></a>
+## stage-55: demo/stage/index.html, inline script, line 606
+
+````js
+  /**
+   * 🔴 THE WINDOW THE ARCHIVE OPENS ON, AND HOW FAR OUT A READER MAY PULL.
+   * Asked 2026-09-18: *"zoom arhvie to 15s and allow to zoom out 4x more"*.
+   *
+   * ⚠️ IT REPLACES A TEN MINUTE CEILING WRITTEN EARLIER THE SAME DAY, and the
+   * reasoning under that one still holds: at 1280 px a three hour recording is
+   * 8.3 seconds per pixel, so the view in which a whole show fits is the view
+   * in which nothing in it can be read. What changed is the number, which was
+   * mine and is now the one that was asked for.
+   *
+   * 🔴 AND ZOOM OUT HAD NO BOUND AT ALL BEFORE THIS, which is why the ask had
+   * to create one to raise. `capPps` floored at 1e-30 px/s, so a reader could
+   * wheel until a recording was a thousandth of a pixel with nothing on screen.
+   * `maxSpan` is the strip's new floor and this is its first caller.
+   * ⚠️ IT TAKES THE RECORDING IF THE RECORDING IS LONGER. A bound that hides
+   * the thing a reader came to look at is not a bound, it is a bug: a three
+   * minute show under a sixty second ceiling could never be seen whole.
+   */
+````
+
+<a id="stage-56"></a>
+## stage-56: demo/stage/index.html, inline script, line 624
+
+````js
+  /**
+   * ⚠️ 30s SINCE 2026-09-18, FROM A SCREENSHOT OF THE ZOOM SOMEBODY ACTUALLY
+   * WANTED: *"zoom around this level"*, with the strip's own readout showing
+   * `30 s`. It was 15, which was my number rather than a measured one.
+   */
+````
+
+<a id="stage-57"></a>
+## stage-57: demo/stage/index.html, inline script, line 631
+
+````js
+  /**
+   * ⚠️ ONE EXPRESSION, BECAUSE THE CHECK READS IT TOO. It was written twice for
+   * one run, once in the strip's option and once in the assert grading it, and
+   * they disagreed immediately: before a show there is no recording, so the
+   * bound is the nominal three minutes rather than sixty seconds, and the check
+   * called a correct page wrong. A shared measurement written in two places is
+   * a measurement that will disagree.
+   */
+````
+
+<a id="stage-58"></a>
+## stage-58: demo/stage/index.html, inline script, line 641
+
+````js
+  /**
+   * 🔴 THE ARCHIVE'S BAR AND STRIP ARE BUILT OFF-PAGE. `createTransportBar` and
+   * `createStripView` APPEND TO THE PARENT THEY ARE GIVEN, so passing the
+   * control room panel put them on screen no matter what else was removed:
+   * deleting the `createGlue(...)` line changed nothing and the page kept
+   * showing two bars and two timelines, reported twice. **The first argument is
+   * a mount point, not a hint.**
+   * ⚠️ They are still constructed, because `archiveCommand` and the archive
+   * deck are what PLAY RECORDING drives and what the playback checks read.
+   */
+````
+
+<a id="stage-59"></a>
+## stage-59: demo/stage/index.html, inline script, line 658
+
+````js
+    // ⚠️ ONE RATE, SO THE BAR DRAWS NO RATE ROW. A lattice of one is not a
+    // choice and `createTransportBar` already refuses to render it, which is
+    // the behaviour `/replay/` bought when a lone armed `1` turned up beside
+    // its LOOP. This is the deck saying what is true of an archive recording
+    // rather than the bar being told to hide something real.
+````
+
+<a id="stage-60"></a>
+## stage-60: demo/stage/index.html, inline script, line 666
+
+````js
+  /**
+   * A made-up audience, deterministic so two visits agree. A real one arrives
+   * over the relay from the page the viewer pressed, which is the same seam
+   * `onPick` names above and is deliberately not built yet.
+   */
+````
+
+<a id="stage-61"></a>
+## stage-61: demo/stage/index.html, inline script, line 671
+
+````js
+  /**
+   * 🔴 THE ANSWERS ARE REAL AND THERE ARE NONE UNTIL SOMEBODY PRESSES ONE.
+   * Instructed 2026-09-17: *"do not simulater answers. do record them"*, which
+   * replaces the invented set this page shipped with an hour earlier. An archive
+   * that opens with thirty-eight answers nobody gave is a picture of nothing,
+   * and it is the kind of thing that reads as working until you look.
+   *
+   * ⚠️ THE SHOW'S CLOCK STARTS WHEN THE PAGE DOES. There is no recording behind
+   * this yet, so "when in the show" is time since load, which is the only honest
+   * origin available: it makes the archive a recording OF THIS VISIT rather than
+   * of something that never happened.
+   * ⚠️ ONE LANE PER OPTION, asked for in the same minute: *"each answer opton
+   * different lane"*. In one lane the marks count answers over time and say
+   * nothing else; split by option they show which way the room went. The lanes
+   * appear as questions are asked, in the order the options were offered.
+   */
+````
+
+<a id="stage-62"></a>
+## stage-62: demo/stage/index.html, inline script, line 688
+
+````js
+  /**
+   * 🔴 THE RECORDING'S CLOCK IS THE WALL CLOCK IT WAS MADE AT. Asked 2026-09-17:
+   * *"also time of video start should be one we started vide"*. The archive's
+   * frame used to burn in the PLAYHEAD, so scrubbing to the start showed
+   * 00:00:00, which is a stopwatch rather than a recording. A show has a time it
+   * happened at, and the whole reason `pattern.mjs` burns a clock is that a
+   * frame should say when it is from.
+   */
+````
+
+<a id="stage-63"></a>
+## stage-63: demo/stage/index.html, inline script, line 700
+
+````js
+  /**
+   * ⚠️ NO SLIDER AND NO CLOCK. Asked 2026-09-17: *"no need for slider / times in
+   * transport lane"*. The strip below carries the position, and this project
+   * already has the rule in `transport-bar.mjs`'s own header: two horizontal
+   * time axes stacked at different scales with no way to tell they are the same
+   * axis. The strip is the better of the two, so the bar keeps only what the
+   * strip has not got.
+   * ⚠️ THE RATES ARE THE BAR'S OWN RADIO GROUP, from `choice.mjs`, and they
+   * appear because the deck DECLARES them. They are rendered from the
+   * intersection of every `caps.rates` a kind declares, so a deck with no
+   * adapters offers none, which is why this one names an adapter that plays
+   * nothing and only says what rates it can be played at.
+   */
+````
+
+<a id="stage-64"></a>
+## stage-64: demo/stage/index.html, inline script, line 713
+
+````js
+  /**
+   * 🔴 NO SLIDER AND NO CLOCK, BECAUSE THE STRIP UNDER IT IS THE POSITION.
+   * Asked twice: *"no need for slider / times in transport lane"*, then
+   * *"rm times from transport bar"* when the times were still there. They were
+   * still there because this call passed `clock: false`, which the bar has
+   * never had as an option and so did nothing at all — a setting that reads as
+   * correct in the source and cannot be seen to be inert from outside. The
+   * option is `time` and it is now real.
+   */
+````
+
+<a id="stage-65"></a>
+## stage-65: demo/stage/index.html, inline script, line 722
+
+````js
+  /**
+   * 🔴 NO LOOP AND NO RATES EITHER. Asked 2026-09-18: *"Rm liop and rare from
+   * archive transport"*. This bar is now play and nothing else, which is the
+   * whole of what an archive recording needs: it is a thing that happened once,
+   * at a speed, and there is no passage in it worth hearing twice at 0.25.
+   * ⚠️ THE TWO COME OFF IN DIFFERENT PLACES AND THAT IS NOT AN INCONSISTENCY.
+   * `loop: false` is the bar's own option, beside `scrub: false` and `time:
+   * false`. The RATES are not the bar's to refuse: they are the intersection of
+   * every `caps.rates` its deck's kinds declare, and the bar draws them only
+   * when that intersection holds more than one value. So the honest way to have
+   * none is for the deck to stop claiming four, which is what the adapter above
+   * now says. Adding a `rates: false` option would have put the same fact in
+   * two places and let them disagree.
+   */
+````
+
+<a id="stage-66"></a>
+## stage-66: demo/stage/index.html, inline script, line 736
+
+````js
+  /**
+   * 🔴 MEDIA IS THE MASTER, SO EVERY VERB DRIVES THE ELEMENT AND THE DECK
+   * FOLLOWS. `mediaMaster` reads `currentTime` and bends the playhead onto it,
+   * so a seek written to the DECK is either undone by the next tick or, while
+   * the element is paused, does nothing at all.
+   * MEASURED HERE 2026-09-18: with the archive stopped, `archiveDeck.seek(798)`
+   * left `currentTime` at **0** after 900 ms, while setting `currentTime`
+   * directly moved it. So dragging the strip moved the playhead and not the
+   * picture, which is precisely the *"transport loops but video does not"*
+   * defect `/replay/` was reported for on 2026-09-16 and fixed the same way.
+   * ⚠️ BOTH SURFACES GO THROUGH IT: the bar takes `command`, the strip takes
+   * `onSeek`, and a page that wired only one would have a bar that works and a
+   * strip that does not.
+   * ⚠️ AND IT FALLS BACK TO THE DECK BEFORE THERE IS A RECORDING, when the
+   * archive is still the generated simulation and the deck IS the only clock.
+   */
+````
+
+<a id="stage-67"></a>
+## stage-67: demo/stage/index.html, inline script, line 768
+
+````js
+    /**
+     * 🔴 PLAY RECORDING IS DISABLED UNTIL THERE IS A RECORDING, AND THAT IS THE
+     * WHOLE POINT OF IT. Asked 2026-09-25: *"add play recording button to
+     * transport what is enabled when shows have ended"*. A control that plays
+     * nothing is the shape this project calls a lie, and the previous answer to
+     * "there is nothing to play yet" was a whole tab that sat there empty.
+     * ⚠️ **IT IS `disabled`, WHICH THE HARNESS CANNOT PRESS, AND THAT IS
+     * DELIBERATE AND ACCOUNTED FOR.** A disabled control is a check the suite
+     * can no longer reach, so nothing is asserted THROUGH this button: the
+     * playback checks below drive `archiveCommand` and the recording's own
+     * element, which is the road that exists whether or not a button does.
+     * What IS asserted about the button is the thing only it can say, that it
+     * refuses before a show has ended and offers itself after.
+     */
+````
+
+<a id="stage-68"></a>
+## stage-68: demo/stage/index.html, inline script, line 782
+
+````js
+    // 🔴 NOT IN THE PAGE. The control room has ONE bar and it is the show's, so
+    // this one must not hold `__demo.transport`: a harness would press a toggle
+    // no visitor can reach. It stays because it owns the archive deck's
+    // command, which PLAY RECORDING drives.
+````
+
+<a id="stage-69"></a>
+## stage-69: demo/stage/index.html, inline script, line 790
+
+````js
+      /**
+       * ⚠️ THE TOP LANE IS THE RECORDING ITSELF, as one span from end to end.
+       * It is what the marks below are positions IN, so it goes first and it is
+       * the only lane that is not an event.
+       */
+````
+
+<a id="stage-70"></a>
+## stage-70: demo/stage/index.html, inline script, line 797
+
+````js
+    // ⚠️ THE REAL DURATION ONCE THERE IS ONE. Until a show has been recorded
+    // this is the nominal length, which is what the page had before anything
+    // could be recorded at all. `recordedMs` is read off the element rather
+    // than counted, because a MediaRecorder file's header carries no duration
+    // and counting timeslices would be a guess with a plausible shape.
+````
+
+<a id="stage-71"></a>
+## stage-71: demo/stage/index.html, inline script, line 817
+
+````js
+  /**
+   * 🔴 A FLOOR UNDER THE TIMELINE. Asked 2026-09-18: *"Make archive timeline 3x
+   * higher"*, then *"Ita ok to have empty space in timelime, def min height"*.
+   * MEASURED at 50 px with its one lane before this, so the floor is 150.
+   * ⚠️ A FLOOR RATHER THAN A HEIGHT, which is what the second message settles:
+   * once an answer lane is added per option the lanes need more than 150 and
+   * they get it. Below the floor the space under the last lane is empty, and
+   * that was explicitly accepted rather than packed out with something.
+   */
+````
+
+<a id="stage-72"></a>
+## stage-72: demo/stage/index.html, inline script, line 841
+
+````js
+  /**
+   * 🔴 LANE 2: WHEN EACH QUESTION WAS SENT, AND HOW LONG IT STOOD. The one lane
+   * the ask specifies that did not exist, and it needs NO new renderer: it is a
+   * second `spans` lane whose `durMs` is the distance to the NEXT question.
+   *
+   * 🔴 THE LAST QUESTION GETS NO `durMs`, AND THAT IS THE POINT RATHER THAN AN
+   * omission. `spansOf` leaves an unterminated span open, runs it to Infinity,
+   * and the renderer FEATHERS its right edge. A question still standing when
+   * the recording stopped was not overridden by anything, and a feathered edge
+   * says exactly that, where a bar closed at the show's end would claim an
+   * event that never happened. The library already knows something the page
+   * would otherwise have had to invent.
+   *
+   * ⚠️ ITS COLOUR IS NEITHER LANE 1'S SLATE NOR THE ANSWER LANES' YELLOW,
+   * because one meaning for colour across every demo means a reader must not
+   * have to work out whether a bar is a recording, a question or an answer.
+   * ⚠️ `terse: false`, so the question's own words are the label. A question is
+   * the one thing on this strip whose text IS the fact.
+   */
+````
+
+<a id="stage-73"></a>
+## stage-73: demo/stage/index.html, inline script, line 872
+
+````js
+  /**
+   * ⚠️ BOTH STRIPS, OR THE CONTROL ROOM SHOWS A SHOW WITH NO QUESTIONS IN IT.
+   * The lanes are rebuilt rather than shared, because two strips holding one
+   * lane object is a shared mutable thing between two renderers and the saving
+   * is nothing.
+   */
+````
+
+<a id="stage-74"></a>
+## stage-74: demo/stage/index.html, inline script, line 879
+
+````js
+  /**
+   * 🔴 THE CONTROL ROOM'S OWN LANE, AND IT GROWS RATHER THAN CLAIMING. Asked
+   * 2026-09-25: *"can not see video lane"*, which REVERSES *"can y rm this
+   * recording"* of 2026-09-18. Both asks are right and they are not in
+   * conflict, which is worth writing down because the next person will read one
+   * of them and undo the other.
+   * ⚠️ WHAT WAS REMOVED WAS A LIE, NOT A LANE. `VIDEO_LANE` draws ONE span the
+   * length of the NOMINAL show, so before anybody pressed Start the control
+   * room showed a full grey bar for a file nothing had written. That is what
+   * *"rm recorded vide"* was pointed at.
+   * ⚠️ WHAT GOES BACK IS THE SHOW AS IT HAPPENS: a span from zero to the write
+   * head, which is where the recorder has actually got to. It appears when a
+   * show starts and it is as long as the show really is. Nothing is drawn
+   * before a press, so the objection does not come back with it.
+   */
+````
+
+<a id="stage-75"></a>
+## stage-75: demo/stage/index.html, inline script, line 910
+
+````js
+    /**
+     * The control room gets its OWN top lane (the show as it happens, not the
+     * archive's finished recording), and then only the lanes that have
+     * something in them.
+     * 🔴 A LANE FOR SOMETHING NOBODY DID IS THE SAME DEFECT AS A BAR FOR A FILE
+     * NOBODY WROTE. Asked 2026-09-25: *"what is \"asked\" lane. i never
+     * askd"*. The question lane was drawn from the moment the page opened, so
+     * an empty row labelled `asked` sat there naming an event that had not
+     * happened. The lane arrives with the first question and the option lanes
+     * arrive with it, which is what `relane` exists to do.
+     */
+````
+
+<a id="stage-76"></a>
+## stage-76: demo/stage/index.html, inline script, line 931
+
+````js
+  /**
+   * 🔴 WHAT follow FOLLOWS WHILE A SHOW IS RUNNING. Asked 2026-09-18: *"What to
+   * do with follow"*, and the open half was never the control, it was the
+   * target. The strip has had `setFollow` all along and every page before this
+   * one followed THE PLAYHEAD, because on those pages there was nothing else it
+   * could be.
+   *
+   * 🔴 THIS TAB HAS A NEWEST FACT AND NO PLAYHEAD. Nothing is playing while a
+   * show is being recorded: `archiveMedia` is null, the deck sits at 0, and the
+   * strip sat still while questions and answers arrived off the right edge. The
+   * thing that is moving is the RECORDER, and the strip already knew how to say
+   * where that has got to: `armWall(0)` at the moment recording starts makes
+   * `wallPos()` the write head, and draws it as the wall cursor.
+   *
+   * ⚠️ SO THE RULE IS ONE RULE, NOT TWO: follow tracks the newest fact on the
+   * strip. During playback that is the playhead, during a show it is the write
+   * head, and `() => wallPos() ?? pos` is both of them written once. It hands
+   * back by itself when the wall is disarmed, and the explicit handover below
+   * is belt and braces rather than the mechanism.
+   *
+   * ⚠️ AND THE GAP BETWEEN THE TWO CURSORS BECOMES A REAL NUMBER HERE, which is
+   * the first time on this page: how far behind the show somebody watching the
+   * archive has got to.
+   */
+````
+
+<a id="stage-77"></a>
+## stage-77: demo/stage/index.html, inline script, line 962
+
+````js
+  /**
+   * The show has stopped, so the write head has, and a wall cursor that goes on
+   * counting is measuring how long ago it finished. The whole recording is the
+   * subject now, so the view fits it rather than holding a window on it.
+   * ⚠️ IT DOES NOT RE-ENGAGE follow. `follow()` reports `engaged: on &&
+   * !userScrolled`, so somebody who dragged the strip during the show stays
+   * where they dragged it: a handover that yanks the view out of a hand is the
+   * demo9 failure the strip was built to avoid, arriving one level up.
+   */
+````
+
+<a id="stage-78"></a>
+## stage-78: demo/stage/index.html, inline script, line 978
+
+````js
+  /**
+   * 🔴 THE BAR AND THE STRIP ARE ONE SURFACE. Asked 2026-09-18: *"do same
+   * treatment as for readout/logs for transport + timeline: can be separate or
+   * glued togehter"*. They are the strongest case there is for it: the strip
+   * shows a position and the bar drives the same position, so two bordered
+   * boxes with the page rhythm between them state that they are two things.
+   * `createGlue` re-parents both into one box with a 1 px seam.
+   * ⚠️ The order is the order they were already in, bar then strip, so gluing
+   * them changes what they look like and not where they are.
+   */
+````
+
+<a id="stage-79"></a>
+## stage-79: demo/stage/index.html, inline script, line 989
+
+````js
+  /**
+   * 🔴 THE QUESTION GOES TO THE AUDIENCE AND BACK TO THE CONTROL ROOM. Asked
+   * 2026-09-17: *"controlroom should also see poll"*. Somebody who has just sent
+   * a question should see what they sent in the form the audience sees it, not
+   * trust the form they typed it into.
+   * ⚠️ TWO INSTANCES, because an element cannot be in two places, built from one
+   * description so the two cannot drift.
+   * ⚠️ THE ARCHIVE GETS NONE. It is finished shows, and a live question there is
+   * a control that answers nothing.
+   */
+````
+
+<a id="stage-80"></a>
+## stage-80: demo/stage/index.html, inline script, line 1002
+
+````js
+  /**
+   * 🔴 SEND IT. THE RENDERING HAPPENS WHEN THE MESSAGE COMES BACK.
+   * `render()` below is what draws it, and it is called by `onWire`, including
+   * for the control room's own question: the relay echoes to the sender, so the
+   * local case and the remote case are ONE code path. A page that drew its own
+   * question directly and rendered other people's from the wire would have two
+   * paths that can drift, and only one of them would ever be exercised by
+   * whoever is testing.
+   * ⚠️ `at` IS WHEN THE CONTROL ROOM SENT IT, which is the one thing the
+   * control room can know exactly. See the note on T0.
+   */
+````
+
+<a id="stage-81"></a>
+## stage-81: demo/stage/index.html, inline script, line 1024
+
+````js
+        // ⚠️ NOTHING IS CHOSEN AT THE START. `createChoice` opens on index 0,
+        // and a question arriving with an answer already given is a question
+        // nobody was asked. -1 leaves every option unpressed.
+````
+
+<a id="stage-82"></a>
+## stage-82: demo/stage/index.html, inline script, line 1028
+
+````js
+        // What a viewer picks is not recorded yet, on instruction: *"later the
+        // recording user clicks but lets do it later"*. The seam is here.
+````
+
+<a id="stage-83"></a>
+## stage-83: demo/stage/index.html, inline script, line 1034
+
+````js
+          // ⚠️ SENT, NOT RECORDED HERE. The control room records it when it
+          // arrives, on ONE clock. An audience device's own stamp is not
+          // comparable with anything else on the strip.
+````
+
+<a id="stage-84"></a>
+## stage-84: demo/stage/index.html, inline script, line 1040
+
+````js
+      /**
+       * ⚠️ THE CONTROL ROOM SEES THE QUESTION AND CANNOT ANSWER IT. Asked
+       * 2026-09-17: *"disable controlroom q's buttons in ui"*. The operator's
+       * copy is there so they can check what they sent, and a live control in it
+       * would put the person asking into their own audience.
+       */
+````
+
+<a id="stage-85"></a>
+## stage-85: demo/stage/index.html, inline script, line 1049
+
+````js
+    // A question replaces the one before it, which is what was asked for. What
+    // happens when there is nothing left to ask is deliberately not decided:
+    // *"dunno about clearing"*.
+    // A new question's options get lanes of their own, empty until somebody
+    // answers, so the archive shows what was ASKED as well as what came back.
+````
+
+<a id="stage-86"></a>
+## stage-86: demo/stage/index.html, inline script, line 1059
+
+````js
+  /**
+   * Put a question in a panel's middle.
+   * ⚠️ IT FADES IN AND RISES A LITTLE. Asked as *"fadein/move poll in from
+   * bottom (a bit)"*. 8 px: enough to read as arriving, too little to read as
+   * sliding.
+   * ⚠️ OPACITY AND `transform` ONLY, WHICH IS THE CONSTRAINT. Both are
+   * composited and neither changes how much room the footer takes, and a
+   * question that grew its box would push the picture above it.
+   */
+````
+
+<a id="stage-87"></a>
+## stage-87: demo/stage/index.html, inline script, line 1069
+
+````js
+    // 🔴 ON THE PICTURE, WHERE SUBTITLES LIVE, NOT IN THE FOOTER. Asked
+    // 2026-09-25: *"Overlay the questions who are appearing on top of video,
+    // sort of a place where usually videos have subtitles and make them more
+    // contrasty. So remove them from video panel footer and move them actually
+    // on top of a video in the lower part."*
+    // ⚠️ CONTRAST IS WHY IT IS A SLOT AND NOT A COLOUR. Text straight on video
+    // is unreadable at some frames whatever the ink: `--fg` on a white frame
+    // COMPUTES 1.25:1. `.pos-vp-cap` carries a gradient scrim plus a solid
+    // plate, measured at 15.77:1 worst case.
+    // ⚠️ AND IT COSTS THE FOOTER NOTHING NOW. The comment above about opacity
+    // and transform still holds, and the reason it mattered is gone with it:
+    // the caption is absolute inside the stage, so a question that grows its
+    // box cannot push the picture.
+````
+
+<a id="stage-88"></a>
+## stage-88: demo/stage/index.html, inline script, line 1097
+
+````js
+  /**
+   * 🔴 START AND STOP ARE A TRANSPORT BAR. Asked twice, 2026-09-18: *"start the
+   * show | stop: standard trasport bar"*, then *"start the show | stop: use
+   * regular control bar"*. They were two hand-built `<button>`s, which is the
+   * fourth-copy mistake CLAUDE.md names in as many words: build from `/kit/`,
+   * and a control that exists in one page and nowhere else is a component
+   * nobody has noticed yet.
+   *
+   * 🔴 `live: true`, SO THE CLOCK IS A LIVE CHIP RATHER THAN A DURATION. A show
+   * has a length only once it has stopped, and a bar counting toward a nominal
+   * end would be claiming a finish time nobody has set. `/archive/radio/` is the shape
+   * rather than `/replay/`, and that distinction is what `transport-bar.mjs`'s
+   * own header is about.
+   * ⚠️ `scrub: false` AND `loop: false` FOR THE SAME REASON: a live show has no
+   * position to drag to and no passage worth hearing twice.
+   *
+   * 🔴 AND ITS DECK REALLY RUNS, WHICH IS WHY THE BAR IS HONEST. `showDeck`
+   * plays when the show starts and pauses when it stops, so the playhead is how
+   * long the show has been on air, read off the same clock everything else
+   * uses. A bar wired to a deck that never moves would be a play button whose
+   * only true behaviour is to look pressed.
+   */
+````
+
+<a id="stage-89"></a>
+## stage-89: demo/stage/index.html, inline script, line 1125
+
+````js
+  /**
+   * 🔴 AN ELEMENT, NOT A DESCRIPTOR. `right` takes DOM nodes and does
+   * `right[0].dataset.end = '1'`; `extras` takes `{id,label,onClick}`. Passing
+   * the wrong shape threw `Cannot set properties of undefined (setting 'end')`
+   * and took the page out before `ready`.
+   * ⚠️ AND IT IS DISABLED UNTIL THERE IS A RECORDING, because a control that
+   * plays nothing is the shape this project calls a lie. Nothing is asserted
+   * THROUGH it: the playback checks drive `archiveCommand` and the file's own
+   * element, which is the road that exists whether or not a button does.
+   */
+````
+
+<a id="stage-90"></a>
+## stage-90: demo/stage/index.html, inline script, line 1135
+
+````js
+  /**
+   * 🔴 THE KIT'S OWN PLAY BUTTON, NOT A WORD. Asked 2026-09-30: *"play
+   * recording should be stn play button, when show stops, timeliune cursor
+   * should go to beginning and playback button should be on pause state"*.
+   * It is the toggle of the archive's transport bar, the one bound to
+   * `archiveDeck` and `archiveCommand`, lifted into this bar's right slot. So
+   * its glyph is that deck's state (paused, playing, ended) and its press goes
+   * through the same command the playback checks drive, with no second copy
+   * of either.
+   * ⚠️ `transport-bar.mjs` HAS NO OPTION FOR A TOGGLE THAT DRIVES ANOTHER DECK,
+   * which is why the element is borrowed rather than asked for.
+   * ⚠️ NOT A `.tbar-x`, so the harness does not press it: it plays nothing
+   * until a show has stopped, and the checks reach playback through
+   * `archiveCommand`.
+   */
+````
+
+<a id="stage-91"></a>
+## stage-91: demo/stage/index.html, inline script, line 1157
+
+````js
+  /**
+   * 🔴 WHOLE SECONDS AND NO NOMINAL END, ASKED 2026-10-05 AS *"rm ms"*. The bar
+   * read `0:00.000 / 3:00.000`: thousandths nobody reads on a show that runs for
+   * minutes, and a `3:00` that is `SHOW_MS`, a range this page gave the deck so
+   * it has one, which no show has ever been told to stop at. The `live: true`
+   * note above already says a bar counting toward a nominal end claims a finish
+   * time nobody set, and the clock went on claiming it.
+   * ⚠️ SO IT IS THE ELAPSED TIME WHILE A SHOW IS ON, AND `elapsed / length`
+   * ONLY ONCE THERE IS A LENGTH. After Stop, `recordedMs` is the recording's
+   * resolved duration and the deck is driven by its playback, so `0:12 / 0:45`
+   * is then a real position in a real file.
+   * ⚠️ `SHOW_MS` STAYS AS THE DECK'S RANGE. The harness transport drill reads
+   * `__demo.transport.range` to pick a seek target, and that reads the deck,
+   * not this text, so the clock can stop showing the number without anything
+   * that grades the transport moving.
+   * ⚠️ A PAGE FORMATTER, NOT A KIT CHANGE. `fmt` is `transport-bar.mjs`'s own
+   * option for how a position reads, and it gets the whole line.
+   */
+````
+
+<a id="stage-92"></a>
+## stage-92: demo/stage/index.html, inline script, line 1183
+
+````js
+    /**
+     * 🔴 NO `LIVE` CHIP, ASKED 2026-09-18: *"rm 'live' from transport bar in
+     * controlroom"*. It said one thing, this source has no end, and the page now
+     * says that three other ways within an inch of it: the panel's own badge
+     * reads `live` while frames are arriving, the tab is called Controlroom, and
+     * the timeline under the bar has a write head on it rather than a duration.
+     * ⚠️ `time: false` GOES WITH IT RATHER THAN BEING A SECOND DECISION. The
+     * slot falls through to a clock when the chip leaves, and a live show's
+     * clock is a duration against a nominal end nobody set, which is the exact
+     * claim the chip existed to avoid making.
+     */
+````
+
+<a id="stage-93"></a>
+## stage-93: demo/stage/index.html, inline script, line 1194
+
+````js
+    // 🔴 ONE BAR: the start on the LEFT, the timers and PLAY RECORDING on
+    // the RIGHT, and no play glyph at all. Asked for across four messages.
+````
+
+<a id="stage-94"></a>
+## stage-94: demo/stage/index.html, inline script, line 1198
+
+````js
+    /**
+     * 🔴 `onClick`, AND IT IS `onClick` BECAUSE THIS PAGE'S TWO MAIN CONTROLS
+     * DID NOTHING FOR A DAY. MEASURED 2026-09-25: `transport-bar.mjs` binds an
+     * `extras` button with `x.onClick?.(b)`, this page passed `onPress`, and
+     * `?.` on an absent handler is silent. So the two start buttons of the
+     * day (`START HLS` went on 2026-09-30) were live buttons wired to nobody,
+     * for a visitor and for the harness
+     * alike, and the page reported *"clikced start webrtf, timelne playing, no
+     * video"*.
+     * 🔴 AND IT IS WHY WIDENING A WAIT NEVER HELPED. The check below presses
+     * this button and polls for `phase`, and the presses at 28 s, 45 s and 80 s
+     * were all waiting for something that had not been asked for. The show then
+     * really did start a few lines later, because the stop drill calls
+     * `toggleTransport` DIRECTLY, which is how one run could read fourteen
+     * asserts red about a show that was not running and then report the page as
+     * live. **Both readings were true.**
+     * ⚠️ **THE MODULE IS THE ODD ONE OUT AND IS NOT FIXED HERE.**
+     * `transport-bar.mjs` documents `extras` as taking `onPress`, and
+     * `barButton`, `loopExtras` and `loopSlot` all bind `onPress`; only
+     * `extras` binds `onClick`. Seven of the eight pages that declare `extras`
+     * pass `onClick` and work, so the repair belongs in the module accepting
+     * both and sweeping all eight, not in one page changing a shared contract
+     * under the other seven.
+     */
+````
+
+<a id="stage-95"></a>
+## stage-95: demo/stage/index.html, inline script, line 1223
+
+````js
+      // 🔴 `Start show`, NOT `Start WebRTC`, SINCE 2026-10-05. There is one
+      // transport now, so naming it on the button tells a visitor a protocol
+      // instead of what happens. The tab's sentence says the press costs a
+      // real stream. The asserts read `^start` and `^stop`, which still hold.
+````
+
+<a id="stage-96"></a>
+## stage-96: demo/stage/index.html, inline script, line 1232
+
+````js
+    /**
+     * 🔴 TWO WORDS, NOT A RED DOT. Asked 2026-09-19: *"replace timeline-glued
+     * transport record button with start | stop text labels (same w)"*. The dot
+     * is the convention for WRITING something and this press does two things at
+     * once, putting a show on air and recording it, so the dot was describing
+     * half of it. `start` and `stop` say the whole thing and need no convention.
+     * ⚠️ THE EQUAL WIDTH IS THE COMPONENT'S, NOT THIS PAGE'S. Both words sit in
+     * the button at once and the hidden one still claims its space, so the
+     * control cannot change size under the finger that pressed it. `/kit/`
+     * measures both states.
+     */
+````
+
+<a id="stage-97"></a>
+## stage-97: demo/stage/index.html, inline script, line 1244
+
+````js
+    /**
+     * 🔴 `publish: false`, AND THIS IS THE LOAD-BEARING LINE. `__demo.transport`
+     * is the only handle the suite has, and every bar used to claim it
+     * unconditionally, so it was whichever bar was built LAST rather than the
+     * one the page means. This page has two: a live show here and a recording
+     * with a real position in the archive. The one that can answer "where are
+     * we in it" is the archive, so the archive keeps the name.
+     * ⚠️ AND THE HARNESS PRESSES THE PUBLISHED BAR'S OWN TOGGLE NOW rather than
+     * the first `.tbar-toggle` in the document, which on a tabbed page is a
+     * different element. Without that fix this bar would have been pressed by
+     * the play drill and STARTED A SHOW in the middle of the page's own checks.
+     */
+````
+
+<a id="stage-98"></a>
+## stage-98: demo/stage/index.html, inline script, line 1266
+
+````js
+  /**
+   * ── the one way a show reaches an audience ─────────────────────────────────
+   *
+   * 🔴 WebRTC, AND ONLY WebRTC, SINCE 2026-09-30: *"can you have just webrtc
+   * transport?"*. The container publishes the picture over WHIP and this page
+   * subscribes over WHEP, and one button starts and stops that.
+   */
+````
+
+<a id="stage-99"></a>
+## stage-99: demo/stage/index.html, inline script, line 1275
+
+````js
+  /**
+   * 🔴 THE PAGE'S OWN CONTAINER AND INPUT SINCE 2026-09-30, AND EACH IS
+   * WRITTEN ONCE. The owner gave `/stage/` a container of its own, which plays
+   * the MIM film over WHIP with no overlay, so this page no longer shares a
+   * publisher (or its test pattern) with `/webrtc/` and `/llhls/`.
+   */
+````
+
+<a id="stage-100"></a>
+## stage-100: demo/stage/index.html, inline script, line 1285
+
+````js
+  /**
+   * Tear down the live picture, so a stop never leaves an element behind.
+   * 🔴 THE PUBLISHER HOLD IS NOT CLOSED HERE. It is a reference count on the
+   * container rather than a property of a picture, and it is released when the
+   * show stops, which is `toggleShow`'s business.
+   */
+````
+
+<a id="stage-101"></a>
+## stage-101: demo/stage/index.html, inline script, line 1292
+
+````js
+    // ⚠️ NOTHING IS LEFT SHIMMERING. A pending state that outlives its wait is
+    // a page claiming to be busy for ever, which is worse than no feedback.
+````
+
+<a id="stage-102"></a>
+## stage-102: demo/stage/index.html, inline script, line 1297
+
+````js
+    // ⚠️ AND NOTHING HOLDS THE FINISHED ELEMENT. `audVideo` had five references
+    // and no assignment back to null anywhere, which is what let a dead element
+    // be re-parented over an archive recording. A stale pointer to a removed
+    // node is indistinguishable from a live one until something appends it.
+````
+
+<a id="stage-103"></a>
+## stage-103: demo/stage/index.html, inline script, line 1314
+
+````js
+  /**
+   * 🔴 ONE BUTTON, AND IT IS ITS OWN STOP.
+   * ⚠️ `transport` IS SET ONLY WHEN THE SHOW REALLY WENT LIVE. It used to be set
+   * after `startShow` returned whatever happened inside it, so a start that
+   * failed left the button reading STOP over a show that did not exist, and
+   * the next press "stopped" nothing.
+   * ⚠️ AND THE BUTTON SHIMMERS WHILE IT STOPS, because a stop now uploads the
+   * recording and plays it back, which takes seconds a person should see.
+   */
+````
+
+<a id="stage-104"></a>
+## stage-104: demo/stage/index.html, inline script, line 1071
+
+````js
+  /**
+   * 🔴 THE CONTROL ROOM HAS A TIMELINE TOO. Asked 2026-09-18: *"rm 'live' from
+   * transport bar in controlroom and add timeline. questin adding below it"*.
+   * The strip was only ever in the archive, so the one person who can act on a
+   * show in progress was the one person who could not see its shape: what has
+   * been asked, when, and what has come back.
+   * ⚠️ **IT IS A DIFFERENT DECK, NOT A SECOND VIEW OF ONE.** `showDeck` is the
+   * show as it happens and `archiveDeck` is a recording of it, so the project's
+   * one-position-surface rule is not in play: two tabs, two subjects, one each.
+   * The bar above it already passes `scrub: false`, so this tab still has
+   * exactly one thing you can drag.
+   * ⚠️ **AND IT DOES NOT SEEK WHILE A SHOW IS ON.** A live show has nowhere to go, so pressing the
+   * strip moves nothing, the same answer the bar gives by having no slider.
+   */
+````
+
+<a id="stage-105"></a>
+## stage-105: demo/stage/index.html, inline script, line 1085
+
+````js
+  /**
+   * 🔴 NO RECORDING LANE IN HERE. Asked 2026-09-18 against a screenshot of the
+   * grey `the show` bar: *"can y rm this recording"*, and *"rm recorded vide"*
+   * a few minutes before it, which turn out to be the same ask.
+   * ⚠️ **IT WAS CLAIMING A RECORDING THAT DOES NOT EXIST YET.** That lane draws
+   * one span the length of the nominal show, so before anybody presses Start the
+   * control room was showing a full grey bar for a file nothing has written.
+   * The archive keeps it, because there the span is a real recording with a
+   * measured length.
+   * ⚠️ **AND WHAT IS LEFT IS WHAT THIS TAB IS FOR**: what has been asked, when,
+   * and what has come back. Those arrive while somebody is watching, which is
+   * the only reason to put a timeline in a control room at all.
+   */
+````
+
+<a id="stage-106"></a>
+## stage-106: demo/stage/index.html, inline script, line 1099
+
+````js
+    // ⚠️ THE SHOW LANE ONLY, AT CONSTRUCTION. `relane()` adds the question and
+    // option lanes when there is a question to put in them, and it does not run
+    // on load, so whatever is declared here is what a visitor meets.
+````
+
+<a id="stage-107"></a>
+## stage-107: demo/stage/index.html, inline script, line 1107
+
+````js
+    /**
+     * 🔴 `follow: false` AT CONSTRUCTION, NOT `setFollow(false)` AFTERWARDS.
+     * MEASURED on the page: the window was **sliding forward before any show**,
+     * reading 30 to 55 seconds on a control room where nothing had happened, and
+     * calling `setFollow(false)` after `fit()` did not stop it. The default is
+     * `opts.follow !== false`, so the only way to open with it off is to say so
+     * here. `startShow` turns it on.
+     */
+````
+
+<a id="stage-108"></a>
+## stage-108: demo/stage/index.html, inline script, line 1117
+
+````js
+  /**
+   * ⚠️ IT OPENS ON 0..30s AND ONLY FOLLOWS ONCE THERE IS SOMETHING TO FOLLOW.
+   * With follow engaged from the start the window centres on a playhead parked
+   * at zero, so the axis read **-30 to 0**: a control room counting backwards
+   * from a show that has not begun. `startShow` turns it on.
+   */
+````
+
+<a id="stage-109"></a>
+## stage-109: demo/stage/index.html, inline script, line 1124
+
+````js
+  /**
+   * The panel a strip lives in may have been hidden when it was built, so both
+   * strips are re-fitted the moment their tab is shown. It is a no-op on a strip
+   * somebody has already dragged, because `fit` is what the page asked for and
+   * `phase` says whether the page still means it.
+   */
+````
+
+<a id="stage-110"></a>
+## stage-110: demo/stage/index.html, inline script, line 1136
+
+````js
+  /**
+   * The bar and the strip are one surface here for the same reason they are in
+   * the archive: the strip shows a position and the bar drives it, so two
+   * bordered boxes with the page rhythm between them would state that they are
+   * two things.
+   */
+````
+
+<a id="stage-111"></a>
+## stage-111: demo/stage/index.html, inline script, line 1142
+
+````js
+  /**
+   * 🔴 A `Clear` BUTTON UNDER THE CONTROL ROOM TIMELINE. Asked 2026-09-25:
+   * *"just add a clear button under control room timeline"*. THIS REVERSES
+   * *"Ok no clear. New run clears"* OF 2026-09-19, and that reasoning is kept a
+   * few hundred lines below rather than deleted, because it was good: a Clear
+   * button is a second thing to find, it is there at moments when there is
+   * nothing to clear, and it asks somebody to tidy up before they can do what
+   * they came to do.
+   * ⚠️ WHAT CHANGED IS THAT THE PAGE NOW KEEPS THINGS WORTH CLEARING ON ITS
+   * OWN TIMELINE. A run leaves a recording, a question, its answers and their
+   * option lanes, and until today the only way to be rid of them was to start
+   * another show. That is fine when you are about to, and wrong when you are
+   * showing somebody the page.
+   * ⚠️ AND IT IS DISABLED WHEN THERE IS NOTHING TO CLEAR, which answers the
+   * strongest half of the old objection: a control that is present at a moment
+   * it cannot act is what made it a second thing to find.
+   * ⚠️ NOT IN `.pos-controls` AND NOT A `.tbar-x`, DELIBERATELY. `verify.mjs`
+   * presses exactly those two selectors, and a harness that pressed Clear
+   * mid-drill would wipe the run it is grading. `clearRun` is still reached in
+   * the checks the way it always was, through the record press.
+   */
+````
+
+<a id="stage-112"></a>
+## stage-112: demo/stage/index.html, inline script, line 1163
+
+````js
+  // `Clear show`, not a bare `Clear`, since 2026-10-05: alone under a timeline
+  // the word did not say what it would throw away.
+````
+
+<a id="stage-113"></a>
+## stage-113: demo/stage/index.html, inline script, line 1174
+
+````js
+  /**
+   * 🔴 WHERE THE RECORDING IS, AS DATA AND NOT AS ROWS ON SCREEN. Asked
+   * 2026-09-30: *"rm, put non-realtime versions to diagram"*, about three glue
+   * rows under the timeline reading local, R2 and playback. What those rows
+   * said that never changes (pieces kept in IndexedDB, uploaded when the show
+   * stops, played from R2) is in the diagram now; what changes (an upload's
+   * progress, a refusal, a failure) goes to the log when it happens.
+   * ⚠️ PUBLISHED ON `__demo.chain`, so the checks read the state the page
+   * acted on rather than a sentence it printed.
+   */
+````
+
+<a id="stage-114"></a>
+## stage-114: demo/stage/index.html, inline script, line 1194
+
+````js
+  // 🔴 THE FILM'S DECK, ITS COMMAND AND ITS `mediaMaster` WENT ON 2026-10-05
+  // WITH THE FILM (*"drop"*). Its bar had gone on 2026-09-25, which left a
+  // mechanism whose only job was to start a local copy nobody could see.
+````
+
+<a id="stage-115"></a>
+## stage-115: demo/stage/index.html, inline script, line 1199
+
+````js
+  /**
+   * 🔴 MUTE IS A GLYPH BESIDE THE FULLSCREEN BUTTON, NOT A ROW OF ITS OWN.
+   * Asked 2026-09-19: *"mute (find utf8 symobls) is next to fullscreen"*. It
+   * landed this morning as a `createChoice` reading `muted | on` under the
+   * timeline, which is a form control for a thing that belongs to the picture.
+   *
+   * 🔴 THE GLYPHS WERE CHOSEN BY LOOKING, AND THE OBVIOUS ONES DO NOT EXIST.
+   * The text style speakers U+1F568, U+1F569 and U+1F56A render as an EMPTY
+   * TOFU BOX here: measured, their ink box is 13.23 px, identical to
+   * U+10FFFD's, which is the codepoint nothing has a glyph for. The speakers
+   * that do exist, U+1F507 and U+1F50A, are emoji presentation: 21 px of ink in
+   * colour beside a ⛶ whose ink is 9.86 px and grey.
+   * ⚠️ SO IT IS `♫` U+266B AND `⊘` U+2298, both monochrome, both present, and
+   * both the weight of the ⛶ they sit next to. The note says there is sound and
+   * the circle says there is not, and each reads alone rather than by being
+   * compared with the state it is not in.
+   * ⚠️ IT IS CENTRED ON ITS INK with `setSymbol`, which is the module that
+   * exists because writing `textContent` silently undoes the centring. Two
+   * glyphs of different heights in one 34 px box is exactly the case it names.
+   * 🔴 IT MUTES THE LIVE PICTURE SINCE 2026-10-05, ASKED AS *"drop"*. It used
+   * to reach only the local film, so the note glyph made a copy nobody could
+   * see audible while the WHEP picture, the one thing on screen, stayed silent.
+   * The container's WHIP leg maps an audio track beside the picture
+   * (`workers/pub/container/server.mjs`), so the WHEP element has sound to
+   * give. Read off the ffmpeg arguments, not heard on this desk.
+   * ⚠️ EVERY SHOW ARRIVES MUTED AND THE PRESS IS WHAT UNMUTES IT. A muted
+   * element may start without a gesture where an unmuted one is refused, and
+   * the WHEP picture starts up to half a minute after Start show, long after
+   * that press stopped counting as a gesture. Unmuting is its own press, so it
+   * is always allowed.
+   * ⚠️ DISABLED WHILE THERE IS NO LIVE PICTURE, because a sound control with
+   * nothing to sound is a control that does nothing. The recording is picture
+   * only (see `startRecorder`), so its playback has nothing for it either.
+   */
+````
+
+<a id="stage-116"></a>
+## stage-116: demo/stage/index.html, inline script, line 1252
+
+````js
+  // ⚠️ PREPENDED, SO THE ⛶ STAYS WHERE IT IS. Overriding the slot would take the
+  // default fullscreen button away, and the panel would then put its floating
+  // way out back over the picture to keep its own promise.
+````
+
+<a id="stage-117"></a>
+## stage-117: demo/stage/index.html, inline script, line 1258
+
+````js
+  /**
+   * 🔴 THE RECORDER TAKES THE TRACK THAT CAME BACK, NEVER THE CANVAS.
+   * `plans/plan-stage-live.md` §4.1. What the audience saw is the RETURNED track; a
+   * recording of the canvas is a recording of what we meant to send, and the
+   * two differ by an encode, a network and a resolution ramp that Cloudflare
+   * drives. Recording the source would make the archive a better picture than
+   * the show, which is a lie in the flattering direction.
+   * ⚠️ THE COST, SAID PLAINLY AND NOT UPGRADED LATER: what lands in R2 is a
+   * SECOND encode of the decoded pictures, not the bytes off the wire. The
+   * claim is about where the pictures came from, never about byte identity.
+   * ⚠️ AND ON THE REAL LEG THE FIRST ~30 SECONDS ARE 640x360, because
+   * Cloudflare ramps WHEP resolution. The archive carries the ramp on purpose:
+   * the alternative is to start recording after it, and then the lane called
+   * "when the video started and ended" would be a lie.
+   */
+````
+
+<a id="stage-118"></a>
+## stage-118: demo/stage/index.html, inline script, line 1273
+
+````js
+  /**
+   * How long a piece is. Named because the CHECK reads it too: a seek lands on
+   * the nearest decodable frame, so the keyframe spacing this sets is also the
+   * honest tolerance for "did the picture move to where I asked".
+   *
+   * ⚠️ IT STAYS AT 2s HERE AND THE THREE HOUR ANSWER IS 5s, WHICH IS NOT A
+   * CONTRADICTION. The pieces a show makes are what an interrupted upload has
+   * to catch up on, and the uploader is ROUND-TRIP BOUND rather than bandwidth
+   * bound: MEASURED in selfrec A2, 13 buffered pieces drained in 6,816 ms, 524
+   * ms each, against a p50 verify of 483 ms. So recovery runs at about 1.9
+   * pieces a second whatever the bitrate is. At 2s a three hour show is 5,400
+   * pieces against 1.9/s of drain and 0.5/s of production, which is 3.8x of
+   * headroom; at 5s it is 2,160 pieces and 9.5x. A show HERE is seconds long,
+   * where a 5s piece means the recorder has produced nothing at all when it is
+   * stopped, so the number that is right for three hours is wrong for this page.
+   * ⚠️ AND SEEKING DOES NOT PAY FOR IT: `proto/selfrec/indexer.mjs --blocks`
+   * indexes per SimpleBlock, so a longer piece is not a coarser seek.
+   */
+````
+
+<a id="stage-119"></a>
+## stage-119: demo/stage/index.html, inline script, line 1293
+
+````js
+  /**
+   * 🔴 THE BITRATE IS A DECISION, AND UNTIL 2026-09-18 IT WAS THE BROWSER'S.
+   * This passed no rate at all, so the recorder used its default.
+   * 🔴 MEASURED, BY TAKING THE RATE BACK OUT AND READING `videoBitsPerSecond`
+   * OFF THE RECORDER: THE DEFAULT HERE IS 2,500 kbit/s. Three hours of that is
+   * **3.38 GB**, which is worse than every row of the table in `BACKLOG.md`,
+   * including the 2 Mbit/s one somebody would have picked as the extravagant
+   * end. It is 134x the 24 MiB an `ingest` session may hold.
+   * ⚠️ THE FIRST VERSION OF THIS COMMENT SAID 1.167 Mbit/s and was wrong in a
+   * way worth keeping. That is the measured rate of
+   * `proto/selfrec/artifacts/a1-concat.webm`, and selfrec's own note says that
+   * file was recorded at a REQUEST of 1200 kbit/s. A rate somebody asked for is
+   * not a default, and the number was believed for an hour because it came off
+   * a real file with a real measurement beside it.
+   *
+   * 🔴 THE FILE SIZE IS NOT WHAT DECIDED IT, BECAUSE THE FILE SIZE IS FREE.
+   * 1.08 GB in R2 is about 1.6 cents a month, and 5,400 writes is about 2.4
+   * cents a show. Every row of the table from 691 MiB to 3.38 GB costs nothing
+   * worth arguing over, so the money axis is the wrong one and reaching for it
+   * first is how this sat undecided.
+   * ⚠️ WHAT IT COSTS IS THE UPLOAD, AND THAT ARITHMETIC IS OVER `SLICE_MS`.
+   *
+   * ⚠️ 700k OF PICTURE IS A DELIBERATE STEP UNDER A DEFAULT THAT IS 3.6x IT, on
+   * a mostly still stage where a viewer will not see the difference and a three
+   * hour archive will. 500 total would force the picture to about 400k, where
+   * VP8 smears the moment anybody moves, and the archive is watched more than
+   * once.
+   * ⚠️ AUDIO IS NOT WHERE A SAVING IS AND IS NOT CUT: 96k over three hours is
+   * 130 MB of the 1.07 GB, and it is the only track carrying the question and
+   * the answers.
+   */
+````
+
+<a id="stage-120"></a>
+## stage-120: demo/stage/index.html, inline script, line 1327
+
+````js
+  /**
+   * ── stage one: the recording lives in this browser ────────────────────────
+   *
+   * 🔴 IndexedDB, ONE RECORD PER PIECE, WRITTEN AS EACH PIECE ARRIVES. Asked
+   * 2026-09-30 as *"local storaage"*. Until then the pieces were an array in
+   * this tab's memory, which is local and is not storage: a reload lost the
+   * show, and nothing a person could open said it existed.
+   * ⚠️ WHY NOT OPFS: a `FileSystemWritableFileStream` commits on `close()`, so
+   * a file that grows every 2 s is either invisible until the show ends or
+   * closed and reopened every piece, which copies the whole file each time.
+   * The fast OPFS handle is worker-only. IndexedDB stores a Blob per record,
+   * commits each one on its own, and its size is the sum of what committed.
+   * ⚠️ WHAT IS UPLOADED IS READ BACK OUT OF IT, NOT TAKEN FROM MEMORY, so the
+   * path the diagram draws is the path the bytes took. The memory copy stays
+   * as the fallback for a browser that refuses IndexedDB (a private window
+   * can), and `__demo.chain.local` says which one it is.
+   * ⚠️ ONE SHOW IS KEPT, NEVER A PILE. A new show clears the store before it
+   * writes, and Clear clears it, so a visitor's disk holds at most the last
+   * recording. Nothing is opened, read or cleared on load.
+   */
+````
+
+<a id="stage-121"></a>
+## stage-121: demo/stage/index.html, inline script, line 1405
+
+````js
+          // ⚠️ THE FALLBACK IS SAID, AND IT IS WHOLE: every piece is also in
+          // `chunks`, so switching mid show loses nothing.
+````
+
+<a id="stage-122"></a>
+## stage-122: demo/stage/index.html, inline script, line 1437
+
+````js
+    /**
+     * ⚠️ A RATE IS PASSED ONLY FOR A TRACK THAT IS ACTUALLY THERE. This stream
+     * is one VIDEO track today, so `audioBitsPerSecond` beside it would be a
+     * setting that reads as correct and does nothing, which is the mistake this
+     * page has already paid for twice: `clock: false` on a bar that has no such
+     * option, and `how` passed inside the spec instead of the options.
+     * `AUDIO_BPS` is declared and applies the day a show carries sound.
+     */
+````
+
+<a id="stage-123"></a>
+## stage-123: demo/stage/index.html, inline script, line 1456
+
+````js
+    /**
+     * ⚠️ WHAT IT SAYS IT GOT, NOT WHAT IT WAS ASKED FOR. A `MediaRecorder`
+     * reflects the rate it will actually use, and a browser is free to answer a
+     * different number. Printing the request would be this page reporting its
+     * own intention back to itself.
+     */
+````
+
+<a id="stage-124"></a>
+## stage-124: demo/stage/index.html, inline script, line 1469
+
+````js
+  /**
+   * 🔴 A NEW RUN CLEARS THE LAST ONE. Asked 2026-09-19. A `Clear` button under
+   * the archive timeline was asked for first and then withdrawn in favour of
+   * this: *"Ok no clear. New run clears"*. It is the better answer and the
+   * reason is the project's own rule about controls. A Clear button is a second
+   * thing to find, it is available at moments when there is nothing to clear,
+   * and it asks somebody to tidy up before they can do the thing they came to
+   * do. Pressing record already means *start again*, so it can mean it fully.
+   * ⚠️ **EVERYTHING A RUN LEAVES BEHIND GOES, NOT THE VISIBLE HALF.** The
+   * recording, its blob URL, the questions, the answers, the option lanes, the
+   * recorder's pieces, the resolved duration and the R2 receipts. A reset that
+   * cleared the picture and left the answers would put the last show's marks on
+   * the next show's timeline, which is the worst of both.
+   * ⚠️ **AND THE BLOB URL IS REVOKED RATHER THAN DROPPED.** A blob URL holds its
+   * blob alive until it is revoked, so five runs would mean five recordings in
+   * memory with four of them unreachable.
+   */
+````
+
+<a id="stage-125"></a>
+## stage-125: demo/stage/index.html, inline script, line 1497
+
+````js
+    // The panel goes back to empty, which is the same swap `openArchive` does in
+    // reverse: there is no recording again, so there is no video element again
+    // either. ⚠️ AND IT IS EMPTY RATHER THAN A CARD. This comment said "the
+    // card comes back" until 2026-09-25, on the day the `Nothing recorded yet`
+    // card was taken off the page, so it described a swap that could no longer
+    // happen and the check below it was still asking for the card.
+````
+
+<a id="stage-126"></a>
+## stage-126: demo/stage/index.html, inline script, line 1515
+
+````js
+    // ⚠️ AND THE LOCAL COPY GOES WITH IT, so a device keeps one recording at
+    // most, and the recording's path is empty again because there is none.
+````
+
+<a id="stage-127"></a>
+## stage-127: demo/stage/index.html, inline script, line 1536
+
+````js
+    /**
+     * 🔴 THE TIMELINE DOES NOT RUN UNTIL THE SHOW IS ON AIR. Asked 2026-09-25:
+     * *"it should not sart rec/play timeline until on air"*. `showDeck.play()`
+     * used to be this line, so the bar's clock started on the PRESS and ran
+     * through the whole publisher wake: a timeline advancing over a show that
+     * did not exist yet. The deck starts where the badge goes on air instead,
+     * so the clock, the recorder and the badge all begin at one moment, and
+     * that moment is the arrival of a frame.
+     * ⚠️ AND THE BADGE SAYS `STARTING`, which only the HLS leg did. A silent
+     * wake reads as a dead control, which this page has paid for twice today.
+     */
+````
+
+<a id="stage-128"></a>
+## stage-128: demo/stage/index.html, inline script, line 1550
+
+````js
+    /**
+     * 🔴 NOTHING LOCAL STARTS WITH THE SHOW SINCE 2026-10-05, ASKED AS *"drop"*.
+     * This used to call `filmCommand.play()`, which fetched the church scene
+     * from R2 into a canvas nobody saw while the same film arrived over WHEP.
+     * The only picture a press asks for now is the one the container publishes.
+     * ⚠️ AND THE SHOW ARRIVES MUTED, whatever the glyph said last show. See the
+     * mute button for why the sound is its own press.
+     */
+````
+
+<a id="stage-129"></a>
+## stage-129: demo/stage/index.html, inline script, line 1562
+
+````js
+      /**
+       * 🔴 THIS PAGE IS A PURE RECEIVER SINCE 2026-09-25. Asked in those words:
+       * *"make it pure receivers"*. It used to capture its own canvas and
+       * publish it over WHIP, and that is what made the two transports
+       * impossible to have together: **stage and the container's own WHIP leg
+       * were two publishers on one live input**, which is one publisher and a
+       * fight, and Cloudflare holds an input against a stale publisher for a
+       * measured 45 s before accepting a new session.
+       * ✅ **SO THE CONTAINER PUBLISHES AND THIS PAGE SUBSCRIBES.** Holding the
+       * socket is what wakes it; it runs two ffmpeg legs, RTMPS for the HLS
+       * input and WHIP for the WebRTC one, from one source. Nothing here
+       * competes for either.
+       * ⚠️ **THE CANVAS IS STILL DRAWN AND IS NOW A MONITOR RATHER THAN THE
+       * SOURCE.** What it shows is what the control room is looking at; what
+       * goes out is whatever the container is publishing.
+       */
+````
+
+<a id="stage-130"></a>
+## stage-130: demo/stage/index.html, inline script, line 1589
+
+````js
+      /**
+       * 🔴 WAIT FOR THE PUBLISHER BEFORE SUBSCRIBING, BECAUSE A COLD PRESS USED
+       * TO FAIL. The hold on the line above is what wakes the container, and a
+       * cold wake is about 22 s: `whepPlay` asked straight away, met a 409 for
+       * seven seconds of retries, and the show "did not start" for a person
+       * who had done nothing wrong. The page's own check already waited for
+       * this before pressing; the button now does what the check did.
+       * ⚠️ IT ALSO MATTERS TO THE HARNESS SINCE 2026-09-30, because with the
+       * HLS button gone this is control 0 and `demo/verify.mjs` presses it
+       * about a second after load, which is exactly the cold press.
+       */
+````
+
+<a id="stage-131"></a>
+## stage-131: demo/stage/index.html, inline script, line 1609
+
+````js
+      // The card goes, the picture arrives. One swap, at the moment there is
+      // something true to show.
+      // 🔴 AND IT GOES TO THE TAB THAT IS SHOWING, NOT ALWAYS THE AUDIENCE.
+      // Reported 2026-09-25 about this leg: *"can not see in controlroom"*. The
+      // HLS leg was fixed an hour earlier and this one was missed, so WebRTC
+      // still put the only `<video>` in the audience panel and the operator
+      // watched an empty box. One element, moved: a second player would be a
+      // second Stream meter for one picture.
+````
+
+<a id="stage-132"></a>
+## stage-132: demo/stage/index.html, inline script, line 1621
+
+````js
+      /**
+       * ⚠️ THE LOOPBACK DEADLINE IS SHORT ON PURPOSE AND IT IS A HARNESS
+       * CONSTRAINT AS MUCH AS A USER ONE. `verify.mjs` stops collecting once
+       * the assert count has been still for 4.8 s, so a six second wait inside
+       * a drill throws away every assert after it and the page reads as having
+       * stopped early. MEASURED: at 6000 the drill landed 1 of its 7 asserts.
+       * The real leg keeps a long deadline, because Cloudflare genuinely takes
+       * seconds and a person is watching it rather than a harness.
+       */
+````
+
+<a id="stage-133"></a>
+## stage-133: demo/stage/index.html, inline script, line 1630
+
+````js
+      /**
+       * 🔴 SHORTER THAN THE CHECK THAT WAITS FOR IT. This was 20 s while the
+       * page's own check polls 10 s for `phase === 'live'`, so a start that
+       * took longer than ten seconds reported `before` on a show that was
+       * about to be fine. Warm, the frame arrives in under a second and it
+       * never showed; cold, it is the whole failure. MEASURED: 37/49 with
+       * twelve asserts downstream of a running show red and NOTHING in the log,
+       * because no error was involved at all, only two timeouts that disagreed.
+       * ⚠️ **A TIMEOUT IS PART OF A CONTRACT WITH WHOEVER IS WAITING.** Two
+       * waits for one event must be ordered deliberately, and the inner one has
+       * to be the shorter.
+       */
+````
+
+<a id="stage-134"></a>
+## stage-134: demo/stage/index.html, inline script, line 1643
+
+````js
+      /**
+       * ⚠️ THE BADGE GOES `live` BECAUSE FRAMES ARRIVED, NOT BECAUSE A PROMISE
+       * SETTLED. A WHEP track exists before it carries anything, so a page that
+       * reports on the negotiation is reporting a socket rather than a picture.
+       */
+````
+
+<a id="stage-135"></a>
+## stage-135: demo/stage/index.html, inline script, line 1654
+
+````js
+      /**
+       * 🔴 IF NO FRAME EVER ARRIVES, RECORD THE CANVAS AND SAY SO IN THOSE
+       * WORDS. MEASURED 2026-09-18 in this sandbox: a local loopback gathers
+       * exactly one host candidate, `iceGatheringState` goes `complete`, and
+       * `iceConnectionState` then sits at **checking** for ever. UDP
+       * connectivity checks do not complete here, so a WebRTC leg cannot carry
+       * a picture however correct the code is.
+       *
+       * ⚠️ THIS IS NOT A WORKAROUND DRESSED AS A FEATURE, AND THE DIFFERENCE IS
+       * THE LABEL. `plans/plan-stage-live.md` §4.1 is right that recording the source
+       * is a lie in the flattering direction, and it is a lie only while nobody
+       * is told. `recSource` carries which track was recorded, the log says it,
+       * and the check below ASSERTS ON THE TRUTH OF THE LABEL rather than
+       * assuming either path. A recording made this way is a recording of what
+       * we meant to send, and the page says exactly that.
+       * ⚠️ AND IT IS WHY `/show/`'S CHECKS HAVE NEVER RUN. That page has the
+       * same in-page loopback and its `check` handler was reported as never
+       * reaching. It was waiting for a leg that cannot connect here.
+       */
+````
+
+<a id="stage-136"></a>
+## stage-136: demo/stage/index.html, inline script, line 1673
+
+````js
+      /**
+       * 🔴 NO CANVAS FALLBACK ANY MORE, AND LEAVING ONE BEHIND IS WHAT BROKE
+       * THIS PAGE. It read `track = stream.getVideoTracks()[0]` when no frame
+       * had crossed, and `stream` was the canvas capture that the pure-receiver
+       * change deleted. So on a COLD start, where the container has not reached
+       * Cloudflare inside the 20 s wait, this branch threw
+       * `ReferenceError: stream is not defined`, the catch below swallowed it,
+       * and the show never reached `live`. MEASURED: 37/49, twelve asserts
+       * downstream of a running show red, and the page said only
+       * `the show did not start`.
+       * ⚠️ **A FALLBACK TO A THING THAT NO LONGER EXISTS IS WORSE THAN NO
+       * FALLBACK**, because it only runs on the unhappy path, which is the one
+       * nobody measures. This page publishes nothing now: the only picture
+       * there has ever been is the one that came back.
+       */
+````
+
+<a id="stage-137"></a>
+## stage-137: demo/stage/index.html, inline script, line 1713
+
+````js
+  /**
+   * 🔴 STOP RETURNS WHEN THE BYTES ARE IN R2 AND READABLE, WHICH A 200 ON THE
+   * PUT DOES NOT SAY. `plans/plan-stage-live.md` §4.2. "Uploaded" and "readable" are
+   * two claims, and the gap between them is exactly where a recording goes
+   * missing while every log line reads fine. `proveReadable` makes the second
+   * claim with a HEAD, and compares the length, because a 200 with
+   * `content-length: 0` is the failure this is for.
+   * ⚠️ AND WHAT LANDED IS SAID IN WORDS, NOT ONLY RECORDED. The manifest has
+   * carried `missing` since it was written and nothing has ever shown it, which
+   * is the same shape as `/open` returning an expiry no demo displays.
+   */
+````
+
+<a id="stage-138"></a>
+## stage-138: demo/stage/index.html, inline script, line 1743
+
+````js
+    /**
+     * 🔴 STAGE ONE ENDS: THE RECORDING IS READ BACK OUT OF WHERE IT WAS KEPT.
+     * The pieces were committed to IndexedDB as they arrived, and the file that
+     * goes to R2 is assembled from those records rather than from the array in
+     * memory, so where the page says the recording lives is where the bytes
+     * that travel came from.
+     */
+````
+
+<a id="stage-139"></a>
+## stage-139: demo/stage/index.html, inline script, line 1755
+
+````js
+    /**
+     * 🔴 STAGE TWO: R2, FOR A PERSON, WITH ITS PROGRESS IN THE LOG. See the
+     * note on `USE_R2` for why the harness skips it. "Uploaded" and "readable"
+     * are two claims, so a HEAD after the upload is what `__demo.chain.r2`
+     * reports, and its length has to be the length that left this browser.
+     * ⚠️ AND STAGE THREE PLAYS THE R2 URL ITSELF, NOT A BLOB MADE FROM IT. This
+     * used to fetch the object back into a Blob and play a `blob:` URL, which
+     * proved the bytes came from R2 and showed a person nothing of the sort.
+     * The element's `src` is the public object now, so the address in the log
+     * is the address playing. A refused or failed upload falls back to this
+     * browser's copy and the log says so.
+     */
+````
+
+<a id="stage-140"></a>
+## stage-140: demo/stage/index.html, inline script, line 1769
+
+````js
+      /**
+       * ⚠️ A THROW HERE USED TO HANG THE STOP. MEASURED 2026-09-30: `/open`
+       * answered without a CORS header once, `fetch` threw, and the page sat
+       * on `opening an upload session` with the button disabled for good. A
+       * failed upload is a stage that failed, and playback falls back to the
+       * local copy and says so.
+       */
+````
+
+<a id="stage-141"></a>
+## stage-141: demo/stage/index.html, inline script, line 1803
+
+````js
+  /**
+   * One recording to R2 as ONE object, with the upload's progress in the log.
+   * ⚠️ IT IS `ingest.mjs`'s `putWhole` WITH AN `XMLHttpRequest` WHERE THE PUT
+   * WAS, because `fetch` reports no upload progress and a person asked to SEE
+   * this stage. It reaches the log a quarter at a time, since a line per
+   * progress event would bury everything else in it. Same session, same single segment, same close. The right home
+   * for it is an `onProgress` option on `putWhole`, which is a shared module
+   * and not this page's to change.
+   * @returns {Promise<{url: string, key: string, session: string, bytes: number}|null>}
+   */
+````
+
+<a id="stage-142"></a>
+## stage-142: demo/stage/index.html, inline script, line 1867
+
+````js
+  /**
+   * A handle for a probe, like `window.__scope` on `/archive/radio/`. Harmless in a
+   * page and it is how the pipeline is looked at from outside without adding a
+   * readout cell for every internal that only matters while building.
+   */
+````
+
+<a id="stage-143"></a>
+## stage-143: demo/stage/index.html, inline script, line 1905
+
+````js
+  /**
+   * 🔴 THE SIDECAR IS WHERE THE EVENTS LIVE AFTER THE SHOW. During the show the
+   * control room holds every question and every answer in memory; afterwards it
+   * does not, and neither does a different device. `workers/store` records a
+   * relay room into SQLite and is the right SHAPE and the wrong LIFETIME: 1000
+   * rows and 24 hours, and a show with a large audience can spend 1000 rows on
+   * answers alone. So the events go in R2 beside the video, written once, living
+   * exactly as long as the recording does.
+   * ⚠️ IT IS BUILT HERE AND WRITTEN NOWHERE YET, because step one plays back
+   * from a blob in this same tab, where the events are already in memory. The
+   * moment a SECOND device opens the archive, this is the file it fetches, and
+   * building the shape now is what stops the archive inventing its own.
+   */
+````
+
+<a id="stage-144"></a>
+## stage-144: demo/stage/index.html, inline script, line 1925
+
+````js
+  /**
+   * 🔴 THE ARCHIVE STOPS SIMULATING AND PLAYS THE RECORDING. Until a show has
+   * been recorded this tab paints a generated frame for whatever position the
+   * transport is at, which is honest and says so. Once there IS a recording,
+   * the picture is that file, the transport drives it through `mediaMaster`,
+   * and dragging the strip moves the burned clock in the picture by the same
+   * amount, which is the thing that cannot be faked.
+   *
+   * ⚠️ THE DURATION IS RESOLVED, NOT COUNTED. A `MediaRecorder` file reports
+   * `duration: Infinity`, which leaves a transport with no range to scrub, and
+   * counting the timeslices would give a number with a plausible shape and no
+   * relationship to the file. `resolveDuration` does the seek-past-the-end
+   * dance, and it is imported rather than written here because this repo
+   * already holds FIVE copies of it and this would have been the sixth.
+   */
+````
+
+<a id="stage-145"></a>
+## stage-145: demo/stage/index.html, inline script, line 1946
+
+````js
+    // ⚠️ `crossOrigin` BEFORE `src`, OR THE R2 COPY TAINTS EVERY CANVAS THE
+    // CHECKS DRAW IT INTO. The archive host answers `access-control-allow-origin:
+    // *`, and an element only asks for it when told to before it loads.
+````
+
+<a id="stage-146"></a>
+## stage-146: demo/stage/index.html, inline script, line 1959
+
+````js
+    // ⚠️ A ZERO IS NOT A LENGTH. `setRange([0, 0])` throws inside the deck, so
+    // a recording that resolves to nothing stops here rather than there.
+````
+
+<a id="stage-147"></a>
+## stage-147: demo/stage/index.html, inline script, line 1969
+
+````js
+    /**
+     * ⚠️ `mediaMaster` RATHER THAN A `timeupdate` HANDLER. It owns the drift
+     * correction, the rate intersection and the stall policy, and this project
+     * has the rule in writing: a recovery action is not free, and a hand-rolled
+     * seek loop is how `low-latency-player.js` once aborted the very fragment
+     * loads it was trying to recover.
+     */
+````
+
+<a id="stage-148"></a>
+## stage-148: demo/stage/index.html, inline script, line 1977
+
+````js
+    /**
+     * 🔴 AND THE CONTROL ROOM'S OWN TIMELINE BECOMES THE RECORDING'S, WITH ITS
+     * CURSOR AT THE START. Asked 2026-09-30, the same message as the play
+     * button. The visible strip is `showDeck`'s, which sat wherever the show
+     * stopped while the recording played on a deck nobody can see. So the
+     * deck takes the recording's length, goes to 0, and follows the element
+     * the same way `archiveDeck` does. The element is paused, so the play
+     * button beside it reads paused.
+     * ⚠️ `mediaMaster` ONLY READS THE ELEMENT, it never seeks or plays it, so
+     * two of them on one element cannot fight.
+     */
+````
+
+<a id="stage-149"></a>
+## stage-149: demo/stage/index.html, inline script, line 1999
+
+````js
+  /**
+   * ⚠️ THE OPTIONS ARE FILLED IN AND THE QUESTION IS NOT, AND THE SPLIT IS THE
+   * WHOLE POINT. Asked 2026-09-17: *"fill sample q sending with same stuff you
+   * haev in hints"*. A form whose fields are all placeholders is a form nobody
+   * can press Send on without typing first, which on a page whose whole point
+   * is watching a question arrive puts a chore in front of the demonstration,
+   * and that argument is still right about the answers.
+   * 🔴 **IT IS WRONG ABOUT THE QUESTION, WHICH CAME BACK AS A DEFECT TWICE.**
+   * `HANDOFF.md` carried *"A STALE QUESTION APPEARS ON LOAD, KAS SA OLED TEINUD
+   * ÖKOPATTU?, on a page that is OFF AIR"* from a screenshot, and it was
+   * reported again on 2026-09-25 as *"when I load it, I get some kind of stale
+   * question"*. A question on screen on a page that is off air reads as
+   * something somebody asked, whatever put it there, and a sample that has to
+   * be explained away is not a sample.
+   * ⚠️ **SO ONE FIELD OF FOUR GAVE UP ITS VALUE AND THE OTHER THREE KEPT
+   * THEIRS.** Three words in three boxes labelled `option` are not a question
+   * and nobody reads them as one, so the 2026-09-17 ask survives everywhere it
+   * still holds: Send is one line of typing away rather than four.
+   * ⚠️ **AND NO PLACEHOLDER, WHICH WAS THE OBVIOUS ANSWER AND IS THE WRONG
+   * ONE.** `createField` takes one, and its own note says a placeholder says
+   * what a good VALUE looks like. A free text question has no shape to show,
+   * and the only concrete example to hand is the exact sentence that was
+   * reported as appearing on load, so a hint here would be the report again in
+   * a lighter ink. What the box needs said is said by the word `question` in
+   * front of it.
+   * ⚠️ **AND `send()` ALREADY REFUSES AN EMPTY ONE IN WORDS**, for the reason
+   * written beside it: there is no silent fallback to the sample, because
+   * clearing the question and pressing Send used to ask the audience something
+   * nobody had typed.
+   */
+````
+
+<a id="stage-150"></a>
+## stage-150: demo/stage/index.html, inline script, line 980
+
+````js
+    /**
+     * `publish: false`: `__demo.transport` belongs to the archive bar, which has a real
+     * position. The harness presses the published bar's own toggle, not the first one.
+     * See lessons/page-stage.md#stage-97
+     */
+````
+
+<a id="stage-151"></a>
+## stage-151: demo/stage/index.html, inline script, line 1734
+
+````js
+  /**
+   * 🔴 THE PAGE'S OWN QUESTION IS ABOUT THE FILM BEHIND IT, AND IT IS THE ONE
+   * THAT WAS ASKED FOR, WORD FOR WORD. Given 2026-09-19 as
+   * *"q is : Kas sa oled teinud ökopattu?: Veidi | Palju | Väga palju"*, with
+   * the film that replaced the Méliès print in the same session. The
+   * performance behind the picture is `MIM goes Sustainable`, in a theatre the
+   * audience generated the power for, so the question and the picture are about
+   * the same thing.
+   * ⚠️ **IT IS NOT TRANSLATED AND NOT CORRECTED.** It replaces
+   * `Kas see film vajab heli`, which was about a silent 1902 print and stopped
+   * being true of anything the moment the film changed.
+   * ⚠️ **AND THE PAGE STAYS ENGLISH AROUND IT ON PURPOSE.** It has been an
+   * Estonian question in an English page since 2026-09-18 and that is the right
+   * division rather than an accident: the labels, the buttons and the log are
+   * the instrument, which anybody reading this project reads, and the question
+   * is CONTENT, which belongs to whoever is running the show. Translating it
+   * would make the page tidier and the demonstration weaker, because a question
+   * with two diacritics and a question mark in it is exactly what proves the
+   * relay carries what was typed.
+   * ⚠️ **AND IT IS THE CHECK'S QUESTION NOW RATHER THAN THE FIELD'S VALUE.**
+   * `ASK_TITLE` is what this page's own self check sends through the relay and
+   * reads back code point by code point, which is where the two diacritics and
+   * the question mark are doing work, and it is why the constant stays exactly
+   * as it was given.
+   */
+````
+
+<a id="stage-152"></a>
+## stage-152: demo/stage/index.html, inline script, line 1761
+
+````js
+  /**
+   * 🔴 THE SAMPLE QUESTION IS BACK, ASKED 2026-09-25: *"restore "Oled sa teinud
+   * okopattu?" q"*. It was emptied earlier the same day because a stale
+   * question appeared on a page reading OFF AIR, and emptying the field was the
+   * WRONG HALF of that fix: the question a stranger saw arrived off the SHARED
+   * ROOM, which is fixed properly at the `ROOM` line instead.
+   * ⚠️ SO A PREFILL IS SAFE NOW AND WAS NOT BEFORE. The room is a per load
+   * `stage-<6 chars>` nobody else is in, so a question sitting in this box
+   * reaches nobody until Send is pressed, and the 2026-09-17 ask that put it
+   * there (*"fill sample q sending with same stuff you haev in hints"*) holds
+   * again: Send is one press rather than four lines of typing.
+   */
+````
+
+<a id="stage-153"></a>
+## stage-153: demo/stage/index.html, inline script, line 1775
+
+````js
+  /**
+   * ⚠️ THE QUESTION ON ONE ROW, THE OPTIONS ON THE NEXT. Asked 2026-09-17:
+   * *"options on its own row in contrrolroom"*. In one wrapping row the question
+   * and two options sat together and the third fell to a line of its own, which
+   * reads as three fields and a stray.
+   */
+````
+
+<a id="stage-154"></a>
+## stage-154: demo/stage/index.html, inline script, line 1792
+
+````js
+    // ⚠️ NO SILENT FALLBACK TO THE SAMPLE. It used to send `Meaning of life`
+    // when the field was empty, so clearing the question and pressing Send asked
+    // the audience something nobody had typed.
+````
+
+<a id="stage-155"></a>
+## stage-155: demo/stage/index.html, inline script, line 1798
+
+````js
+    /**
+     * ⚠️ THE DELAY IS FOR TESTING AND IT SAYS SO ON THE BUTTON. Asked for as
+     * *"make send not | send in 10s for testing"*: the two tabs are two halves
+     * of one page, so posting from here and watching it arrive there needs the
+     * posting to happen after you have moved. Ten seconds is long enough to
+     * switch tabs and short enough to wait through.
+     */
+````
+
+<a id="stage-156"></a>
+## stage-156: demo/stage/index.html, inline script, line 1810
+
+````js
+  /**
+   * ⚠️ SECONDARY, LIKE EVERYTHING ELSE ON THE PAGE. Asked 2026-09-18 with a
+   * photograph: *"All secodary buttons"*. `pos-pri` paints the yellow fill, and
+   * one yellow button beside an outlined one claims that sending now is the
+   * right answer and sending in ten seconds is the lesser one. They are two
+   * ways of doing the same thing.
+   */
+````
+
+<a id="stage-157"></a>
+## stage-157: demo/stage/index.html, inline script, line 1819
+
+````js
+  /**
+   * ⚠️ NAMED FOR WHAT IT IS FOR, SINCE 2026-10-05. A UX review of the page
+   * found `Send in 10s` unexplained: nothing said why anybody would want to
+   * wait. It exists so one person can test the whole loop in one browser tab,
+   * by sending and then switching to Audience before the question goes out.
+   * The label says the purpose and the `title` carries the delay, in two short
+   * lines per the tooltip rule.
+   */
+````
+
+<a id="stage-158"></a>
+## stage-158: demo/stage/index.html, inline script, line 1831
+
+````js
+  /**
+   * ⚠️ THE FORM IS IN A BOX. Asked 2026-09-17: *"put it into box"*. Loose fields
+   * on the page background read as part of the page rather than as one thing you
+   * fill in and send. It is the project's standard surface: `--card` at 4 px
+   * with a `--line` edge, the same as the log and the table.
+   */
+````
+
+<a id="stage-159"></a>
+## stage-159: demo/stage/index.html, inline script, line 1842
+
+````js
+  /**
+   * The drawing loop. `burn` is the project's own test picture and it takes a
+   * frame number, so the clock in the corner is real rather than decorative.
+   * ⚠️ IT DRAWS WHILE THE TAB IS VISIBLE AND STOPS WHEN IT IS NOT.
+   * `requestAnimationFrame` already pauses in a background tab, which is the
+   * behaviour wanted rather than something to work around.
+   */
+````
+
+<a id="stage-160"></a>
+## stage-160: demo/stage/index.html, inline script, line 1853
+
+````js
+    /**
+     * 🔴 ONE FLAT COLOUR, BECAUSE THERE IS NOTHING LEFT TO DRAW. The film used
+     * to be drawn here with `drawCamera` and went on 2026-10-05 (*"drop"*); the
+     * generated test picture was taken off screen on 2026-09-18 (*"i get
+     * blinkig on-screen timecode etc stuff. rm it"*). The live picture is the
+     * WHEP `<video>` itself, moved to the showing tab by `showPictureOn`, and
+     * never a copy in this canvas: a canvas mirror was tried on 2026-09-25 and
+     * drew into a panel that shows no canvas.
+     * ⚠️ THE LOOP STAYS BECAUSE IT TICKS THE TWO `mediaMaster`s BELOW, and the
+     * flat field is what the at-rest check reads to prove nothing started on
+     * its own.
+     */
+````
+
+<a id="stage-161"></a>
+## stage-161: demo/stage/index.html, inline script, line 1867
+
+````js
+    // ⚠️ THE ARCHIVE IS NOT FED FROM HERE. It is a recording: its picture comes
+    // from wherever its transport is, which is what makes scrubbing visible.
+````
+
+<a id="stage-162"></a>
+## stage-162: demo/stage/index.html, inline script, line 1870
+
+````js
+    /**
+     * 🔴 AND THE ARCHIVE'S MASTER IS DRIVEN FROM HERE, BECAUSE `mediaMaster`
+     * DOES NOT RUN ITSELF. Its own docstring says to call it from the rAF loop
+     * you already run, and `/crate/` carries the same warning in a comment:
+     * without this the object is BUILT and nothing happens. This page built it
+     * and never ticked it, so the archive's deck was never once driven by its
+     * element.
+     * ⚠️ IT WAS REPORTED AS *"there is not caret in arvhice playback"* AND
+     * DIAGNOSED WRONGLY TWICE, as a MediaRecorder file carrying no cues. The
+     * file is fine: MEASURED, the element went to 1.00s of a 3.45s recording,
+     * `ended` false, `seekable` 0.00..3.45, while the deck sat at 3.45s.
+     * `master ticks 0, backstop 0, driving false` is what finally said it, and
+     * printing those three counters took one run where guessing took three.
+     * ⚠️ THE SEEK CHECK ABOVE PASSED THROUGHOUT, because it asks the ELEMENT
+     * where it went. Every assert about this page's archive was on the one side
+     * of the join that worked.
+     */
+````
+
+<a id="stage-163"></a>
+## stage-163: demo/stage/index.html, inline script, line 1894
+
+````js
+  /**
+   * 🔴 THE ARCHIVE'S PICTURE IS A FUNCTION OF ITS PLAYHEAD. Drag the strip and
+   * the burned clock in the frame moves with it, forwards or back, which is the
+   * whole of *"scrubbing moves video back and forth"*. Nothing here is a video
+   * file yet: the frame is generated for the position, which is a simulation and
+   * says so.
+   * ⚠️ IT REDRAWS ON A POSITION CHANGE RATHER THAN EVERY FRAME. A stopped
+   * recording that repaints sixty times a second is a page doing work to show
+   * the same picture, and this one is stopped by default.
+   */
+````
+
+<a id="stage-164"></a>
+## stage-164: demo/stage/index.html, inline script, line 1913
+
+````js
+  /**
+   * ⚠️ IT READS `position()` ON A FRAME RATHER THAN USING `observePosition`.
+   * That helper hands back `{ pos, nowUs }` and reaches for `transport.clock.now()`,
+   * which this deck does not expose: MEASURED as `TypeError: Cannot read
+   * properties of undefined (reading 'now')` the first time this ran. A
+   * recording only has to repaint when its playhead moves, and the guard above
+   * makes a still frame cost one comparison.
+   */
+````
+
+<a id="stage-165"></a>
+## stage-165: demo/stage/index.html, inline script, line 1921
+
+````js
+  /**
+   * 🔴 THE ARCHIVE NEVER SIMULATES A RECORDING. Asked 2026-09-18: *"is archive
+   * 'file' video simulated? no"*. It used to paint a GENERATED frame for
+   * whatever position the playhead was at, which looked exactly like a
+   * recording being scrubbed and was not one: nothing had been recorded, and
+   * the picture said otherwise.
+   *
+   * That is the same lie this page already refuses one tab over. The audience
+   * gets a card rather than an empty `<video>` because a black 16:9 box with a
+   * transport under it is the shape of a thing that could be played and cannot;
+   * an archive drawing a convincing frame of a show that never happened is
+   * worse, because it is not empty, it is WRONG.
+   *
+   * So: a card until there is a file, then the file. `paintArchive` is kept and
+   * called exactly once, for nothing, so the burn path stays compiled and the
+   * next reader can see what used to happen here.
+   */
+````
+
+<a id="stage-166"></a>
+## stage-166: demo/stage/index.html, inline script, line 1947
+
+````js
+  // 🔴 NO `Nothing recorded yet` CARD. PLAY RECORDING already says it by being
+  // disabled, and a paragraph explaining that nothing has happened yet is
+  // furniture where a control would do.
+````
+
+<a id="stage-167"></a>
+## stage-167: demo/stage/index.html, inline script, line 1955
+
+````js
+  /**
+   * 🔴 NOTHING HERE OPENS A SOCKET, MAKES A SOUND OR PRESSES A CONTROL, and it
+   * is gated anyway. CLAUDE.md: a self-check never runs for a visitor, no
+   * exceptions, and the two arguments that were used to make exceptions are both
+   * answered in that file. Everything below reads what is already on screen.
+   */
+````
+
+<a id="stage-168"></a>
+## stage-168: demo/stage/index.html, inline script, line 1961
+
+````js
+  /**
+   * 🔴 EVERY ASSERT IS HELD AND EMITTED IN ONE GO AT THE END, AND THAT IS THE
+   * HARNESS'S OWN DESIGN RATHER THAN A TRICK.
+   *
+   * `verify.mjs` has two phases. While the page has asserted NOTHING it waits,
+   * sized by `settleMs`, up to 30 s: "while the count is still zero, wait".
+   * Once anything has landed it switches to the cheap one, which exits the
+   * moment the count is unchanged for a single 400 ms tick. So a page that
+   * asserts early and then works for ten seconds has its whole tail thrown
+   * away, and reads as having stopped rather than as having been cut off.
+   * MEASURED HERE: the drill produced all 7 of its asserts on the page and the
+   * harness collected 1 of them.
+   *
+   * ⚠️ THE OTHER TWO WAYS OUT DO NOT FIT THIS PAGE. A control marked
+   * `data-busy` gives the checks a slot, and this page has no controls row on
+   * purpose: a global Start would appear on the AUDIENCE tab, where the one
+   * thing that must not be possible is starting the show. `settleMs` on
+   * control 0 needs a control 0 for the same reason.
+   * ⚠️ AND HOLDING THEM COSTS NOTHING A READER SEES. `d.assert` is the report;
+   * the ORDER it is written in is this list, so the page reads exactly as
+   * before and a visitor, who never runs any of this, is unaffected either way.
+   */
+````
+
+<a id="stage-169"></a>
+## stage-169: demo/stage/index.html, inline script, line 1985
+
+````js
+  /**
+   * Every request this page made for the film, by the browser's own list. Read
+   * in both tiers: at rest, and again once a show is live. See the at-rest
+   * check for the pattern.
+   */
+````
+
+<a id="stage-170"></a>
+## stage-170: demo/stage/index.html, inline script, line 1994
+
+````js
+  /**
+   * ⚠️ THE WAKE IS DECLARED BESIDE THE HELD ASSERTS BECAUSE IT IS READ IN A
+   * DIFFERENT FUNCTION FROM THE ONE THAT STARTS IT. `checks()` starts it and
+   * `showDrill()` awaits it, and the first version declared it as a `const`
+   * inside `checks()`: `ReferenceError: whipUp is not defined`, which took the
+   * page to 2 asserts and was caught only by `no console errors`. A local that
+   * two functions need is not a local.
+   */
+````
+
+<a id="stage-171"></a>
+## stage-171: demo/stage/index.html, inline script, line 2005
+
+````js
+  /**
+   * Eight fixed points of a canvas, as luminance. Used by more than one check
+   * below and therefore declared once, outside them: the first version sat
+   * inside the block that introduced it and the second use read `lumAtOf is not
+   * defined` at runtime, which the suite caught as a console error rather than
+   * as a failed assert.
+   */
+````
+
+<a id="stage-172"></a>
+## stage-172: demo/stage/index.html, inline script, line 2020
+
+````js
+    // ⚠️ EITHER TIER. This read `q.get('selfcheck') !== '1'` until 2026-10-04,
+    // which would have skipped every check on a deep run (`selfcheck=2`).
+````
+
+<a id="stage-173"></a>
+## stage-173: demo/stage/index.html, inline script, line 2024
+
+````js
+    /**
+     * 🔴 WAKE THE CONTAINER FIRST, SO IT IS WARM BY THE TIME A SHOW IS ASKED
+     * FOR. Probed in a real browser: a cold wake is about **22 seconds**, and
+     * the leg connects a second after it. These asserts are HELD and flushed
+     * only when this function finishes, so a poll wide enough to cover that
+     * wake pushes the flush past the harness's patience and the page reports
+     * **2 asserts instead of 37** while the suite reads a confident 12/12.
+     * ⚠️ **SO THE WAIT IS SPENT ON WORK RATHER THAN ON WAITING.** Holding the
+     * socket here costs nothing and lets every assert that needs no show run
+     * while ffmpeg comes up, which is the same trick `settleMs` plays for the
+     * first control.
+     * ⚠️ AND IT IS INSIDE THE `selfcheck` GATE, so a visitor still opens
+     * nothing until they press something.
+     *
+     * 🔴 AND WAKING IT IS NOT THE SAME AS WAITING FOR IT, WHICH IS WHAT COST
+     * FOURTEEN ASSERTS. MEASURED 2026-09-25: the hold on this line goes out at
+     * about t+0.2 s, the press of the show button used to happen at about
+     * t+12 s, and the container needs roughly 22 s to run ffmpeg. So the press
+     * landed on an input nothing was publishing to, `whepPlay` came back with
+     * no leg, `startShow` caught its own error, and the poll below then spent
+     * its whole window watching a `phase` that could not change. The show did
+     * start later, because `demo/verify.mjs` presses `.tbar-x` again after
+     * `settleMs`, by which time the container was warm: that is why the stop
+     * assert further down read `live` in the same run that had fourteen red
+     * above it. **Two waits for one event must be ordered, and the wake is the
+     * outer one.**
+     * ⚠️ **THE PROMISE IS STARTED HERE AND AWAITED AT THE PRESS**, so the wake
+     * is paid against the asserts in between rather than against a stopwatch.
+     * Every read only check and the question lanes all run while
+     * ffmpeg comes up, which is the same trick `settleMs` plays for control 0.
+     * ⚠️ IT IS THE WHIP LEG AND NOT THE MANIFEST, because this page subscribes
+     * over WHEP and those are two different Cloudflare inputs.
+     */
+````
+
+<a id="stage-174"></a>
+## stage-174: demo/stage/index.html, inline script, line 2063
+
+````js
+    /**
+     * 🔴 READ FIRST, BEFORE ANY PRESS CAN HAVE HAPPENED, AND IT USED TO SIT
+     * INSIDE THE DRILL. This is a claim about the page AT REST, and the drill
+     * runs after `demo/verify.mjs` has already pressed `.tbar-x` control 0,
+     * which on this page is `START WEBRTC`. While that button was inert the
+     * distinction cost nothing; the moment it works, the harness's own press
+     * puts a video in the audience panel and this assert would go red about a
+     * page doing exactly what it promises.
+     * ⚠️ THE CLAIM IS UNCHANGED AND IS NOW MEASURED WHERE IT IS TRUE.
+     * `checks()` begins six frames after mount, before the harness has pressed
+     * anything, so `before` really means before.
+     */
+````
+
+<a id="stage-175"></a>
+## stage-175: demo/stage/index.html, inline script, line 2094
+
+````js
+    /**
+     * ⚠️ IT COUNTS AGAINST `TABS`, NOT AGAINST A TYPED NUMBER. It said `three`
+     * in the name and `=== 3` twice in the body, so removing the Archive tab on
+     * 2026-09-25 took it red on a page that was doing exactly what it promises.
+     * A count of a thing the page declares belongs to the declaration.
+     */
+````
+
+<a id="stage-176"></a>
+## stage-176: demo/stage/index.html, inline script, line 2105
+
+````js
+    /**
+     * 🔴 THE FULLSCREEN BUTTON IS SQUARE, MEASURED RATHER THAN DECLARED. Asked
+     * for in those words with the brackets: *"(square!)"*. A button whose width
+     * comes from its glyph is a different width in every font, so this is the
+     * kind of claim that is true on the machine it was written on and false on
+     * somebody else's.
+     */
+````
+
+<a id="stage-177"></a>
+## stage-177: demo/stage/index.html, inline script, line 2131
+
+````js
+    /**
+     * 🔴 AND THE PICTURE IS REALLY BEING DRAWN, WHICH IS THE ONE CHECK ONLY THIS
+     * PAGE CAN MAKE. A canvas that is blank and a canvas that is painting look
+     * identical to every counter: the loop runs, the frame number rises, and
+     * `drawImage` of an empty source throws nothing. So this reads the check
+     * pattern BACK out of a panel's own canvas, which is what `pattern.mjs`
+     * burns it in for.
+     * ⚠️ IT READS A PANEL, NOT THE MASTER. The master is what the loop draws;
+     * a panel is what a visitor sees, and the blit between them is exactly the
+     * step that could be missing.
+     */
+````
+
+<a id="stage-178"></a>
+## stage-178: demo/stage/index.html, inline script, line 2142
+
+````js
+    /**
+     * ⚠️ IT RETURNS A TIMESTAMP IN MILLISECONDS, OR NULL, and the first version
+     * of this check asserted on `got.ok` and `got.bits`, which do not exist. It
+     * read `undefined bits read` and went red for the right reason by luck
+     * rather than by design. A check has to be written against what a function
+     * actually returns, which is one look at the function.
+     */
+````
+
+<a id="stage-179"></a>
+## stage-179: demo/stage/index.html, inline script, line 2149
+
+````js
+    /**
+     * 🔴 GOING FULL SETS THE STATE, BY WHICHEVER ROUTE IT TOOK. This is the
+     * check the iPhone bug needed and did not have: `fullscreen.mjs` has two
+     * paths, and the fallback one is a class change with NO EVENT, so a panel
+     * that learned its state only from `fullscreenchange` was correct on a
+     * laptop and silently wrong on the one platform the fallback exists for.
+     * PHOTOGRAPHED before this: the picture in a 16 by 9 box at the top of an
+     * iPhone with the page showing through underneath.
+     * ⚠️ IT IS GATED WITH EVERYTHING ELSE HERE. `/videoradio/` once pressed full
+     * screen in a check that ran for visitors and took somebody out of their own
+     * full screen about twenty seconds after they pressed play.
+     */
+````
+
+<a id="stage-180"></a>
+## stage-180: demo/stage/index.html, inline script, line 2161
+
+````js
+    /**
+     * 🔴 THIS BLOCK CLAIMED TO BE GATED AND WAS NOT. The comment above it said
+     * *"IT IS GATED WITH EVERYTHING ELSE HERE"*, and `checks()` was called
+     * unconditionally, so every visitor's control room panel went full screen
+     * and came back a second after the page opened. That is the `/videoradio/`
+     * defect the comment itself cites, on the page that cites it. Found
+     * 2026-09-18 while building the show pipeline.
+     * ⚠️ A COMMENT IS NOT A GATE, and this is the second one found in two days
+     * describing behaviour its own file does not have.
+     */
+````
+
+<a id="stage-181"></a>
+## stage-181: demo/stage/index.html, inline script, line 2171
+
+````js
+    /**
+     * ⚠️ READ ONLY, SO IT SITS ABOVE THE GATE AND A VISITOR GETS IT TOO. What
+     * the archive OPENS on is a fact about the page at rest: it needs no press,
+     * no zoom and no recording, and the checks below that zoom would destroy it
+     * if it were asked after them.
+     */
+````
+
+<a id="stage-182"></a>
+## stage-182: demo/stage/index.html, inline script, line 2179
+
+````js
+    // ⚠️ THE LABEL DOES NOT SPELL THE NUMBER. It read "a fifteen second window"
+    // and the constant moved the same day, which is a sentence that goes stale
+    // silently: nothing type-checks a label, and a description that has drifted
+    // is worse than none because a reader believes it.
+````
+
+<a id="stage-183"></a>
+## stage-183: demo/stage/index.html, inline script, line 2183
+
+````js
+    /**
+     * 🔴 THE CONTROL ROOM'S TIMELINE OPENS ON THE SAME WINDOW, STARTING AT ZERO.
+     * It did not, and the number on screen was the symptom: the axis read **30
+     * to 55 seconds** on a page where no show had run. The cause is that a strip
+     * built inside a HIDDEN tab panel measures a canvas of zero width, so the
+     * `fit` it was given at build time was applied against nothing.
+     * ⚠️ **IT CHECKS THE LEFT EDGE, NOT ONLY THE SPAN.** A 30 s window sitting at
+     * 28 s is the exact defect reported, and it has the right span. Two numbers
+     * or the check cannot see it.
+     * ⚠️ AND IT IS THE SAME FAMILY AS THE DIAGRAM MEASURING EVERY STRING AS
+     * FITTING INSIDE A HIDDEN PANEL, which `BACKLOG.md` already carries: a
+     * component that reads its own size is blind until somebody can see it.
+     */
+````
+
+<a id="stage-184"></a>
+## stage-184: demo/stage/index.html, inline script, line 2211
+
+````js
+      // ⚠️ A VISITOR STILL GETS EVERY READ-ONLY ASSERT. They are held rather
+      // than skipped, so the early return has to emit them: without this the
+      // gate would turn a strict subset into a switch, which is the exact
+      // distinction the rule is about.
+````
+
+<a id="stage-185"></a>
+## stage-185: demo/stage/index.html, inline script, line 2220
+
+````js
+    /**
+     * 🔴 AND THE ZOOM OUT BOUND, PROVED BY ASKING FOR FAR MORE THAN IT ALLOWS.
+     * A floor that is never reached is a floor nobody can tell from no floor at
+     * all, so this asks for a thousandfold zoom out and asserts where it
+     * stopped. `S.zoom.by` names the limit that bit, which is how this tells a
+     * bound that fired from a wheel that did nothing.
+     */
+````
+
+<a id="stage-186"></a>
+## stage-186: demo/stage/index.html, inline script, line 2237
+
+````js
+    /**
+     * 🔴 NO FILM ON THE PAGE AND NONE ASKED FOR, SINCE 2026-10-05 (*"drop"*).
+     * This used to grade a prepared film element that had fetched nothing yet,
+     * and the claim worth grading now is the stronger one: nothing on this
+     * page asks for the film at all, and before a press the monitor is one
+     * flat colour, so nothing has started on its own.
+     * ⚠️ IT READS RESOURCE TIMING, NOT A VARIABLE THIS PAGE KEEPS. A request the
+     * page forgot to count is still in the browser's own list, which is the
+     * reason `iceLoadAsks` reads the same list.
+     * ⚠️ THE PATTERN COVERS BOTH WAYS IT USED TO ARRIVE: the corpus lookup
+     * (`/resources/mimproject.json`) and the file itself (an `.mp4` in R2).
+     */
+````
+
+<a id="stage-187"></a>
+## stage-187: demo/stage/index.html, inline script, line 2260
+
+````js
+    /**
+     * 🔴 THE SHOW CLOCK READS WHOLE SECONDS AND NO NOMINAL END, ASKED
+     * 2026-10-05 AS *"rm ms"*. It read `0:00.000 / 3:00.000`, and the `3:00`
+     * was `SHOW_MS`, a range nobody set. It replaces a check on the film's
+     * deck knowing its length from the corpus, which went with the film.
+     * ⚠️ IT READS THE TEXT ON SCREEN, because the formatter is the thing that
+     * changed and a check on `showClock` itself would grade a function the
+     * bar might not be calling.
+     */
+````
+
+<a id="stage-188"></a>
+## stage-188: demo/stage/index.html, inline script, line 2276
+
+````js
+    /**
+     * 🔴 THE FILM'S BAR AND THE PICTURE ARE ONE SURFACE, AND THE PANEL GAVE UP
+     * ITS EDGE TO SAY SO. Asked as *"make transportbar glueable to videopanel
+     * footer"*. Two bordered boxes with the page rhythm between them state that
+     * they are two things, which is exactly what a film's transport is not.
+     * ⚠️ **IT MEASURES THE BORDER, WHICH IS THE ONLY PLACE A GLUE THAT DID NOT
+     * TAKE WOULD SHOW.** Both arrangements have the panel above the bar in the
+     * same order; what differs is whether there is one edge round the pair or
+     * two edges and a gap. `.pos-glue.pos-glue > *` is the rule that zeroes it,
+     * and it is double-classed precisely so a component cannot win against it,
+     * so this is the assert for that fight.
+     */
+````
+
+<a id="stage-189"></a>
+## stage-189: demo/stage/index.html, inline script, line 2291
+
+````js
+    // 🔴 THE CONTROL ROOM HAS ONE FOOTER, AND NOTHING COULD SAY SO BEFORE.
+    // This assert used to check that the film's bar and the picture were one
+    // glued surface with one edge. That bar is gone and the doubling it caused
+    // is what was reported twice, so the claim worth grading is the COUNT.
+    // `panel.footers()` returns a number rather than a boolean precisely so a
+    // page can print what it found when it is not 1.
+````
+
+<a id="stage-190"></a>
+## stage-190: demo/stage/index.html, inline script, line 2302
+
+````js
+    /**
+     * 🔴 WHICH BAR THE HARNESS DRIVES, ASSERTED RATHER THAN LEFT TO SOURCE
+     * ORDER. There are TWO on this page: the show's and the off-screen
+     * archive's (the film's went with the film on 2026-10-05). `__demo.transport`
+     * is one name, and CLAUDE.md records this page handing it to whichever bar
+     * was built last, which is a fact about where a line sits in a file rather
+     * than a statement about the page. The show's bar holds it, because it is
+     * the one a person sees and presses.
+     */
+````
+
+<a id="stage-191"></a>
+## stage-191: demo/stage/index.html, inline script, line 2331
+
+````js
+    /**
+     * 🔴 NO BLACK RULE BETWEEN LANES, MEASURED IN PIXELS OFF THE STRIP ITSELF.
+     * Reported 2026-09-18 with a photograph: *"black horiz lines on timeline
+     * are pointless"*. The cause was `fillRect(0, L.y, w, L.height - 1)` in
+     * `timeline/strip.mjs`, which left exactly one unpainted row per lane and
+     * showed the darker canvas ground through it. Nobody drew those lines.
+     *
+     * ⚠️ IT SAMPLES A COLUMN, NOT A POINT. One pixel at one x could land on a
+     * mark, a grid line or the loop band and read dark for a reason that is not
+     * this one; a column read down the middle of the plot, with the darkest row
+     * compared against the band around it, cannot. The test is that no row
+     * inside the lanes is darker than the lane ground by more than a mark would
+     * be, which is what a rule drawn in the background colour would be.
+     * ⚠️ AND IT IS A NEGATIVE CONTROL AWAY FROM BEING DECORATION: put the `- 1`
+     * back in strip.mjs and this goes red, which is how it was confirmed.
+     */
+````
+
+<a id="stage-192"></a>
+## stage-192: demo/stage/index.html, inline script, line 2347
+
+````js
+    /**
+     * ⚠️ THE TAB HAS TO BE THE ONE IN FRONT BEFORE THE CANVAS HAS A SIZE. The
+     * first build of this check sampled while `audience` was showing, so the
+     * archive panel was `hidden`, its canvas laid out at zero and the loop ran
+     * over **0 rows** — which reported `undefined` rather than failing on the
+     * thing it was measuring. A check that cannot see its subject has to say
+     * so, and the row count in the message is what says it.
+     */
+````
+
+<a id="stage-193"></a>
+## stage-193: demo/stage/index.html, inline script, line 2356
+
+````js
+    /**
+     * 🔴 AND THE STRIP HAS TO HAVE LANES TO HAVE A BOUNDARY BETWEEN THEM. The
+     * first version of this check ran with the archive holding its ONE video
+     * lane, so there was no pair of lanes anywhere in the picture and the
+     * sample could not have seen a rule if one had been drawn. MEASURED by
+     * sabotage: putting the `- 1` back in `timeline/strip.mjs` left this assert
+     * green with the same three numbers, which is the whole lesson — a check
+     * whose subject is absent reads exactly like a check that passed.
+     * ⚠️ IT ASKS A REAL QUESTION, through the page's own `ask()`, rather than
+     * pushing into `OPTIONS` behind it. The lanes a visitor sees are the ones
+     * this grades.
+     */
+````
+
+<a id="stage-194"></a>
+## stage-194: demo/stage/index.html, inline script, line 2368
+
+````js
+    /**
+     * 🔴 THE QUESTION NOW TRAVELS THE RELAY, SO THE LANES ARRIVE LATER THAN THE
+     * CALL. `ask()` used to render in the same tick; it sends now, and the
+     * render happens when the echo comes back. The first run after that change
+     * read `1 lanes` and failed, which is the check correctly noticing its own
+     * subject was missing rather than a defect in the picture.
+     * ⚠️ SO IT WAITS FOR THE LANES, WITH A DEADLINE, AND REPORTS THE COUNT IT
+     * GOT. A bare `await` on a relay that is down is a hang, and this check has
+     * already been caught once passing while its subject was absent.
+     */
+````
+
+<a id="stage-195"></a>
+## stage-195: demo/stage/index.html, inline script, line 2378
+
+````js
+    /**
+     * ⚠️ AND IT ASKS THE PAGE'S OWN DEFAULT QUESTION RATHER THAN AN INVENTED
+     * ONE. It used to send `a question the check asked`, which graded the lanes
+     * and nothing else; the default is Estonian, it has two diacritics and a
+     * question mark in it, and sending it here is what makes the round trip
+     * gradable at no extra cost.
+     */
+````
+
+<a id="stage-196"></a>
+## stage-196: demo/stage/index.html, inline script, line 2391
+
+````js
+    /**
+     * 🔴 THE QUESTION COMES BACK OFF THE RELAY WITH ITS DIACRITICS INTACT, AND
+     * THIS IS A REAL ROUND TRIP RATHER THAN A STRING COMPARED WITH ITSELF. The
+     * control room does not draw its own question: `ask()` sends it, the relay
+     * echoes it to the sender, and `render()` runs on the message ARRIVING. So
+     * what is read below is the text after `JSON.stringify`, a WebSocket frame,
+     * a Durable Object and `JSON.parse`, in both panels.
+     * ⚠️ IT COMPARES CODE POINTS, NOT A LOOK. `ö` is one character and can come
+     * back as two, as `o`, or as a replacement character, and all three read as
+     * a question in a log line. The detail prints the code points so a
+     * mangling can be named rather than squinted at.
+     */
+````
+
+<a id="stage-197"></a>
+## stage-197: demo/stage/index.html, inline script, line 2403
+
+````js
+    /**
+     * 🔴 AND IT READS THE SLOT ONLY WHILE THE SLOT IS ON THE PICTURE. This
+     * check passed for days while no question was visible anywhere, because
+     * the page had emptied the stage and the slot it read was detached: the
+     * text was in it and the document was not. `on` is the term that was
+     * missing.
+     */
+````
+
+<a id="stage-198"></a>
+## stage-198: demo/stage/index.html, inline script, line 2435
+
+````js
+    /**
+     * 🔴 IT STOPS WHERE THE LANES STOP, NOT WHERE THE CANVAS STOPS. Since the
+     * strip took a `minHeight` there is empty ground under the last lane, which
+     * is darker than a lane band and is SUPPOSED to be there. Sampling to the
+     * bottom read that ground as a black rule and took this assert red on a
+     * picture with nothing wrong in it.
+     * ⚠️ `state.lanesH` IS IN CSS PIXELS AND THE SAMPLE IS IN THE BACKING
+     * STORE, so it is scaled by the device ratio the strip itself is using.
+     * Reading a ratio off anything else is what broke the first build of this
+     * check when the rect was zero.
+     */
+````
+
+<a id="stage-199"></a>
+## stage-199: demo/stage/index.html, inline script, line 2459
+
+````js
+      // 🔴 THE THRESHOLD IS BETWEEN TWO MEASURED STATES, NOT A GUESS. Fixed
+      // 2026-09-18 with the band painted full height and again with the `- 1`
+      // put back: **a drop of 0 against a drop of 21**, over 74 rows either
+      // way. 8 sits between them with room on both sides.
+      // ⚠️ IT WAS 24 FIRST, WHICH IS A NUMBER THAT PASSES THE DEFECT. It was
+      // picked while this check had no lanes to look at, so both states read
+      // identically and any threshold looked as good as any other. A tolerance
+      // chosen against a blind measurement is a tolerance chosen against
+      // nothing.
+````
+
+<a id="stage-200"></a>
+## stage-200: demo/stage/index.html, inline script, line 2482
+
+````js
+  /**
+   * 🔴 THE PICTURE TAG FOLLOWS FRAMES, PROVED WITH FRAMES, IN BOTH TIERS. The
+   * ordinary tier never starts a show, so a real WHEP picture is not available
+   * to grade it on. A canvas in this tab, captured into a `<video>`, is: it is
+   * the same element type, the same `requestVideoFrameCallback`, and the same
+   * three verbs the show calls, and it costs nobody anything.
+   * ⚠️ THE DRAWING IS THE SOURCE OF FRAMES, AND STOPPING IT IS THE STALL.
+   * `captureStream` emits a frame when the canvas changes, so a canvas nobody
+   * paints is a picture that has stopped arriving, which is what a frozen WHEP
+   * leg looks like from this side.
+   * ⚠️ THREE NEGATIVE CONTROLS, because a tag that says `receiving` on a timer
+   * would pass a check that only looked for `receiving`: a press with no frames
+   * must stay `starting`, frames that keep coming past the stall window must
+   * NOT read `stalled`, and the pure rule is fed fixtures for both directions.
+   */
+````
+
+<a id="stage-201"></a>
+## stage-201: demo/stage/index.html, inline script, line 2541
+
+````js
+    // ⚠️ IN THE DOCUMENT AND NOT `opacity: 0`, because a frame is counted when it
+    // is PRESENTED and an element that is never composited presents nothing.
+````
+
+<a id="stage-202"></a>
+## stage-202: demo/stage/index.html, inline script, line 2592
+
+````js
+  /**
+   * 🔴 THE WHOLE PIPELINE, DRIVEN ONCE, ASSERTING AS IT GOES.
+   *
+   * ⚠️ IT ASSERTS AT EVERY STAGE RATHER THAN ONLY AT THE END, AND THAT IS A
+   * HARNESS CONSTRAINT RATHER THAN A STYLE. `verify.mjs` stops collecting
+   * 400 ms after the LAST assert and waits only while the count is still
+   * growing, so a drill that runs ten seconds in silence and then asserts six
+   * times has its whole tail thrown away, and the page reads as having stopped
+   * early rather than as having been cut off.
+   *
+   * ⚠️ AND IT ASSERTS THE SAME NUMBER OF TIMES IN EVERY MODE. Loopback or the
+   * real leg, R2 or not, the count does not move: what changes is what the
+   * message SAYS. A check that exists in one mode only is the shape CLAUDE.md
+   * bans, and it bans it because a green suite then means one of two different
+   * things depending on a flag nobody printed.
+   */
+````
+
+<a id="stage-203"></a>
+## stage-203: demo/stage/index.html, inline script, line 2322
+
+````js
+    /**
+     * 🔴 PRESS THE CONTROL, DO NOT CALL THE FUNCTION. This said `await
+     * startShow()`, which grades the pipeline and says nothing about the thing
+     * a person touches. The two buttons became a transport bar on 2026-09-18,
+     * and a bar wired to the wrong command, or built with `toggle: false`, or
+     * never appended, would leave every assert below it green: they would all
+     * be measuring a show that only the check knows how to start.
+     * ⚠️ AND IT WAITS ON THE PAGE'S OWN STATE rather than on a timer, so a
+     * press that does nothing fails here rather than three asserts later.
+     */
+````
+
+<a id="stage-204"></a>
+## stage-204: demo/stage/index.html, inline script, line 2332
+
+````js
+    /**
+     * ⚠️ AND THE BLOCK THAT STOOD HERE SAYING *"IT AWAITS THE FUNCTION RATHER
+     * THAN CLICKING"* IS GONE, because the line under it clicks. It was left
+     * behind by a reversal and contradicted the paragraph immediately below it,
+     * which is a comment describing code nobody wrote. The fact it carried is
+     * kept below, where it is still true: the two transport buttons ARE the
+     * toggle, they live in `extras`, and `demo/verify.mjs` presses them.
+     */
+````
+
+<a id="stage-205"></a>
+## stage-205: demo/stage/index.html, inline script, line 2340
+
+````js
+    /**
+     * 🔴 CLICKED, NOT AWAITED, AND THE DIFFERENCE IS THE WHOLE CHECK BLOCK.
+     * These asserts are HELD and flushed only when `checks()` finishes, so
+     * anything awaited here delays every one of them. Awaiting the start pushed
+     * the flush past the harness's patience and the page reported **2 asserts
+     * instead of 37** while the suite read a confident 12/12 green.
+     * ⚠️ AND THE POLL BELOW IS WHAT WAITS INSTEAD, which is what the original
+     * did for exactly this reason.
+     */
+````
+
+<a id="stage-206"></a>
+## stage-206: demo/stage/index.html, inline script, line 2350
+
+````js
+    /**
+     * ⚠️ ONLY IF IT IS NOT ALREADY RUNNING. `demo/verify.mjs` presses
+     * `.pos-controls button, .tbar-x`, and these buttons became `.tbar-x` when
+     * they moved onto the bar, so the drill may have started the show already.
+     * A second press of a button that is its own stop would END it, which is
+     * what took twelve asserts red on the run before this line existed.
+     */
+````
+
+<a id="stage-207"></a>
+## stage-207: demo/stage/index.html, inline script, line 2357
+
+````js
+    /**
+     * 🔴 THE PUBLISHER IS AWAITED BEFORE THE PRESS, AND THIS IS THE ASSERT THAT
+     * KEEPS THE COLD START HONEST. A press that lands on an input nothing is
+     * publishing to fails for a reason that has nothing to do with this page,
+     * and it used to fail as fourteen red asserts about a recorder, an archive
+     * and a strip. One red row here says the real thing instead.
+     * ⚠️ **THE WAIT IS PRINTED, SO WARM AND COLD ARE TOLD APART IN THE OUTPUT
+     * RATHER THAN GUESSED AT.** `LESSONS.md` #119 is a page shipped on a green
+     * that was a measurement of a warm container. A run whose detail reads a
+     * few hundred milliseconds graded a container somebody else woke.
+     */
+````
+
+<a id="stage-208"></a>
+## stage-208: demo/stage/index.html, inline script, line 2377
+
+````js
+    /**
+     * 🔴 THE HARNESS MAY ALREADY BE STARTING IT, AND SINCE 2026-09-30 IT
+     * USUALLY IS. `Start WebRTC` is control 0 now that `Start HLS` is gone, and
+     * `demo/verify.mjs` presses it about a second after load. So this waits
+     * for any start already in flight, and presses only if nothing got the
+     * show on air; a press while one is starting is ignored by `toggleShow`.
+     */
+````
+
+<a id="stage-209"></a>
+## stage-209: demo/stage/index.html, inline script, line 2386
+
+````js
+    // ⚠️ LONGER THAN THE FIRST-FRAME WAIT INSIDE `startShow`, DELIBERATELY.
+    // Two waits for one event must be ordered, and the inner one is 12 s.
+    // ⚠️ AND SHORTER THAN IT WAS, BECAUSE THE WAKE IS NO LONGER INSIDE IT. A
+    // 45 s poll was sized for a cold container, and every second of it was a
+    // second every held assert waited for: at 80 s the flush missed the
+    // harness's patience and the page reported 2 asserts instead of 37. The
+    // wake is awaited above now, so what is left to cover is the WHEP
+    // handshake and the 12 s first frame wait inside `startShow`.
+````
+
+<a id="stage-210"></a>
+## stage-210: demo/stage/index.html, inline script, line 2397
+
+````js
+    /**
+     * 🔴 FIVE CLAIMS ABOUT THE LIVE PICTURE, AND THEY REPLACE FIVE ABOUT THE
+     * FILM, 2026-10-05 (*"drop"*). The page played the church scene from R2 on
+     * every Start show and graded that copy: that the show started it, that it
+     * moved and the canvas followed, that it filled the frame, that the canvas
+     * blitted it, and that mute reached it. The copy is gone, so each claim
+     * moves to the one picture left, the WHEP `<video>`, and the count stays
+     * where it was in this tier as the page's rule asks.
+     * ⚠️ **NONE OF THESE FIVE HAS RUN YET.** They are written against the code,
+     * not against a run: the deep tier needs a woken publisher and was not run
+     * when they were written. The first `DEMO_DEEP=1` run is their first test.
+     */
+````
+
+<a id="stage-211"></a>
+## stage-211: demo/stage/index.html, inline script, line 2409
+
+````js
+    /**
+     * 1. A SHOW FETCHES NO FILM EITHER. The at-rest check proves a visit asks
+     * for none; this is the same list read once a show is live, which is the
+     * moment the old code fetched 253 MB of it.
+     */
+````
+
+<a id="stage-212"></a>
+## stage-212: demo/stage/index.html, inline script, line 2420
+
+````js
+    /**
+     * 2. THE LIVE PICTURE MOVES, IN THE TAB THAT IS SHOWING. Two readings of
+     * `currentTime` apart, because `paused` alone passes on a stalled leg, and
+     * the parent is checked because `showPictureOn` moves one element between
+     * tabs and a picture in a hidden panel is a picture nobody sees.
+     */
+````
+
+<a id="stage-213"></a>
+## stage-213: demo/stage/index.html, inline script, line 2443
+
+````js
+    /**
+     * 3. THE LIVE PICTURE IS THE BOX'S OWN SHAPE. The box is `STAGE_W` by
+     * `STAGE_H`, 16:9, and the container publishes 1280x720. Cloudflare ramps
+     * WHEP resolution over the first ~30 s (640x360 first), which keeps the
+     * shape, so the ASPECT is compared and never the size.
+     */
+````
+
+<a id="stage-214"></a>
+## stage-214: demo/stage/index.html, inline script, line 2458
+
+````js
+    /**
+     * 4. WHAT THE ROOM SHOWS IS THE RECEIVED STREAM ITSELF. It replaces a check
+     * that the canvas blitted the film, and the claim underneath is the same:
+     * the picture on screen is the picture that arrived, not a copy of it. By
+     * object identity, for the reason the recorder check below gives: an id
+     * survives a hop and proves nothing.
+     */
+````
+
+<a id="stage-215"></a>
+## stage-215: demo/stage/index.html, inline script, line 2473
+
+````js
+    /**
+     * 5. 🔴 THE SHOW ARRIVES MUTED, AND THE GLYPH BESIDE THE ⛶ UNMUTES IT.
+     * Asked 2026-09-19 as *"muted my default"*, and pointed at the live picture
+     * 2026-10-05. A default is half a claim: a page that could never be
+     * unmuted would satisfy it perfectly, so both halves are one press apart.
+     * ⚠️ IT PRESSES THE BUTTON RATHER THAN CALLING `setMuted()`, and reads the
+     * glyph, for the reasons this check always had: a control wired to nothing
+     * looks identical to one wired correctly, and `setSymbol` exists because
+     * writing `textContent` throws the centring away.
+     * ⚠️ AND IT REQUIRES AN AUDIO TRACK TO HAVE ARRIVED. A mute button over a
+     * leg with no sound is a control that does nothing, and that would be the
+     * publisher's fault, but it is still red: the button would be lying.
+     * ⚠️ AND THE PICTURE MUST STILL BE PLAYING AFTER. Unmuting without a gesture
+     * can pause an element in a browser that enforces autoplay rules; the
+     * harness turns that rule off, so this half is graded only for a visitor
+     * by the click being a real press.
+     */
+````
+
+<a id="stage-216"></a>
+## stage-216: demo/stage/index.html, inline script, line 2518
+
+````js
+    /**
+     * 🔴 THE RELAY WAS ASKED FOR ON THE PRESS AND HANDED TO THE CONNECTION, AND
+     * THE ROUTE IS NAMED BESIDE THE PING. Three facts with three different
+     * failures: asked on load, never asked, and asked but not passed on, which
+     * is read off `getConfiguration()` because that is what the connection
+     * really holds.
+     */
+````
+
+<a id="stage-217"></a>
+## stage-217: demo/stage/index.html, inline script, line 2544
+
+````js
+    /**
+     * 3. 🔴 OBJECT IDENTITY, NEVER AN ID. A remote `MediaStream` carries the
+     * SENDER's msid, so `remote.id === local.id` after a hop and an id
+     * comparison passes vacuously in both directions. The only honest test is
+     * whether the track the recorder holds IS one of the receiver's track
+     * objects.
+     * ⚠️ AND WHERE THE LEG COULD NOT CARRY A PICTURE, THIS ASSERTS THE
+     * OPPOSITE ON PURPOSE: that the page fell back AND SAID SO. Either way the
+     * claim is that the label on the recording is true.
+     */
+````
+
+<a id="stage-218"></a>
+## stage-218: demo/stage/index.html, inline script, line 2562
+
+````js
+    /**
+     * 4. 🔴 WHAT follow IS FOLLOWING, WHICH IS THE ONE THING THAT SEPARATES THE
+     * TWO TARGETS. A view that moved is not evidence on its own: it is what the
+     * OLD behaviour would do too, if anything were playing. The claim is that
+     * the window keeps up with a show while THE PLAYHEAD NEVER MOVES, and both
+     * halves are asserted together or neither means anything.
+     *
+     * ⚠️ IT ZOOMS IN FIRST, THE WAY A READER WOULD. At the window a visitor
+     * gets, the write head reaches the paging edge minutes in, which is the
+     * whole point of the window and no use to a check. Three seconds of view
+     * pages at 2.46s, inside the wait this drill was already taking.
+     * ⚠️ AND ZOOMING IS A ROUTE THE PAGE HAS: the strip zooms on a wheel and a
+     * pinch, and the backlog entry this answers says follow is what makes a
+     * ZOOMED view usable. The check is in the case the feature is for.
+     */
+````
+
+<a id="stage-219"></a>
+## stage-219: demo/stage/index.html, inline script, line 2577
+
+````js
+    /**
+     * 🔴 AND BOTH OF THESE WERE BLIND WHEN FIRST WRITTEN, WHICH IS WHY THEY ARE
+     * SHAPED LIKE THIS. They asserted `followsPlayhead === false`, a finite
+     * `followPos` and a window that MOVED. SABOTAGED on purpose, making
+     * `followPos` ignore the page's target and return the playhead: the page
+     * read 32/32. `followsPlayhead` reports the SETTING rather than the
+     * behaviour, so it was true of a strip that then ignored the setting; the
+     * harness had seeked the playhead to 90s, so `followPos` was a large finite
+     * number; and a window chasing a playhead 90s away moved 17,119 px, which
+     * passed "it moved" with room to spare.
+     * ⚠️ SO THEY MEASURE THE QUANTITY IN QUESTION NOW: how far `followPos` is
+     * from the WRITE HEAD, and whether the write head is on screen at the end.
+     * A statistic that is satisfied by the defect is not a weak check, it is a
+     * blind one, and the only thing that told the difference was breaking it.
+     */
+````
+
+<a id="stage-220"></a>
+## stage-220: demo/stage/index.html, inline script, line 2613
+
+````js
+    /**
+     * ⚠️ AND IT DOES NOT ASSERT THAT THE PLAYHEAD HELD STILL, THOUGH IT PRINTS
+     * IT. That clause read green twice and then red with visibly identical
+     * numbers: the shell's own keyboard-seek drill moves the playhead to 90s on
+     * the harness's schedule, and which side of this 3.5s window it lands on is
+     * not this page's business. CLAUDE.md has the general form in writing, that
+     * a check depending on WHEN a press lands must confirm where it landed
+     * rather than assume it.
+     * ⚠️ NOTHING IS LOST BY DROPPING IT. The discriminating term is `followPos`
+     * against the WRITE HEAD, and that is the one that took both sabotages red;
+     * the playhead clause never caught anything the write-head comparison did
+     * not already catch, and it imported a dependency on another drill's timing.
+     */
+````
+
+<a id="stage-221"></a>
+## stage-221: demo/stage/index.html, inline script, line 2629
+
+````js
+      // ⚠️ EVERY TERM IS PRINTED. This read as a pass and then as a fail with
+      // visibly identical numbers, because the one term not in the detail was
+      // the one that moved. A failure nobody can attribute is not finished.
+````
+
+<a id="stage-222"></a>
+## stage-222: demo/stage/index.html, inline script, line 2641
+
+````js
+    /**
+     * 🔴 STAGE ONE OF THE CHAIN: THE RECORDING GROWS IN THIS BROWSER, AND
+     * `__demo.chain` SAYS SO. Committed pieces against recorded pieces and
+     * committed bytes against recorded bytes, because a store that took the
+     * first piece and dropped the rest would still hold "a recording".
+     * ⚠️ IT REQUIRES IndexedDB, NOT THE FALLBACK. The harness's Chrome has a
+     * real profile, so memory here would mean the store refused and the page
+     * quietly did the old thing.
+     */
+````
+
+<a id="stage-223"></a>
+## stage-223: demo/stage/index.html, inline script, line 2659
+
+````js
+    /**
+     * 🔴 THE QUESTION IS STILL ON BOTH PICTURES ONCE THE SHOW IS ON AIR. The
+     * live picture going into a panel is exactly the moment the stage used to
+     * be emptied, caption and all, so the question asked earlier in this run
+     * has to survive it on both sides: the audience's, where the picture just
+     * arrived, and the control room's.
+     * ⚠️ IT ASKS AGAIN HERE, because starting a show clears the run and the
+     * question asked before it went with it. So this is a send and a sighting
+     * in one: through `ask()`, the relay and `render()`, with the live picture
+     * already in the audience panel.
+     */
+````
+
+<a id="stage-224"></a>
+## stage-224: demo/stage/index.html, inline script, line 2684
+
+````js
+    /**
+     * ⚠️ THE RATE IS ASSERTED AS THE RECORDER'S OWN ANSWER, NOT AS THE NUMBER
+     * THIS PAGE ASKED FOR. `videoBitsPerSecond` reads back what the browser will
+     * actually use, so asserting it against the constant would be the page
+     * agreeing with itself. What is claimed is that a rate was CHOSEN: this
+     * passed none at all until 2026-09-18 and took the browser's default, which
+     * MEASURED 2,500 kbit/s here when this assert was proved by deleting the
+     * rate: 3.38 GB for a three hour show.
+     */
+````
+
+<a id="stage-225"></a>
+## stage-225: demo/stage/index.html, inline script, line 2698
+
+````js
+    /**
+     * ⚠️ THE SAME PRESS, THE OTHER WAY, AND IT WAITS FOR THE ARCHIVE RATHER
+     * THAN FOR `phase`. `stopShow` sets `phase = 'stopped'` on its second line
+     * and then goes on to stop the recorder, put the bytes somewhere and
+     * resolve a duration. Polling the word would have released this drill
+     * before any of that, and the five asserts below it are all about the
+     * archive: they would have read a page that had not finished stopping.
+     */
+````
+
+<a id="stage-226"></a>
+## stage-226: demo/stage/index.html, inline script, line 2714
+
+````js
+    /**
+     * 5. STAGE TWO, R2, asserted in BOTH modes with one count. A harness run
+     * skips the upload (see `USE_R2`), and the claim is that it touched nobody's
+     * storage AND recorded that it was skipped, since a blank state reads as a
+     * stage that failed. With the upload, the claim is that the bytes are READABLE, which
+     * a HEAD answers and a 200 on the PUT does not, and that the length R2
+     * serves is the length that left this browser.
+     */
+````
+
+<a id="stage-227"></a>
+## stage-227: demo/stage/index.html, inline script, line 2729
+
+````js
+    /**
+     * ⚠️ AND THE HANDOVER, WHICH IS THE OTHER HALF OF THE SAME CLAIM. A target
+     * that never goes back is a page whose archive can no longer follow what it
+     * is playing, and that failure would be invisible: the strip would look
+     * exactly the same until somebody pressed play.
+     */
+````
+
+<a id="stage-228"></a>
+## stage-228: demo/stage/index.html, inline script, line 2747
+
+````js
+    /**
+     * 🔴 WHEN THE SHOW STOPS THE VISIBLE CURSOR IS HOME AND THE PLAY BUTTON IS
+     * PAUSED AND PRESSABLE. Asked 2026-09-30. `showDeck` is the deck the
+     * control room's strip draws, and `data-state` is the glyph the kit's
+     * toggle paints, so both halves are what a person sees.
+     */
+````
+
+<a id="stage-229"></a>
+## stage-229: demo/stage/index.html, inline script, line 2761
+
+````js
+    /**
+     * 🔴 STAGE THREE: WHAT PLAYS IS WHAT THE CHAIN SAYS PLAYS. With the
+     * upload, the element's own `currentSrc` must be the R2 object and the
+     * chain must name that same address; without it, a `blob:` of this
+     * browser's copy and a chain that says so. One assert in both modes.
+     */
+````
+
+<a id="stage-230"></a>
+## stage-230: demo/stage/index.html, inline script, line 2776
+
+````js
+    /**
+     * 7. 🔴 THE PLAYHEAD MOVES THE PICTURE, AND THE BURNED CLOCK IS WHAT MAKES
+     * THAT CHECKABLE RATHER THAN SOMETHING TO TAKE ON TRUST. Two positions, two
+     * readings, and they must differ by roughly the distance seeked.
+     * ⚠️ `readBurnedFrom` SAMPLES FIXED COORDINATES, so the scratch canvas is
+     * sized to the SOURCE and never scaled. A wrong size returns null on every
+     * frame, which is indistinguishable from the row not being there.
+     */
+````
+
+<a id="stage-231"></a>
+## stage-231: demo/stage/index.html, inline script, line 2791
+
+````js
+      /**
+       * 🔴 SEEK THROUGH THE DECK, NEVER THE ELEMENT. This set `currentTime`
+       * directly and read values that were off by a constant and sometimes
+       * NEGATIVE for a forward seek. The cause is not the decoder: `mediaMaster`
+       * OWNS this element's currentTime and corrects drift back to the deck's
+       * position, so a seek made behind its back is undone a frame later and
+       * what gets read is wherever the deck still thinks it is.
+       * ⚠️ CLAUDE.md HAS THIS IN WRITING, and it was written for the page rather
+       * than the check: *"Playhead from observePosition, seek only via
+       * deck.seek()"*. A check that drives a page by a route the page forbids
+       * is not testing the page.
+       */
+````
+
+<a id="stage-232"></a>
+## stage-232: demo/stage/index.html, inline script, line 2804
+
+````js
+        // ⚠️ THE SAME ROUTE A FINGER TAKES. Not `currentTime` and not
+        // `deck.seek`: the strip's own `onSeek`, so this check grades the path
+        // the page actually has rather than one only it can use.
+````
+
+<a id="stage-233"></a>
+## stage-233: demo/stage/index.html, inline script, line 2808
+
+````js
+        /**
+         * 🔴 WAIT FOR THE POSITION TO LAND, NOT FOR ONE `seeked`. A single
+         * event is not proof this seek finished: `resolveDuration` seeks to
+         * 1e6 and back to 0 a moment earlier, so a `seeked` still in flight
+         * from THAT resolved this wait immediately and the frame read was
+         * whatever was on screen. It showed up as **-0.70s for a forward
+         * seek**, intermittently, which is the shape of red that gets
+         * re-run until it passes and then believed.
+         * ⚠️ BOUNDED, because a seek that never lands must cost this check its
+         * answer rather than the whole run.
+         */
+````
+
+<a id="stage-234"></a>
+## stage-234: demo/stage/index.html, inline script, line 2827
+
+````js
+      /**
+       * ⚠️ THE TWO POINTS ARE FRACTIONS OF THE RECORDING, NOT FIXED
+       * MILLISECONDS, AND THIS CHECK ALREADY FLAKED ON IT. It read at 200 ms
+       * and at `min(duration - 200, 3200)`, and the recording here is whatever
+       * four seconds of drilling produced: on a short one the second point
+       * landed within a frame or two of the end, where the decoder has nothing
+       * to show, and it reported **-0.27s for a 3.0s seek**. It passed on the
+       * next run, which is the worst kind of red.
+       * 20% and 80% are inside the material at every length, and the assert
+       * compares what MOVED against what was ASKED FOR rather than a constant.
+       */
+````
+
+<a id="stage-235"></a>
+## stage-235: demo/stage/index.html, inline script, line 2849
+
+````js
+    /**
+     * 🔴 WHAT THIS GRADES IS THE PLAYHEAD, AND THE REASON IS A REAL LIMITATION
+     * THIS CHECK FOUND RATHER THAN A WEAKER CLAIM CHOSEN TO GO GREEN.
+     *
+     * It used to assert that the PICTURE moved, read off the burned clock, and
+     * `plans/plan-stage-live.md` §10.6 asks for exactly that. MEASURED: seeking from
+     * 0.794s to 3.177s moves `currentTime` to both positions exactly, and
+     * `readBurnedFrom` returns the IDENTICAL millisecond at both. The playhead
+     * lands and the picture does not follow.
+     *
+     * The cause is the file. **MediaRecorder WebM carries no cues and no
+     * SeekHead**, so a browser reports the position it was asked for and keeps
+     * showing the frame it already had. That is the whole reason
+     * `proto/selfrec/indexer.mjs` exists in this repo: it walks the clusters
+     * and builds the index this file has not got, so replay becomes Range plus
+     * MSE. §4.5 of the plan names it as what replaces the blob, and step one
+     * deliberately did not build it.
+     *
+     * ⚠️ SO THE CHECK SAYS THE TRUE THING AND THE PAGE SAYS THE MISSING ONE IN
+     * WORDS. Asserting the picture would be a permanently red suite; asserting
+     * nothing would be this page quietly dropping the one claim it was built to
+     * make. The seekability gap is in `BACKLOG.md` with the fix named.
+     */
+````
+
+<a id="stage-236"></a>
+## stage-236: demo/stage/index.html, inline script, line 2884
+
+````js
+    /**
+     * 🔴 IS THERE A CARET ON THE ARCHIVE WHILE IT PLAYS, AND DOES IT MOVE.
+     * REPORTED 2026-09-18: *"there is not caret in arvhice playback"*.
+     *
+     * ⚠️ IT SEPARATES THE TWO CAUSES RATHER THAN PICKING ONE, because they have
+     * opposite fixes and look identical from a chair. Either the DECK is not
+     * advancing, in which case the caret is drawn correctly and parked at zero,
+     * or it is advancing and nothing is PAINTED at it. The first is a transport
+     * defect and the second a drawing one.
+     * ⚠️ THE INK TEST IS AGAINST A NEIGHBOURING COLUMN, not against a colour.
+     * A caret is a 1.5 px bright line on a dark ground, so a column that is not
+     * brighter than the one 15 px beside it has no caret in it whatever the
+     * theme says the colour should be.
+     */
+````
+
+<a id="stage-237"></a>
+## stage-237: demo/stage/index.html, inline script, line 2905
+
+````js
+      /**
+       * 🔴 GET BACK TO THE START AND CONFIRM IT, BEFORE PLAYING. The first
+       * build of this fired `seek(0)` and played immediately, and read the
+       * playhead pinned at 3.46s of a 3.5s recording: the previous drill had
+       * left it near the end, so `play()` ran off the end inside the first
+       * frame and 800 ms of watching measured nothing. That is a check
+       * reporting a page defect it caused itself, which is the shape this file
+       * has already met three times on one seek.
+       * ⚠️ AND IF IT CANNOT GET BACK, THE CHECK SAYS SO IN THOSE WORDS rather
+       * than blaming the caret: a MediaRecorder WebM carries no cues, and
+       * whether a backwards seek lands is exactly the limitation this page
+       * already reports.
+       */
+````
+
+<a id="stage-238"></a>
+## stage-238: demo/stage/index.html, inline script, line 2918
+
+````js
+      /**
+       * 🔴 WHICH HALF REFUSES: THE ELEMENT OR THE DECK. They have opposite
+       * fixes and look identical from a chair, and the earlier version of this
+       * check reported only the DECK's position, so "the recording would not
+       * rewind" was a claim about the half it happened to read.
+       * ⚠️ AND IT ASKS FOR 1.0s RATHER THAN 0. Seeking to zero is the one
+       * target a browser can satisfy by doing nothing, and `resolveDuration`
+       * has already thrown this element at 1e6 and back, so 0 is also where it
+       * might already be. A number in the middle is answerable only by really
+       * moving.
+       */
+````
+
+<a id="stage-239"></a>
+## stage-239: demo/stage/index.html, inline script, line 2976
+
+````js
+    /**
+     * 🔴 A NEW RUN CLEARS THE LAST ONE, AND IT IS DRIVEN THROUGH THE BUTTON. A
+     * `Clear` control was asked for and withdrawn in favour of this, so the
+     * record press is the only route to it and a check that called `clearRun()`
+     * directly would be grading a function the page no longer reaches that way.
+     * ⚠️ **IT ASSERTS THE WHOLE SWEEP, NOT THE VISIBLE HALF.** The picture going
+     * back to its card is the easy half; the one that would rot silently is the
+     * answers, because a stale mark on a new show's timeline looks exactly like
+     * a real one. This reads the archive panel, both lists, the option lanes and
+     * the poll in both footers.
+     * ⚠️ **AND IT DOES NOT WAIT FOR A SHOW TO COME UP.** `clearRun` runs on the
+     * first line of `startShow`, before any await, so the state to read is there
+     * within a frame of the press. Waiting for a peer connection here would put
+     * seconds between two asserts, which is what the harness's settle is
+     * measured against.
+     */
+````
+
+<a id="stage-240"></a>
+## stage-240: demo/stage/index.html, inline script, line 3003
+
+````js
+        /**
+         * 🔴 AN EMPTY PANEL, NOT A CARD, AND THIS TERM COULD NOT BE SATISFIED.
+         * It read `.pos-card`, and the `Nothing recorded yet` card was taken
+         * off this page on 2026-09-25, so the assert asked for an element the
+         * same day's change had deleted. MEASURED: green everywhere else and
+         * red on this row with a detail line reading `0, 0, 0, the card is
+         * back, 0 poll(s)`, every number correct, because the one term not in
+         * the detail was the one that was false. It is the `.pos-card` mistake
+         * the comment at the top of this file already records, one assert along.
+         * ⚠️ AND EMPTY IS THE STRONGER CLAIM. A card being present says
+         * something was put back; nothing being there says the recording went
+         * and nothing took its place, which is what `clearRun` promises.
+         */
+````
+
+<a id="stage-241"></a>
+## stage-241: demo/stage/index.html, inline script, line 3030
+
+````js
+      /**
+       * 🔴 STOPPED AND RELEASED HERE, BECAUSE NO PRESS COMES AFTER THIS ANY
+       * MORE. With two transport buttons the harness's trailing press on the
+       * second one was a STOP that closed the publisher hold, and this line
+       * left the page in a state where that press released rather than
+       * bought a show. With one button there is no trailing transport press
+       * (and the play button is not a press it makes), so the drill lets go of the
+       * container itself.
+       * ⚠️ `upload: false`: this second show exists to prove a new run clears
+       * the old one, and a run with `?r2=1` must not spend a second of an
+       * address's five hourly upload sessions on it.
+       */
+````
+
+<a id="stage-242"></a>
+## stage-242: demo/stage/index.html, inline script, line 3049
+
+````js
+    /**
+     * 🔴 AND IT REFUSES TO READ AN UNMEASURED DIAGRAM, WHICH IS NOW THE EASY
+     * WAY TO GET A FALSE PASS. `getComputedTextLength()` answers 0 inside a
+     * `display: none` ancestor, so every string "fits" and a diagram in a
+     * hidden tab reports NO CUTS however badly it is cut. Both of these live in
+     * tab panels that are hidden until somebody selects them, so without
+     * `measured` this assert would have gone green by never having looked.
+     * `/kit/` names this failure in writing: it reads as a wrapping bug and is
+     * an attachment bug.
+     * ⚠️ SO THE CHECK SELECTS EACH TAB AND WAITS. The component re-renders
+     * itself on reveal through a `ResizeObserver`, which is what makes the
+     * picture correct for a visitor; this waits for that rather than assuming
+     * it, and puts the page back on the tab it found.
+     */
+````
+
+<a id="stage-243"></a>
+## stage-243: demo/stage/index.html, inline script, line 3080
+
+````js
+    // ⚠️ AND HERE IS THE ONLY PLACE ANY OF THEM REACH THE REPORT.
+````
+
+<a id="stage-244"></a>
+## stage-244: demo/stage/index.html, inline script, line 3090
+
+````js
+  /**
+   * 🔴 A PAGE WITH A REAL PIPELINE IN IT EARNS A DIAGRAM, and this one had
+   * none. `how: true` and NO title: the heading lives in `diagram.mjs` as
+   * `How it works` and a page that passes its own gets it refused, because
+   * `/station/` once shipped two headings stacked.
+   */
+````
+
+<a id="stage-245"></a>
+## stage-245: demo/stage/index.html, inline script, line 3096
+
+````js
+  /**
+   * ⚠️ `how` AND `atEnd` ARE THE THIRD ARGUMENT, NOT PART OF THE SPEC, AND
+   * PUTTING THEM IN THE SPEC IS A SETTING THAT READS AS CORRECT AND DOES
+   * NOTHING. Caught here by looking at the page: the standing heading simply
+   * was not there. This page has paid for the identical mistake once already,
+   * when it passed `clock: false` to a transport bar that has never had that
+   * option, and its own comment says so twenty lines up.
+   */
+````
+
+<a id="stage-246"></a>
+## stage-246: demo/stage/index.html, inline script, line 3104
+
+````js
+  /**
+   * 🔴 IT LIVES IN THE CONTROL ROOM AND THE ARCHIVE, NOT AT THE END OF THE
+   * PAGE. Asked 2026-09-18: *"move how it works to control room and archive"*.
+   * Under the tabs it belonged to all three panels and described none of them
+   * in particular, which on a tabbed page reads as a footnote to the navigation
+   * rather than an explanation of what you are looking at.
+   * ⚠️ **THIS DEPARTS FROM THE STANDING RULE AND CLAUDE.md WAS CHANGED WITH
+   * IT.** That rule says every diagram passes `{ how: true, atEnd: true }` and
+   * goes last on the page, and `atEnd` appends to `document.body` rather than
+   * to the host, so a panel needs `atEnd: false` or the picture leaves the tab.
+   * A rule and the code disagreeing is the failure this project keeps paying
+   * for, so they were changed together.
+   * ⚠️ **TWO INSTANCES FROM ONE DESCRIPTION**, the way the question already
+   * does it on this page: an element cannot be in two places, and two specs
+   * would drift.
+   * ⚠️ **AND THE AUDIENCE GETS NONE.** They are watching a show. How the
+   * picture reached them is the operator's question, and both panels that carry
+   * it are the operator's.
+   */
+````
+
+<a id="stage-247"></a>
+## stage-247: demo/stage/index.html, inline script, line 3123
+
+````js
+  /**
+   * 🔴 REDRAWN 2026-09-30 FOR ONE TRANSPORT AND A RECORDING THAT TRAVELS.
+   * It still drew a canvas publishing over WHIP, which this page stopped doing
+   * on 2026-09-25 when it became a pure receiver, and an audience box choosing
+   * between WebRTC and HLS. The container publishes now, and the control
+   * room's three parts are the three stages a person watches: the recorder,
+   * the local copy, and the playback.
+   * ⚠️ `join: false` ON THE CONTROL ROOM, WITH ITS ONE REAL ARROW DECLARED.
+   * The default would draw an arrow from IndexedDB to playback, and playback
+   * comes from R2, not from the local copy, except in a harness run.
+   */
+````
+
+<a id="stage-248"></a>
+## stage-248: demo/stage/index.html, inline script, line 3149
+
+````js
+      /**
+       * 🔴 ONE CLOUDFLARE MACHINE WITH ITS PARTS IN IT. Asked 2026-09-18 with a
+       * screenshot: *"put these 3 to cloudflare box"*, and arrows between them
+       * rather than brackets (*"need arrows"*). The publisher is the fourth
+       * part since the page became a pure receiver.
+       */
+````
+
+<a id="stage-249"></a>
+## stage-249: demo/stage/index.html, inline script, line 3155
+
+````js
+      /**
+       * 🔴 `set: true` WITH ITS ONE REAL ARROW DECLARED, SINCE 2026-10-05. The
+       * default chain drew Publisher to Stream to R2 to Relay as one pipeline,
+       * so the picture claimed Stream writes into R2 a box after Stream's own
+       * note said it records nothing, and that R2 feeds the relay. Only the
+       * first step is real. The rest are parts of one account, which is what
+       * a bracket says.
+       */
+````
+
+<a id="stage-250"></a>
+## stage-250: demo/stage/index.html, inline script, line 3175
+
+````js
+          /**
+           * 🔴 THE NOTE SAYS WHY THE QUESTION IS NOT IN THE VIDEO, BECAUSE THAT
+           * IS THE ONE THING A READER ASSUMES AND IT IS WRONG. Asked 2026-09-25:
+           * *"update diagram with good info how msg sync works"*.
+           */
+````
+
+<a id="stage-251"></a>
+## stage-251: demo/stage/index.html, inline script, line 3185
+
+````js
+      /**
+       * 🔴 `join: false`, SO NOTHING IS DRAWN BETWEEN THEM. Asked on sight
+       * 2026-09-18: *"why video has arrow to answer"*: a picture arriving does
+       * not produce a press.
+       */
+````
+
+<a id="stage-252"></a>
+## stage-252: demo/stage/index.html, inline script, line 3222
+
+````js
+  /**
+   * ⚠️ `atEnd: false` IS THE WHOLE DIFFERENCE, AND IT IS NOT A STYLE CHOICE.
+   * With `atEnd` the component appends to `document.body` and the host is
+   * ignored, so a diagram asked to live in a tab would have appeared under the
+   * page instead, looking exactly like the thing that was just moved.
+   */
+````
+
+<a id="stage-253"></a>
+## stage-253: demo/stage/index.html, inline script, line 3228
+
+````js
+  // 🔴 ONE DIAGRAM. There were two, one per panel, and folding the Archive tab
+  // into the control room put both of them in the same panel.
+````

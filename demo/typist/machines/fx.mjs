@@ -1,18 +1,7 @@
-// demo/typist/machines/fx.mjs: the fx box of /typist/machines/.
-//
-// Typewriter characters made from ONE Hermes Precisa 305 sample set, one per
-// positive index, every one generated from its number by the same logic
-// (asked: *"why handtuned? just universal logic?"*). A character is two
-// halves, and they live where each can be done:
-//   - `rate`, a playback rate per key type (letter, space, return, bell,
-//     delete). Pitch and length belong to the sampler, because a buffer's rate
-//     is set where it starts. The typewriter takes it from its own index input.
-//   - everything else, a chain of filters, a body, a little drive and a short
-//     room, built here as WebAudio nodes on the fx box.
-// The box builds the chosen chain on a switch and ramps the old and the new
-// output gains over FADE seconds, so a change in the middle of a strike does
-// not click. The same `chain()` runs on an OfflineAudioContext, which is how
-// the characters are measured against each other.
+// The fx box of /typist/machines/: one typewriter character per positive index, generated
+// from one Hermes Precisa 305 sample set by one rule. Rate belongs to the sampler; the
+// filter chain is built here and crossfaded over FADE seconds so a switch does not click.
+// See lessons/page-typist.md#typist-1
 
 import { mulberry32 } from '/shell/seed.mjs';
 
@@ -74,37 +63,25 @@ export function chain(c, ch, seed = 1) {
 }
 
 /**
- * The character for an index, 1 based, GENERATED from the index with no
- * special case, so the same index is always the same machine and every index
- * is a different one.
- * ⚠️ THE MAIN DIMENSIONS ARE A LOW DISCREPANCY SEQUENCE, NOT RANDOM DRAWS.
- * Seeded draws gave neighbours that sounded alike (2, 5 and 7 all keyed near
- * 1.2). Each main dimension k puts index n at frac(0.5 + n * a_k), a_k an
- * irrational step (the golden ratio for the pitch, square roots for the rest),
- * which spreads any run of consecutive indices evenly and never repeats
- * exactly; a seeded draw (mulberry32, `shell/seed.mjs`) only
- * jitters it and picks the minor things. Every range still sounds like a
- * typewriter, and the level comes down as the boosts and the drive go up, so
- * no index is broken or much louder than another.
+ * The character for an index, 1 based, generated with no special case. The main
+ * dimensions are a low discrepancy sequence (frac(0.5 + n * a_k)), not seeded draws,
+ * which made neighbours sound alike; the seed (shell/seed.mjs) only jitters.
+ * See lessons/page-typist.md#typist-2
  */
 // pitch, highpass, lowpass, peak frequency, peak gain, shelf gain, room length
 const ALPHA = [(Math.sqrt(5) - 1) / 2, Math.SQRT2 - 1, Math.sqrt(5) - 2, Math.sqrt(3) - 1,
                Math.sqrt(7) - 2, Math.sqrt(11) - 3, Math.sqrt(13) - 3];
 
-// 🔴 MACHINE 0 IS THE ORIGINAL (asked 2026-10-11, *"machine 0 should be
-// original (no paramter to fx)"*, *"or disabed / enabled signal you choose"*):
-// the index stays the one signal, and 0 means the fx box passes the sound
-// through untouched, every key at its recorded pitch. 1 and up are generated.
+// Machine 0 is the original: the fx box passes the sound through untouched, every key at
+// its recorded pitch. 1 and up are generated.
+// See lessons/page-typist.md#typist-3
 const ORIGINAL = { n: 0, name: 'Machine 0', amt: 0, rate: { key: 1, space: 1, return: 1, bell: 1, del: 1 }, level: 1, room: { ms: 0, wet: 0 } };
 
 /**
- * 🔴 DISTINCT, 0 TO 1: HOW FAR A MACHINE IS FROM THE ORIGINAL (asked 2026-10-11,
- * *"2 and 8 sounds too extreme. make it more closer to original in general.
- * distictivness as sepaate knob"*). Every parameter is drawn as before for the
- * index, then blended toward the original by `amt`: pitch in log steps toward
- * 1, the filters toward wide open, shelf, peak, drive and room toward none,
- * the grit toward 16 bits. 0 is the original for every index, 1 the full
- * machine. DISTINCT is the default.
+ * `amt`, 0 to 1, blends every drawn parameter toward the original (pitch to 1, filters
+ * open, shelf, peak, drive and room to none, grit to 16 bits). 0 is the original for
+ * every index, 1 the full machine; DISTINCT is the default.
+ * See lessons/page-typist.md#typist-4
  */
 export const DISTINCT = 0.35;
 
@@ -134,14 +111,10 @@ function machine(n) {
   const lin = (a, b, u = r()) => a + (b - a) * u;
   const log = (a, b, u = r()) => a * (b / a) ** u;
   const rd = (x, k = 100) => Math.round(x * k) / k;
-  // 🔴 NARROWER RANGES SINCE 2026-10-11, NOTHING METALLIC OR THIN. Asked:
-  // *"2 is reall metally, do not like"*, *"4 is metally and htin too"*, *"do not
-  // like those"*. At full distinctness 2 had a +5.9 dB peak at 3.7 kHz, Q 2,
-  // with drive, and 4 played 1.74 times fast through a 3.4 ms comb. So: pitch
-  // 0.8 to 1.15 (faster reads as thin and toy), the peak only in the body,
-  // 150 to 1500 Hz, gentle and broad, no comb, no bit grit, a light drive on a
-  // third of them, a low pass that only darkens, a small quiet room. Machines
-  // differ in pitch, body, warmth and room.
+  // Narrow ranges, so nothing sounds metallic or thin: pitch 0.8 to 1.15, a broad gentle
+  // peak only at 150 to 1500 Hz, no comb, no bit grit, light drive on a third, a low pass
+  // that only darkens, a small quiet room.
+  // See lessons/page-typist.md#typist-5
   const key = log(0.8, 1.15, at(0));
   const hp = log(30, 220, at(1));
   const lp = log(5000, 16000, at(2));
@@ -158,14 +131,14 @@ function machine(n) {
     hp: Math.round(hp), lp: Math.round(lp), shelf, peak, drive, bits, room, level };
 }
 
-/** Every index is named by its number (asked: *"all machine n's"*). */
+/* Every index is named by its number.
+   See lessons/page-typist.md#typist-6 */
 export const nameOf = (n) => `Machine ${n}`;
 
 /**
- * The fx box on a live context. `set(n)` builds that index's chain, feeds it,
- * ramps its output up and the old one's down over FADE, and drops the old
- * chain once the ramp is over, so at most two chains work, and only for the
- * length of a fade. Any positive index is a machine.
+ * The fx box on a live context. `set(n)` builds that index's chain and crossfades over
+ * FADE, then drops the old chain, so at most two chains run, only during a fade.
+ * See lessons/page-typist.md#typist-7
  */
 export function createFx(c, at = 1, trim = async () => 1) {
   const input = c.createGain(), output = c.createGain();
@@ -253,12 +226,10 @@ export async function render(buffer, n, kind = 'key', trim = 1, amt = DISTINCT) 
 }
 
 /**
- * THE LOUDNESS TRIM. The ranges above make every machine sound like a
- * typewriter but not equally loud: MEASURED before this, one strike through
- * indexes 1 to 12 ranged from 0.0064 to 0.047 RMS, 17 dB, and the quiet ones
- * read as broken. So each index is measured once, offline, on a letter
- * strike, and given the gain that brings it to the original strike's loudness, within 0.5 to 4.
- * Cached per index, so a switch back costs nothing.
+ * The loudness trim: untrimmed, indexes 1 to 12 spanned 0.0064 to 0.047 RMS (17 dB). Each
+ * index is measured once offline on a letter strike and gained to the original's
+ * loudness, within 0.5 to 4, cached per index.
+ * See lessons/page-typist.md#typist-8
  */
 // Every machine is trimmed to the loudness of the ORIGINAL strike, so
 // stepping from Machine 0 to any other changes the sound and not the level.

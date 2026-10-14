@@ -1,34 +1,6 @@
-// EXPERIMENT 7. WITHIN TAKE ADAPTATION, THROUGH THE CODE THAT SHIPS.
-//
-//   node demo/resources/chord-e7-take.mjs
-//
-// 🔴 WHAT THIS IS FOR. `plans/plan-better-chords-2026-09-25.md` section 6.2
-// measured the largest single gain in the whole document and nobody built it:
-// adapting on the first N chords of a piece and predicting the rest is worth
-// **+7.44 points of top 1 at N = 16**, where the entire step from a bigram to a
-// trigram was 4.5 points and justified downloading two corpora.
-//
-// 🔴 AND THAT NUMBER WAS MEASURED ON FULL COUNTS, NOT ON THE TABLE THAT SHIPS.
-// The same correction section 13 had to make for the temperature applies here:
-// `demo/resources/chord-tables.json` keeps five rows a context, drops anything
-// seen fewer than eight times and writes each probability as one character. A
-// gain measured on the unpruned counts is a gain about a table nobody has. So
-// every number below runs through `shipShape` and through `suggest.mjs`'s own
-// `adaptRows`, `sampleRow` and `rowsFor`.
-//
-// 🔴 EXPANSION IS OFF, WHICH IS THE CONSERVATIVE READING AND THE ONE TO QUOTE.
-// iRb writes a repeat as a repeat, and expanding it means the second half of a
-// piece literally contains the first. The plan measured +10.1 with expansion on
-// and +7.44 with it off, and said the difference is exactly the repetition the
-// corpus adds rather than anything learned about a person.
-//
-// 🔴 THE SELF FEEDING ARM IS A NEGATIVE CONTROL AND NOT A VARIANT. `/nola/`
-// carries a rule from a report reading *"you recorded a suggestion. why>"*, and
-// a suggester that learns from its own output writes its own line and calls it
-// yours. The arm named `SELF FED` below does exactly that on purpose, so the
-// trap has a number instead of a warning.
-//
-// It contacts nobody. tmp/chord-corpora/ is already on this disk.
+// Experiment 7: within-take adaptation through shipShape and suggest.mjs's own adaptRows,
+// sampleRow and rowsFor, expansion off. SELF FED is a negative control. Run with no args.
+// See lessons/page-resources.md#resources-9
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -88,11 +60,8 @@ function run(label, songs, temp, mix) {
 
   /* ── A. top 1, which is the plan's own measure ──────────────────────────── */
   console.log(`\n  A. ADAPT ON WHAT HAS BEEN PLAYED, THEN PREDICT THE REST`);
-  /* 🔴 THREE ARMS, BECAUSE THE PLAN'S WORDS AND THE PAGE'S BEHAVIOUR ARE NOT THE
-     SAME THING. The plan said *over the last sixteen to thirty two chords* and
-     MEASURED the FIRST N of a piece, which is a different window, and what a page
-     naturally does is neither: it accumulates everything since the take started.
-     All three are here so the sentence can be checked against the number. */
+  /* Three arms: the first N chords, the last N, and everything since the take started.
+     See lessons/page-resources.md#resources-10 */
   console.log(`     N  weight   world      first N   gain      last N   gain      all so far  gain`);
   for (const N of [8, 16, 32]) {
     for (const w of [0.1, 0.2, 0.25, 0.3, 0.5]) {
@@ -120,11 +89,8 @@ function run(label, songs, temp, mix) {
     }
   }
 
-  /* 🔴 THE SHIPPED DEFAULT, MEASURED AS ITS OWN ARM RATHER THAN INFERRED FROM
-     THE THREE ABOVE. `mkTake` keeps the last 64 chords at weight 0.25, which is
-     *everything so far* for any take shorter than 64 and a slow forget after
-     that. Quoting the `all so far` column for a windowed take would be quoting an
-     arm nobody runs. */
+  /* The shipped default as its own arm: mkTake keeps the last 64 chords at weight 0.25.
+     See lessons/page-resources.md#resources-11 */
   {
     const W = 64, w = mix, N = 16;
     let n = 0, hit = 0, hit0 = 0;
@@ -188,10 +154,8 @@ function run(label, songs, temp, mix) {
     for (let k = 0; k < walks.length; k++) {
       const wk = walks[k];
       let cx = [...wk.ctx];
-      /* 🔴 THE TAKE IS THE REAL CHORDS THAT CAME BEFORE, AND THE WALK'S OWN
-         OUTPUT NEVER JOINS IT. That is both the rule and the only way this
-         measurement means anything: a generator learning from itself is
-         measuring its own echo. */
+      /* The take is the real chords before; the walk's own output never joins it.
+         See lessons/page-resources.md#resources-12 */
       let take = stranger ? walks[(k + 1) % walks.length].take : (short ? wk.short : wk.take);
       const p = [];
       for (let i = 0; i < 10; i++) {

@@ -1,36 +1,7 @@
-// demo/code/sampler.mjs: the sampling core of /nola/, lifted for
-// the sampler concept pages (sampler/000, 010, 020) and pointed at our R2
-// bucket instead of the site's own static files.
-//
-// What is the same as /nola/ (demo/nola/index.html), and why it matters:
-//   - the RHODES is fifteen notes at uneven steps and five velocity layers,
-//     layer 1 the hardest, picked by the author's own SFZ crossfade table, with
-//     his fallback where two layers have holes;
-//   - a tie between two recordings goes to the lower one (his SFZ says so);
-//   - the damper is a ramp, never a stop(), and the pedal is /shell/pedal.mjs;
-//   - a key struck again damps the voice it is about to replace;
-//   - 64 voices, oldest taken first past that;
-//   - a note let go while its recording was still loading SOUNDS and is damped
-//     at once, rather than being dropped or ringing on;
-//   - every URL is fetched and decoded once.
-//
-// THE PIANO IS THE SALAMANDER GRAND (plans/plan-piano-samples.md), since
-// 2026-10-11, replacing /nola/'s FluidR3 render, which MEASURED brighter than
-// a Yamaha C5 struck as hard as it can be, phase cancelling above middle C and
-// cut dead at 3.13 s. Thirty notes three apart, A0 to C8 (the same grid, so
-// `nearestIn` is unchanged), four velocity bands hard switched (v1, v6, v11,
-// v16 of Salamander's sixteen), capped at 8 s with a 1.5 s fade, and the 88
-// key-off release samples played when the damper falls. Made by
-// demo/resources/fetch-salamander.mjs, served from R2 at sampler/salamander/web/.
-// A press fetches ONE file, the one it plays; the rest of its octave, the
-// octave's releases and the other bands follow behind it, one file at a time.
-// The FluidR3 piano is still here as PIANO_FLUID (program 2) and still in R2
-// at sampler/piano/, so nothing that pointed at it breaks.
-//
-// What is different from /nola/: the files come from R2 (`positron-station`,
-// served by the station worker at /media/, CORS `*`), nothing at all is opened
-// before the first note, and an instrument is chosen by a MIDI program change
-// (0 piano, 1 Rhodes), which is how every instrument on this desk is switched.
+// /nola/'s sampling core (Rhodes layers, ramp damper via /shell/pedal.mjs, 64 voices) on files
+// from R2 at /media/: the Salamander grand (program 0), Rhodes (1), FluidR3 as PIANO_FLUID (2).
+// Nothing opens before the first note; a press fetches only the file it plays, the rest follow.
+// See lessons/page-code.md#code-43
 import { createPedal, SUSTAIN_CC } from '/shell/pedal.mjs';
 
 export const BASE = 'https://positron-station.kristjan-jansen.workers.dev/media/sampler/';
@@ -47,12 +18,13 @@ export const nearestIn = (notes, note) => notes.reduce(
 export const VOICES = 64;
 /** How long a note sounds whose key was already up when its recording arrived. */
 const LATE_S = 0.3;
-/** The loudest FluidR3 piano file, measured on /nola/ 2026-09-22 by decoding all thirty. */
+/* The loudest FluidR3 piano file, measured by decoding all thirty.
+   See lessons/page-code.md#code-44 */
 const FLUID_PEAK = 0.097;
 /**
- * The loudest Salamander v16 file as encoded, decoded back, from
- * PROVENANCE-salamander.json (`peak.web`). ONE number for the whole set, so the
- * 18 dB the recordings carry between v1 and v16 is kept (plan section 4.2).
+ * The loudest Salamander v16 file as encoded, from PROVENANCE-salamander.json (`peak.web`).
+ * One number for the whole set, so the 18 dB between v1 and v16 is kept.
+ * See lessons/page-code.md#code-45
  */
 const SALAMANDER_PEAK = 0.9085;
 /** The loudest Rhodes file, from PROVENANCE-rhodes.json. */
@@ -67,8 +39,9 @@ export const velGain = (ins, vel) => (ins.gain ? ins.gain(vel)
   : (LOUDEST / ins.peak) * Math.pow(clampVel(vel) / 127, 1.5));
 
 /**
- * The Salamander's four bands, hard switched, no crossfade (plan section 4.1).
+ * The Salamander's four bands, hard switched, no crossfade.
  * Salamander's own SFZ ranges for these files are 1-26, 47-50, 81-88, 121-127.
+ * See lessons/page-code.md#code-46
  */
 export const PIANO_BANDS = Object.freeze([
   { layer: 1, lo: 1, hi: 40 },
@@ -80,9 +53,9 @@ export const bandOf = (vel) => { const v = clampVel(vel); return PIANO_BANDS.fin
 /** The Salamander layer a velocity plays. */
 export const bandFor = (vel) => bandOf(vel).layer;
 /**
- * Within a band the level rises 6 dB from its bottom to its top; between bands
- * the recordings carry the step themselves. INFERRED in the plan (section 4.2)
- * from Salamander's own `amp_veltrack=75`; tune by ear.
+ * Within a band the level rises 6 dB from bottom to top; between bands the recordings carry
+ * the step. Inferred from Salamander's `amp_veltrack=75`; tune by ear.
+ * See lessons/page-code.md#code-47
  */
 export const BAND_SPAN_DB = 6;
 export function pianoGain(vel) {
@@ -91,9 +64,9 @@ export function pianoGain(vel) {
   return (LOUDEST / SALAMANDER_PEAK) * Math.pow(10, db / 20);
 }
 /**
- * A key-off sample's level, from Salamander's Data/hammer.txt: `volume=-37`,
- * `amp_veltrack=82` on SFZ's default square curve, `rt_decay=2` dB for every
- * second the note was held. On the set's one normalising constant.
+ * A key-off sample's level, from Salamander's Data/hammer.txt: `volume=-37`, `amp_veltrack=82`
+ * on SFZ's default square curve, `rt_decay=2` dB per second held. On the set's one constant.
+ * See lessons/page-code.md#code-48
  */
 export const RELEASE_DB = -37;
 export function releaseGain(vel, heldSec = 0) {
@@ -168,7 +141,8 @@ export const PIANO = {
     ].filter(Boolean);
   },
 };
-/** /nola/'s FluidR3 piano, as it was before 2026-10-11, at program 2. Still in R2 at sampler/piano/. */
+/* The FluidR3 piano at program 2. Still in R2 at sampler/piano/.
+   See lessons/page-code.md#code-49 */
 export const PIANO_FLUID = {
   id: 'piano-fluid', name: 'FluidR3 piano', program: 2,
   notes: PIANO_NOTES, peak: FLUID_PEAK,
@@ -192,6 +166,7 @@ export const RHODES = {
 /**
  * What one press needs in hand before it sounds: one Salamander file, an
  * octave of the FluidR3 piano, or every layer of one Rhodes note.
+ * See lessons/page-code.md#code-50
  */
 export function planFor(ins, near, layer) {
   if (ins.plan) return ins.plan(near, layer);
@@ -201,10 +176,8 @@ export function planFor(ins, near, layer) {
 }
 
 /**
- * A sampler engine. Takes MIDI-shaped events ({ cls, d1, d2 }) on `midi(ev)`:
- * notes, CC 64 as the damper pedal, and a program change that picks one of
- * `instruments` by its `program` number.
- *
+ * A sampler engine: `midi(ev)` takes { cls, d1, d2 }: notes, CC 64 as the damper, and a
+ * program change that picks one of `instruments` by its `program` number.
  * @param {object} o
  * @param {object[]} [o.instruments]  PIANO, and RHODES if the page has it
  * @param {(line:string, kind?:string)=>void} [o.log]
@@ -212,6 +185,7 @@ export function planFor(ins, near, layer) {
  * @param {(ins:object)=>void} [o.onProgram]  the instrument changed
  * @param {number[]} [o.warm]  [lo, hi] notes to fetch when an instrument is switched to
  * @param {() => AudioContext} [o.context]  a context to play in; left out, the first note makes one
+ * See lessons/page-code.md#code-51
  */
 export function createSampler({ instruments = [PIANO], log = () => {}, onFetch = () => {},
   onProgram = () => {}, warm = null, context = null } = {}) {
@@ -302,10 +276,9 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
   function room() { while (voices.length >= VOICES) take(voices[0]); }
 
   /**
-   * The key-off sound, when the damper actually lands on a sounding string.
-   * Not on a key up under the pedal (pedal.mjs never calls release then), not
-   * on a key struck again, not on a steal. Skipped in silence if its file has
-   * not arrived yet: it is a detail, and a press never waits for it.
+   * The key-off sound, when the damper lands on a sounding string: not under the pedal, not on
+   * a restrike, not on a steal. Skipped if its file has not arrived; a press never waits for it.
+   * See lessons/page-code.md#code-52
    */
   function keyOff(v) {
     const ins = instruments.find((x) => x.id === v.inst);
@@ -367,10 +340,9 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
     stat.started++;
     stat.last = { inst: ins.id, note, near, layer, rate: +v.rate.toFixed(4), file: url.split('/').pop() };
     stat.firstAt ??= performance.now();
-    // A note whose key came up while its file was loading (the press that
-    // wakes the sampler, almost always, as a click is shorter than a fetch)
-    // sounds for LATE_S and is then damped. /nola/ damps it at once, which on
-    // a first click is a blip too short to hear as the key you pressed.
+    // A note whose key came up while its file was loading sounds for LATE_S, then is damped;
+    // damping at once makes a first click a blip too short to hear.
+    // See lessons/page-code.md#code-53
     if (alreadyUp) {
       stat.late++;
       setTimeout(() => { if (!held.has(note) && !pedal.down() && !v.damped) { damp(v, pedal.damper()); keyOff(v); } }, LATE_S * 1000);
