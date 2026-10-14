@@ -213,11 +213,28 @@ export function createMidiNode({ slug, log = () => {}, listen = null, tap = fals
     return true;
   }
 
+  /* Opens still in flight, by key. `openBoard` can take seconds, so a second
+     request for the same link joins the first, and a close marks it cancelled. */
+  const pending = new Map();
+
   /** The answer to a `link.request` for one of this page's ports. */
   async function answer({ source, target, open }) {
     const key = `${source} ${target}`;
-    if (!open) { closeOne(key); return { ok: true }; }
+    if (!open) {
+      const p = pending.get(key);
+      if (p) p.cancelled = true;
+      closeOne(key);
+      return { ok: true };
+    }
     if (opened.has(key)) return { ok: true, why: 'already open' };
+    if (pending.has(key)) return pending.get(key).done;
+    const p = { cancelled: false };
+    p.done = openOne(key, source, target, p).finally(() => pending.delete(key));
+    pending.set(key, p);
+    return p.done;
+  }
+
+  async function openOne(key, source, target, p) {
     if (!mg.present(source)) return { ok: false, why: `${source} is not plugged in here` };
     let h;
     try {
@@ -234,6 +251,10 @@ export function createMidiNode({ slug, log = () => {}, listen = null, tap = fals
         h = await openBoard(source, to);
       }
     } catch (e) { return { ok: false, why: String(e?.message || e) }; }
+    if (p.cancelled) {
+      try { h.close(); } catch { /* already gone */ }
+      return { ok: false, why: `${source} -> ${target} was closed while it was opening` };
+    }
     opened.set(key, h);
     showBadge(h, `${source} -> ${target}`);
     log(`${source} -> ${target} opened, asked for by the patchbay`, 'ok');
@@ -249,6 +270,7 @@ export function createMidiNode({ slug, log = () => {}, listen = null, tap = fals
     return node.me();
   }
   function leave() {
+    for (const p of pending.values()) p.cancelled = true;
     for (const k of [...opened.keys()]) closeOne(k);
     node.leave();
     group.enable('join', true);
@@ -427,6 +449,14 @@ export async function checkMidiNode({ assert, log, page, slug, tap = false }) {
     const r4 = await bayPeer.request(evoOut, CIRCUIT_IN, true, { timeoutMs: 1500 });
     assert('under the harness a link to the board’s Circuit is refused in words, because no stand-in board is on this machine',
       r4?.open === false && /no stand-in board/.test(r4.why || ''), r4?.why);
+    // NEGATIVE CONTROL: two requests for one link while it is opening share one
+    // open. Each used to run its own `openBoard`, and the first board was never closed.
+    const [a, b] = await Promise.all([
+      scratch.answer({ source: evoOut, target: CIRCUIT_IN, open: true }),
+      scratch.answer({ source: evoOut, target: CIRCUIT_IN, open: true }),
+    ]);
+    assert('a second request for a link that is still opening joins the first rather than opening another',
+      a === b, a === b ? 'one answer' : 'two separate opens');
     log('the link to the board was graded as a refusal; a run with a stand-in board grades it for real '
       + '(node demo/fake-board.mjs, then DEMO_QUERY="relay=ws://127.0.0.1:8897&board=1")', 'dim');
   } else if (!driving) {

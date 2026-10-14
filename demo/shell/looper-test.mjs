@@ -10,10 +10,10 @@
 // half. None of those needs a browser to catch, and the page that carried them
 // is one no harness may open.
 //
-// FOUR OF THESE ARE NEGATIVE CONTROLS: they are written so that the bug they
+// SIX OF THESE ARE NEGATIVE CONTROLS: they are written so that the bug they
 // describe would fail them, rather than so that today's code passes.
 
-import { ringOrder, planVoice, headOf, LOOP_WAYS, LOOP_TURN, WAY_GLYPH, LOOP_SAYS,
+import { createLooper, ringOrder, planVoice, headOf, LOOP_WAYS, LOOP_TURN, WAY_GLYPH, LOOP_SAYS,
   CHOP_DIV, CHOP_MIN_S } from './looper.mjs';
 
 let pass = 0, fail = 0;
@@ -190,6 +190,47 @@ ok('every way the button can reach has a glyph and a sentence',
   const strings = [...Object.values(LOOP_SAYS), ...Object.values(WAY_GLYPH)];
   ok('no em dash in anything the button says', strings.every((s) => !s.includes('—')),
     `${strings.length} strings`);
+}
+
+// 19 and 20. NEGATIVE CONTROLS. `setRate` while a loop runs, through the real
+//     looper on a fake AudioContext. The head must not jump at the change and
+//     must then move at the new rate; a way change must pick up from there.
+{
+  const sr = 1000;
+  const param = () => ({ value: 1, setTargetAtTime() {}, cancelScheduledValues() {},
+    setValueAtTime() {}, linearRampToValueAtTime() {} });
+  const node = () => ({ connect() {}, disconnect() {} });
+  const ctx = {
+    sampleRate: sr, currentTime: 0, destination: node(),
+    createGain: () => ({ ...node(), gain: param() }),
+    createScriptProcessor: () => (ctx.tap = node()),
+    createBuffer: (ch, n, rate) => {
+      const data = Array.from({ length: ch }, () => new Float32Array(n));
+      return { numberOfChannels: ch, length: n, sampleRate: rate, duration: n / rate,
+        getChannelData: (c) => data[c] };
+    },
+    createBufferSource: () => ({ ...node(), playbackRate: param(), start() {}, stop() {} }),
+  };
+  const lp = createLooper({ seconds: 8, channels: 1 });
+  const tap = node();
+  lp.attach(ctx, { tap, out: node() });
+  lp.keep();
+  // Four seconds into the ring, fed the way the script processor would.
+  const fill = { inputBuffer: { length: 4 * sr, numberOfChannels: 1, getChannelData: () => new Float32Array(4 * sr) } };
+  ctx.tap.onaudioprocess(fill);
+  lp.close();
+  ctx.currentTime = 1;                       // one second in at 1x
+  const before = lp.headFrac();
+  lp.setRate(2);
+  const at = lp.headFrac();
+  ctx.currentTime = 1.5;                     // half a second at 2x is one second of sound
+  const after = lp.headFrac();
+  ok('NEGATIVE CONTROL: a rate change neither jumps the head nor leaves it at the old rate',
+    before !== null && near(before, 0.25) && near(at, 0.25) && near(after, 0.5),
+    `${before} then ${at} at the change, ${after} half a second later at 2x`);
+  lp.setWay(LOOP_TURN[1]);                   // ← from where the sound is
+  ok('NEGATIVE CONTROL: and the next way change picks the sound up where it is',
+    near(lp.headFrac(), 0.5, 1e-6), `${lp.headFrac()} after turning back`);
 }
 
 console.log(`\n${pass} ok · ${fail} failed`);

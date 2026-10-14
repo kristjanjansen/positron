@@ -167,6 +167,12 @@ export function createHero({ tag = 'h2' } = {}) {
   frame.append(inner);
   big.append(frame);
   const life = createBayTraffic();
+  // The traffic rows are added once per wire and keep this one view object,
+  // which each draw points at the picture that is up. Adding per draw grew the
+  // rows every time the width crossed 560 px.
+  let current = null, idOf = new Map();
+  const live = { wires: { get: (k) => current?.wires.get(idOf.get(k)) } };
+  const added = new Set(), feed = feeds();
   const phoneQ = matchMedia('(max-width: 560px)');
   let drawW = 0;
   // Drawn at a fixed width (760 at the desk, 520 on a phone, each above the
@@ -180,8 +186,15 @@ export function createHero({ tag = 'h2' } = {}) {
     inner.style.width = `${drawW}px`;
     const view = createBayView(bay, opts);
     inner.replaceChildren(view.el);
-    const feed = feeds();
-    for (const l of bay.links()) life.add(view, l.id, bay.portMap.get(l.from).medium, feed[l.from]);
+    const wireKey = (l) => `${l.from} ${l.to}`;
+    current = view;
+    idOf = new Map(bay.links().map((l) => [wireKey(l), l.id]));
+    for (const l of bay.links()) {
+      const k = wireKey(l);
+      if (added.has(k)) continue;
+      added.add(k);
+      life.add(live, k, bay.portMap.get(l.from).medium, feed[l.from]);
+    }
     createPortInk({ ports: () => bay.ports() }, MEDIA).paint(frame);
     requestAnimationFrame(fit);
   }

@@ -522,7 +522,9 @@ export function createKnob({
     const target = clamp(Number(next));
     if (!Number.isFinite(target)) return v;
     if (!force && (dragging || now() - userAt < RECEIVE_HOLD_MS)) { got.ignored++; return v; }
-    if (dragging) dragging = false;
+    // A forced value mid-drag ends the drag the way a lift does, or the pointer
+    // stays captured and an auto-moving knob is never resumed.
+    if (dragging) endDrag(dragId);
     got.n++; got.last = target; got.from = src;
     from = src;
     if (src === 'hardware') hw++;
@@ -561,7 +563,7 @@ export function createKnob({
   // handlers below name it, and they must not be reading a variable in its dead
   // zone if one of them ever runs during construction.
   let handApi = null;
-  let dragging = false, acc = 0;
+  let dragging = false, acc = 0, dragId = null;
 
   svg.addEventListener('pointerdown', (e) => {
     if (off) return;
@@ -572,6 +574,7 @@ export function createKnob({
     stopGlide();
     dragging = true;
     acc = 0;
+    dragId = e.pointerId;
     svg.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
@@ -601,15 +604,15 @@ export function createKnob({
     acc = (want - got) / per;
   });
 
-  const stop = (e) => {
-    if (!dragging) return;
+  function endDrag(id) {
     dragging = false;
     userAt = now();
-    try { svg.releasePointerCapture(e.pointerId); } catch { /* already gone */ }
+    try { svg.releasePointerCapture(id); } catch { /* already gone */ }
     // A lift resumes it at once. Only a `set()` with no lift has to wait out
     // `HAND_YIELD_MS`, which is the arrow-key case below.
     handApi?.resume();
-  };
+  }
+  const stop = (e) => { if (dragging) endDrag(e.pointerId); };
   svg.addEventListener('pointerup', stop);
   svg.addEventListener('pointercancel', stop);
 

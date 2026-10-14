@@ -1018,7 +1018,8 @@ export function createTransportBar(host, deck, {
   // the transport back to the start when you ask for play again. Restarting is
   // well defined in this library in a way it is not for a media element: a
   // backward seek replays each event exactly once.
-  toggle.addEventListener('click', () => {
+  // Space goes through this too, so a key never skips `stopLap()` or `leaveEnd()`.
+  function pressToggle() {
     // A reversed lap is playing even though the deck is not, so pausing one is
     // stopping the driver rather than pausing a transport that is already
     // stopped. Pressing play again picks the lap up where it left off.
@@ -1027,7 +1028,8 @@ export function createTransportBar(host, deck, {
     if (loopA != null && loopB != null && wayName() !== 'round') return startLap();
     if (endStop && (atEnd || (seekable && deck.position() >= range[1]))) leaveEnd(range[0]);
     cmd.play();
-  });
+  }
+  toggle.addEventListener('click', pressToggle);
   function leaveEnd(to) { atEnd = false; clearNote(); cmd.seek(to); }
 
   function seekFromEvent(e) {
@@ -1464,7 +1466,7 @@ export function createTransportBar(host, deck, {
     // ⚠️ NOT ON A BAR WITH NO TOGGLE. The space bar is the keyboard's name for
     // the play button, so on a page that has none it would be a shortcut to a
     // control nobody can see, and on `/keys/` the space bar is over a piano.
-    if (e.key === ' ') { if (!wantToggle) return; e.preventDefault(); deck.playing?.() ? cmd.pause() : cmd.play(); }
+    if (e.key === ' ') { if (!wantToggle) return; e.preventDefault(); pressToggle(); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); doSeek(Math.min(b, cur + step)); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); doSeek(Math.max(a, cur - step)); }
     else if (/^[0-9]$/.test(e.key)) { e.preventDefault(); doSeek(fracToPos(Number(e.key) / 10)); }

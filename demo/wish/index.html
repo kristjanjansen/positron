@@ -450,7 +450,7 @@
   import { createGlue } from '/shell/glue.mjs';
   import { createTable } from '/shell/table.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { createBay, printLink, checkTransforms, delivers, classOf, OP_HELP } from '/shell/bay.mjs';
+  import { createBay, printLink, checkTransforms, delivers, eventOf, isNoteOff, OP_HELP } from '/shell/bay.mjs';
   import { describe, reword } from '/shell/instruments.mjs';
   import { decode } from '/shell/midi-decode.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
@@ -1385,7 +1385,7 @@
    */
   function toBytes(ev) {
     const ch = Math.max(0, Math.min(15, (ev.ch ?? 1) - 1));
-    if (ev.cls === 'note') return [(ev.d2 === 0 ? 0x80 : 0x90) | ch, ev.d1, ev.d2 ?? 0];
+    if (ev.cls === 'note') return [(isNoteOff(ev) ? 0x80 : 0x90) | ch, ev.d1, ev.d2 ?? 0];
     if (ev.cls === 'cc') return [0xb0 | ch, ev.d1, ev.d2 ?? 0];
     if (ev.cls === 'bend') return [0xe0 | ch, ev.d1 ?? 0, ev.d2 ?? 64];
     return null;
@@ -1437,8 +1437,7 @@
    */
   function wireSource(id, port) {
     port.onmidimessage = (e) => {
-      const m = decode(Array.from(e.data));
-      desk.send(id, { cls: classOf(m), ch: m.ch, d1: m.d1, d2: m.d2 });
+      desk.send(id, eventOf(decode(Array.from(e.data))));
     };
   }
 
@@ -4831,6 +4830,15 @@
       d.assert('a class the far end does not consent to is dropped at the boundary and counted',
         at() === beforePc && link.dropped === 1 && link.sent === 1,
         `${at() - beforePc} message(s) arrived, ${link.dropped} dropped and ${link.sent} sent`);
+
+      /* A note off with a release velocity (0x81 60 64) must leave as a note
+         off. Read as "note with d2 > 0" it went out as 0x91 and re-struck the key. */
+      const beforeRelease = at();
+      ins.get(REPAIRED[0].from).onmidimessage({ data: [0x81, 60, 64] });
+      const rel = heardBytes.slice(beforeRelease);
+      d.assert('a note off with a release velocity crosses as a note off, never a note on',
+        rel.length === 1 && rel[0].bytes[0] === 0x81 && rel[0].bytes[1] === 61 && rel[0].bytes[2] === 64,
+        `[${(rel[0]?.bytes ?? []).map((b) => b.toString(16)).join(' ')}] from 81 3c 40`);
 
       /* 🔴 `×` IS BOTH HALVES IN ONE GESTURE, AND IT QUIETENS WHAT IT WAS
          REACHING. This page's own FACTS say the Model 12's REC buttons send no

@@ -27,7 +27,7 @@
 // is in the plan as `12 byte header`. It compares number and unit now.
 
 import { createBay, apply, delivers, printLink, parseLink, printPatch, parsePatch,
-  classOf, checkTransforms, CLASSES, MEDIA, STALE_MS, OP_NAMES, OP_HELP,
+  classOf, eventOf, isNoteOff, checkTransforms, CLASSES, MEDIA, STALE_MS, OP_NAMES, OP_HELP,
   OP_SAYS, HEAVY, NODE_KINDS, WHERE, TRANSPORTS, chooseTransport,
   RELAY, READS, TRANSPORT_NAMES, MACHINE_ONLY } from './bay.mjs';
 import { STALE_MS as REGISTRY_STALE_MS } from './graph-registry.mjs';
@@ -426,6 +426,22 @@ console.log('\n== the patch bay ==');
   ok('NEGATIVE CONTROL: and it leaves a note off alone, or a release becomes a second note on',
     apply(fixed, n(0))?.d2 === 0,
     'the release stays 0');
+}
+{
+  // A note off sent as `0x80 nn 64` keeps its release velocity, so it has to be
+  // known by its status, not by `d2 === 0`. Each of these went wrong without it.
+  const off = eventOf(decode([0x80, 60, 64]));
+  ok('NEGATIVE CONTROL: 0x80 with a release velocity is a note off', isNoteOff(off) && off.d2 === 64,
+    JSON.stringify(off));
+  ok('NEGATIVE CONTROL: 0x90 with a velocity is not a note off',
+    !isNoteOff(eventOf(decode([0x90, 60, 64]))), 'note on');
+  ok('NEGATIVE CONTROL: a release passes a soft layer it could never enter',
+    isNoteOff(apply([{ op: 'vrange', lo: 70 }], off) ?? {}), 'the hard layer still hears its off');
+  ok('NEGATIVE CONTROL: velocity and fixed leave a release velocity alone',
+    apply([{ op: 'velocity', scale: 0.5 }], off)?.d2 === 64 && apply([{ op: 'fixed', to: 96 }], off)?.d2 === 64,
+    'a 64 release stays 64');
+  ok('a transform keeps the note off flag', apply([{ op: 'transpose', by: 1 }], off)?.off === true,
+    'transpose spreads the event');
 }
 {
   /* 🔴 THE NAME IS THE THING'S NAME AND NEVER ITS KEY SINCE 2026-09-22. This

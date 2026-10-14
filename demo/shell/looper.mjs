@@ -154,6 +154,16 @@ export function planVoice({ way, unit, fromFrac = null, rate = 1 }) {
 }
 
 /**
+ * Where the voice is reading, in seconds of the buffer it reads.
+ * ⚠️ FROM WHERE THE VOICE WAS TOLD TO BEGIN (`off`), not from the top of its
+ * lap: a way change picks the sound up where it already was.
+ */
+function voicePos({ lapFrom, lapTo, off, rate, elapsed }) {
+  const lap = lapTo - lapFrom;
+  return lapFrom + (((off - lapFrom) + Math.max(0, elapsed) * rate) % lap);
+}
+
+/**
  * Where the SOUND is, as a fraction of the kept seconds a picture draws.
  *
  * From the voice's own clock rather than from a deck's, because a deck's
@@ -167,13 +177,8 @@ export function planVoice({ way, unit, fromFrac = null, rate = 1 }) {
  * return, which is the half a reader is listening for.
  */
 export function headOf({ back, ping, unit, lapFrom, lapTo, off, rate, elapsed }) {
-  const lap = lapTo - lapFrom;
-  if (!(lap > 0) || !(unit > 0)) return null;
-  const into = Math.max(0, elapsed) * rate;
-  // ⚠️ FROM WHERE THE VOICE WAS TOLD TO BEGIN, not from the top of its lap. A
-  // way change picks the sound up where it already was, so a head computed from
-  // `lapFrom` alone runs a whole lap out of step with what you hear.
-  const at = lapFrom + (((off - lapFrom) + into) % lap);
+  if (!(lapTo - lapFrom > 0) || !(unit > 0)) return null;
+  const at = voicePos({ lapFrom, lapTo, off, rate, elapsed });
   const f = ping ? (at <= unit ? at : 2 * unit - at)
     : back ? unit - at
     : at;
@@ -446,9 +451,19 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
     rate: () => rate,
     setRate(r) {
       rate = r;
+      if (!src) return;
       // `half` still halves it from the code, so the row and the way multiply
       // rather than fight.
-      if (src) src.playbackRate.value = (LOOP_WAYS[way][1] === 'half' ? 0.5 : 1) * r;
+      const next = (LOOP_WAYS[way][1] === 'half' ? 0.5 : 1) * r;
+      // Re-anchor the voice's clock where the sound is now. Without it the head
+      // runs at the old rate and the next way change restarts from the wrong place.
+      const now = ctx.currentTime;
+      if (now > at) {
+        off = voicePos({ lapFrom, lapTo, off, rate: voiceRate, elapsed: now - at });
+        at = now;
+      }
+      voiceRate = next;
+      src.playbackRate.value = next;
     },
 
     way: () => way,

@@ -195,6 +195,21 @@ export function classOf(m) {
   return kindOfDecoded(m);
 }
 
+/**
+ * A decoded message as a bay event. A note off keeps its release velocity and
+ * says `off: true`, so `0x80 nn 64` is never read as a note on.
+ */
+export function eventOf(m) {
+  const ev = { cls: classOf(m), ch: m.ch, d1: m.d1, d2: m.d2 };
+  if (m?.kind === 'note off') ev.off = true;
+  return ev;
+}
+
+/** A note off is `off: true` or a note on at velocity 0. */
+export function isNoteOff(ev) {
+  return ev?.cls === 'note' && (ev.off === true || ev.d2 === 0);
+}
+
 // ── transforms ────────────────────────────────────────────────────────────
 //
 // 🔴 A TRANSFORM IS A PLAIN OBJECT, NOT A FUNCTION, and that is what makes the
@@ -239,7 +254,7 @@ const OPS = {
     eg: { op: 'velocity', scale: 0.5 },
     classes: (set) => set,
     run: (ev, a) => {
-      if (ev.cls !== 'note' || ev.d2 === 0) return ev;
+      if (ev.cls !== 'note' || isNoteOff(ev)) return ev;
       return { ...ev, d2: Math.max(1, Math.min(127, Math.round(ev.d2 * a.scale))) };
     },
   },
@@ -307,8 +322,8 @@ const OPS = {
   /**
    * 🔴 A VELOCITY LAYER: soft hits one instrument and hard hits another, which
    * is how a real split-by-touch is built.
-   * 🔴 AND A NOTE OFF CARRIES VELOCITY 0, SO A NAIVE FILTER LEAVES EVERY NOTE
-   * HANGING. `d2 === 0` is the off and it passes ALWAYS, whatever the window
+   * 🔴 A NOTE OFF (`isNoteOff`, a velocity 0 or `off: true`) passes ALWAYS,
+   * whatever the window
    * is: dropping it would mean a note let through by a hard hit is never told
    * to stop, and a stuck note on a synth in another building is the worst thing
    * in this file. The test asserts the off passes a window it could not enter.
@@ -319,7 +334,7 @@ const OPS = {
     eg: { op: 'vrange', lo: 1, hi: 63 },
     classes: (set) => set,
     run: (ev, a) => {
-      if (ev.cls !== 'note' || ev.d2 === 0) return ev;
+      if (ev.cls !== 'note' || isNoteOff(ev)) return ev;
       const lo = a.lo === undefined ? 1 : a.lo;
       const hi = a.hi === undefined ? 127 : a.hi;
       return (ev.d2 < lo || ev.d2 > hi) ? null : ev;
@@ -340,7 +355,7 @@ const OPS = {
     eg: { op: 'fixed', to: 96 },
     classes: (set) => set,
     run: (ev, a) => {
-      if (ev.cls !== 'note' || ev.d2 === 0) return ev;
+      if (ev.cls !== 'note' || isNoteOff(ev)) return ev;
       return { ...ev, d2: Math.max(1, Math.min(127, Math.round(a.to))) };
     },
   },

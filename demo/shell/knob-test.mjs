@@ -240,6 +240,12 @@ function driveDrag({ min, max, step = 0, from, pixels, each = 1 }) {
     pts.map((p) => p.toFixed(3)).join(' '));
   is('the glide is short enough to read as a turn and not a wait',
     RECEIVE_GLIDE_MS >= 120 && RECEIVE_GLIDE_MS <= 200, `${RECEIVE_GLIDE_MS} ms`);
+  // NEGATIVE: a forced value mid-drag ends the drag through the lift's own path.
+  // `dragging = false` alone left pointerup returning early: capture held, hand parked.
+  is('a forced value mid-drag ends the drag as a lift does, releasing capture and resuming the hand',
+    /if \(dragging\) endDrag\(dragId\)/.test(fn) && !/dragging = false/.test(fn)
+    && /releasePointerCapture\(id\)[\s\S]*handApi\?\.resume\(\)/.test(code.slice(code.indexOf('function endDrag(id)'), code.indexOf('const stop ='))),
+    'receive calls endDrag');
 }
 
 console.log(`\n${ok} ok, ${bad} failed`);
