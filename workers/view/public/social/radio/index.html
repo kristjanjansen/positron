@@ -25,9 +25,13 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { fromFirstFrame } from '/shell/mp3-frames.mjs';
   import { createMix, pinkNoise } from '/shell/tuner-mix.mjs';
-  import { createReel, field, font, drawWordmark, drawLowerLine, W, H, X, TEXT_W, SAFE_TOP, C } from '/shell/reel.mjs';
+  import { createReel, field, font, drawWordmark, drawLowerLine, svgImage, W, H, X, TEXT_W, SAFE_TOP, SAFE_BOTTOM, C } from '/shell/reel.mjs';
+  import { sliderLook, drawSlider, knobLeft, MARK } from '/shell/slider-canvas.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
+  import { drawBay } from '/shell/bay-svg.mjs';
 
-  // A radio reel: a needle sweeps a dial across three of our own recordings, by
+  // A radio reel: the kit slider sweeps across three of our own recordings, by
   // /radio/tuner/'s maths. Every sound and frame is a function of deck position,
   // so a seek, a scrub and a recorded take all hear and show the same thing.
   // See lessons/page-social.md#social-1
@@ -38,10 +42,10 @@
   const STATIONS = [
     { id: 'raadio2', label: 'Raadio 2', short: 'R2', key: 'radio/raadio2/2026-10-11.mp3', at: 0.2, echo: 0.09, from: 20, rate: 16000 },
     { id: 'raadio4', label: 'Raadio 4', short: 'R4', key: 'radio/raadio4/2026-10-11.mp3', at: 0.5, echo: 0.11, from: 40, rate: 16000 },
-    { id: 'ida', label: 'Ida', short: 'IDA', key: 'radio/ida/2026-10-11.aac', at: 0.8, echo: 0.13, from: 111.5, rate: 40302 },
+    { id: 'ida', label: 'Ida', short: 'Ida', key: 'radio/ida/2026-10-11.aac', at: 0.8, echo: 0.13, from: 111.5, rate: 40302 },
   ];
   const END = 14000, SPAN = 16;   // the take, and how many seconds of each recording to fetch
-  // The needle's path, [ms, dial]: noise, Raadio 2, Raadio 4, Ida, each held.
+  // The handle's path, [ms, dial]: noise, Raadio 2, Raadio 4, Ida, each held.
   const KEYS = [[0, 0.06], [700, 0.06], [2000, 0.2], [4200, 0.2], [6400, 0.5], [8600, 0.5], [10800, 0.8], [END, 0.8]];
   const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
   function dialAt(pos) {
@@ -162,10 +166,66 @@
     };
   }
 
-  // ── the picture ─────────────────────────────────────────────────────────
+  // ── the patch: the three recordings come down as files, a player in this tab
+  // decodes them, and /radio/tuner/'s noise, dial, tuner and speakers do the rest
+  const S = 'web', CF = 'cf-r2';
+  const REC_OUT = (st) => `${CF}:${st.id}:file-out`;
+  const bay = createBay();
+  for (const st of STATIONS) {
+    addNodes(bay, S, [{ name: 'recording', site: CF, as: st.id, label: `${st.label} recording` }],
+      { ports: { [REC_OUT(st)]: { label: 'recording', address: `${MEDIA}${st.key}` } } });
+  }
+  addNodes(bay, S, ['player', 'noise', 'dial', 'tuner', 'speaker'], {
+    ports: { 'web:noise:audio-out': { label: 'noise' }, 'web:dial:value-out': { label: 'dial' },
+      'web:tuner:audio-in': { label: 'tuner' }, 'web:tuner:audio-out': { label: 'tuner' },
+      'web:tuner:value-in': { label: 'tune' }, 'web:speaker:audio-in': { label: 'speakers' } },
+  });
+  const WIRES = [...STATIONS.map((st) => [REC_OUT(st), 'web:player:file-in']),
+    ['web:player:audio-out', 'web:tuner:audio-in'], ['web:noise:audio-out', 'web:tuner:audio-in'],
+    ['web:dial:value-out', 'web:tuner:value-in'], ['web:tuner:audio-out', 'web:speaker:audio-in']];
+  for (const [a, b] of WIRES) {
+    const r = bay.link(a, b, [], { site: S });
+    if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+  // the box notes patchbay.mjs gives a box by default: the node's label, in the sans
+  const drawn = drawBay(bay, { width: 480, wires: false, detail: (n) => [{ text: n.label || '', sans: true }] });
+
+  // ── the picture: the station's name, the kit slider with the station names under it,
+  // and the patch under that, stacked in the band a story leaves clear
   function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32); }
-  const NAME_Y = SAFE_TOP + 430, NAME_PX = 190, DIAL_Y = 940, DIAL_H = 220;
-  const xOf = (u) => X + u * TEXT_W;
+  const look = sliderLook();
+  // The slider as a 375 px phone shows it, so its proportions are the page's.
+  const SLD_SCALE = W / 375;
+  const NAME_PX = 104, NAME_Y = SAFE_TOP + 170;
+  const SLD_Y = NAME_Y + 56, SLD_H = look.laneH * SLD_SCALE;
+  const LABEL_BOTTOM = SLD_Y + SLD_H + (MARK.gap + MARK.px) * SLD_SCALE;
+  const BAY_Y = Math.round(LABEL_BOTTOM + 48);
+  const BAY_SCALE = Math.min(TEXT_W / (drawn.width + 2), (SAFE_BOTTOM - BAY_Y) / (drawn.height + 2));
+  const bayPic = await svgImage(drawn.body, { width: drawn.width, height: drawn.height, scale: BAY_SCALE });
+  const bayWires = drawn.wires.map((w) => ({ ...w, path: new Path2D(w.d) }));
+
+  // How bright a wire is: a recording's by how clearly the tuner has it, the noise's by
+  // how loud the noise is, the rest steady. 0.35 is bay-traffic's idle line.
+  function wireLevel(w, m) {
+    const i = STATIONS.findIndex((st) => REC_OUT(st) === w.from);
+    if (i >= 0) return Math.min(1, m.st[i].clear + m.st[i].echo);
+    if (w.from === 'web:noise:audio-out') return Math.min(1, m.noise / 0.3);
+    return 1;
+  }
+  function drawWires(ctx, m) {
+    ctx.save();
+    ctx.translate(X + bayPic.pad, BAY_Y + bayPic.pad);
+    ctx.scale(BAY_SCALE, BAY_SCALE);
+    ctx.lineJoin = 'round';
+    for (const w of bayWires) {
+      const k = wireLevel(w, m);
+      ctx.strokeStyle = w.colour;
+      ctx.globalAlpha = 0.35 + 0.65 * k;
+      ctx.lineWidth = 1.5 + 1.5 * k;
+      ctx.stroke(w.path);
+    }
+    ctx.restore();
+  }
 
   function drawFrame(ctx, pos) {
     const u = dialAt(pos), m = mix(u);
@@ -177,11 +237,11 @@
     const pad = drawWordmark(ctx);
 
     // static over the name band, as dense as the noise is loud
-    const dots = Math.round(2600 * static_);
+    const dots = Math.round(1800 * static_);
     for (let i = 0; i < dots; i++) {
       const g = 60 + Math.floor(r() * 120);
       ctx.fillStyle = `rgba(${g},${g},${g},${0.25 + r() * 0.5})`;
-      ctx.fillRect(X + r() * TEXT_W, NAME_Y - NAME_PX - 60 + r() * (NAME_PX + 140), 3, 3);
+      ctx.fillRect(X + r() * TEXT_W, NAME_Y - NAME_PX + r() * (NAME_PX + 20), 3, 3);
     }
 
     // the nearest station's name: whole when tuned, faint and flickering between
@@ -193,27 +253,12 @@
     ctx.fillText(st.label, X + (1 - clear) * (r() - 0.5) * 24, NAME_Y);
     ctx.globalAlpha = 1;
 
-    // the dial: a scale, three station marks and the needle
-    ctx.strokeStyle = '#2a303c'; ctx.lineWidth = 2;
-    ctx.strokeRect(X, DIAL_Y, TEXT_W, DIAL_H);
-    for (let i = 0; i <= 50; i++) {
-      const x = X + 16 + (i / 50) * (TEXT_W - 32), major = i % 5 === 0;
-      ctx.fillStyle = major ? '#5b6372' : '#363d4a';
-      ctx.fillRect(x - 1, DIAL_Y + 18, 2, major ? 46 : 24);
-    }
-    ctx.font = font(400, 34);
-    ctx.textAlign = 'center';
-    STATIONS.forEach((s, i) => {
-      const on = m.st[i].clear > 0.5;
-      ctx.fillStyle = on ? C.hi : C.dim;
-      ctx.fillRect(xOf(s.at) - 3, DIAL_Y + 18, 6, DIAL_H - 36);
-      ctx.fillText(s.short, xOf(s.at), DIAL_Y + DIAL_H + 64);
-    });
-    ctx.textAlign = 'left';
-    ctx.fillStyle = C.hi;
-    const nx = xOf(u);
-    ctx.fillRect(nx - 3, DIAL_Y - 24, 6, DIAL_H + 24);
-    ctx.beginPath(); ctx.moveTo(nx - 16, DIAL_Y - 40); ctx.lineTo(nx + 16, DIAL_Y - 40); ctx.lineTo(nx, DIAL_Y - 18); ctx.fill();
+    // the dial is the kit slider, its handle where the timeline says, the tuned name lit
+    drawSlider(ctx, look, { x: X, y: SLD_Y, w: TEXT_W, scale: SLD_SCALE, t: u,
+      marks: STATIONS.map((s, i) => ({ at: s.at, label: s.short, on: m.st[i].clear > 0.5 })) });
+
+    drawWires(ctx, m);
+    ctx.drawImage(bayPic.img, X, BAY_Y, bayPic.w, bayPic.h);
 
     drawLowerLine(ctx, lower.t.value, pad);
   }
@@ -235,9 +280,9 @@
   window.__demo.reel = reel;
 
   if (SELFCHECK) {
-    d.assert('the take is 12 to 15 s and the needle path ends on it', END >= 12000 && END <= 15000 && KEYS.at(-1)[0] === END,
+    d.assert('the take is 12 to 15 s and the handle path ends on it', END >= 12000 && END <= 15000 && KEYS.at(-1)[0] === END,
       `${END / 1000} s`);
-    d.assert('the needle starts between stations, in noise', mix(dialAt(0)).st.every((s) => s.clear < 0.05),
+    d.assert('the handle starts between stations, in noise', mix(dialAt(0)).st.every((s) => s.clear < 0.05),
       `noise ${mix(dialAt(0)).noise.toFixed(2)}`);
     const holds = [[2000, 4200], [6400, 8600], [10800, END]].map(([a, b]) => mix(dialAt((a + b) / 2)));
     d.assert('each hold is tuned dead on its own station, in order', holds.every((m, i) => m.near === i && m.st[i].clear > 0.99),
@@ -250,12 +295,44 @@
     });
     d.assert('each sweep passes through noise and the whistle', sweeps.every((s) => s.best < 0.05 && s.whistle > 0.03),
       sweeps.map((s) => `clear down to ${s.best.toFixed(3)}, whistle up to ${s.whistle.toFixed(3)}`).join('; '));
-    d.assert('the needle is a function of the position, so a seek lands where a play would', dialAt(5300) === dialAt(5300) && dialAt(-5) === KEYS[0][1] && dialAt(END + 99) === KEYS.at(-1)[1]);
+    d.assert('the handle is a function of the position, so a seek lands where a play would', dialAt(5300) === dialAt(5300) && dialAt(-5) === KEYS[0][1] && dialAt(END + 99) === KEYS.at(-1)[1]);
     const { ctx } = reel;
     const px = ctx.getImageData(X, NAME_Y - NAME_PX, TEXT_W, NAME_PX).data;
     let ink = 0;
     for (let i = 0; i < px.length; i += 4) if (px[i] > 180) ink++;
     d.assert('the finished frame names the station it is tuned to', ink > 2000, `${ink} bright pixels`);
+    // The slider and the patch are drawn, and the handle sits where the timeline puts it.
+    const inkIn = (x, y, w, h, test) => {
+      const q = ctx.getImageData(x, y, w, h).data;
+      let n = 0;
+      for (let i = 0; i < q.length; i += 4) if (test(q[i], q[i + 1], q[i + 2])) n++;
+      return n;
+    };
+    const lit = (r, g, b) => r > 200 && g > 170 && b < 90;
+    d.assert('the frame keeps the band a story leaves clear', NAME_Y - NAME_PX >= SAFE_TOP && BAY_Y + bayPic.h <= SAFE_BOTTOM,
+      `name from ${NAME_Y - NAME_PX}, patch ends at ${Math.round(BAY_Y + bayPic.h)}, band ${SAFE_TOP} to ${SAFE_BOTTOM}`);
+    d.assert('the slider is the kit\'s, read off a real .sld-lane and .sld-knob', look.laneH > 0 && look.knobW > 0 && look.knobW < look.laneH * 2,
+      `lane ${look.laneH} px, handle ${look.knobW} px, ${look.lane}, ${look.knob}`);
+    const laneInk = inkIn(X, SLD_Y + 4, TEXT_W, Math.round(SLD_H) - 8, (r, g, b) => !(r < 16 && g < 18 && b < 24));
+    d.assert('the slider\'s lane is drawn across the frame', laneInk > TEXT_W * (SLD_H - 8) * 0.9, `${laneInk} pixels off the ground`);
+    const bayInk = inkIn(X, BAY_Y, Math.round(bayPic.w), Math.round(bayPic.h), (r, g, b) => !(r < 16 && g < 18 && b < 24));
+    d.assert('the patch is drawn under the slider', bayInk > 20000, `${bayInk} pixels off the ground`);
+    const kw = look.knobW * SLD_SCALE;
+    const frameOf = () => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+    const seen = [];
+    for (const p of [3000, 5300]) {
+      reel.deck.seek(p);
+      await frameOf();
+      const q = ctx.getImageData(X, Math.round(SLD_Y + SLD_H / 2), TEXT_W, 1).data;
+      let a = -1, b = -1;
+      for (let i = 0; i < TEXT_W; i++) if (lit(q[i * 4], q[i * 4 + 1], q[i * 4 + 2])) { if (a < 0) a = i; b = i; }
+      const want = knobLeft(dialAt(p), TEXT_W, kw) + kw / 2, got = (a + b + 1) / 2;
+      seen.push({ p, want, got, w: b - a + 1 });
+    }
+    reel.deck.seek(0);
+    await frameOf();
+    d.assert('the handle is where the timeline puts it, at two seek points', seen.every((x) => Math.abs(x.want - x.got) < 2 && Math.abs(x.w - kw) < 3),
+      seen.map((x) => `${x.p} ms: at ${x.got.toFixed(1)}, wants ${x.want.toFixed(1)}, ${x.w} px wide`).join('; '));
     const bytes = STATIONS.reduce((a, st) => a + Math.floor(SPAN * st.rate), 0);
     d.assert('a play asks for under 1.5 MB, a slice of each recording', bytes < 1.5e6, `${bytes.toLocaleString('en')} bytes planned`);
     d.assert('a visit opened no audio and fetched nothing', reel.audio === null && Object.keys(fetched).length === 0);

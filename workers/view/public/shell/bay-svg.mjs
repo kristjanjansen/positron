@@ -45,9 +45,11 @@ const read = (x) => (typeof x === 'function' ? x() : x);
  * layout's own coordinates (0,0 at the top left, the picture `width` by
  * `height`), for a caller placing it inside a bigger SVG; `svg` is the same as
  * a standalone `<svg>` with bay-view's 1 px margin; `boxes` is each node's
- * `{ id, x, y, w, h }`, for a check against the page's own view.
+ * `{ id, x, y, w, h }`, for a check against the page's own view; `wires` is
+ * each link's `{ id, from, to, medium, colour, d }`, so a canvas can light one.
+ * `wires: false` leaves the wire paths out of `body` and `svg` for that caller.
  */
-export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infinity, detail = null } = {}) {
+export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infinity, detail = null, wires: withWires = true } = {}) {
   if (!(width > 0)) throw new Error('drawBay needs a width');
   const nodes = read(bay.nodes), ports = read(bay.ports), links = read(bay.links);
   const fieldsOf = (n) => (detail ? detail(n) || [] : []).map((f) => (f == null ? null : typeof f === 'string' ? { text: f } : f));
@@ -59,7 +61,7 @@ export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infi
 
   const mono = { 'font-family': FAMILY.mono };
   const colour = (m) => MEDIUM_COLOURS[m] || INK.fg;
-  const wires = [], top = [], opts = [];
+  const wires = [], top = [], opts = [], drawn = [];
   for (const b of boxes) {
     const g = [tag('rect', { x: n2(b.x + 0.5), y: n2(b.y + 0.5), width: n2(b.w - 1), height: n2(b.h - 1), rx: 4, fill: INK.card2, stroke: INK.line2 })];
     const ty = b.y + PAD + TITLE - 2;
@@ -90,7 +92,8 @@ export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infi
     const medium = ports.find((p) => p.id === l.from)?.medium || '';
     const { d, mid } = acrossWire(a, b, o, backs.indexOf(l) + 1, L, n2);
     const timed = printOptions(l.options, TIMING_NAMES);
-    wires.unshift(tag('path', { d, fill: 'none', stroke: colour(medium), 'stroke-width': 1.5, 'stroke-linejoin': 'round', 'stroke-dasharray': timed ? '6 4' : null }));
+    drawn.push({ id: l.id, from: l.from, to: l.to, medium, colour: colour(medium), d });
+    if (withWires) wires.unshift(tag('path', { d, fill: 'none', stroke: colour(medium), 'stroke-width': 1.5, 'stroke-linejoin': 'round', 'stroke-dasharray': timed ? '6 4' : null }));
     if (timed) {
       // the same ladder bay-view climbs: the full option, then the node it
       // follows, then the option's name, then nothing but the dash
@@ -102,5 +105,5 @@ export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infi
   }
   const body = wires.join('') + top.join('') + opts.join('');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${n2(avail + 2)}" height="${n2(H + 2)}" viewBox="-1 -1 ${n2(avail + 2)} ${n2(H + 2)}">${body}</svg>`;
-  return { width: avail, height: H, body, svg, boxes: boxes.map((b) => ({ id: b.n.id, x: b.x, y: b.y, w: b.w, h: b.h })) };
+  return { width: avail, height: H, body, svg, boxes: boxes.map((b) => ({ id: b.n.id, x: b.x, y: b.y, w: b.w, h: b.h })), wires: drawn };
 }
