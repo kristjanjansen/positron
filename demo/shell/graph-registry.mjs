@@ -149,7 +149,11 @@ export function jackRows(from, to) {
  * @param {Array}  [o.inputs]    `[{ name, channels, midi: { port, channels } | null }]`
  * @param {Array}  [o.alsa]      `alsa.mjs` `addressable()` rows
  * @param {number} [o.frameMs]
- * @param {boolean} [o.gpu]      whether the GPU video path exists here
+ * @param {boolean} [o.gpu]      whether the GPU video path exists here (`video.mjs`
+ *   `videoAvailable()`). The flag keeps its name; the NODE it announces is
+ *   `shader` since 2026-10-14, see below.
+ * @param {boolean} [o.camera]   whether the board has a camera it will send
+ *   (`camera.mjs`: a key set AND `findCamera()` found one). Off by default.
  * @param {string} [o.label]     the human name a reader shows for this site.
  *   A fixed 'Raspberry Pi' rather than the board's hostname, because the
  *   hostname is `raspberrypi` on every fresh Pi OS (`board.mjs`, `NAME`).
@@ -159,7 +163,7 @@ export function jackRows(from, to) {
  *   and the capture as nodes of their own. Off by default, so a page building a
  *   board graph to test against gets exactly the graph it always got.
  */
-export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, label = 'Raspberry Pi', jack = false }) {
+export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false }) {
   const place = room;
   // Port names are `<medium>-<dir>` (plans/plan-site-names.md §4c), so the id
   // says what a port carries and which way. `graphProblem` holds a board to it.
@@ -170,7 +174,7 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
   // The synths the board can start. `pappusFx` is an insert on another sound,
   // not a sound of its own, so it is not a node here.
   for (const [k, ok] of Object.entries(instruments)) {
-    if (!ok || k === 'pappusFx') continue;
+    if (!ok || k === 'pappusFx' || k === 'collide') continue;
     const n = slug(k);
     node(n, 'engine', k);
     // A synth lives in the board's MAIN room: `audio.start` and `note.on` go
@@ -205,11 +209,54 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     port('capture', 'audio-in', { label: 'Pi capture', dir: 'in', medium: 'audio', shape: { rate: 48000 },
       transports: ['jack'], jack: [...JACK_ENDS.capture] });
   }
+  // 🔴 A NODE KEEPS ITS CATALOGUE NAME ON EVERY SITE, AND ONLY THE SITE PREFIX
+  // CHANGES, SINCE 2026-10-14 (the owner: *"Perhaps shader is better than gpu?
+  // Should also match web:shader?"*). So the board's nodes below are named and
+  // ported as `demo/shell/nodes.mjs` NODES has them on `web`: `collide`,
+  // `drums` (the catalogue's `drum` type, one node for the kit), `shader`,
+  // `camera`. A port the Pi lacks is left out rather than faked.
+  //
+  // SUPERCOLLIDER, `scollide.mjs` (the page programs' scsynth, `poscollide`),
+  // announced while `collideAvailable()` says scsynth, sclang, jackd and the
+  // limiter are all there. It is ONE engine with two nodes over it, because two
+  // pages play it two ways: /remote/collide/ sends notes (`note.on {node:
+  // 'collide'}`) and parameters (`sc.set`), /drums/remote/ sends timed hits
+  // (`sc.hit`). Both sounds come back on the board's main stream and leave the
+  // engine on the same two JACK ports, so a JACK link from either node carries
+  // whatever the engine is playing.
+  if (instruments.collide) {
+    const j = jack ? JACK_ENDS.collide : null;
+    const sound = (n, l) => port(n, 'audio-out', { label: l, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs },
+      address: room, transports: [...BOARD_TRANSPORTS.audio, ...(j ? ['jack'] : [])], ...(j ? { jack: [...j] } : {}) });
+    node('collide', 'engine', 'SuperCollider');
+    port('collide', 'midi-in', { label: 'SuperCollider', dir: 'in', medium: 'midi', accepts: ['note'], never: [], address: room });
+    port('collide', 'value-in', { label: 'SuperCollider', dir: 'in', medium: 'value', shape: { of: 'param' }, address: room });
+    sound('collide', 'SuperCollider');
+    node('drums', 'engine', 'drums');
+    port('drums', 'midi-in', { label: 'drums', dir: 'in', medium: 'midi', accepts: ['note'], never: [], address: room });
+    sound('drums', 'drums');
+  }
+  // THE SHADER, `video.mjs`: `rig/vis/v3dpipe` renders the mirror shader on the
+  // VideoCore GPU and the hardware encoder sends it as H.264. `gpu` until
+  // 2026-10-14. `value-in` is `video.params` (the page's `segments` is the
+  // board's `mirrors`), `program-in` is `video.shader`, compiled here as 310 es.
+  // The picture leaves on `<room>-video` or on the main socket's direct `vid`
+  // channel (`board.mjs` `videoDirect`, since 2026-10-13).
   if (gpu) {
-    node('gpu', 'engine', 'GPU');
-    port('gpu', 'program-in', { label: 'GPU', dir: 'in', medium: 'program', shape: { language: 'glsl' } });
-    port('gpu', 'video-out', { label: 'GPU', dir: 'out', medium: 'video', shape: { codec: 'h264' }, address: `${room}-video`,
-      transports: [...BOARD_TRANSPORTS.video] });
+    node('shader', 'engine', 'mirror shader');
+    port('shader', 'value-in', { label: 'mirror shader', dir: 'in', medium: 'value', shape: { of: 'param', names: ['segments'] }, address: room });
+    port('shader', 'program-in', { label: 'mirror shader', dir: 'in', medium: 'program', shape: { of: 'glsl' }, address: room });
+    port('shader', 'video-out', { label: 'mirror shader', dir: 'out', medium: 'video', shape: { codec: 'h264' }, address: `${room}-video`,
+      transports: [...BOARD_TRANSPORTS.video, 'datachannel'] });
+  }
+  // THE CAMERA, `camera.mjs`: a CSI or USB camera on the board, sent only to a
+  // holder of the key, in `<room>-cam` (keyed by the relay) or on an input's
+  // direct `cam` channel. The board says `camera` only when it holds a key AND
+  // found a camera, so a board without one announces none.
+  if (camera) {
+    node('camera', 'device', 'camera');
+    port('camera', 'video-out', { label: 'camera', dir: 'out', medium: 'video', shape: { codec: 'h264' }, address: `${room}-cam`,
+      transports: [...BOARD_TRANSPORTS.video, 'datachannel'] });
   }
   // A hardware input is an instrument on the desk: its sound comes in through
   // the board's audio interface, and its MIDI goes out through the gate.
@@ -243,6 +290,43 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     port(n, 'midi-in', { label: a.client, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend'], never: [] });
   }
   return { v: GRAPH_V, site, place, ...(net ? { net } : {}), kind: 'board', label, nodes, ports };
+}
+
+/**
+ * 🔴 ONE ANNOUNCED BOARD NODE, DRAWN ON A PAGE'S OWN BAY, SINCE 2026-10-14.
+ * A page that plays the Pi draws the Pi's node from `boardGraph()` rather than
+ * typing it, so the node, its ports and their order are the ones the board
+ * announces, and /connect/ and the live layer see the same thing the page draws.
+ * Pure, and it imports nothing: it only calls the bay it is given.
+ * @param {object} bay      the page's bay (`createBay`)
+ * @param {object} g        a board graph, `boardGraph({...})` or one heard on the wire
+ * @param {string} name     the node's name on the board, `collide`
+ * @param {object} [o]
+ * @param {string} [o.label]    the page's own label for the node, the board's when absent
+ * @param {object} [o.deliver]  `{ '<port>': fn }`, what this page does with an event on that port
+ * @param {object} [o.ports]    `{ '<port>': { ...fields } }` merged over the announced port, for
+ *   what only the page knows (the parameter names of the program it loaded)
+ * @param {string|null} [o.portLabel]  `'node:port'` (the default) labels each port `<node>:<port>`,
+ *   as `nodes.mjs` `addNodes` does; null keeps the board's label
+ * @param {boolean} [o.withPorts]  false adds the node alone, for a page whose
+ *   picture order puts another node between it and its ports (`addBoardPorts`)
+ * @returns the bay's node, or null when the graph has no such node
+ */
+export function addBoardNode(bay, g, name, { label, withPorts = true, ...o } = {}) {
+  const n = g.nodes.find((x) => x.id === `${g.site}:${name}`);
+  if (!n) return null;
+  const node = bay.addNode({ ...n, ...(label ? { label } : {}) });
+  if (withPorts) addBoardPorts(bay, g, name, o);
+  return node;
+}
+/** The ports of one announced board node, as `addBoardNode` adds them. Answers the ids added. */
+export function addBoardPorts(bay, g, name, { deliver = {}, ports = {}, portLabel = 'node:port' } = {}) {
+  const id = `${g.site}:${name}`;
+  return g.ports.filter((q) => q.id.split(':').slice(0, 2).join(':') === id).map((p) => {
+    const pname = p.id.split(':')[2];
+    return bay.addPort({ ...p, ...(portLabel ? { label: `${name}:${pname}` } : {}), ...(ports[pname] || {}),
+      ...(deliver[pname] ? { deliver: deliver[pname] } : {}) }).id;
+  });
 }
 
 /** Is this a graph this file can read. Answers a reason, or '' when it is. */

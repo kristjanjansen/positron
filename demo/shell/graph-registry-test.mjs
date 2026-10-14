@@ -71,13 +71,15 @@ console.log('\n== what a board says it is ==');
     !g.nodes.some((n) => /pappus/i.test(n.id)) && !g.ports.some((p) => /pappus/i.test(p.id)));
   ok('NEGATIVE CONTROL: a synth the board cannot start is not described',
     !node(g, 'pi-1:zynaddsubfx') && !g.ports.some((p) => p.id.startsWith('pi-1:zynaddsubfx:')));
-  ok('the GPU takes a program and gives video',
-    node(g, 'pi-1:gpu')?.kind === 'engine'
-    && port(g, 'pi-1:gpu:program-in')?.dir === 'in' && port(g, 'pi-1:gpu:program-in')?.medium === 'program'
-    && port(g, 'pi-1:gpu:video-out')?.dir === 'out' && port(g, 'pi-1:gpu:video-out')?.medium === 'video');
+  ok('the shader takes a program and gives video',
+    node(g, 'pi-1:shader')?.kind === 'engine'
+    && port(g, 'pi-1:shader:program-in')?.dir === 'in' && port(g, 'pi-1:shader:program-in')?.medium === 'program'
+    && port(g, 'pi-1:shader:video-out')?.dir === 'out' && port(g, 'pi-1:shader:video-out')?.medium === 'video');
   const noGpu = desk({ gpu: false });
-  ok('NEGATIVE CONTROL: a board with no video path has no GPU node and no GPU port',
-    !node(noGpu, 'pi-1:gpu') && !noGpu.ports.some((p) => p.id.startsWith('pi-1:gpu:')));
+  ok('NEGATIVE CONTROL: a board with no video path has no shader node and no shader port',
+    !node(noGpu, 'pi-1:shader') && !noGpu.ports.some((p) => p.id.startsWith('pi-1:shader:')));
+  ok('NEGATIVE CONTROL: the shader is no longer announced under its old id, gpu',
+    !node(desk(), 'pi-1:gpu') && !desk().ports.some((p) => p.id.startsWith('pi-1:gpu:')));
 }
 
 {
@@ -147,7 +149,7 @@ console.log('\n== what a page hears ==');
     reg.ingest({ type: 'board.alive', from: 'b1', graph: desk({ gpu: false }) }) === true);
   ok('NEGATIVE CONTROL: a bad graph is ignored and leaves the good one in place',
     reg.ingest({ type: 'board.alive', from: 'b1', graph: { ...g, v: 9 } }) === false
-    && reg.graphs().length === 1 && !reg.graphs()[0].graph.nodes.some((n) => n.id === 'pi-1:gpu'));
+    && reg.graphs().length === 1 && !reg.graphs()[0].graph.nodes.some((n) => n.id === 'pi-1:shader'));
   ok('NEGATIVE CONTROL: a message of another type is not read even when it carries a graph',
     reg.ingest({ type: 'midi.send', from: 'b2', graph: g }) === false && reg.graphs().length === 1);
   ok('NEGATIVE CONTROL: a message with no sender is not read',
@@ -178,7 +180,7 @@ console.log('\n== what a page hears ==');
   const m = reg.merged();
   ok('two sockets for one site merge as one site', m.sites.length === 1 && m.sites[0].from === 'new-socket');
   ok('NEGATIVE CONTROL: the freshest wins, so the older socket\'s GPU is not drawn',
-    !m.nodes.some((n) => n.id === 'pi-1:gpu'));
+    !m.nodes.some((n) => n.id === 'pi-1:shader'));
   ok('NEGATIVE CONTROL: and no node is drawn twice',
     new Set(m.nodes.map((n) => n.id)).size === m.nodes.length);
   reg.ingest({ type: 'graph.announce', from: 'page-1',
@@ -228,7 +230,7 @@ console.log('\n== into a bay ==');
             { id: 'web:screen:video', label: 'screen', dir: 'in', medium: 'video' }] } });
   const bay = reg.fill(createBay());
   const a = bay.link('pi-1:circuit:audio-out', 'web:screen:audio');
-  const v = bay.link('pi-1:gpu:video-out', 'web:screen:video');
+  const v = bay.link('pi-1:shader:video-out', 'web:screen:video');
   ok('an input\'s stream is addressed to the room the board really uses', a.session?.address === 'studio-1-circuit', a.session?.address);
   ok('and the GPU\'s to its video room', v.session?.address === 'studio-1-video', v.session?.address);
   // NEGATIVE CONTROL: a port with no declared address still gets the derived one.
@@ -273,14 +275,15 @@ console.log('\n== into a bay ==');
   const tx = (id) => g.ports.find((p) => p.id === id)?.transports?.join(',');
   ok('the board declares relay or a data channel for its sound and relay H.264 for its picture',
     tx('pi-1:synth:audio-out') === 'relay,datachannel' && tx('pi-1:circuit:audio-out') === 'relay,datachannel'
-      && tx('pi-1:gpu:video-out') === 'relay-h264', `${tx('pi-1:synth:audio-out')} | ${tx('pi-1:gpu:video-out')}`);
+      // and the main socket's direct `vid` channel since 2026-10-13 (board.mjs `videoDirect`)
+      && tx('pi-1:shader:video-out') === 'relay-h264,datachannel', `${tx('pi-1:synth:audio-out')} | ${tx('pi-1:shader:video-out')}`);
   ok('NEGATIVE CONTROL: a MIDI in and a program in declare no transport, because they carry their own bytes',
     !g.ports.some((p) => p.dir === 'in' && p.transports));
   /* A board that predates the field, as the Pi on the desk does until a push. */
   const old = { ...g, ports: g.ports.map(({ transports, ...p }) => p) };
   const reg = createRegistry();
   reg.ingest({ type: 'board.alive', from: 'b', graph: old });
-  const heard = reg.merged().ports.find((p) => p.id === 'pi-1:gpu:video-out');
+  const heard = reg.merged().ports.find((p) => p.id === 'pi-1:shader:video-out');
   ok('a board graph that says nothing about transports is given the board\'s own on ingest',
     heard?.transports?.join(',') === BOARD_TRANSPORTS.video.join(','), JSON.stringify(heard?.transports));
   /* NEGATIVE CONTROLS: a page's announce is not touched, and a board that says something keeps it. */
@@ -290,11 +293,11 @@ console.log('\n== into a bay ==');
     !reg.merged().ports.find((p) => p.id === 'cam-1:cam:video')?.transports);
   const own = withBoardTransports({ ...old, ports: old.ports.map((p) => (p.medium === 'video' ? { ...p, transports: ['whep'] } : p)) });
   ok('NEGATIVE CONTROL: a board port that already names its transports keeps them',
-    own.ports.find((p) => p.id === 'pi-1:gpu:video-out').transports.join(',') === 'whep');
+    own.ports.find((p) => p.id === 'pi-1:shader:video-out').transports.join(',') === 'whep');
   const b = reg.fill(createBay());
   b.addNode({ id: 'home:page', kind: 'screen', label: 'home', place: 'home' });
   b.addPort({ id: 'home:page:video', label: 'home', dir: 'in', medium: 'video', shape: { codec: 'h264' } });
-  const v = b.link('pi-1:gpu:video-out', 'home:page:video');
+  const v = b.link('pi-1:shader:video-out', 'home:page:video');
   ok('so the bay gives the board\'s picture relay H.264, the way the page really opens it, and not WHEP',
     v.ok && v.session?.transport === 'relay-h264', JSON.stringify(v.session || v.why));
 }
@@ -340,10 +343,10 @@ console.log('\n== into a bay ==');
   ok('every board port is named for its medium and direction',
     g.ports.every((p) => p.id.split(':')[2] === `${p.medium}-${p.dir}`), names.join(','));
   ok('boardPort names a port the board really announces', BOARD_SITE === 'pi-1'
-    && g.ports.some((p) => p.id === boardPort('collide', 'midi-in')) && boardPort('gpu', 'video-out') === 'pi-1:gpu:video-out');
+    && g.ports.some((p) => p.id === boardPort('collide', 'midi-in')) && boardPort('shader', 'video-out') === 'pi-1:shader:video-out');
   ok('the addresses still name the room, so no stream moved',
     g.ports.find((p) => p.id === 'pi-1:collide:audio-out')?.address === 'studio-1'
-    && g.ports.find((p) => p.id === 'pi-1:gpu:video-out')?.address === 'studio-1-video'
+    && g.ports.find((p) => p.id === 'pi-1:shader:video-out')?.address === 'studio-1-video'
     && g.ports.find((p) => p.id === 'pi-1:circuit:audio-out')?.address === 'studio-1-circuit');
   const two = boardGraph({ room: 'studio-2', site: 'pi-2', instruments: { synth: true }, gpu: false });
   ok('a second board says pi-2 and still lives in its own room', two.site === 'pi-2' && two.place === 'studio-2'
@@ -355,9 +358,9 @@ console.log('\n== into a bay ==');
     /pi-1:collide:audio is named audio/.test(graphProblem(old)), graphProblem(old));
   const backwards = rename('pi-1:collide:midi-in', 'pi-1:collide:midi-out');
   ok('NEGATIVE CONTROL: a name that says out on an in port is refused', /audio-out|midi-in/.test(graphProblem(backwards)), graphProblem(backwards));
-  const wrongMedium = rename('pi-1:gpu:program-in', 'pi-1:gpu:video-in');
+  const wrongMedium = rename('pi-1:shader:program-in', 'pi-1:shader:video-in');
   ok('NEGATIVE CONTROL: a name that says the wrong medium is refused', graphProblem(wrongMedium) !== '', graphProblem(wrongMedium));
-  ok('a numbered second port of one kind is allowed', graphProblem(rename('pi-1:gpu:program-in', 'pi-1:gpu:program-in-2')) === '');
+  ok('a numbered second port of one kind is allowed', graphProblem(rename('pi-1:shader:program-in', 'pi-1:shader:program-in-2')) === '');
   ok('NEGATIVE CONTROL: a browser graph with an old style name still passes, the rule is for boards only',
     graphProblem({ v: 1, site: 'web-ab12', kind: 'browser', nodes: [], ports: [{ id: 'web-ab12:keys:out', dir: 'out', medium: 'midi' }] }) === '');
   ok('NEGATIVE CONTROL: and so does one that says nothing about its kind',
@@ -431,6 +434,67 @@ console.log('\n== the sampler on the board (2026-10-11) ==');
   ok('NEGATIVE CONTROL: no other engine grows a file-in', !port(g, 'pi-1:collide:file-in') && !port(g, 'pi-1:synth:file-in'));
   ok('NEGATIVE CONTROL: a board that cannot run the sampler announces none of it',
     !desk({ instruments: { ...INSTRUMENTS, sampler: false } }).ports.some((p) => p.id.startsWith('pi-1:sampler:')));
+}
+
+console.log('\n== the Pi nodes the concept pages play, under their catalogue names (2026-10-14) ==');
+
+{
+  // 🔴 ASKED 2026-10-14 (*"Make pi announce"*, then *"Perhaps shader is better
+  // than gpu? Should also match web:shader?"*). A node keeps its catalogue name
+  // (`demo/shell/nodes.mjs` NODES) on every site: `pi-1:collide`, `pi-1:drums`,
+  // `pi-1:shader`, `pi-1:camera`, each with the ports, in the order, that the
+  // page drawing it uses. One block per node, each with its NEGATIVE CONTROL:
+  // a board that cannot run that thing announces none of it.
+  const ids = (g, n) => g.ports.filter((p) => p.id.startsWith(`pi-1:${n}:`)).map((p) => p.id.split(':')[2]).join(',');
+
+  const g = desk({ jack: true });
+  ok('collide: SuperCollider on the Pi takes notes and parameters and gives sound, in the page\'s port order',
+    node(g, 'pi-1:collide')?.kind === 'engine' && ids(g, 'collide') === 'midi-in,value-in,audio-out'
+    && port(g, 'pi-1:collide:midi-in').accepts.join() === 'note' && port(g, 'pi-1:collide:value-in').shape.of === 'param'
+    && port(g, 'pi-1:collide:audio-out').address === 'studio-1', ids(g, 'collide'));
+  ok('NEGATIVE CONTROL: collide: a board without the collide engine announces no collide node or port',
+    !desk({ instruments: { synth: true } }).ports.some((p) => /^pi-1:(collide|drums):/.test(p.id))
+    && !node(desk({ instruments: { synth: true } }), 'pi-1:collide'), ids(desk({ instruments: { synth: true } }), 'collide'));
+
+  ok('drums: the drum kit on the Pi takes notes and gives sound on the collide engine\'s own stream and JACK ports',
+    node(g, 'pi-1:drums')?.kind === 'engine' && ids(g, 'drums') === 'midi-in,audio-out'
+    && port(g, 'pi-1:drums:audio-out').address === 'studio-1'
+    && JSON.stringify(port(g, 'pi-1:drums:audio-out').jack) === JSON.stringify(JACK_ENDS.collide), ids(g, 'drums'));
+  ok('NEGATIVE CONTROL: drums: the kit has no value-in the board cannot take, and nothing past collide grows one',
+    !port(g, 'pi-1:drums:value-in') && !node(desk({ instruments: { synth: true, collide: false } }), 'pi-1:drums'));
+
+  ok('shader: the mirror shader takes its segments and a program and gives H.264, relay or direct',
+    node(g, 'pi-1:shader')?.kind === 'engine' && ids(g, 'shader') === 'value-in,program-in,video-out'
+    && port(g, 'pi-1:shader:value-in').shape.names.join() === 'segments' && port(g, 'pi-1:shader:program-in').shape.of === 'glsl'
+    && port(g, 'pi-1:shader:video-out').transports.join() === 'relay-h264,datachannel', ids(g, 'shader'));
+  ok('NEGATIVE CONTROL: shader: a board with no GPU path announces no shader, and no shader takes a camera in',
+    !desk({ gpu: false }).ports.some((p) => p.id.startsWith('pi-1:shader:')) && !port(g, 'pi-1:shader:video-in'));
+
+  const cam = desk({ camera: true });
+  ok('camera: a board with a camera announces a device whose picture leaves on the keyed camera room',
+    node(cam, 'pi-1:camera')?.kind === 'device' && ids(cam, 'camera') === 'video-out'
+    && port(cam, 'pi-1:camera:video-out').address === 'studio-1-cam'
+    && port(cam, 'pi-1:camera:video-out').transports.join() === 'relay-h264,datachannel' && graphProblem(cam) === '', graphProblem(cam));
+  ok('NEGATIVE CONTROL: camera: a board without a camera announces none, and the default is none',
+    !node(desk(), 'pi-1:camera') && !desk({ camera: false }).ports.some((p) => p.id.startsWith('pi-1:camera:')));
+
+  // The four, as a page links them: the bay takes each, and gives the camera's
+  // picture the board's own transport rather than WHEP.
+  const b = createBay();
+  for (const n of cam.nodes) b.addNode(n);
+  for (const p of cam.ports) b.addPort(p);
+  b.addNode({ id: 'web:keys', kind: 'person', label: 'keys', place: 'browser' });
+  b.addPort({ id: 'web:keys:midi-out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
+  b.addNode({ id: 'web:screen', kind: 'screen', label: 'screen', place: 'browser' });
+  b.addPort({ id: 'web:screen:video-in', label: 'screen', dir: 'in', medium: 'video' });
+  const k1 = b.link('web:keys:midi-out', 'pi-1:collide:midi-in'), k2 = b.link('web:keys:midi-out', 'pi-1:drums:midi-in');
+  const cv = b.link('pi-1:camera:video-out', 'web:screen:video-in');
+  ok('a page\'s keys reach collide and drums, and the camera\'s picture is a relay H.264 session at its room',
+    k1.ok && k2.ok && cv.ok && cv.session?.transport === 'relay-h264' && cv.session.address === 'studio-1-cam',
+    k1.why || k2.why || cv.why || JSON.stringify(cv.session));
+  const whep = b.link('pi-1:camera:video-out', 'web:screen:video-in', [], { via: 'whep' });
+  ok('NEGATIVE CONTROL: the camera asked for over WHEP is refused, naming the transports it has',
+    !whep.ok && /relay-h264/.test(whep.why || ''), whep.why || 'it was accepted');
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);

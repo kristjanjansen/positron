@@ -1213,7 +1213,20 @@ console.log('\nbeat: the graph on the hello and on every beat');
   is('an input whose MIDI device is unplugged announces no MIDI in', gone.ports.some((p) => p.id === 'pi-1:circuit:midi-in'), false);
   is('and still announces its sound', gone.ports.some((p) => p.id === 'pi-1:circuit:audio-out'), true);
   is('NEGATIVE CONTROL: plugged in, the MIDI in is back', there.ports.some((p) => p.id === 'pi-1:circuit:midi-in'), true);
-  is('no video path means no GPU node', graphOf({ ...graphFacts, gpu: false }).nodes.some((n) => n.id === 'pi-1:gpu'), false);
+  // The GPU's node is `shader` since 2026-10-14 (the catalogue's name), so the
+  // check asks for the id the board announces and its positive control beside it.
+  is('no video path means no shader node', graphOf({ ...graphFacts, gpu: false }).nodes.some((n) => n.id === 'pi-1:shader'), false);
+  is('NEGATIVE CONTROL: with a video path the shader is there, and never under its old id gpu',
+    [graphOf({ ...graphFacts, gpu: true }).nodes.some((n) => n.id === 'pi-1:shader'), graphOf({ ...graphFacts, gpu: true }).nodes.some((n) => n.id === 'pi-1:gpu')],
+    [true, false]);
+  // A camera is announced only when board.mjs found one AND holds the key (`camera: true`).
+  is('no camera fact means no camera node', graphOf(graphFacts).nodes.some((n) => n.id === 'pi-1:camera'), false);
+  is('NEGATIVE CONTROL: camera: true is carried through to a camera node at <room>-cam',
+    graphOf({ ...graphFacts, camera: true }).ports.find((p) => p.id === 'pi-1:camera:video-out')?.address, `${graphFacts.room}-cam`);
+  is('the collide engine is two nodes, collide and drums, only when the board says it has it',
+    [graphOf({ ...graphFacts, instruments: { ...graphFacts.instruments, collide: true } }).nodes.filter((n) => /^pi-1:(collide|drums)$/.test(n.id)).length,
+     graphOf({ ...graphFacts, instruments: { ...graphFacts.instruments, collide: false } }).nodes.filter((n) => /^pi-1:(collide|drums)$/.test(n.id)).length],
+    [2, 0]);
   is('a beat before the first hello carries no graph rather than an empty one',
     'graph' in aliveMsg({ insert: {}, graphFacts: null }), false);
   const errHello = helloMsg({ backend: 'alsa', ports: [], error: 'cannot open sequencer', hint: 'modprobe snd-seq',

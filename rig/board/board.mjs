@@ -25,11 +25,11 @@ import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          setCaptureUnit,
        } from './jacksynth.mjs';
 import { startScSampler, samplerAvailable, startPlan, stopPlan, isForSampler } from './scsampler.mjs';
-import { createCollideService } from './scollide.mjs';
+import { createCollideService, collideAvailable } from './scollide.mjs';
 import { captureHolders } from './jacksynth.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
-import { createCameraRoom, framePieces } from './camera.mjs';
+import { createCameraRoom, framePieces, findCamera } from './camera.mjs';
 import { parseInputs, createInputs } from './inputs.mjs';
 import { createMainDirect } from './rtc.mjs';
 import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
@@ -1383,7 +1383,9 @@ async function handle(msg, replyVia = null) {
       if (!video) return reply('video.params', { ok: false, reason: 'no picture running' });
       // The page's names on the left, the renderer's uniforms on the right — a
       // client should not have to know that `grain` is a noise frequency.
-      const MAP = { mirrors: ['seg', 2, 64], grain: ['scale', 0.5, 40], hue: ['hue', 0, 3] };
+      // `segments` is the same uniform as `mirrors`, under the name the board's
+      // graph announces on `pi-1:shader:value-in` (the catalogue's, since 2026-10-14).
+      const MAP = { mirrors: ['seg', 2, 64], segments: ['seg', 2, 64], grain: ['scale', 0.5, 40], hue: ['hue', 0, 3] };
       let n = 0;
       for (const [name, [key, lo, hi]] of Object.entries(MAP)) {
         if (!Number.isFinite(msg[name])) continue;
@@ -1699,7 +1701,10 @@ function connect() {
     // and the beat every five seconds should not be.
     const instruments = { synth: true, pappusFx: pappusAvailable(),
                           ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])),
-                          sampler: samplerAvailable() };
+                          sampler: samplerAvailable(),
+                          // The page programs' scsynth (scollide.mjs), announced as
+                          // `collide` and `drums` (graph-registry.mjs `boardGraph`).
+                          collide: collideAvailable() };
     // `jack`: this board has a JACK graph, so its JACK ends are announced
     // (graph-registry.mjs `boardGraph`). The sampler installed (it plays into the
     // JACK capture) or an input on JACK; it read `jackSynthAvailable('yoshimi')`
@@ -1707,7 +1712,7 @@ function connect() {
     const jack = samplerAvailable() || [...inputsCfg.inputs.values()].some((i) => i.via === 'jack');
     graphFacts = { room: ROOM, site: SITE, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports, jack,
                    midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
-                   frameMs: 1000 * FRAME / RATE, gpu: videoAvailable() };
+                   frameMs: 1000 * FRAME / RATE, gpu: videoAvailable(), camera: cameraFound };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,
                     frameMs: 1000 * FRAME / RATE, instruments, error: s.error, hint: s.hint, graphFacts,
                     direct: !!mainDirect?.direct }));
@@ -1880,6 +1885,14 @@ const camera = (DRY || ONCE) ? null : createCameraRoom({
     bitrate: Math.min(Number(process.env.BOARD_CAM_BITRATE) || 1_500_000, 4_000_000),
   },
 });
+
+// Whether the board announces `pi-1:camera` (graph-registry.mjs `boardGraph`):
+// a key set AND a camera found. Asked ONCE here, because `findCamera` spawns
+// `rpicam-hello` synchronously and the hello must not block on it; a camera
+// plugged in later shows up at the next service restart. `camera.mjs` asks again
+// on every start, so this decides only what is announced, never what runs.
+const cameraFound = !!camera?.enabled && findCamera().ok === true;
+if (camera?.enabled) log(`camera: ${cameraFound ? 'found, announced as camera' : 'none found, so none is announced'}`);
 
 // ── hardware inputs, each in a room of its own ───────────────────────────────
 // inputs.mjs has the why. Configured in /etc/default/positron-board as

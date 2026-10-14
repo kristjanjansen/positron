@@ -126,17 +126,23 @@ echo "== what landed, against what was sent"
 # imports from demo/shell. The compiler is the one most likely to be stale on the
 # board, because a page compiles with the laptop's copy and `same` in `sc.loaded`
 # then compares two different files.
+# ⚠️ AND WHAT THE BOARD ANNOUNCES, SINCE 2026-10-14: `beat.mjs` and the
+# `graph-registry.mjs` it imports build the graph on every hello and beat, so a
+# stale copy announces the old node names (`gpu`) with nothing failing.
 ssh "$USER_@$IP" "md5sum $DEST/rig/board/board.mjs $DEST/rig/board/jacksynth.mjs $DEST/rig/board/pappus.mjs \
   $DEST/rig/board/scsampler.mjs $DEST/rig/board/sampler.mjs $DEST/rig/board/norns/possampler-defs.scd \
   $DEST/rig/board/norns/run-pappus.scd \
   $DEST/rig/board/scollide.mjs $DEST/rig/board/norns/poscollide-defs.scd \
   $DEST/demo/shell/sclang-lite.mjs $DEST/demo/shell/synthdef.mjs \
+  $DEST/rig/board/beat.mjs $DEST/demo/shell/graph-registry.mjs \
   $SC_EXT/pappus/lib/Engine_Pappus.sc $SC_EXT/pappus/lib/PosSource.sc 2>/dev/null"
 md5sum "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/scsampler.mjs" "$SRC/sampler.mjs" "$SRC/norns/possampler-defs.scd" "$SRC/norns/run-pappus.scd" \
   "$SRC/scollide.mjs" "$SRC/norns/poscollide-defs.scd" "$SRC/../../demo/shell/sclang-lite.mjs" "$SRC/../../demo/shell/synthdef.mjs" \
+  "$SRC/beat.mjs" "$SRC/../../demo/shell/graph-registry.mjs" \
   "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc" 2>/dev/null \
   || md5 -r "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/scsampler.mjs" "$SRC/sampler.mjs" "$SRC/norns/possampler-defs.scd" "$SRC/norns/run-pappus.scd" \
      "$SRC/scollide.mjs" "$SRC/norns/poscollide-defs.scd" "$SRC/../../demo/shell/sclang-lite.mjs" "$SRC/../../demo/shell/synthdef.mjs" \
+     "$SRC/beat.mjs" "$SRC/../../demo/shell/graph-registry.mjs" \
      "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc"
 
 if [ "$RESTART" = 1 ]; then

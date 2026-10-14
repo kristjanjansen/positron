@@ -34,7 +34,8 @@ import { boardGraph } from '../../demo/shell/graph-registry.mjs';
  * @param {Map|Array} f.inputs      `parseInputs(...).inputs`, a Map, or its values
  * @param {Array} f.ports           `addressable()` rows, `state().ports`
  * @param {number} f.frameMs
- * @param {boolean} f.gpu           `videoAvailable()`
+ * @param {boolean} f.gpu           `videoAvailable()`, announced as the `shader` node
+ * @param {boolean} [f.camera]     a camera key is set AND `findCamera()` found one (camera.mjs)
  * @param {function} [f.midiPresent] `(port) => boolean`, is that ALSA card there now
  * @param {boolean} [f.jack]         the board has a JACK graph, so its JACK ends are announced
  */
@@ -58,7 +59,7 @@ export function graphOf(f) {
       midi: i.midi && present(f, i.midi.port) ? i.midi : null,
       // An input on JACK announces its JACK port (graph-registry `inputJack`).
       ...(i.via === 'jack' ? { jack: true, take: i.take ?? 1 } : {}) })),
-    alsa: f.ports || [], frameMs: f.frameMs, gpu: f.gpu !== false, jack: f.jack === true,
+    alsa: f.ports || [], frameMs: f.frameMs, gpu: f.gpu !== false, camera: f.camera === true, jack: f.jack === true,
   });
 }
 

@@ -62,14 +62,14 @@ const DESK = [
 const PHONE = [
   ['phone:touch:midi-out', 'pi-1:circuit:midi-in'],
   ['phone:tilt:value-out', 'pi-1:circuit:value-in'],
-  ['phone:tilt:value-out', 'pi-1:gpu:value-in'],
-  ['phone:camera:video-out', 'pi-1:gpu:video-in'],
+  ['phone:tilt:value-out', 'pi-1:shader:value-in'],
+  ['phone:camera:video-out', 'pi-1:shader:video-in'],
   ['phone:camera:video-out', 'cf-stream:live:video-in'],
   ['phone:mic:audio-out', 'cf-stream:live:audio-in'],
 ];
 const LABELS = { 'web:keys': 'keyboard', 'web:rec': 'recorder', 'web:synth': 'sine synth', 'web:fx': 'octaver',
   'web:speaker': 'speakers', 'cf-relay:room': 'Cloudflare', 'pi-1:circuit': 'Novation Circuit', 'r2:recordings': 'R2',
-  'web:pico': 'emulated Pico', 'web:oled': 'its screen', 'web:editor': 'shader code', 'pi-1:gpu': 'Pi GPU',
+  'web:pico': 'emulated Pico', 'web:oled': 'its screen', 'web:editor': 'shader code', 'pi-1:shader': 'Pi shader',
   'web:screen': 'screen', 'web:camera': 'camera', 'cf-stream:live': 'Stream',
   'pico-1:knob': 'a knob on a Pico', 'phone:screen': 'every phone watching',
   'phone:touch': 'touch', 'phone:tilt': 'tilt', 'phone:camera': 'camera', 'phone:mic': 'microphone' };

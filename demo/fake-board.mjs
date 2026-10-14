@@ -277,7 +277,9 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     circuit: { device: 'hw:CARD=Fake,DEV=0', channels: 2, take: 1, midi: { port: 'Circuit', channels: [1, 2, 10] } },
   }));
   const graphFacts = {
-    room, instruments: { synth: true }, inputs: INPUTS.inputs, ports: [],
+    // `collide`: the collide verbs ARE answered here, by the board's own service
+    // (above), so its two nodes (`collide`, `drums`) are announced as the Pi does.
+    room, instruments: { synth: true, collide: true }, inputs: INPUTS.inputs, ports: [],
     frameMs: FRAME_MS, gpu: false, midiPresent: () => true,
   };
 

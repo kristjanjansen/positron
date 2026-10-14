@@ -156,12 +156,12 @@
    * `Show the board` in the right-hand pane.
    * ⚠️ AND THIS TAB IS A SITE OF ITS OWN, `web-<four>`, announcing two ports,
    * so `/patchbay/` draws it: its shader as a `program` out, and its right
-   * pane as a `video` in. The Pi already announces `pi-1:gpu:program-in` and
-   * `pi-1:gpu:video-out` (`graph-registry.mjs` `boardGraph`); its site is
+   * pane as a `video` in. The Pi already announces `pi-1:shader:program-in` and
+   * `pi-1:shader:video-out` (`graph-registry.mjs` `boardGraph`); its site is
    * `pi-1` and no longer the room, since 2026-10-10.
    */
   const ROOM = roomFor({ slug: 'mirror' });
-  const GPU_PROGRAM = boardPort('gpu', 'program-in'), GPU_VIDEO = boardPort('gpu', 'video-out');
+  const GPU_PROGRAM = boardPort('shader', 'program-in'), GPU_VIDEO = boardPort('shader', 'video-out');
   const SITE = randomSite('web');
   const PROGRAM_PORT = `${SITE}:webgl:program`;
   const SCREEN_PORT = `${SITE}:screen:video`;
@@ -1574,8 +1574,8 @@
 
   /**
    * 🔴 TWO LINKS, DESCRIBED IN A BAY BEFORE ANYTHING IS OPENED. The shader goes
-   * out as `<site>:webgl:program -> pi-1:gpu:program-in` and the picture comes back
-   * as `pi-1:gpu:video-out -> <site>:screen:video`, which the bay gives the
+   * out as `<site>:webgl:program -> pi-1:shader:program-in` and the picture comes back
+   * as `pi-1:shader:video-out -> <site>:screen:video`, which the bay gives the
    * `relay-h264` session because that is the only way the board's port says it
    * travels. Which opener takes the video is `openers.pick`, the same choice
    * `/patchbay/` makes, so the two pages cannot disagree about it.
