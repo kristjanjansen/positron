@@ -267,6 +267,32 @@ a go. The native build (1.A) is still the route that sounds beside the other
 engines on JACK; its cost is now expected under these figures, not above them.
 2.2 below is kept as the estimate this replaced.
 
+### 2.2b Native, MEASURED on the Pi, 2026-10-14 (step 1 done, step 2 half done)
+
+Built in `/tmp` on the Pi with its own g++ 14.2.0, the 31 sources and the shim
+at the pinned commits, `build.sh`'s flags plus `-ffp-contract=off`, no JACK, no
+install; **compiled in 22 s**. One warning, upstream's: `chord_engine.cc:69`
+*"iteration 4 invokes undefined behavior"* (the wasm build compiles the same
+line). Everything in `/tmp/plai-pi` was removed after.
+
+Worst case at 8 voices: **additive 7.1x realtime, 14.1 % of one core** (wasm
+19.6 %). FM 11.6 %, VA 4.9 %, speech 2.1 %. Native runs about 1.4 times the
+wasm's speed across the table; at 1 voice every engine is under 2 %.
+
+Sample by sample against `plai.wasm` (all 16 engines in one init, 4 voices,
+three notes, 100 chunks of 960 each):
+- **bit identical:** VA, shaper, formant, additive, table, chord, speech,
+  modal, kick (100.0 % of samples, max difference 0).
+- **FM:** 100.0 % to one decimal, but a max difference of 0.084 (-21.5 dBFS)
+  in a few samples. Not explained yet.
+- **differ:** swarm, noise, dust, string (0.1 to 7.5 % identical), snare
+  (70.2 %), hat (86.4 %). Every one of these draws on stmlib's random
+  generator, whose state is global, and **the native binary ran the whole
+  timing table before its reference render while the wasm reference started
+  from a fresh instance**. So the two generators were at different points:
+  very likely a defect of the test, not of the build. INFERRED, not shown;
+  settled by rendering the native reference first, in a fresh process.
+
 ### 2.2 Scaled to the Pi's A72, COMPUTED (superseded by 2.2a)
 
 The one like for like pair this repository has: the arithmetic Rhodes in node,
