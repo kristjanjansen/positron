@@ -1,5 +1,7 @@
 # Timeline — artistic prior art (2026-08-26)
 
+Status (2026-10-14): done (reference). A survey of artistic precedent cited by research/timeline-own-prior-art-2026-08.md, research/radio-tallinn-1965-2026-08.md and research/moholy-nagy-partiturskizze-2026-10-04.md.
+
 Companion to timeline-prior-art-2026-08.md (technical survey). Verdict mirrors it
 from the opposite shore: the artistic canon for every imagined use is DEEP; the
 shared infrastructure canon is EMPTY. Each canonical work required bespoke

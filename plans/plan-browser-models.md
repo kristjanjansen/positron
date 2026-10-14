@@ -1,5 +1,7 @@
 # Models that run inside the browser, and whether one of them can transcribe
 
+Status (2026-10-14): open. /wish/ stayed on Workers AI as advised, but the on-device speech probe it recommends was never built (no SpeechRecognition call anywhere in demo/).
+
 Answers `does chrome has in-browser llm-based models now? investigate in bg`,
 asked 2026-09-22 and recorded in `BACKLOG.md`.
 

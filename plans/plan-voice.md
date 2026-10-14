@@ -1,5 +1,7 @@
 # plan-voice — "split my keyboard, bass below, pads above"
 
+Status (2026-10-14): superseded by /wish/. A split is now two bay links with the range op (demo/shell/bay.mjs) written from words on /wish/ (demo/wish/index.html), and the Yoshimi multitimbral path it assumed was retired 2026-10-13.
+
 Status: **not started.** Written 2026-09-10 from a spoken request, against a box
 that now exists in `rig/board` (38/38 + 13/13 green) and a multitimbral instrument
 that was proved on arm64 Linux the same day.

@@ -1,5 +1,7 @@
 # plan-two-machines: m1 and m2 on one remote, and the rig that went stale between them
 
+Status (2026-10-14): partly done. rig/m1/bin/ is in .gitignore and rig/m1/taptest.sh is committed, but rig/m1/build.sh, push.sh and install.sh do not exist and rig/audit.mjs still lists m1 as PARKED.
+
 Written 2026-09-25 on m1 (MacBookPro18,3, Apple M1 Pro, measured with
 `sysctl -n hw.model`), against the running rig, not from documentation. Every
 number below says whether it was measured today, measured earlier and re-checked,

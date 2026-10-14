@@ -1,5 +1,7 @@
 # Meta Quest 3S, for this project (2026-09-11)
 
+Status (2026-10-14): done. The headset was bought and plans/plan-xr.md carries what was measured on it, while demo/verify-quest.mjs and demo/shell/shell.css cite this file.
+
 > 🔴 **SUPERSEDED IN PART, 2026-09-12.** A headset arrived. `plans/plan-xr.md` carries
 > what was MEASURED on it and it settles several things this document could only
 > tag UNCONFIRMED — the framebuffer (3360×1760, two views), the frame rate

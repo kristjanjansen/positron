@@ -1,5 +1,7 @@
 # ERR archive: stage performances and theatre (2026-09-18)
 
+Status (2026-10-14): done (reference). A catalogue measurement that deliberately shipped no corpus, recorded as done in BACKLOG.md.
+
 What `arhiiv.err.ee` holds of the Estonian stage, how it is filed, and which
 search parameters actually work. Catalogue only. **No media of any kind was
 fetched**: not a manifest, not a segment, not an mp3, not an mp4, not a

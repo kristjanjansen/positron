@@ -1,5 +1,7 @@
 # plan-board-pappus: take the granulator out of `/keys/`, and say what is left
 
+Status (2026-10-14): retired. The removal was done on 2026-09-16, then /keys/ itself was retired on 2026-09-17 (archive/keys/README.md) and /grains/ went 404 on 2026-10-13 (archive/demos/grains-index.html).
+
 🔴 **SECOND PASS, 2026-09-16. THE TWO THINGS §2 KEPT ARE BOTH GONE, AND §9
 GAINED AN ANSWER.** Instructed as *"get rid of both"*, quoting this file's own
 exceptions back at it. `/keys/` no longer sends `fx.pappus {on:false,

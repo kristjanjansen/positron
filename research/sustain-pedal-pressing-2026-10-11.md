@@ -1,5 +1,7 @@
 # Pressing a sustain pedal: force, timing and gestures (2026-10-11)
 
+Status (2026-10-14): done. Its section 5 became plans/plan-sustain-pedal.md and the pedal handling in demo/code/piano/index.html cites it; the sampler/015 debugger it read is archived at archive/concepts/sampler-015.md.
+
 Asked: *"do some reading and analyzis of my sustan-pressing. its heavy to push.
 doubles are hard."* (BACKLOG, 2026-10-11, the `sampler/015` line.)
 

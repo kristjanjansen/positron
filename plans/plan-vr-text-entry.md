@@ -1,5 +1,7 @@
 # Typing in a headset, for `/weight/`
 
+Status (2026-10-14): done. demo/weight/index.html marks the word with the trigger and asks for the system keyboard (options 2a and 2d), and the headset run that would settle 2a is still not recorded.
+
 Written 2026-09-15, after this was reported from a real Quest:
 
 > held demo: click in vr brought me back to browser.

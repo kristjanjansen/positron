@@ -1,5 +1,7 @@
 # Plan: `/stage/` as a receiver, fed by a real publisher, on ONE transport
 
+Status (2026-10-14): done. /stage/ is a receiver on WebRTC only, fed by its own container playing the MIM film (commit 2026-09-30 in demo/stage/index.html), with the HLS half dropped the same day.
+
 > **2026-10-13, DATED NOTE.** The test pattern inputs `positron-demo` and
 > `whep-rig`, the `STREAM_KEY` and `WHIP_URL` secrets, and pub's `/watch`,
 > `/status`, `/start`, `/stop` and `/whip` were retired that day (410). The text

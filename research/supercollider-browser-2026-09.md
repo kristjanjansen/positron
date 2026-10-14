@@ -1,5 +1,7 @@
 # SuperCollider in a browser — what runs today (2026-09-12)
 
+Status (2026-10-14): done. wasm scsynth ships as demo/shell/scsynth.mjs with demo/shell/synthdef.mjs and demo/shell/sclang-lite.mjs, which cite it, and plays https://positron.studio/code/piano/ through demo/code/sc-sampler.mjs.
+
 **scsynth compiles to WebAssembly and it works right now: booted here in headless
 Chrome in 747 ms, played a note at peak RMS 0.503 against a silence control of
 exactly 0.000000, with `crossOriginIsolated: false` and `SharedArrayBuffer`

@@ -1,5 +1,7 @@
 # plan-twins — make the two granulators the same instrument
 
+Status (2026-10-14): retired. It was built into /grains/, which was retired 2026-10-13 with Yoshimi (archive/demos/grains-index.html, archive/demos/README.md).
+
 Written 2026-09-13, from a session note after `grains` put them side by side:
 *"make them similar. Simplify the board granulator a lot, but document what's
 existing there currently, so we can return to it later. Sync the shape of the

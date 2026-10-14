@@ -1,5 +1,7 @@
 # plan-circuit-editor: a Circuit synth editor, and the one byte that destroys a patch
 
+Status (2026-10-14): done. The editor is https://positron.studio/shape/ (demo/shape/index.html, archived on /archive/ since 2026-10-12) on demo/shell/circuit-patch.mjs and circuit-cc.mjs, all three citing this plan.
+
 > **The ask**, 2026-09-21: *"also research circuit synth editor"*.
 >
 > 🟢 **THIS ONE IS UNUSUALLY WELL FOUNDED FOR A PLAN IN THIS REPOSITORY.** Two

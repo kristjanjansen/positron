@@ -1,5 +1,7 @@
 # plan-instrument — one instrument, two ends, shared parts
 
+Status (2026-10-14): retired. /instrument/ is a 404 (archive/demos/instrument-index.html) and workers/instrument is deleted (workers/instrument/RETIRED.md).
+
 Status: **not started.** Written 2026-09-10, out of building `rig/m1`
 beside the existing `instrument` demo and finding they share a subject and almost
 no code.

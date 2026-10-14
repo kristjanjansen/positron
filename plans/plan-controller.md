@@ -1,5 +1,7 @@
 # plan-controller: a synth you play with your hands on two sliders
 
+Status (2026-10-14): retired. It was built as /knobs/, which went 404 with Yoshimi on 2026-10-13 (archive/demos/knobs-index.html, which cites this plan).
+
 > ⚠️ **NOTHING IN THIS FILE IS BUILT.** No code was changed, no row was added to
 > `demo/manifest.mjs`, nothing was deployed, nothing was committed, and nothing
 > on the board was started, stopped or restarted. It is a proposal.

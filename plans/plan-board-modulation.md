@@ -1,5 +1,7 @@
 # plan-board-modulation — the granulator's movement, on the board
 
+Status (2026-10-14): retired. Never built (rig/board/pappus.mjs keeps only its own drift), and the board granulator's pages are gone: /keys/ is archive/keys/ and /grains/ is a 404 (archive/demos/grains-index.html), with pappus-live.mjs refusing since 2026-10-13.
+
 > ⚠️ **NOTHING IN THIS FILE IS BUILT.** No code was changed, nothing was
 > deployed, and nothing on the board was restarted or reconfigured. It is a
 > proposal.

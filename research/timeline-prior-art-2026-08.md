@@ -1,5 +1,7 @@
 # Universal timeline — prior-art survey (2026-08-26)
 
+Status (2026-10-14): done (reference). A technical prior art survey cited by research/timeline-art-prior-art.md, research/timeline-own-prior-art-2026-08.md and research/browser-av-editors-2026-08.md.
+
 VERDICT: not invented as a whole. Every half exists per-domain; no shipped system
 unifies heterogeneous events + media spans + live/archive continuum + transport
 semantics + adapters + multi-user capture + web playback. Two qualified

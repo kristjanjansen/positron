@@ -1,5 +1,7 @@
 # Kurenniemi — other digitised sources, and what a machine can do with each (2026-09-14)
 
+Status (2026-10-14): done. Zenodo, its headline find, is now a corpus source in demo/resources/build-corpus.mjs and demo/resources/corpus.json, and the file is cited by PROGRESS.md and research/corpus-from-thesis-2026-09.md.
+
 Follow-up to `research/kurenniemi-archive-2026-08.md`, which probed what
 `proto/aikajana/` is built on. This asks the next question: **what else is
 out there that we do not already pull?** Every endpoint below was exercised

@@ -1,5 +1,7 @@
 # Alo Mattiisen, Kirjutusmasina kontsert D-duur (Typewriter Concerto in D)
 
+Status (2026-10-14): done (reference). Prior art for the typist concept group (demo/typist/, live at https://positron.studio/typist/score/), cited in BACKLOG.md and HANDOFF.md as a description and a link only because the piece is in copyright until 2066.
+
 Research for the `typist` concepts group (BACKLOG.md, 2026-10-11). Read 2026-10-11.
 Listing and catalogue pages only. No audio or video was opened, played or downloaded,
 and nothing was fetched from ERR's media servers.

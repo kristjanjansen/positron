@@ -1,5 +1,7 @@
 # plan-pi-oled: the Pico's OLED and four keys on the Pi, as a board node
 
+Status (2026-10-14): open. Nothing under rig/board/ drives an SSD1306 or I2C, and the BACKLOG.md row for it is still open.
+
 > Asked 2026-10-12, verbatim in `BACKLOG.md` under `## Open` ("The Pico's OLED
 > and four keys on the Pi"): *"can i connect pi to the sceren we planned for
 > pico?"*, then *"yes backlog it and plan"*.

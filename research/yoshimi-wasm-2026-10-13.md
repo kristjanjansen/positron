@@ -1,5 +1,7 @@
 # Yoshimi and ZynAddSubFX in a browser tab (2026-10-13)
 
+Status (2026-10-14): retired. Yoshimi was retired from the Pi the same day (archive/yoshimi/README.md, plans/plan-retire-yoshimi.md), and the port it recommended was never started (BACKLOG.md).
+
 Asked 2026-10-13, about the Yoshimi the Raspberry Pi plays for
 `/concepts/remote/000/`: *"yoshimi is based on sc? or just binary? can it work
 in browser?"*, then whether a ZynAddSubFX or Yoshimi WebAssembly build exists

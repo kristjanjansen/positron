@@ -1,5 +1,7 @@
 # plan-wish-dawless: Wish without a laptop, the Pi as the hub
 
+Status (2026-10-14): open. No route table exists on the board (no rig/board/routes.mjs) and /wish/ still holds its rows in the page, now unlisted since 2026-10-13.
+
 > ⚠️ **§4 AND §9'S ROUTE TABLE ARE SUPERSEDED BY `plans/plan-route-core.md`**
 > (2026-10-03), which defines the routing engine for any board, the Pi included.
 > This plan stays as the plan for THIS desk: one Pi, a phone as ear and screen,

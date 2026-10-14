@@ -1,5 +1,7 @@
 # plan-midi2: MIDI 2.0, microtonality, and whether any of it reaches this project (2026-09-20)
 
+Status (2026-10-14): open. Its first experiment, a bend float on note.on graded on a measured frequency, was never built: demo/shell/wire.mjs carries no bend field and no test asserts 386 cents.
+
 Written because of two questions, in this order:
 
 > *"investigate midi2, browser and our setup to test/similate it (via cf udp?) osc replacer?"*

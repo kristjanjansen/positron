@@ -1,5 +1,7 @@
 # Has Cloudflare abandoned streaming for AI? — Research findings (2026-08-26)
 
+Status (2026-10-14): done (reference). A reading of Cloudflare's product trajectory with nothing to build, cited by plans/plan-m2m.md.
+
 Researched by web agent; all URLs verified at research time. Complements the hands-on
 measurements in plans/plan.md / plans/plan-m2m.md.
 

@@ -1,5 +1,7 @@
 # The remote looper, and the distributed instrument behind it
 
+Status (2026-10-14): open. BACKLOG.md triage of 2026-10-12 says plan only, no part.mjs, /num/ archived, and only demo/shell/numloop.mjs survives on /kit/input/.
+
 Answers two messages, 2026-09-24:
 
 > *"in bg, plan the "remote looper" feature. I am in desktop browser, midi keyb

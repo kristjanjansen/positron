@@ -1,5 +1,7 @@
 # plan: a small code editor for the synth pages
 
+Status (2026-10-14): done. Built as demo/shell/code-box.mjs and code-lang.mjs, used by demo/code/faust/, demo/code/collide/ and /kit/input/.
+
 Asked 2026-09-30: *"in bg: invertigate minimal visual code editor with basic
 syntac hilite for our synths. they are rare languages so perhaps we need use
 some other templte"*. Two follow ups the same afternoon: *"a hand-rolled

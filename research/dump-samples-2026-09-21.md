@@ -1,5 +1,7 @@
 # Getting the audio out of the archive download, with no Circuit wrapper
 
+Status (2026-10-14): done. demo/shell/circuit-sample.mjs and https://positron.studio/tom/ cite it for the WAV and SysEx sample reading.
+
 > **The ask**, 2026-09-21, verbatim: *"can you inverstigate downloaded dump stuff
 > can we just get samples out of it does not have to be circuit wrapper? some
 > guardrails."*

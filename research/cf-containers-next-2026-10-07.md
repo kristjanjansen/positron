@@ -1,5 +1,7 @@
 # Cloudflare Containers, the new `durable_object` runtime against the legacy class (2026-10-07)
 
+Status (2026-10-14): done. workers/pub/worker.mjs carries PubNext on the durable_object runtime, and HANDOFF.md records pub.positron.studio answering runtime next.
+
 Measured on this account, 2026-10-07 between 15:53Z and 16:06Z, with positron's
 own test image (node:22-alpine plus ffmpeg, the `server.mjs` from
 `rig/containers/container/`), from a laptop in Tallinn. Both runtimes were

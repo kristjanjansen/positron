@@ -1,5 +1,7 @@
 # plan-flipper-patchbay: `/flipper/` as eight video channels, each on its own transport, described as bay links
 
+Status (2026-10-14): overruled or abandoned. Shelved by the owner on 2026-10-05 (*"no films page"*, quoted at its head), and /flipper/ is now a 404 (archive/demos/flipper-index.html).
+
 > 🔴 **SHELVED 2026-10-05, THE WHOLE PLAN**: *"no films page"*. `/flipper/` is three ERR TV channels with `/now/`'s timeline folded in (*"no radio. 3 tvs"*). Nothing here is to be built.
 
 > ⚠️ **SECTION 9 (MERGING /now/ INTO FLIPPER) IS REFUSED, 2026-10-05**: *"Current now-plan is no go"*, after the owner asked whether /now/ can be made to work with ERR. /now/ stays its own page; nothing in it retires and `fake-err.mjs` keeps its user. The rest of the plan is unchanged and still waits on the owner's answers in section 12.

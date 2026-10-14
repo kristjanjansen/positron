@@ -1,5 +1,7 @@
 # Radio Tallinn 1965 — the first named client (2026-08-27)
 
+Status (2026-10-14): done (reference). A summary of the platform theses with nothing built from it directly, cited by plans/plan-slides.md.
+
 Working theses received from the same PhD circle as the Kurenniemi work
 (plan-timeline §−1): a contemporary-music platform on the counterfactual of an
 electronic-music studio Tallinn could have had in 1965. ERR archives 1965–1991

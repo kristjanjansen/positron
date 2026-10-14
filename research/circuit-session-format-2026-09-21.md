@@ -1,5 +1,7 @@
 # The Circuit session file, measured, and who has already done this
 
+Status (2026-10-14): done. The session container reader and byte identical rebuild is demo/shell/circuit-session.mjs, used by https://positron.studio/pack/.
+
 > **The ask**, 2026-09-21: *"Look for session parsing and writing"*.
 >
 > 🔴 **THIS DOCUMENT CORRECTS ONE THIS SESSION PUBLISHED SIX HOURS EARLIER.**

@@ -1,5 +1,7 @@
 # U: and positron — what connects, what it costs, and how their gear gets on a network (2026-09-14)
 
+Status (2026-10-14): done. Its headline gap, the #define macro pass for real vClick scores, is built in timeline/csound.mjs (section 1a MACROS), and it corrected plans/plan-uuu-local.md.
+
 **Asked: what has been built here that is useful to U:, how does it fit their
 setup, and what is the cheapest way to get their analogue gear onto a network.**
 

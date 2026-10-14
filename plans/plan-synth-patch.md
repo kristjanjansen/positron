@@ -1,5 +1,7 @@
 # plan-synth-patch: a WebAudio synth built in the patchbay (2026-10-10)
 
+Status (2026-10-14): done. demo/synth/patch-synth.mjs builds the bay-node synth and is used by /synth/sound/ (https://positron.studio/synth/sound/) and three other concept pages.
+
 Asked: *"Would it be possible to somehow model a synth building, what we have in
 a front page slide of based on FAU, ... but maybe not FAU based, but just web
 audio based, where we can have oscillator, filter, I don't know, maybe a third

@@ -1,5 +1,7 @@
 # Are the MK-425C's rotaries smoothed? Measured 2026-09-23
 
+Status (2026-10-14): done (reference). The question was answered (no smoothing) off a take from demo/evo/index.html ?rec=1 read by demo/resources/read-evo-take.mjs, and nothing cites this file.
+
 **No. They are sampled and reported, not chased.** Measured off the wire on the
 unit on this desk, 5,228 control messages over 72.4 s, all eight rotaries swept
 end to end at two deliberate speeds.

@@ -1,5 +1,7 @@
 # plan: a site says what it is
 
+Status (2026-10-14): done. demo/shell/graph-registry.mjs carries site pi-1, kind and label and the medium-dir port names (commit 2026-10-10 "pi-1 and <medium>-<dir> board ports").
+
 2026-10-09. Asked on `/concepts/1/`: *"can we imporove it. i do not what is m2
 (me) m1 pi ..."*. Nothing in this plan is built. This is a spec and nothing
 else.

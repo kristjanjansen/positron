@@ -1,5 +1,7 @@
 # plan-take — a recording you can scrub, with nothing on the wire
 
+Status (2026-10-14): done. It was built as /take/ and lives on as the TAKES tab of https://positron.studio/capture/ (demo/capture/takes.mjs) since 2026-10-04 (archive/demos/README.md).
+
 Status: **not started.** Written 2026-09-07, out of the `transport`–`sound`
 rework. Proposed slug **`take`**, Act 3 (*capture and return*), first row.
 

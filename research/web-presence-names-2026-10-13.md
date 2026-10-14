@@ -1,5 +1,7 @@
 # Web presence names for positron.studio, 2026-10-13
 
+Status (2026-10-14): done (reference). The name survey is closed in BACKLOG.md and summarised in HANDOFF.md, and nothing was registered.
+
 Research only. Nothing was registered, claimed or logged in to. A handful of
 anonymous requests per platform, measured 2026-10-13 from this laptop.
 

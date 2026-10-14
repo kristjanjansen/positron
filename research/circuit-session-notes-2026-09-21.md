@@ -1,5 +1,7 @@
 # Note data out of a Circuit session, measured
 
+Status (2026-10-14): done. The note decoder is in demo/shell/circuit-session.mjs and demo/shell/note-grid.mjs, drawn by https://positron.studio/pack/.
+
 > **The ask**, 2026-09-21, verbatim: *"can we get note data out of regions?"*
 >
 > ✅ **YES. The sixteen 1,508 byte `wide` regions carry a 16 step grid of 28

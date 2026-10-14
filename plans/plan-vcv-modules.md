@@ -1,5 +1,7 @@
 # plan-vcv-modules: VCV Rack's open source modules, headless, on a Pi, and in a browser
 
+Status (2026-10-14): partly done. Its first experiment, one Mutable engine in wasm in an AudioWorklet, is https://positron.studio/muta/ (demo/muta/index.html cites §9), and Cardinal on the Pi was never run.
+
 **Written 2026-09-22.**
 
 🔴 **THIS DOCUMENT IS WRITTEN FROM DOCUMENTATION AND SOURCE READING, NOT FROM A

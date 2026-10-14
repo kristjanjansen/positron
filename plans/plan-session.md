@@ -1,5 +1,7 @@
 # plan-session — a show off the wire, laid on one line, kept for six hours
 
+Status (2026-10-14): retired. It was built as /keep/, folded into /capture/'s ROUND TRIP tab on 2026-10-04 (archive/demos/README.md), and that tab's WHIP leg was retired 2026-10-13 with pub's /whip (demo/capture/roundtrip.mjs).
+
 > **2026-10-13, DATED NOTE.** The test pattern inputs `positron-demo` and
 > `whep-rig`, the `STREAM_KEY` and `WHIP_URL` secrets, and pub's `/watch`,
 > `/status`, `/start`, `/stop` and `/whip` were retired that day (410). The text

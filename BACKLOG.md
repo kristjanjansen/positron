@@ -29,7 +29,7 @@
 
 - ~~**Research: local MCP tools or DIY for UI video capture, for Instagram stories**~~ (2026-10-14, DONE; building `demo/reel.mjs` waits for a yes). Asked: *"In bg research what local mcp tools or diy we can do for ui video capture for ig stories etc"*. Output `research/ui-video-capture-2026-10-14.md`.
 
-- **Plans and research: review, mark done, perhaps consolidate** (2026-10-14, a background agent). Asked: *"In bg review research abd plans and clean up, mark them done, perhaos consolidate?"*. A status line on each, an index, and a consolidation proposal; moves and merges wait for a yes.
+- ~~**Plans and research: review, mark done, perhaps consolidate**~~ (2026-10-14, DONE: status lines, plans/README.md, research/README.md; merges and moves in plans/plan-consolidate-docs-2026-10-14.md wait for a yes). Asked: *"In bg review research abd plans and clean up, mark them done, perhaos consolidate?"*. A status line on each, an index, and a consolidation proposal; moves and merges wait for a yes.
 
 - ~~**Code review and simplification proposal**~~ (2026-10-14, DONE as a plan; every phase waits for a yes). Asked: *"In bg do comprehensive code revirew and simplification proposal"*. A plan in `plans/plan-code-review-2026-10-14.md`, no code changes.
 

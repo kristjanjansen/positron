@@ -1,5 +1,7 @@
 # Browser A/V editors — how everyone else drives time (2026-08-28)
 
+Status (2026-10-14): done (reference). A comparative survey against timeline/transport.mjs with nothing to build, cited by timeline/score.mjs and timeline/lab/NOTES.md.
+
 Comparative survey against `timeline/transport.mjs` v0.4 (sessions 6h/6n/6p/6q/6r/6w,
 `timeline/lab/NOTES.md`). Marks: ✅ measured (by us, or a number published by the
 vendor), 📄 documented (primary source says so), ⚠️ inferred (no primary source;

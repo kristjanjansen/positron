@@ -1,5 +1,7 @@
 # Card descriptions on /concepts/, rewritten and verified
 
+Status (2026-10-14): done. Applied in commit 593becda to demo/shell/concept-list.mjs, with the rules in .claude/skills/positron-describe/SKILL.md, and later trimmed in bc817a57.
+
 2026-10-12. Asked in the owner's editorial brief (BACKLOG, *"Rewrite every card
 description, verified, and a writing skill"*). Every `say` in
 `demo/concepts/list.mjs`, both `CONCEPTS` and `DEMO_CARDS`, read against its

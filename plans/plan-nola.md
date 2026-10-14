@@ -1,5 +1,7 @@
 # nola, a piano you play from a MIDI keyboard
 
+Status (2026-10-14): done. /nola/ was built and then archived 2026-10-13 (BACKLOG.md "Archive /nola/", unlisted in demo/manifest.mjs, still served), while its piano lives on in demo/code/piano/.
+
 Answers `what drives it, sc? plain webmidi?`, asked 2026-09-22 about a proposed
 demo with the slug `nola`: a playable piano in the browser, driven from a MIDI
 keyboard, with the sustain pedal working.

@@ -1,5 +1,7 @@
 # plan-held-in-human-3d, what of this piece a headset could actually be given
 
+Status (2026-10-14): open. It recommends building nothing but one passthrough alpha measurement, and no page makes the passthrough alpha a parameter (grep of demo/ for it finds nothing).
+
 Written 2026-09-19, the same day the score arrived. It answers one question
 Kristjan asked about **Held in Human**: *"what can you actually simulate in
 3d?"*

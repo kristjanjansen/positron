@@ -1,5 +1,7 @@
 # Better sounding chords: the complaint is three complaints, and two of them are the argmax
 
+Status (2026-10-14): done. All four §10 build items (sampling with a per style temperature, a route to a target, within take adaptation, the log) are in demo/shell/suggest.mjs, which cites this plan, used by demo/nola/.
+
 Asked 2026-09-25, verbatim, with three screenshots of `/nola/`'s suggestion lanes:
 
 > *"better soudning chords. labme soundin susggestion, recording my played

@@ -1,5 +1,7 @@
 # plan-live-timeline — ERR live on the line, with the present as the right-hand end
 
+Status (2026-10-14): retired. The page it proposed, /now/, was built, folded into /flipper/ on 2026-10-05 and both are archived as archive/demos/now-index.html and archive/demos/flipper-index.html.
+
 Status: **not started.** Written 2026-09-08, out of "err live feeds in timeline
 (playhead keep on moving, allow backseeking if possible)". Proposed slug
 **`now`**, Act 5 (*archives*), directly after `flipper`.

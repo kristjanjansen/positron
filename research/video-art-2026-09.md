@@ -1,5 +1,7 @@
 # Video art techniques worth stealing next, for /videoradio/
 
+Status (2026-10-14): open. None of its nine techniques (slit-scan, phosphor age, warp mesh, datamosh and the rest) appears in demo/videoradio/index.html, and only research/video-granulation-prior-art-2026-10-13.md cites it.
+
 2026-09-15. Research only. No code was changed for this document.
 
 `/videoradio/` draws a live radio station going through a granular synthesiser in

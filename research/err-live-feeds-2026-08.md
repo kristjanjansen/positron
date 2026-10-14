@@ -1,5 +1,7 @@
 # ERR live feeds — discovery + measurements (2026-08-27)
 
+Status (2026-10-14): done. Its live.err.ee findings are demo/shell/err-live.mjs, which https://positron.studio/archive/tv/ still uses after /flipper/ was archived.
+
 Probed read-only at low rate from otse.err.ee page source + direct verification (curl/ffprobe/node),
 ~08:49–09:01Z. Proto: `proto/flipper/` (verified playing in headless Chrome, see below).
 Provenance: ✅ measured · 📄 documented (seen in page source/headers, not exercised) · ⚠️ unverified.

@@ -1,5 +1,7 @@
 # plan-circuit-samples: the pack in a browser, the drum machine after it
 
+Status (2026-10-14): done. demo/shell/unzip.mjs and circuit-sample.mjs read a pack, https://positron.studio/pack/ opens one and https://positron.studio/tom/ is the sample drum machine (both archived on /archive/).
+
 > **Three asks, 2026-09-21, all in `BACKLOG.md` verbatim:** parse and upload a
 > Circuit pack locally in the browser and pull the samples out of it; research
 > sample packs worth having for *"alternative and non-club... atmospheric, or

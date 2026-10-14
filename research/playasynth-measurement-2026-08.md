@@ -1,5 +1,7 @@
 # Play-a-Synth: attempted latency measurement — clean negative (2026-08-28)
 
+Status (2026-10-14): done (reference). A clean negative with no number to build on, mentioned in BACKLOG.md; nothing in demo/ or plans/ cites the file.
+
 **Outcome in one line: it did not play, and it cannot play without creating an
 account. No number was measured. No synth was touched, no note was sent, no
 session was started, no account was created, no payment details were entered.**

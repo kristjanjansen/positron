@@ -1,5 +1,7 @@
 # The Pi's SuperCollider sampler in a tab, against the WebAudio sampler (2026-10-11)
 
+Status (2026-10-14): done. Its comparison drove the all in move to demo/code/sc-sampler.mjs on wasm scsynth (BACKLOG 2026-10-12), which overruled its keep WebAudio default recommendation.
+
 Asked: *"Build sampler/040 with the same keyboard and samples, played by the Pi's
 synthdefs running in the tab. Then compare the two by ear and in the readouts."*
 

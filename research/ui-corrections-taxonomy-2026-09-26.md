@@ -9,6 +9,8 @@
 
 # An empirical taxonomy of the repeated UI corrections in ~/personal/positron
 
+Status (2026-10-14): done. It is the empirical base of the positron-compose skill (.claude/skills/positron-compose/SKILL.md cites it) and of plans/plan-instrument-audit.md.
+
 Read-only survey. No file changed, no browser, no harness. Sources mined in full: `.claude/skills/positron-ui/SKILL.md` (1838 lines), `LESSONS.md` (2846), `BACKLOG.md` (4514), `CLAUDE.md` (565), `demo/shell/shell.css` (7266), `demo/shell/glue.mjs`, `demo/shell/instrument-panel.mjs`, `demo/shell/panel-layout.mjs`, the per-page comment headers in `demo/*/index.html`, and `git log`.
 
 The owner's hypothesis (alignment, inner padding, corner radius, glued containers) is confirmed and is incomplete. The evidence forces **four extra buckets**, and one of them (a number typed twice) is larger than any of the eight given.

@@ -1,5 +1,7 @@
 # plan-drum-twin: one pattern, one set of samples, two renderers, compared
 
+Status (2026-10-14): partly done. https://positron.studio/drums/remote/ runs a pattern on the Pi through demo/shell/board-collide.mjs, but the decoded sample transfer and the per bar comparison it plans are not built.
+
 > **The ask, verbatim, 2026-09-21:** *"same idea as in shadrs / sc pathces:
 > compare in browser and pi rendering, share assets to render (in drum pachnine
 > wavs and patterns)"*, and then, when building started, *"i do not have pi

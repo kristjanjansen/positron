@@ -1,5 +1,7 @@
 # plan-xr-together: the patchbay, a headset, and many people at once or over time
 
+Status (2026-10-14): open. Step 1's demo/shell/pose.mjs does not exist and no page records or plays poses.
+
 > Asked 2026-10-04, verbatim in `BACKLOG.md`: *"Still need plan to univesral
 > router and xp and multiuse. See lcd soundsystem and google cardboard
 > interactive experiment"*. Read as: join the universal patchbay

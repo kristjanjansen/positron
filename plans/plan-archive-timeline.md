@@ -1,5 +1,7 @@
 # plan-archive-timeline — 1965 on the line, played from ERR
 
+Status (2026-10-14): done. The proposed slug was built as demo/reel/index.html (manifest row `reel`), still served at https://positron.studio/reel/ and listed on /archive/ since 2026-10-13.
+
 Status: **not started.** Written 2026-09-08, out of `take`/`keep` and the §−1
 archival horizon. Proposed slug **`reel`**, Act 5 (*archives*), directly after
 `flipper`.

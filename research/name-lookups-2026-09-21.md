@@ -1,5 +1,7 @@
 # Finding this desk's instruments in what a speech model actually heard
 
+Status (2026-10-14): done. The resolve() changes it measured are in demo/shell/instruments.mjs and demo/shell/instruments-test.mjs, which cite it, and /wish/ (demo/wish/) uses them.
+
 > **The ask**, 2026-09-21: *"do a comprehensive rig testing on get good
 > lookups"*, about `demo/shell/instruments.mjs`'s `resolve(text)`.
 >

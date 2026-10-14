@@ -1,5 +1,7 @@
 # Loops in the lineage — what the wrap point already cost (2026-08-28)
 
+Status (2026-10-14): done. Its re-seek, not re-fire finding is cited by timeline/nested.mjs, timeline/lab/prop-nested.mjs and plans/plan-loop-ui.md.
+
 Mined from elektronstudio v1–v4, tracker, wakeup-synth, the relay, and this repo.
 Companion to `plans/plan-timeline.md` §8. Marks: ✅ read here · 📄 documented · ⚠️ inferred.
 

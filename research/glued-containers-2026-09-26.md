@@ -10,6 +10,8 @@
 
 # Gluing: how the industry builds one surface out of stacked rounded sections
 
+Status (2026-10-14): done. It feeds .claude/skills/positron-compose/SKILL.md and the .pos-glue rules in demo/shell/shell.css, where subgrid landed for glued rows per BACKLOG.md.
+
 Research done 2026-09-26. Every CSS block below was pulled from a real source file (raw.githubusercontent.com, npm tarballs, or a spec draft), not reconstructed. Where something is a blog measurement, a bug report or my own inference, it is labelled. Four parallel researchers plus my own fetches; disagreements between them are resolved in the text and flagged.
 
 ---

@@ -1,5 +1,7 @@
 # A public Circuit archive, downloaded and measured
 
+Status (2026-10-14): done (reference). A measurement record of a downloaded corpus with nothing to build, cited by research/dump-samples-2026-09-21.md and plans/plan-slides.md.
+
 > **The ask**, 2026-09-21, verbatim: *"in bg dl
 > https://archive.org/download/novation-circuit_202402 stuff to purchased/dump
 > or whaterv you have"*.

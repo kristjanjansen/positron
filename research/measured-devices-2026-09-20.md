@@ -1,5 +1,7 @@
 # What is actually plugged into the M2 Mac, MEASURED 2026-09-20
 
+Status (2026-10-14): done (reference). A measurement record cited by demo/evo/index.html, demo/manifest.mjs, demo/shell/circuit-cc-test.mjs, LAYOUT.md and PROGRESS.md.
+
 🔴 **EVERY LINE HERE IS MEASURED ON THIS MACHINE, NOT READ FROM A MANUAL.**
 `plans/plan-circuit-model12.md`, `plans/plan-device-layouts.md` and `plans/plan-fasttrack-mk425c.md`
 are written almost entirely from documentation and mark their claims as read.

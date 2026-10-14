@@ -1,5 +1,7 @@
 # plan-rack — everything on the studio Mac, whether the Ableton route is the right one, and what to do if this is picked up again (2026-09-12)
 
+Status (2026-10-14): retired. /rack/ was retired 2026-09-11 (archive/demos/rack-index.html) and rig/m1/ stayed parked, untouched since 2026-10-04.
+
 `rig/m1/` is PARKED. It is parked **working** — 11/11 links on the
 day it stopped — and the stated reason to stop was cost, not failure. This
 document does four things the parking note could not: it lists what is actually

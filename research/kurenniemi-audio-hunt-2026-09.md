@@ -1,5 +1,7 @@
 # Kurenniemi audio: why 24 of 334 play, what else is out there, and where it should go
 
+Status (2026-10-14): partly done. demo/resources/build-corpus.mjs names kurenniemi.activearchives.org, but demo/resources/corpus.json holds no .ogg file, so the 23 Ogg recordings it found are not in what /tapes/ plays.
+
 **2026-09-15.** Every claim below is labelled **READ** (taken from a file or a
 page), **MEASURED** (a request I made, with the time it was made) or
 **INFERRED** (reasoned, not observed). Candidates nobody probed are in §5, under

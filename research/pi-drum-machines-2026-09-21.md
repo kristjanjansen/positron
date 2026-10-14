@@ -1,5 +1,7 @@
 # pi-drum-machines: what runs a drum machine on a Raspberry Pi, and whether this rig wants one
 
+Status (2026-10-14): done. Its recommendation, the grid in the browser with the drums also played on the board, is demo/drums/remote/ (https://positron.studio/drums/remote/), and plans/plan-drum-twin.md and demo/remote/collide/index.html cite it.
+
 > **The ask, verbatim, 2026-09-21:** *"in bg research drum ,achines / samplers of
 > pi"*, *"for pi"*.
 >

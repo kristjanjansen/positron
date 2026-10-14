@@ -1,5 +1,7 @@
 # Screens and panels for the Pi, bought in Estonia (2026-10-04)
 
+Status (2026-10-14): open. It led to plans/plan-pi-oled.md, which BACKLOG.md marks not built and WAITING because the OLED module is not bought.
+
 Asked: *"research basic screens/panels for pi available in est"*.
 
 Every price, stock line and part number below was READ from the shop page on

@@ -1,5 +1,7 @@
 # plan-looper — the local looper (built) and the remote looper (2026-08-30)
 
+Status (2026-10-14): superseded by plans/plan-remote-looper.md. The local looper (proto/looper, then /looper/) was retired 2026-10-04 as archive/demos/looper-index.html with demo/shell/looper.mjs kept, and the remote half was replanned in plans/plan-remote-looper.md.
+
 ## 0. Where this sits
 
 `proto/looper` is built and measured (`proto/looper/NOTES.md`): a MIDI looper

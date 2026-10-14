@@ -1,5 +1,7 @@
 # plan-retire-yoshimi: archive Yoshimi and take it off the Raspberry Pi
 
+Status (2026-10-14): done. Yoshimi is archived in archive/yoshimi/README.md and off the board, as the 2026-10-13 retirement note in HANDOFF.md records.
+
 Written 2026-10-13. Asked: *"also make plan how to archive and discard yoshimi
 from pi"*. PLAN ONLY: nothing in the repository was changed and nothing on the
 Pi was changed. The VPN was off (`route -n get 8.8.8.8` said `en0`), so the

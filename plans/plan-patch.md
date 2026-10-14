@@ -1,5 +1,7 @@
 # plan-patch — an instrument that travels as a file (2026-09-13)
 
+Status (2026-10-14): retired. /patch/ was built and taken off the site the same day (commit a54a353d, its answer went into grains); demo/patch/ remains with no manifest row and is not deployed.
+
 Companion to `plans/plan-visuals.md` (which made this argument for pictures and not
 for sound), `research/supercollider-browser-2026-09.md` (which measured the
 mechanism and then priced a different question), and `plans/plan-twins.md` (whose

@@ -1,5 +1,7 @@
 # Secret rotation checklist (open since session 1 → 2026-08-27)
 
+Status (2026-10-14): partly done. ROOM_TOKEN and the RTMPS key are rotated and the retired workers took their tokens with them (dated note at the top), while the TURN token rotation still reads WAITING in BACKLOG.md.
+
 > **2026-10-13, DATED NOTE.** The workers elektron-selfrec, elektron-cues and
 > elektron-rtc (with instrument, moq-safari and osc) were deleted from
 > Cloudflare that day, so `SELFREC_TOKEN`, `CUES_TOKEN`, `ROOM_TOKEN` and

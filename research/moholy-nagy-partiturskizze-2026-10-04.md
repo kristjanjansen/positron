@@ -1,5 +1,7 @@
 # Moholy-Nagy, *Partiturskizze zu einer mechanischen Exzentrik*, read against the timeline (2026-10-04)
 
+Status (2026-10-14): done. The /partitur/ page (demo/partitur/, built manifest row) draws the score, and demo/partitur/score.mjs cites this file.
+
 Asked 2026-10-04 with four museum photographs of the plate: *"research and
 assess this bauhaus work and give context relevance to our timeline work"*.
 

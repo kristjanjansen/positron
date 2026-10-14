@@ -1,5 +1,7 @@
 # Key detection on /concepts/radio/040/, what the literature says and what was measured
 
+Status (2026-10-14): done. The edge fade, 35 dB floor, 30 s decay and 0.05 stickiness are in the KEY CORE block of demo/radio/key/index.html (commit 1d3215ae), live at https://positron.studio/radio/key/.
+
 Written 2026-10-11, asked *"improve in bg key detectiom. do more measurement.
 read about aliritms"*. The page is `demo/concepts/radio/040/index.html`, live at
 https://positron.studio/concepts/radio/040/. The detector is the block between

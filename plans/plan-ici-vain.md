@@ -1,5 +1,7 @@
 # plan-ici-vain: ici on Väin, with nothing of positron in between
 
+Status (2026-10-14): open. Nothing cites it outside plans/ and no code for it exists.
+
 **Nothing in this document is built.** Written 2026-10-07 from a pasted
 description of Albert Saprykin's *ici* and a reading of `tarmoj/radio1965`.
 

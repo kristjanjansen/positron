@@ -1,5 +1,7 @@
 # plan-patchbay: a universal patch bay, scoped to MIDI and audio
 
+Status (2026-10-14): done. The model and validator are demo/shell/bay.mjs graded by bay-test.mjs, the page is /patchbay/ (unlisted, still built), and route-core and universal routing followed it.
+
 > **The ask**, 2026-09-21, in full in `BACKLOG.md`: *"a system where you can
 > freely map one signal to another"*, kept to **MIDI and audio for now** and
 > designed so that video, 3D rendering, multi-presence and shader control can

@@ -1,5 +1,7 @@
 # plan: make `/stage/`'s LL-HLS leg record, 2026-09-25
 
+Status (2026-10-14): overruled or abandoned. The HLS leg was removed from /stage/ on 2026-09-30 on "can you have just webrtc transport?", so there is nothing left to record (comment at demo/stage/index.html line 113).
+
 Asked: *"add hls recording. can you do it? plan first in bg"*.
 
 🔴 **NOTHING HERE IS MEASURED AGAINST A RUNNING `/stage/`.** No press, no

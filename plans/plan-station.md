@@ -1,5 +1,7 @@
 # plan-station: one playlist, live shows and archive files in the same line
 
+Status (2026-10-14): retired. /station/ was built, moved to eccm on 2026-10-02 and retired 2026-10-08 (archive/demos/station-index.html, archive/demos/README.md).
+
 `research/station-one-source-2026-09.md` settled the architecture and this plan
 does not reopen it. In one paragraph: the station is **an HLS media playlist
 whose segments are `#EXT-X-BYTERANGE` ranges into whole programme files in R2**,

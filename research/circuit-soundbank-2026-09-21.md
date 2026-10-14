@@ -1,5 +1,7 @@
 # A purchased Circuit soundbank, measured, and the one press that would cost the sessions
 
+Status (2026-10-14): done. Its patch decoder is demo/shell/circuit-patch.mjs, used by https://positron.studio/pack/, and its warning is in CLAUDE.md.
+
 > **The ask**, 2026-09-21: parse and analyse the Synth-Patches.com soundbank for
 > Novation Circuit and Tracks, bought and dropped in `purchased/`.
 >

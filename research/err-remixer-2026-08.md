@@ -1,5 +1,7 @@
 # ERR archive remixer — the year-chord instrument, measured (2026-08-27)
 
+Status (2026-10-14): retired. The instrument it measured is archive/remixer/, out of the deploy.
+
 Addendum to research/err-archives-2026-08.md: the "historic year chords /
 blend visuals from year X" instrument built and verified as proto/remixer/
 (port 8891, plain node ESM + static HTML, hls.js 1.7.1 vendored from flipper).

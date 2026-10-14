@@ -1,5 +1,7 @@
 # Key detection, second pass: a better reference, the band, and single note autoplay
 
+Status (2026-10-14): open. The recommended band top of 1 kHz is not applied, since the KEY CORE block in demo/radio/key/index.html still defaults to hi 2000, and BACKLOG.md marks it waiting on the owner's listen; autoplay went the chroma chord way instead (commit 049aacde).
+
 Written 2026-10-13. Asked, about https://positron.studio/concepts/radio/040/
 (Live key): *"it feels repeating same chords all the time"*, then *"do research
 for better key detection. perhaps single note mode as default?"*. The owner has

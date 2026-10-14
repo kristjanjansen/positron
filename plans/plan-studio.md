@@ -1,5 +1,7 @@
 # Positron Studio — operator app plan (2026-08-26)
 
+Status (2026-10-14): retired. studio/engine.mjs and studio/verify.mjs were built and are marked RETIRED 2026-10-13 because workers/rtc was deleted, and the placeholder manifest row is gone (comment in demo/manifest.mjs).
+
 Goal: collapse all measured pathways into ONE operator surface with ~three buttons.
 Audience/participants never install anything (their pages exist). Only the operator
 side needs wrapping — and it must survive ThreatLocker.

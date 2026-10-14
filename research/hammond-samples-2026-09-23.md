@@ -1,5 +1,7 @@
 # A Hammond organ for a web page, surveyed
 
+Status (2026-10-14): open. No Hammond or organ sample set was added to demo/nola/ or demo/code/piano/, and no file in demo/, plans/ or BACKLOG.md cites this survey.
+
 Answers *"research Hammond organ sample sets that could be played from a web
 page"*, asked 2026-09-23. The page it has to fit is `/nola/`, which already
 plays two instruments from recordings fetched per note over the wire: FluidR3's

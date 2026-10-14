@@ -1,5 +1,7 @@
 # Networked music jamming — science, prior art, protocol options (2026-08-27)
 
+Status (2026-10-14): done (reference). A reference on latency thresholds cited by plans/plan-xr-together.md and research/pico-open-issues-and-modular-2026-10-04.md; the proto/jam demo it informed is retired (workers/jam/RETIRED.md, archive/demos/jam-index.html).
+
 Marks: ✅ measured (ours) · 📄 documented (external, cited) · ⚠️ inferred.
 Companion to plans/plan-timeline.md (C3 two-clock, C10 trace-vs-authoring, §5 MIDI
 stance) and research/timeline-own-prior-art-2026-08.md. Context for the

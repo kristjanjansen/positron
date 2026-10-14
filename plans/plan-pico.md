@@ -1,5 +1,7 @@
 # plan-pico: what a Pico 2 W can do for positron besides routing USB MIDI
 
+Status (2026-10-14): partly done. Item 1, the wifi relay node, is rig/pico/net/ (built, never run on a board), and the OLED rings are rig/pico/rings/, while light, sound, clock box, BLE MIDI and CV are not built.
+
 > Asked 2026-10-04, verbatim in `BACKLOG.md`: *"Plan all of them"*: the Pico 2 W
 > as a patchbay node over wifi, light output (WS2812 and DMX) for the timeline's
 > light lane, sound (PWM, I2S DAC, USB audio), a clock box, BLE MIDI, physical

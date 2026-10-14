@@ -1,5 +1,7 @@
 # plan-radio-sound — making `/radio/` more than one wash
 
+Status (2026-10-14): done. Its idea 1, a chord out of the station, is in demo/archive/radio/index.html, and that demo is archived at https://positron.studio/archive/radio/ since 2026-10-13.
+
 > ⚠️ **NOTHING IN THIS FILE IS BUILT.** It is a proposal. No page, module or
 > definition has been changed; every value below is read off
 > `rig/board/norns/Engine_Pappus.sc` and has not been heard.

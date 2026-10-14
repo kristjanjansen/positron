@@ -1,5 +1,7 @@
 # plan-two-more-modules: the next two DSP cores after Plaits, one of them an effect
 
+Status (2026-10-14): partly done. Warps (§3) runs after Plaits inside https://positron.studio/muta/ (demo/muta/), and Marbles at /seed/ (§4) was never built.
+
 **Written 2026-09-22.**
 
 🔴 **WHAT HAPPENED NEXT, THE SAME DAY: `/plai/` BECAME `/muta/` AND THE

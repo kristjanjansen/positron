@@ -1,5 +1,7 @@
 # plan-gesture — one surface for recording a movement, and playing it back
 
+Status (2026-10-14): done. demo/draw/index.html (citing this plan) and demo/shell/xy-pad.mjs carry it, archived on /archive/ since 2026-10-12 with demo/archive/draw-xy/.
+
 Written 2026-09-13, from a session note: *"rethink the whole thing as an XY pad
 experience, and maybe later make some parts reusable — so we can use it with a
 sync control later. Get out of the original demo and more toward a

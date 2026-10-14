@@ -1,5 +1,7 @@
 # plan-away-webrtc: a direct path from the browser to the Pi for /away/
 
+Status (2026-10-14): done. rig/board/rtc.mjs with node-datachannel (rig/board/package.json) and the browser side in demo/shell/board.mjs, used by demo/away/ and demo/remote/circuit/ (https://positron.studio/remote/circuit/).
+
 > Asked 2026-09-30: *"write webrtc path to plan"*, after *"can we bring roundtrip
 > more down"*. **BUILT AND DEPLOYED 2026-09-30, see §9 for what it measured.** The measurements marked MEASURED were
 > taken on 2026-09-30 on this desk; everything else is marked as reasoning or as

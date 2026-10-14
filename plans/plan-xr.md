@@ -1,5 +1,7 @@
 # plan-xr — a headset, measured rather than guessed (2026-09-12)
 
+Status (2026-10-14): retired. Its page /scene/ became /blocks/ on 2026-09-15 and was retired 2026-09-24 (archive/demos/blocks-index.html), while the fixes it found live on in demo/shell/xr-*.mjs.
+
 `research/quest-xr-2026-09.md` opened by admitting **"nothing here was measured
 on a headset."** A Quest 3 arrived, and this is what changed. Everything below
 carries a tag: **MEASURED** (on the device, this session), **DOCUMENTED** (a

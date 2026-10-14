@@ -1,5 +1,7 @@
 # plan-xr-hands — controller and hand poses, and the small screen you hold
 
+Status (2026-10-14): done. demo/shell/xr-hands.mjs and xr-tablet.mjs are built and used through xr-panel.mjs and xr-room.mjs on /mirror/, /floor/ and /weight/.
+
 > Written 2026-09-13, from the owner's question: *"assess the possibility to get
 > controller data — mostly angles and x/y/z — in order to connect something to
 > them so the user can see rendered controllers, maybe hands, and where we can

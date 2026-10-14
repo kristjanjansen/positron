@@ -1,5 +1,7 @@
 # plan-xr-room — one room, panels around you, and sound that comes from them (2026-09-12)
 
+Status (2026-10-14): done. demo/shell/xr-room.mjs is built and used by /floor/, /weight/ and /mirror/.
+
 > Extends `plans/plan-xr.md`, which holds the device measurements and the five defects
 > the headset found. Nothing here re-derives those. Read §7 of that file first:
 > item 7 already says a doff watchdog is required **before** anything streams,

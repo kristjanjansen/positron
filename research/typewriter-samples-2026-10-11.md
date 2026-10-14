@@ -1,5 +1,7 @@
 # Typewriter samples that are free to use, surveyed
 
+Status (2026-10-14): done. The CC0 Hermes Precisa 305 recordings it pointed to play on https://positron.studio/typist/typewriter/, recorded in demo/typist/typewriter/SOURCES.md.
+
 Answers *"You don't have to implement anything, but do a research of
 typewriter samples, which are free to use"*, asked 2026-10-11 for the `typist`
 concepts group (`BACKLOG.md`, top entry). Two pages need it: **010** plays a

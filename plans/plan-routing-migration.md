@@ -1,5 +1,7 @@
 # plan-routing-migration: what it takes to move every demo onto universal routing and the patchbay, and what is still missing
 
+Status (2026-10-14): partly done. Steps 0 to 5 landed in commit a3bfe31 (bay-node.mjs, openers.mjs, midi-graph.mjs, fake-board.mjs, 14 pages on the patchbay), while step 6, the five hard pages, was not done.
+
 > Asked 2026-10-06, verbatim: *"make analysis in bg what it takes to move all
 > demos to universal routing / patchbay and what is still missing"*.
 >

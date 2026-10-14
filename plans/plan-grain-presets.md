@@ -1,5 +1,7 @@
 # Grain presets for `/radio/`, and whether it can keep time
 
+Status (2026-10-14): done. The presets ship in demo/archive/radio/index.html (citing this plan), served at https://positron.studio/archive/radio/.
+
 Session 27, 2026-09-15. Everything below was measured on the page itself unless
 it says otherwise. The page is at
 **<https://positron.studio/radio/>** when it is deployed; locally, with the

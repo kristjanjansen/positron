@@ -1,5 +1,7 @@
 # plan-universal-routing: one model for audio, video, control, renderers, scenes and storage
 
+Status (2026-10-14): partly done. Steps 1 to 4 are built as demo/shell/bay.mjs, midi-kinds.mjs, graph-registry.mjs and https://positron.studio/patchbay/, and step 5 (/wish/ prompting from the registry) is not.
+
 > Asked 2026-10-03, verbatim in `BACKLOG.md`: *"Think about a more universal
 > routing. When I can ask, okay, I want this, this video there, this WebGL
 > renderer there, this scene there, in all those different routings, what we

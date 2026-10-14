@@ -1,5 +1,7 @@
 # plan-vain-upload: put a broadcast in R2 and give it back, without a database
 
+Status (2026-10-14): retired. workers/vain and /crate/ were built and retired 2026-10-02 when the protocol moved to eccm (archive/demos/crate-index.html, archive/vain/).
+
 Status: **not started.** Written 2026-09-15, session 28, at the owner's request.
 Nothing here is built. Proposed worker **`workers/vain`**, proposed bucket
 **`vain-archive`**, proposed read host **`vain.positron.studio`**.

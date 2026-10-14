@@ -1,5 +1,7 @@
 # plan-routing-time: lightweight signals landing on time against video and sound
 
+Status (2026-10-14): partly done. Step 1 is built as demo/shell/timebase.mjs and is used by /sync/ (demo/sync/ahead.mjs, follow.mjs), while steps 2 to 10 (partitur and wall on the peer clock, PDT calibration, Pi header times, replay sidecar) have no code.
+
 > Asked 2026-10-04, verbatim: *"expand and work with universal router plan about
 > those syncing stuff having lightweight signals sync to the rich signals like
 > cues and messages to a video and audio stuff"*.

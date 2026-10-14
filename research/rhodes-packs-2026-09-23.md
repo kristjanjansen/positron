@@ -1,5 +1,7 @@
 # A Rhodes sample pack for `/nola/`, surveyed
 
+Status (2026-10-14): done. The surveyed jRhodes3d pack plays on /nola/ (demo/nola/LICENSE-jrhodes3d, demo/resources/fetch-jrhodes3d.mjs) and in the code/piano concept (https://positron.studio/code/piano/), and plans/plan-piano-samples.md cites it.
+
 Answers *"nola: can you get similar good sample pack for rhodes? investigate in
 bg"*, asked 2026-09-23. *Similar* is to the Salamander Grand Piano that
 `plans/plan-nola.md` section 2.3 sized: **641 files, 748,397,030 bytes, 48 kHz,

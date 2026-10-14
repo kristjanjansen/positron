@@ -1,5 +1,7 @@
 # plan-audio-shader: the granulator, drawn per pixel, from three signals it already has
 
+Status (2026-10-14): partly done. Its step 0 measurement is timeline/lab/audio-field.mjs and its step 2 lift is demo/shell/radio-gran.mjs, and demo/videoradio/index.html draws the instrument as §0 argues, but no per-pixel granulator shader page exists.
+
 > ⚠️ **NOTHING IN THIS FILE IS BUILT.** No page, module, manifest row, shader,
 > assert or harness exists. Nothing was deployed and nothing on the board was
 > touched. It is a proposal.

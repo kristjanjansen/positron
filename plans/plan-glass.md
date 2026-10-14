@@ -1,5 +1,7 @@
 # plan-glass — the fourth clock owner
 
+Status (2026-10-14): retired. No glass lane was ever built, and the lanes page it extends is a 404 (archive/demos/lanes-index.html).
+
 Status: **not started.** Written 2026-09-07, out of the `02 lanes` work, which
 put three lanes on one page each measuring itself. This is the fourth, and it is
 blocked behind a correction that reaches backwards through the whole project.

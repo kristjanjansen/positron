@@ -1,5 +1,7 @@
 # plan-agents — what makes this repo hard for two agents at once
 
+Status (2026-10-14): partly done. P1, P2 and P6 are built (workers/view/deploy.mjs, the tree digest in workers/view/build.mjs, .claude/hooks/guard-tree.mjs, port-free harnesses) and P4's routing became .claude/skills/, while P3, P5 and P7 have no code behind them.
+
 🔴 **P1, P2 and P6 ARE BUILT — READ §11 BEFORE ACTING ON ANYTHING BELOW.** The
 argument sections still read in the present tense because the reasoning is worth
 keeping; the state of the tree is in §11. A plan that has been executed and goes

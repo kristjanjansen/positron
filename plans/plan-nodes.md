@@ -1,5 +1,7 @@
 # plan-nodes — boxes joined by wires, and whether we have a graph to put in one (2026-09-11)
 
+Status (2026-10-14): superseded by plans/plan-nodes-revisited.md. The patchbay built afterwards as demo/shell/bay.mjs, bay-view.mjs and graph-registry.mjs settled it differently, as plans/plan-nodes-revisited.md records.
+
 > **RECONSIDERED 2026-10-11 in `plans/plan-nodes-revisited.md`.** The patchbay (`demo/shell/bay.mjs`) was built after this plan and settles most of it differently. Read that first.
 
 Companion to `plans/plan-hardware.md` §8 (the box, and *a patch is a value*),

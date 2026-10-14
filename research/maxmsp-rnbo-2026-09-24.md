@@ -1,5 +1,7 @@
 # Max/MSP, RNBO, and what a collaborator's patch can reach
 
+Status (2026-10-14): open. No page, module or plan imports a collaborator's RNBO export, and no file cites this one; plans/plan-synthesis-2026-10-07.md names RNBO only as a talk topic.
+
 Asked 2026-09-24: a collaborator has Max experience, and we want to know how
 their sketches could connect to a Cloudflare-hosted web thing, and whether we can
 run and validate their patches here **without anyone buying a licence**.

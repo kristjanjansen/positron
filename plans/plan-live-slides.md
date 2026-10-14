@@ -1,5 +1,7 @@
 # plan: live instruments on a slide
 
+Status (2026-10-14): done. demo/shell/slide-synth.mjs loads Faust compiled ahead of time on the press (commit 1163e11a), played by the synths deck at /slides/synths/.
+
 Asked 2026-10-06, verbatim: *"in bg figure out to build working exmaples of
 stynths etc on a slide. does it need a separate page or can somehow lazyload its
 stuff. when on a page, can it use stuff from the page (a la fau loadaer /

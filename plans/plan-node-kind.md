@@ -1,5 +1,7 @@
 # plan: a node says only what the bay reads
 
+Status (2026-10-14): open. addNode in demo/shell/bay.mjs still requires a kind from NODE_KINDS, and BACKLOG.md marks the change waiting on the owner's five answers.
+
 2026-10-10. Asked: shrink the bay's node `kind`. The owner's view is that
 `device`, `engine`, `person` and `screen` give nothing for UI, and the proposal
 on the table is two booleans, `store: true` and `external: true`, keeping only

@@ -1,5 +1,7 @@
 # Cloudflare Birthday Week 2026, read against positron
 
+Status (2026-10-14): done. Its first item, the new Containers runtime, was measured and adopted as PubNext in workers/pub/worker.mjs, recorded in HANDOFF.md.
+
 Read 2026-10-06 from https://blog.cloudflare.com/birthday-week-2026-wrap-up/
 (46 announcements, 2026-09-28 to 2026-10-02). Ten announcement posts were opened;
 the rest are judged from the wrap-up's one-line summary only, and say so.

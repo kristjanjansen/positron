@@ -1,5 +1,7 @@
 # plan-radio-messages — a clean-room editorial platform on positron primitives
 
+Status (2026-10-14): open. No page, worker or route of it exists in demo/ or workers/, and nothing in BACKLOG.md or HANDOFF.md takes it up.
+
 🔴 **NOTHING IN THIS DOCUMENT IS BUILT.** No page, no worker, no route, no
 deploy. It is an architecture and a set of arguments.
 

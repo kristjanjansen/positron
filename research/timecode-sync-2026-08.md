@@ -1,3 +1,5 @@
+Status (2026-10-14): done (reference). An industry synthesis cited by plans/plan.md section 11b, plans/plan-routing-time.md and PROGRESS.md, with nothing of its own to build.
+
 ## Wall-clock timecode through live→VOD: industry survey + recommendation (2026-08-26)
 
 **TL;DR — the industry independently arrived at our architecture.** ATSC 3.0 concluded that in-band metadata does not survive redistribution, and standardized (1) a luma-modulated data strip in the top lines of the picture (A/335) and (2) an inaudible audio watermark carrying an incrementing time interval code (A/334/Verance VP1), with out-of-band recovery servers (A/336). Our 56-block ms-strip is a taller, more robust private A/335; our T0-in-metadata plan is a private A/336. Keep both.

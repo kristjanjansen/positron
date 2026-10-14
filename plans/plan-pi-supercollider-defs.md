@@ -1,5 +1,7 @@
 # plan-pi-supercollider-defs: the Pi plays SuperCollider programs compiled in a tab
 
+Status (2026-10-14): done. rig/board/scollide.mjs compiles program text with sclang-lite on the board, steps 1 to 6 struck in BACKLOG.md, played by /remote/collide/ and /drums/remote/.
+
 Written 2026-10-12 from reading, with one measurement taken on the laptop
 (the compiled sizes in §1.3). The Pi was not on the LAN, so **nothing in this
 plan has run on the board**. Asked (BACKLOG `## Open`, "SuperCollider drums on

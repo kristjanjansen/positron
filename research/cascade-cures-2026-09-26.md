@@ -12,6 +12,8 @@
 
 # Cascade side effects: structural cures, measured 2026-09-26
 
+Status (2026-10-14): partly done. The diagnostics exist as demo/ancestry.mjs and demo/which-rule-won.mjs, but demo/shell/shell.css has 0 @layer and there is no stylelint config, as BACKLOG.md's 2026-10-12 triage line says.
+
 Five researchers ran in parallel. Everything below was fetched or measured today. Browser stable versions on the day: Chrome 154 (2026-09-22), Firefox 156 (2026-09-15), Safari 27 (2026-09-14). Support figures come from the webstatus.dev API and MDN browser-compat-data, not from memory, because caniuse is stale on two of the features below.
 
 Nothing in the repo was edited. One researcher did run stylelint and css-analyzer against `demo/shell/shell.css` read-only, and those numbers are in section 6.

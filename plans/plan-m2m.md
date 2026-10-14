@@ -1,5 +1,7 @@
 # Many-to-many video — plan
 
+Status (2026-10-14): retired. The phase one prototype is in proto/m2m and the workers it ran on, workers/rtc and workers/moq-safari, carry RETIRED.md (2026-10-13).
+
 > **2026-10-13, DATED NOTE:** `moq.positron.studio` (workers/moq-safari) and `rtc.positron.studio` (workers/rtc) were deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md). The text below is the plan as written and is not rewritten.
 
 **Date:** 2026-08-25 · **Status:** designed, phase-1 prototype in flight (`proto/m2m/`, sibling agent) ·

@@ -1,5 +1,7 @@
 # SuperCollider's own scsynth.wasm — how big a definition it takes (2026-09-13)
 
+Status (2026-10-14): done. Its first recommendation landed as the corrected comment in rig/board/norns/Engine_Pappus.sc, which cites this file, and demo/shell/sclang-lite.mjs cites it too.
+
 **The official WebAssembly backend has no 64 KiB ceiling and nothing like one.
 Measured today with the same generator that found SuperSonic's 65,520: this
 engine takes a definition of 860,000 bytes and loses the engine at 880,000 —

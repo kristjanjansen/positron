@@ -1,5 +1,7 @@
 # A better piano for the sampler, from free sample sets
 
+Status (2026-10-14): done. Salamander Grand V3 replaced FluidR3 in demo/code/sampler.mjs and on the Pi via demo/code/sc-sampler.mjs (commit 93ce6f63).
+
 Answers *"in bg do re-search for piano samples, see a aplan. current one sounds
 metallic thin and lame"*, asked 2026-10-11 about the piano in
 `/concepts/sampler/000/` to `030/`, `/nola/` and the Pi sampler in

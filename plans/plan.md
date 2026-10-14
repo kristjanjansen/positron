@@ -1,5 +1,7 @@
 # Cloudflare Low-Latency Streaming — Findings & Test Rig Plan
 
+Status (2026-10-14): done. The test rig it planned is in rig/ (measure-llhls.html, whep/, relay/, moq/), and workers/cues and the whep-rig input it names were retired 2026-10-13.
+
 > **2026-10-13, DATED NOTE:** `cues.positron.studio` (workers/cues) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md). The input `whep-rig` (§2.2) was deleted from Stream the same day. The text below is the plan as written and is not rewritten.
 
 **Date:** 2026-08-25 · **Account:** `dc1ee8d72a1fb7da857c46479a8503b8` · **Stream customer code:** `customer-mwuu1cmlyif6eluy`

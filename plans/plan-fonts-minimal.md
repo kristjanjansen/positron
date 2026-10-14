@@ -1,5 +1,7 @@
 # The minimal font set
 
+Status (2026-10-14): done. demo/shell/shell.css loads only JetBrains Mono and Geist at 400 and 600, and demo/shell/vendor/ holds just those four files plus the Greek 600 subset.
+
 Asked 2026-10-12: *"make a plan what to cut from fonts. lets have absolutely
 minimal set for out use cases."*, then *"cut our font list"*, then about the
 accidentals *"no bravura needed i hope. can we do without?"*. The session

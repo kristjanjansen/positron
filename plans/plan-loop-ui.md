@@ -1,5 +1,7 @@
 # Loop UI: seeing where every loop is, what is in it, and what comes next
 
+Status (2026-10-14): open. Its 050 Loop clock was built and then removed at the owner's ask on 2026-10-12 (BACKLOG.md, recoverable from f4b6d4c0), and 060 Laps and 070 Ahead were never built.
+
 2026-10-11. Asked, verbatim: *"Research different looping UIs. There is a lot
 of work done in those clips based work, like I think Logic has something, maybe
 GarageBand. It seems that there is not that much visualization going on in

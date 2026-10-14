@@ -1,5 +1,7 @@
 # plan-names — one write path, tiered by credential, with a name that says what it does
 
+Status (2026-10-14): overruled or abandoned. The merge was never built and became moot when selfrec was deleted 2026-10-13 (workers/selfrec/RETIRED.md), leaving workers/ingest alone.
+
 > **2026-10-13, DATED NOTE:** `selfrec.positron.studio` (workers/selfrec) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md). The text below is the plan as written and is not rewritten.
 
 Status: **not started.** Written 2026-09-08 out of "rename ingest selfrec to

@@ -1,5 +1,7 @@
 # Uncertain position — what the spatial trades know, ported to TIME (2026-08-28)
 
+Status (2026-10-14): done. The settled when bracket is read by timeline/strip.mjs (row.payload.when, whenOf) and timeline/transport.mjs, both citing this file, per PROGRESS.md session 6ab.
+
 Background survey for the queued **uncertainty-as-position** work (lab NOTES
 Checkpoint 7 ranks it behind the firewall: "changes what an `at` IS — scalar →
 distribution — touching insertIdx, cursor, horizon, reconcile and every

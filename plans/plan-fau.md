@@ -1,5 +1,7 @@
 # fau, one description of a sound that runs in the tab and on the board
 
+Status (2026-10-14): done. Built as demo/fau/ and demo/shell/faust.mjs (both citing this plan), now also the concept page https://positron.studio/code/faust/.
+
 Answers *"in bg do faust research. demo called fau"* and *"also loop up similar
 alternatives"*, asked 2026-09-22 about a proposed demo with the slug `fau`.
 

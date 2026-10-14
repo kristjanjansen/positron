@@ -1,5 +1,7 @@
 # Universal timeline — mining the OWN prior art (2026-08-27)
 
+Status (2026-10-14): done (reference). A mining of earlier repos cited by demo/shell/pointer-adapter.mjs, demo/shell/text-adapter.mjs and proto/instrument/NOTES.md, whose adapters took its mechanisms.
+
 Companion to timeline-prior-art-2026-08.md (external) and timeline-art-prior-art.md
 (artistic). Five agents read ~/personal/{time,demo,maria,maria_old,tracker,track}
 in full — every file, every branch, git history — briefed to report only what

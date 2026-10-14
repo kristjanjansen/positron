@@ -1,5 +1,7 @@
 # plan-route-core: one routing core, small enough for a microcontroller
 
+Status (2026-10-14): done. The core is demo/shell/route-core.mjs with route-core-test.mjs and the C twin in rig/route-core/, also running in rig/pico/firmware/.
+
 > Asked 2026-10-03, verbatim in `BACKLOG.md`: *"maybe not make that routing so
 > be specific. So something which you can also use on smaller hardware.
 > Microcontrollers with smaller cortex chips on them ... plan it as abstract as

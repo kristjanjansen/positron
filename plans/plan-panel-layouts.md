@@ -1,5 +1,7 @@
 # plan-panel-layouts: where every control physically sits on the four devices
 
+Status (2026-10-14): done. The arrangements it settled are drawn on demo/twelve/index.html and demo/circuit/index.html and read by demo/shell/circuit-cc.mjs, all citing it.
+
 > 🔴 **NOTHING IN THIS FILE IS BUILT.** No page was changed, no module was
 > added, nothing was committed and nothing was deployed. It is a description of
 > four pieces of hardware, written so that a layout can be drawn without owning

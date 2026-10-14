@@ -1,5 +1,7 @@
 # The links picture on a phone
 
+Status (2026-10-14): done. The phone layout with ports on the right and wires in a gutter is built in demo/shell/bay-view.mjs (laneOf, STACK_BELOW 480), and its three open questions sit in BACKLOG.md.
+
 Written 2026-10-10 from two screenshots of `/concepts/21/` at 375 px, asked as
 *"how to improve mobile rendering. inlets outlets always to right? title always
 on top left (extra fields bottom left if bigger version)"*. A spec, not built.

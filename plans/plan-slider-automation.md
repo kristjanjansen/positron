@@ -1,5 +1,7 @@
 # plan-slider-automation: an invisible hand on the kit's slider (2026-09-16)
 
+Status (2026-10-14): done. demo/shell/hand.mjs and hand-drive.mjs drive the kit's slider.mjs, knob.mjs and fader.mjs, graded by hand-test.mjs.
+
 ## 0. The ask, and what it commits to
 
 Verbatim, 2026-09-16:

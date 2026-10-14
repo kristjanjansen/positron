@@ -1,5 +1,7 @@
 # Cloudflare Containers, hands-on — can the engine live in one? (2026-08-27)
 
+Status (2026-10-14): done. Its verdict was acted on: workers/pub runs the ffmpeg publisher in a Container (the containers block in workers/pub/wrangler.jsonc).
+
 Hands-on deploy + measurement (✅) with docs research (📄) around it. Test workload = the
 selfrec repackage job (proto/selfrec/repackage.mjs) transplanted into a container: pull the
 kept proof show from the R2 pub URL, concat, copy-remux p1 (h264) + transcode p2 (vp8,

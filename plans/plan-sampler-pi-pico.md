@@ -1,5 +1,7 @@
 # plan-sampler-pi-pico: the sampler on the Pi, on a Pico, and whether a Pico can drive the Fast Track Pro
 
+Status (2026-10-14): partly done. The Pi half was built the same day as rig/board/scsampler.mjs and rig/board/sampler.mjs (commit "a SuperCollider sampler on the Pi"), and nothing for a Pico sampler or the Fast Track Pro exists under rig/pico/.
+
 > Asked 2026-10-11, verbatim in `BACKLOG.md`: *"Can pi be similar sampler too?
 > Pico?"*, then *"Yes to plans"*, and while this was being written: *"Can pico
 > drive our soundcard?"*

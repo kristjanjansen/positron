@@ -1,5 +1,7 @@
 # Capturing the Circuit through the Fast Track Pro, measured
 
+Status (2026-10-14): done. Its capture channel and levels are used in demo/shell/instruments.mjs and cited by plans/plan-patchbay.md and PROGRESS.md.
+
 > **The ask**, 2026-09-21: *"reseach how to use fastreack pro to capture circuit
 > output (i have mono cable r -> r conntected)"*, then four corrections from the
 > desk while it was being measured: *"i do not use ch2"*, *"moved l to l"*,

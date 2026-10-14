@@ -1,5 +1,7 @@
 # plan-radio-patches — a patch selector for `/radio/`, and where its sound went
 
+Status (2026-10-14): done. Its section 2 patches were built into the radio demo, which moved to demo/archive/radio/ (unlisted, still served at https://positron.studio/archive/radio/) on 2026-10-13.
+
 > ✅ **§2 IS BUILT (2026-09-14). §0.3 IS NOT, ON PURPOSE. §3 IS NOT.**
 > Read this before the body, which is still written as a proposal throughout.
 >

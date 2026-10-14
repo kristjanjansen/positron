@@ -1,5 +1,7 @@
 # plan-stage-patchbay: `/stage/` as patchbay nodes and links
 
+Status (2026-10-14): overruled or abandoned. HANDOFF.md (commit 5291380 row) says it was shelved by the owner, "i do not about patchbay, perhaps just visual indication of picture happening", and demo/stage/index.html imports no bay module.
+
 > Asked 2026-10-05, verbatim, in `BACKLOG.md` under `## Open`: *"can we rework
 > stage to new patchbay stuff"*.
 >

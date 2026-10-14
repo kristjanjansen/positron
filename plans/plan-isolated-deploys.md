@@ -1,5 +1,7 @@
 # plan: isolated deploys
 
+Status (2026-10-14): overruled or abandoned. BACKLOG.md records it as answered no, with workers/view/preview.mjs (a preview alias upload) built instead.
+
 Asked 2026-09-16: *"figure out isolated depolys. perhaps <demoname>.positron.studio
 separately? just quick plan"*. A plan, not an implementation. Nothing was built,
 deployed or committed. Claims are tagged MEASURED (a command was run), READ (a

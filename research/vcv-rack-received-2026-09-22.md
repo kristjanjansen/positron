@@ -1,5 +1,7 @@
 # VCV Rack, received analysis: module architecture, headless, licensing, ARM64
 
+Status (2026-10-14): done (reference). Received, unchecked input that plans/plan-vcv-modules.md verifies and corrects; no VCV module runs anywhere in demo/ or rig/.
+
 > **Handed to this repository 2026-09-22** by the owner, in reply to the ask
 > *"in the background investigate vcv project exp open source modules: how they
 > run? do they run without gui / headless in mac or linux? do they run in pi /

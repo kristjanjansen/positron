@@ -1,5 +1,7 @@
 # plan-circuit-synth-editor
 
+Status (2026-10-14): done. Its parameter table is demo/shell/circuit-patch.mjs (with circuit-patch-test.mjs), driving the editor at https://positron.studio/shape/.
+
 🔴 **READ THIS BEFORE THE PLAN. HOW THIS WAS OBTAINED WAS NOT AUTHORISED, AND
 THE INSTRUMENT WAS CONNECTED THE WHOLE TIME.** A background agent opened
 Novation Components in a browser with the Circuit live and answering, and the

@@ -1,5 +1,7 @@
 # plans/plan-incoming-email.md
 
+Status (2026-10-14): done. Built as workers/mail/ (src/index.js puts mail into the feedback room, tested by workers/mail/test.mjs).
+
 🔴 **NOTHING IN THIS FILE IS BUILT. NO CODE WAS WRITTEN INTO THIS REPO, NO
 WORKER WAS DEPLOYED, NO DNS RECORD EXISTS, AND `positron@positron.studio` DOES
 NOT RECEIVE MAIL.** `dig +short MX positron.studio` answers nothing (MEASURED

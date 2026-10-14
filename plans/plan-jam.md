@@ -1,5 +1,7 @@
 # plan-jam — two machines on one pulse
 
+Status (2026-10-14): retired. Both pages it reworked are gone: /jam/ is archive/demos/jam-index.html and workers/jam and workers/instrument carry RETIRED.md (2026-10-13).
+
 Status: **written 2026-09-14. P1, P2 and P4 DONE the same day; P3 was already
 done on 2026-09-10 and this file said otherwise — see §4.** Proposed after
 reading `jam` and `instrument` beside `click` and finding the three are the

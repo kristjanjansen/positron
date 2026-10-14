@@ -1,5 +1,7 @@
 # plan-portable-board: a board somebody else can build, and who gets to play it
 
+Status (2026-10-14): partly done. Steps 3 and 4 landed (rig/board/setup.sh reads rig/board/packages.txt and refuses to default to studio-1), while graph.get, service.restart, the tarball and rig/board/clients/ do not exist.
+
 > ⚠️ **NOTHING IN THIS FILE IS BUILT.** No code was changed, no script was
 > written, nothing was deployed, nothing was committed, and nothing on the board
 > was started, stopped or reconfigured. `git add` was never run. It is a

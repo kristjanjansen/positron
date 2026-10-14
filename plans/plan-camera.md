@@ -1,5 +1,7 @@
 # plan-camera — a webcam and two microphones on the box, and what they are actually for (2026-09-11)
 
+Status (2026-10-14): partly done. The Pi's camera now shows on /remote/circuit/ through rig/board/camera.mjs (2026-10-13), but the microphone ideas and the §5 contention measurement were never run.
+
 Ideas only. Nothing here is built, and nothing here should be built before §6
 says which measurement settles it.
 

@@ -1,5 +1,7 @@
 # Visualising a live MP3 stream in VR — a throbbing, waving floor (2026-09-14)
 
+Status (2026-10-14): done. Its slow envelope finding drives demo/shell/radio-gran.mjs and demo/videoradio/index.html, both citing it, and plans/plan-audio-shader.md and plans/plan-plate.md build on it.
+
 Companion to `research/quest-xr-2026-09.md` (the headset), `plans/plan-visuals.md`
 (which side of the wire a picture is made on), and `demo/floor/index.html`
 (an infinite instanced WebXR floor that already exists).

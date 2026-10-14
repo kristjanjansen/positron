@@ -1,5 +1,7 @@
 # plan: slides, a presentation track with live elements
 
+Status (2026-10-14): done. demo/shell/slide.mjs, slide.css and demo/slides/ (deck.mjs) are built and deployed at https://positron.studio/slides/ as an unlisted manifest row.
+
 Asked 2026-10-05: *"Bg track to presentations i need to do. Use videopanel for in
 page placement and prev next. Investigate and make sample page for extra large
 and large monotype. On page live examples. Look for slide design skills for

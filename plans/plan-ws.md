@@ -1,5 +1,7 @@
 # plan-ws — one message shape, and a backlog that is ours to write
 
+Status (2026-10-14): done. demo/shell/wire.mjs and https://positron.studio/wire/ are built, and workers/backlog lives on renamed as workers/store.
+
 Status: **P1–P3 BUILT AND DEPLOYED 2026-09-09** — `demo/shell/wire.mjs`,
 `workers/backlog` on `backlog.positron.studio`, and `wire` at
 `positron.studio/wire/` (17/17 green). Two things are outstanding: the

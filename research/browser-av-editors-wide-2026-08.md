@@ -1,5 +1,7 @@
 # Browser A/V tooling — the wide pass (2026-08-28)
 
+Status (2026-10-14): done (reference). The second survey pass against timeline/transport.mjs with nothing to build, cited by timeline/score.mjs and timeline/lab/NOTES.md.
+
 Companion to `research/browser-av-editors-2026-08.md` (1,057 lines, 63 URLs). That file
 surveyed browser NLEs/DAWs, the engines they build on, timingsrc/MediaSync and the hard
 problems. **This one goes where that one did not**: native engines with published

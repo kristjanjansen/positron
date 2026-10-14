@@ -10,6 +10,8 @@
 
 # Layout as a system, not as arithmetic
 
+Status (2026-10-14): done. It is one of the strands behind the positron-compose skill, which cites Every Layout, as do demo/shell/shell.css and demo/shell/strip.mjs.
+
 Research report. Every finding is RULE / SOURCE / CSS. Confidence is marked where a source could not be read first hand. Contradictions are collected in section 8 and again inline where they bite.
 
 A note on sourcing before anything else. The twelve Every Layout primitive pages are paywalled, but the authors serve the finished component code publicly and unauthenticated at `https://every-layout.dev/downloads/<Name>.zip` (Stack, Box, Center, Cluster, Sidebar, Switcher, Cover, Grid, Frame, Reel, Imposter, Icon, Container, all HTTP 200). Every piece of CSS quoted in section 1 is from those official files or from the four free pages (Stack, Sidebar, Switcher, and all six rudiments). Nothing in this report comes from a pirated book scan.

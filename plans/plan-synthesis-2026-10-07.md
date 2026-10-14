@@ -1,5 +1,7 @@
 # Positron: a studio, a practice, and a set of invitations
 
+Status (2026-10-14): done (reference). The owner's synthesis as received; the slide decks in demo/shell/decks.mjs were written from it (BACKLOG.md, 2026-10-07 entry) and research/video-granulation-prior-art-2026-10-13.md cites it.
+
 Comprehensive synthesis of the project discussion, source inspection, artistic references and presentation proposals. 7 October 2026.
 
 ## What this document brings together

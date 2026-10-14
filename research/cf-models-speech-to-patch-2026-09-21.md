@@ -1,5 +1,7 @@
 # Cloudflare models for turning speech into a patch, read off their docs
 
+Status (2026-10-14): done. Whisper speech input runs in workers/wish/src/wish.mjs behind https://positron.studio/wish/ (demo/wish/index.html cites this document).
+
 > **The ask**, 2026-09-21: *"In bg investigate cf models to do sound-to-patcbay
 > conversion"*. This is level 3 of `plans/plan-patchbay.md` §4: somebody says
 > what they want and a patch comes out.

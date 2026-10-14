@@ -1,5 +1,7 @@
 # positron and U:
 
+Status (2026-10-14): done (reference). A comparison of the two codebases cited by timeline/csound.mjs, demo/csound/score.mjs, demo/notes/index.html and plans/plan-uuu-local.md.
+
 Read from the code, not the pitch: `tarmoj/radio` cloned, the other 40
 repos read over the API. Both projects make media happen at the right time in
 more than one place. They answer it differently, and each answer follows from

@@ -1,5 +1,7 @@
 # plan-demo-structure: fewer pages for time, messages, sync and routing
 
+Status (2026-10-14): done. The five tab pages exist as demo/sync/, demo/time/, demo/wire/, demo/patchbay/ and demo/capture/ (all archived on /archive/ since 2026-10-12/13), with cues, jam, lanes and loops in archive/demos/.
+
 > Asked 2026-10-04, verbatim: *"Too many of thise demos, those old halfbroken
 > but useful… peopose a new structure of denis for this suff of times messages
 > ayncs routes etc"*.

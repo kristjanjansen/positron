@@ -2,6 +2,8 @@
 
 # Share images: Open Graph and Instagram, as a kit image
 
+Status (2026-10-14): partly done. Its headless Chrome verdict was overruled, and its route B shipped instead as demo/shell/share-card.mjs, /kit/share/ and resvg at build time in workers/view/og/.
+
 Written 2026-10-13. A plan, nothing in positron changed: no code, no build, no
 deploy, no commit. Asked, in the background: *"In bg do plan for og and insta
 images. We need patchbay renderer and typogtaphy to work there. See ../eccm and

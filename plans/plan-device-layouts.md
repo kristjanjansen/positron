@@ -1,5 +1,7 @@
 # plan-device-layouts: what a control MEANS, and then how to compose one screen out of them
 
+Status (2026-10-14): done. Its control types are in demo/shell/bay.mjs and circuit-cc.mjs and its §3.12 layout in demo/circuit/index.html, all three citing this plan.
+
 > 🔴 **NOTHING IN THIS FILE IS BUILT.** No module was added to `demo/shell/`, no
 > row was added to `demo/manifest.mjs`, no page was created, nothing was
 > deployed and nothing was committed. It is a proposal.

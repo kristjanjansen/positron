@@ -1,5 +1,7 @@
 # plan-nodes-revisited: the node based UI plan, read again after the patchbay was built (2026-10-11)
 
+Status (2026-10-14): partly done. The JACK arm is built (rig/board/jack.mjs and the jack transport in demo/shell/bay.mjs), while tap to link in demo/shell/bay-view.mjs and the canonical scene document are not.
+
 > Asked 2026-10-11: *"Read nondebased ui plan and recosnider it in the light of patchbay"*.
 > The plan is `plans/plan-nodes.md` (2026-09-11). Since then `plans/plan-patchbay.md`
 > (2026-09-21), `plans/plan-universal-routing.md` (2026-10-04) and

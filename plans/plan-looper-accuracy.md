@@ -1,5 +1,7 @@
 # Looper accuracy: a coarse pedal, and a foot that is not in time with the hands
 
+Status (2026-10-14): done. The rolling buffer, start lookback and seam fold (LOOKBACK_MS, SEAM_MS, BUFFER_MS) and the 3 s hold clear are in demo/code/piano/index.html, live at https://positron.studio/code/piano/.
+
 2026-10-11. Asked, about the sustain pedal looper on `/concepts/sampler/020/`:
 *"research how to improve the accuracy of Looper, because I'm especially with
 this Low resolution sustain. I just can't time my keyboard key pressing and

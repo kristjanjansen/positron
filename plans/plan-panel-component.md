@@ -1,5 +1,7 @@
 # plan-panel-component: the hardware panel layout, extracted into the kit
 
+Status (2026-10-14): done. The extraction is demo/shell/panel-layout.mjs (createPanelLayout), landed in session 40 as "the panel layout is a kit component".
+
 > 🔴 **NOTHING IN THIS FILE IS BUILT.** No page was changed, no module was
 > added, `demo/shell/shell.css` was not touched, `/kit/` was not touched,
 > nothing was committed and nothing was deployed. The only file written is this

@@ -1,5 +1,7 @@
 # Beat detection on /concepts/radio/020/, how it works and what is next
 
+Status (2026-10-14): partly done. The detector it describes is demo/radio/tempo.mjs on https://positron.studio/radio/tempo/, while the §6 next steps (a fourth recording, per-band onset latency, the comb resonator bank) have not landed.
+
 Written 2026-10-11, asked *"write these workings to pplan"* after *"what was
 bmp detect fix?"*. The page is `demo/concepts/radio/020/index.html` (it was
 `radio/020` until the same day). The measurements behind it are in

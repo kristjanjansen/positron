@@ -1,5 +1,7 @@
 # Beat phase on /concepts/radio/020/: why the beats land on the upbeat (2026-10-11)
 
+Status (2026-10-14): done. The hat free pulse train phase it recommends is in demo/radio/tempo.mjs (PH_W, HAT_BETA), used by https://positron.studio/radio/tempo/ and planned in plans/plan-beat-detection.md.
+
 Asked: *"beats are often upbeat"*, then *"radio 2 is upbeat. not good. freq
 analsis?"*. The page is `demo/concepts/radio/020/index.html`, the detector in
 `detBuild`, `detHop` and `detEstimate`.

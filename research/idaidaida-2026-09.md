@@ -1,5 +1,7 @@
 # IDA Radio (idaidaida.net): the live feed, the archive, and why neither is wired in yet
 
+Status (2026-10-14): done. The live feed it said was not wired in was wired in the next day (7e7755e9): workers/shout/worker.mjs carries broadcast.idaidaida.net and demo/radio/blend/ and demo/radio/key/ play the ida-tallinn mount, while the archive stays a no.
+
 Every claim below is labelled **READ** (taken from a page, a document or an API
 response), **MEASURED** (this machine did it and the timestamp is given) or
 **INFERRED** (a conclusion drawn from the two).

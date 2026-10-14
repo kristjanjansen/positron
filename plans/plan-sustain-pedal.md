@@ -1,5 +1,7 @@
 # Sustain pedal: what the owner's presses measured, and what the looper should do about it
 
+Status (2026-10-14): done. demo/code/piano/index.html ignores a press within SPRING_MS 70 of a release, refuses loops under MIN_LOOP_MS 500 and clears on a hold, at https://positron.studio/code/piano/.
+
 2026-10-11. Asked: *"i want to copy and analyze sustain now, hardness to double
 etc"*, then *"sustain analysis?"* and *"what about sustain pedal anaysis"*.
 

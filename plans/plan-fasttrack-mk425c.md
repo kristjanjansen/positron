@@ -1,5 +1,7 @@
 # plan-fasttrack-mk425c: an interface that was supposed to be dead, and a keyboard that only talks
 
+Status (2026-10-14): done. The MK-425C is demo/evo/index.html and its footswitch demo/shell/pedal.mjs (which cites this plan), and the Fast Track Pro captures the Circuit on the Pi for /away/.
+
 > 🔴 **NOTHING IN THIS FILE IS BUILT.** No page was written, no module was
 > touched, no row was added to `demo/manifest.mjs`, nothing was deployed and
 > nothing was committed. `demo/dump/index.html` is being written by somebody

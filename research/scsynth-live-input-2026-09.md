@@ -1,5 +1,7 @@
 # Live browser audio into scsynth-in-a-tab — MEASURED 2026-09-14
 
+Status (2026-10-14): retired. Its subject, Pappus fed live in a tab, is archived at demo/archive/pappus/ and archive/box-pappus/, and the only code citing it is demo/archive/radio/index.html.
+
 **It works. It has always worked. Nothing needs building.**
 
 A browser `AudioNode` connected to `sonic.node.input` reaches SuperCollider's

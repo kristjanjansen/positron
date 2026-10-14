@@ -1,5 +1,7 @@
 # plan-held-in-human-score, what the Held in Human score says and what we can use
 
+Status (2026-10-14): done. Its data is demo/resources/held-in-human.json from demo/resources/build-held-in-human.mjs, both citing this plan, and /held/ draws from it.
+
 Written 2026-09-19 against `research/held-in-human-score-2026-09-19.txt`, which
 Kristjan supplied verbatim that morning.
 

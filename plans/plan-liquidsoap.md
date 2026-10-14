@@ -1,5 +1,7 @@
 # Liquidsoap: what to learn from it, and where it could plug in
 
+Status (2026-10-14): open. No file under demo/, workers/ or rig/ mentions Liquidsoap, so neither the five ideas nor the Pi Icecast station have been taken up.
+
 2026-10-07. Prompted by `plans/plan-ici-vain.md`, where Liquidsoap is the source
 for ici's Icecast mount on Väin, and by the question *"what to learn from
 liquidsoap / integrate etc?"*.

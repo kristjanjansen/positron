@@ -1,5 +1,7 @@
 # plan-kit-split: one page per kit part, each with its own card
 
+Status (2026-10-14): done. The kit is one page per part under demo/kit/<part>/ (input, status, timeline, layout, devices, hardware, diagram, slides, patchbay and more), each its own kit/<part> row in demo/manifest.mjs.
+
 > Asked 2026-10-06, verbatim: *"for ui, we are pressing limits of tabs in kit
 > page. for your testing you have page size issue. i am proposing split page up
 > to separate ones, link from frontpage cards. can be something else. plan in

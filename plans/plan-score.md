@@ -1,5 +1,7 @@
 # plan-score — one normalized score, three languages
 
+Status (2026-10-14): done. timeline/score.mjs carries scoreDoc and loadScoreDoc, used by demo/time/score.mjs (the SCORE tab of https://positron.studio/time/) and demo/csound/; the old /score/ page was folded into /time/ on 2026-10-04 (archive/demos/README.md).
+
 Status: **not started.** Written 2026-09-07, out of the `03 nest` rework and a
 reading of `04 score`. Supersedes nothing; `plans/plan-timeline.md` §8 owns quotation
 semantics and this plan owes it deference.

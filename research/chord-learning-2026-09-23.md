@@ -1,5 +1,7 @@
 # Learning chords off the keys on `/nola/`, and suggesting the next two
 
+Status (2026-10-14): done. The learning mode is in demo/nola/index.html with demo/shell/name.mjs and demo/shell/roll.mjs citing it, while its 173 byte rule was replaced by research/chord-suggester-benchmark-2026-09-23.md.
+
 Answers, in the owner's words, asked 2026-09-23:
 
 > *"do bg research of learn/suggest chords. idea is to have alt mode in nola

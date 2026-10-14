@@ -1,5 +1,7 @@
 # ERR archive platforms — API, metadata, playability (2026-08-27)
 
+Status (2026-10-14): done. The arhiiv.err.ee API it mapped is read by https://positron.studio/reel/, /floor/ and /history/newsreels/ (demo/shell/reel-line.mjs).
+
 Hands-on probe of arhiiv.err.ee + jupiter.err.ee for the §−1 cultural-heritage
 horizon and radio-tallinn-1965. All endpoints exercised live from this machine
 (in Estonia); low request rate, sample items only. Marks: ✅ measured here,

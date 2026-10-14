@@ -1,5 +1,7 @@
 # synth-editors-2026-09-21: what other hardware editors are made of, and what this kit is missing
 
+Status (2026-10-14): partly done. The Circuit editor exists as /shape/ (demo/shape/index.html cites the comparison), but the four gaps it named (envelope breakpoint editor, list search, A/B compare, undo stack) are not in demo/shell/.
+
 > **The ask**, 2026-09-21: *"in the background also see existing a bunch of
 > editors maybe something to learn from what UI elements we need I think we have
 > already have, have a lot maybe open source stuff look it up"*.

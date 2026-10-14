@@ -1,5 +1,7 @@
 # plan-pack-page
 
+Status (2026-10-14): done. demo/pack/index.html with demo/shell/circuit-patch.mjs and demo/shell/drop.mjs, a built unlisted pack row in demo/manifest.mjs at https://positron.studio/pack/.
+
 **A page that opens a Circuit pack and says what is in it, and a drop target
 that opens a file without sending it anywhere.** Asked 2026-09-21:
 *"do lightweight planning on patch demo (inclu global dragdroppable upload)"*.

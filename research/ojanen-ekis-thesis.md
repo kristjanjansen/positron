@@ -1,5 +1,7 @@
 # Ojanen, *User Stories of Erkki Kurenniemi's Electronic Musical Instruments, 1961-1978*: extracted text
 
+Status (2026-10-14): done (reference). Somebody else's dissertation kept as extracted text, cited by research/ojanen-ekis-notes.md and research/corpus-from-thesis-2026-09.md.
+
 This file is a machine extraction of somebody else's PhD dissertation. It is
 reference material, not this project's writing. Nothing in it was edited,
 summarised or corrected. The analysis built on it is a separate file,

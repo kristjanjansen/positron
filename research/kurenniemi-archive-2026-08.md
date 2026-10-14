@@ -1,5 +1,7 @@
 # Kurenniemi — what is publicly reachable, and what a SECOND institution taught (2026-08-28)
 
+Status (2026-10-14): done (reference). Its prototype proto/aikajana/ was deleted on 2026-09-15 (41206498), and the archive.org audio it found is what demo/resources/ and demo/tapes/ play, cited by research/kurenniemi-sources-2026-09.md and plans/plan-slides.md.
+
 Availability probe for the §−1 PhD case study, and the Tier-A demo it supported
 (`proto/aikajana/`). Every endpoint below was exercised live from this machine
 at ≤1 req/s. Marks: ✅ measured here, 📄 from the source's own docs/terms,

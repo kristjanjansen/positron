@@ -1,5 +1,7 @@
 # plan-diagram — a picture of where the signal goes
 
+Status (2026-10-14): done. Built as demo/shell/diagram.mjs (citing this plan), shown on https://positron.studio/kit/diagram/.
+
 Written 2026-09-13, from a session note: *"a flow diagram drawer… lightly
 rounded rectangles, labels inside them, a title and description… good text
 wrapping and cutting… arrows between them, horizontal mostly, maybe some

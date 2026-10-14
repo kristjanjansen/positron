@@ -1,5 +1,7 @@
 # plan-demos — one coherent demo story, one UI
 
+Status (2026-10-14): superseded by the concepts front page. The numbered story it describes was replaced on 2026-10-13 by the concept cards of demo/shell/concept-list.mjs on https://positron.studio/, with no numbers in any URL.
+
 Status: **18 of 23 built and deployed** (2026-09-04), 239/239 green against
 https://positron.studio. Demos live at `/<nn>-<name>/`, notes at `/notes/`.
 

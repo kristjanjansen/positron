@@ -1,5 +1,7 @@
 # Improving tempo (radio/020, radio/030) and key (radio/040), ranked
 
+Status (2026-10-14): partly done. Fixes 1 and 2 (phase keep, no steady beat below 0.5) landed in ecb2d57f in the radio tempo module (now demo/radio/tempo.mjs), and the edma key profile was left as an option (BACKLOG.md).
+
 Written 2026-10-12 after *"not good perf of bmp"* on
 https://positron.studio/concepts/radio/030/ and *"save more and evaluate bmp
 and keys perf. do reseach / get tooling"*. The measurements are in

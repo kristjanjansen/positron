@@ -1,5 +1,7 @@
 # Granulating and sampling video: prior art, 1957 to 2002 (2026-10-13)
 
+Status (2026-10-14): done (reference). A 1957 to 2002 prior art survey cited by plans/plan-synthesis-2026-10-07.md, with nothing of its own built.
+
 Research only. No code was changed for this document. Asked by the owner on
 2026-10-13, after hearing that our research had almost nothing on it: *"so do
 the research"*.

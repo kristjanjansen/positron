@@ -1,5 +1,7 @@
 # The 64 KiB SynthDef ceiling — where it is, and what it actually binds (2026-09-13)
 
+Status (2026-10-14): done. Its constant fix landed as SIZE_CEILING = 65488 in demo/shell/synthdef.mjs, used by demo/patch/engine.mjs, both citing this file.
+
 **There is no 64 KiB ceiling on a SynthDef. There is a ceiling on an OSC
 MESSAGE, it belongs to one engine out of the four ways in, and 65,536 is not
 its value.** Measured today with one generator and the same byte counts at both

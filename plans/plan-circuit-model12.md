@@ -1,5 +1,7 @@
 # plan-circuit-model12: a groovebox and a mixer, and which of them owns the clock
 
+Status (2026-10-14): done. The maps were built into demo/circuit/index.html and demo/twelve/index.html (both archived on /archive/ since 2026-10-12) and demo/shell/circuit-cc.mjs, and /circuit/ cites this plan.
+
 > 🔴 **NOTHING IN THIS FILE IS BUILT.** No code was changed, no row was added to
 > `demo/manifest.mjs`, nothing was deployed, nothing was committed, and nothing
 > on the board was started, stopped or restarted. It is a proposal.

@@ -1,5 +1,7 @@
 # Pico open issues, settled where research can, and Eurorack boards for playing a modular remotely (2026-10-04)
 
+Status (2026-10-14): partly done. Part A settled plans/plan-pico.md's open list, but Part B's Workshop Computer was judged too dear and the cheaper Crave route is not bought (HANDOFF.md).
+
 > Asked 2026-10-04, verbatim in `BACKLOG.md`: *"regarding those open issues to
 > do some research and in general would be cool to have some kind of modular
 > support maybe there are boards which are ready at the right voltage for

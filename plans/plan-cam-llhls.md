@@ -1,5 +1,7 @@
 # Plan: a webcam to the container and back as LL-HLS, for `/cam/`
 
+Status (2026-10-14): retired. /cam/'s RTMPS leg and the positron-cam input were retired 2026-10-13 (HANDOFF.md, "Retired 2026-10-13"), and the same publish lives on as https://positron.studio/video/llhls/ through pub's /loop.
+
 > **2026-10-13, DATED NOTE: what this plan built is retired.** /cam/'s RTMPS
 > camera leg is gone: the input `positron-cam` (`157863305ec9583187dfbb1c66c031ea`)
 > was deleted from Stream and the `CAM_STREAM_KEY` secret from positron-pub, pub's `wss /cam` and

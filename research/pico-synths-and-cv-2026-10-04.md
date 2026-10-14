@@ -1,5 +1,7 @@
 # Synths, effects and CV on RP2040 and RP2350, and how to hear them before the hardware (2026-10-04)
 
+Status (2026-10-14): partly done. It feeds plans/plan-sampler-pi-pico.md, but mod-core, the C modulation library it ranks first, is still a next step in HANDOFF.md and exists nowhere in rig/.
+
 > Asked 2026-10-04: *"look at the synths and general effect and CV and
 > modulation stuff which can be built on that chip maybe in the eurorack
 > context or those DX7 style stuff look into it what what could we compile

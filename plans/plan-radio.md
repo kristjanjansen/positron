@@ -1,5 +1,7 @@
 # plan-radio — `/radio/`, what it is and where it goes
 
+Status (2026-10-14): done. The page it records moved to demo/archive/radio/ on 2026-10-13 and /radio/ now belongs to the radio concepts (positron-history skill).
+
 Written 2026-09-14, session 24, after building it. The page is live and green;
 this records the decisions, the measured prices behind them, and the one thing
 that is parked and why — so none of it gets re-litigated from scratch.

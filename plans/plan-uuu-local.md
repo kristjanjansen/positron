@@ -1,5 +1,7 @@
 # plan-uuu-local — U:'s scores through our compiler, with the network out of the TIMING path
 
+Status (2026-10-14): partly done. P1 is done (the macro pass in timeline/csound.mjs compiles both real vClick scores, demo/csound/), while P3's two devices on one LAN and P4 have no measurement in the repository.
+
 Status: ⚠️ **CORRECTED 2026-09-14 — it was NOT "mostly already true", and it was
 wrong in both directions at once.** ✅ **P1 fails at the first statement of the
 first file:** `compileCsound` THROWS `tempoMap: non-finite point 0,NaN` on BOTH

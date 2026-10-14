@@ -1,5 +1,7 @@
 # Piano key proportions on a screen, and where the black keys really go (2026-09-17)
 
+Status (2026-10-14): done. demo/shell/keyboard.mjs takes the black key offsets from this file (at half strength, by its own comment) and cites it.
+
 **Outcome in one line: our widths are right and our POSITIONS are wrong.** A real
 piano does not centre its black keys on the joins between the white keys, and
 ours does. Fixing that moves nothing else: same key widths, same heights, same

@@ -1,5 +1,7 @@
 # Tutorial layout: one slide frame with the words, the build area and the patchbay
 
+Status (2026-10-14): done. It was built as /concepts/50/ and now sits archived at demo/archive/tutorial-slide/ (https://positron.studio/archive/tutorial-slide/).
+
 2026-10-10. The page is `/concepts/50/` (`demo/concepts/50/index.html`, with its
 own `modules.mjs`).
 

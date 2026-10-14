@@ -1,5 +1,7 @@
 # A box that is the instrument
 
+Status (2026-10-14): done. The box it argued for is the Raspberry Pi board in rig/board/ (board.mjs, positron-board.service, which cites this file), followed up in plans/plan-hardware.md.
+
 You press a key here. A synthesiser somewhere else plays the note, and you hear
 it back. That works today, and it is measured: **58 milliseconds** from the key
 going down to the sound arriving, with Ableton Live making the sound on a machine

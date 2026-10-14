@@ -1,5 +1,7 @@
 # plan-visuals — generative pictures, and which side of the wire they are made on (2026-09-11)
 
+Status (2026-10-14): done. The GPU rig it asked for first is demo/verify-gl.mjs and rig/vis/, and pictures render in the browser on /mirror/ and the shader concept pages (demo/shader/).
+
 Companion to `plans/plan-hardware.md` (the box), `research/quest-xr-2026-09.md` (the
 headset), and `rig/board/README.md` (the instrument that already exists). Written
 because the user asked one question with a shape this project has answered

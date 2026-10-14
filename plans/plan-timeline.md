@@ -1,5 +1,7 @@
 # plan-timeline — "save anything to a timeline, play anything back" (2026-08-26)
 
+Status (2026-10-14): partly done. The library is built in timeline/ (score.mjs, store.mjs, nested.mjs, render.mjs, §7 BUILT and §9 CLOSED) and drives /time/ and /csound/, while §-1's archival renderer and deep time ticks were never built.
+
 The universal substrate under studio/replay/archive. Synthesis of two lineages:
 the user's four timeline experiments (~/personal/{time,demo,maria,tracker}) and
 positron's measured machinery. Each supplies what the other lacks.

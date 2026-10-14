@@ -1,5 +1,7 @@
 # Ojanen's EKIS thesis: what is in it, and what this project can use (2026-09-15)
 
+Status (2026-10-14): done. Its reading fed research/corpus-from-thesis-2026-09.md, and demo/resources/corpus.json names Ojanen 85 times.
+
 Analysis of Mikko Ojanen, *User Stories of Erkki Kurenniemi's Electronic Musical
 Instruments, 1961-1978* (PhD, University of Helsinki, 2020). The extracted text
 is `research/ojanen-ekis-thesis.md`, with its provenance, licence and page map

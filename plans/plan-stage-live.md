@@ -1,5 +1,7 @@
 # plan-stage-live: a show that starts, is recorded by the room that runs it, and plays back afterwards
 
+Status (2026-10-14): done. demo/stage/index.html starts a real show, records it in the room with MediaRecorder, keeps it in IndexedDB and plays it back with the answers on a strip, at https://positron.studio/stage/.
+
 > **2026-10-13, DATED NOTE.** The test pattern this plan names as the second
 > leg is gone: the input `whep-rig` (`224558e8993d5a5efd234d9d3a320f87`), the
 > `WHIP_URL` secret and pub's `/watch`, `/status`, `/start`, `/stop` and `/whip`

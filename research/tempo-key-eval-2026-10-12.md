@@ -1,5 +1,7 @@
 # Tempo and key on our radio pages, measured against reference tools, 2026-10-12
 
+Status (2026-10-14): done. It fed plans/plan-tempo-key-improve.md and the detector in demo/radio/tempo.mjs (https://positron.studio/radio/tempo/ and /radio/live/), which cite its section 4.4.
+
 Asked 2026-10-12 about https://positron.studio/concepts/radio/030/ Live tempo:
 *"not good perf of bmp"*, then *"save more and evaluate bmp and keys perf. do
 reseach / get tooling"*. The detectors measured are the tempo detector of

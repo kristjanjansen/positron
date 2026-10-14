@@ -1,5 +1,7 @@
 # Free live TV-like sources for `/now/` (2026-10-05)
 
+Status (2026-10-14): retired. Its subject /now/ was folded into /flipper/, which was retired 2026-10-12 (archive/demos/now-index.html and flipper-index.html, archive/demos/README.md).
+
 ASKED, VERBATIM (BACKLOG, 2026-10-05): *"Also look into oher free live tvlike
 sources"*, in the context of `/now/` (`demo/now/index.html`): one live channel
 with a DVR window, drawn on a timeline whose right end is the present. Today it

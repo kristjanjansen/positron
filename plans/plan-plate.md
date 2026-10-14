@@ -1,5 +1,7 @@
 # plan-plate — the live station standing still, on a floor you can stand on
 
+Status (2026-10-14): open. There is no /plate/ page, manifest row or archived copy, and the re-derivation script it asked for first does not exist.
+
 > ⚠️ **NOTHING IN THIS FILE IS BUILT.** No page, module, manifest row or assert
 > exists. Every number tagged **R§** below is quoted from
 > `research/vr-sound-visual-2026-09.md` and **has not been reproduced here** —

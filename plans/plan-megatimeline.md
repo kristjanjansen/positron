@@ -1,5 +1,7 @@
 # plan-megatimeline — the ERR archive as one scrollable surface (2026-08-27)
 
+Status (2026-10-14): retired. Its prototype survives only as the screenshots in archive/megatimeline/, and the newsreel line it pointed at went into /reel/ (commit e22b871b).
+
 One zoomable canvas: x = time, 1908 → today (~5000× zoom range, decades → days);
 horizontal tracks of archive material — video items as THUMBNAIL frames (from
 ERR's own preview images, never parsed from video), audio as waveform strips,

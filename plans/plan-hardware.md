@@ -1,5 +1,7 @@
 # plan-hardware — the box that IS the instrument, with no laptop under it
 
+Status (2026-10-14): done. The box is the Raspberry Pi in rig/board/, whose README.md corrects and narrows this plan's §8, though it runs node rather than the Chrome page proposed.
+
 Status: **not started.** Written 2026-09-10, out of `rig/m1/` reaching
 58 ms key→ear with Ableton Live on the other machine — and that other machine
 being a Mac Pro running a headless browser, which is a large and expensive way to

@@ -1,5 +1,7 @@
 # One source for a station that is a schedule (2026-09-15)
 
+Status (2026-10-14): done. It settled the architecture of plans/plan-station.md, which is built as workers/station/worker.mjs.
+
 The station is a list of programmes, each a file in R2 or a live mount, and
 every client works out from the wall clock which one is playing and how far in.
 That is fine on a page. The question is what happens on **an iPhone, added to

@@ -1,5 +1,7 @@
 # plan-circuit-patches: getting the patches off a 2015 Circuit without losing them
 
+Status (2026-10-14): done. The pack was taken through Components on 2026-09-20 and lives in <private-pack-repo> (CLAUDE.md), it is read by demo/pack/index.html, and demo/remote/circuit/ and rig/board/inputs.mjs cite this plan.
+
 > **The ask**, 2026-09-20: *"can you get my patches from circuit? reseach in bg"*,
 > after *"careful, do not want to lose my patches"* earlier the same evening.
 >

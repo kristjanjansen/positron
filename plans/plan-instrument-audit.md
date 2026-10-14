@@ -1,5 +1,7 @@
 # plan-instrument-audit: nine instruments against `positron-compose`, and the one to convert first
 
+Status (2026-10-14): done. Its pick, /fau/, was converted to createInstrumentPanel (demo/fau/index.html cites this plan), as were /tom/, /shape/ and /muta/, while /nola/, /circuit/, /evo/ and /twelve/ were not.
+
 **2026-09-26. An assessment, not a change.** The ask, verbatim: *"now audit all
 instruments to the new rules we make. pick one. do not do anything just assess
 and propose."*

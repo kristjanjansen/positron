@@ -1,5 +1,7 @@
 # positron audience-participation archaeology — the research instrument we already built (2026-08-28)
 
+Status (2026-10-14): done (reference). An archaeology of the elektronstudio lab app with nothing to build, cited by plans/plan-names.md.
+
 Companion to `research/timeline-own-prior-art-2026-08.md`. That doc surveyed the
 elektronstudio message vocabulary and the 176-line ws relay. This one goes after
 three specific mechanisms the user remembered: **video archived and aligned from a

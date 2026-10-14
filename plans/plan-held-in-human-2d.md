@@ -1,5 +1,7 @@
 # plan-held-in-human-2d, the piece as a picture on a flat screen
 
+Status (2026-10-14): done. Built as demo/held/index.html (citing this plan), still served at https://positron.studio/held/ and listed on /archive/ since 2026-10-13.
+
 Written 2026-09-20, in answer to one line from Kristjan: *"In bg plan and
 implement basic held visualization in 2d. We have typing info, hue,
 ligtness…"*
