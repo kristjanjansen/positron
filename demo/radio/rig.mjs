@@ -6,6 +6,7 @@
 // links into it, and how a station starts and stops.
 import { el } from '/shell/shell.mjs';
 import { createPatchbay } from '/shell/patchbay.mjs';
+import { addNodes } from '/shell/nodes.mjs';
 import { createVideoPanel } from '/shell/video-panel.mjs';
 import { createGrainScope } from '/shell/grain-scope.mjs';
 import { createButtonGroup } from '/shell/button-group.mjs';
@@ -44,31 +45,17 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
   const FX_IN = `${S}:fx:audio-in`, FX_TEMPO = `${S}:fx:value-in`, FX_MIX = `${S}:fx:value-in-2`, FX_OUT = `${S}:fx:audio-out`;
   const MIX_OUT = `${S}:knob-mix:value-out`;
 
-  bay.addNode({ id: `${S}:wave`, kind: 'screen', label: 'wave', place: 'browser' });
-  bay.addPort({ id: WAVE_IN, label: 'wave', dir: 'in', medium: 'audio' });
-  // The beats the detector placed reach the wave as events on a link of their
-  // own, so the marks on the wave are only what arrived here.
-  bay.addPort({ id: WAVE_BEATS, label: 'beats', dir: 'in', medium: 'value', deliver: (ev) => beatsIn(ev) });
-  bay.addNode({ id: `${S}:bpm`, kind: 'engine', label: 'tempo detector', place: 'browser' });
-  bay.addPort({ id: BPM_IN, label: 'tempo detector', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: BPM_EV, label: 'tempo', dir: 'out', medium: 'value' });
-  // The only way a tempo reaches the scope: a delivered event on this port.
-  // The detector never touches the scope.
-  bay.addNode({ id: `${S}:display`, kind: 'screen', label: 'tempo scope', place: 'browser' });
-  bay.addPort({ id: DISPLAY_IN, label: 'tempo scope', dir: 'in', medium: 'value', deliver: (ev) => shown(ev) });
-  // The fx box: the radio thinner (a low cut) with a click synthesised in
-  // this tab on the detector's beat grid, mixed against the untouched radio by
-  // a knob of its own. It takes the tempo on one value port and the mix on the
-  // second, and only its output reaches the speakers.
-  bay.addNode({ id: `${S}:fx`, kind: 'engine', label: 'low cut and click', place: 'browser' });
-  bay.addPort({ id: FX_IN, label: 'fx', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: FX_TEMPO, label: 'tempo', dir: 'in', medium: 'value', deliver: (ev) => fxTempo(ev) });
-  bay.addPort({ id: FX_MIX, label: 'mix', dir: 'in', medium: 'value', deliver: (ev) => fxMix(ev) });
-  bay.addPort({ id: FX_OUT, label: 'fx', dir: 'out', medium: 'audio' });
-  bay.addNode({ id: `${S}:knob-mix`, kind: 'engine', label: 'mix knob', place: 'browser' });
-  bay.addPort({ id: MIX_OUT, label: 'mix', dir: 'out', medium: 'value' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
+  // The wave's beats and the scope's tempo are only what arrives on their value
+  // ins. The fx box is a low cut plus a click on the beat grid, mixed against the
+  // untouched radio by its own knob: tempo on value-in, the mix on value-in-2.
+  addNodes(bay, S, ['wave', 'bpm', 'display', 'fx-click', 'knob-mix', 'speaker'], {
+    deliver: { 'wave:value-in': (ev) => beatsIn(ev), 'display:value-in': (ev) => shown(ev),
+      'fx:value-in': (ev) => fxTempo(ev), 'fx:value-in-2': (ev) => fxMix(ev) },
+    ports: Object.fromEntries(Object.entries({ 'wave:audio-in': 'wave', 'wave:value-in': 'beats',
+      'bpm:audio-in': 'tempo detector', 'bpm:value-out': 'tempo', 'display:value-in': 'tempo scope',
+      'fx:audio-in': 'fx', 'fx:value-in': 'tempo', 'fx:value-in-2': 'mix', 'fx:audio-out': 'fx',
+      'knob-mix:value-out': 'mix', 'speaker:audio-in': 'speakers' }).map(([k, label]) => [k, { label }])),
+  });
 
   // ── the links, held from load so the picture does not change with play ────
   const held = new Map();

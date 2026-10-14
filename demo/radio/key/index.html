@@ -39,6 +39,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
@@ -108,56 +109,36 @@
   // detector's readings leave on a value port for the keyboard.
   const bay = createBay();
   for (const st of STATIONS) {
-    bay.addNode({ id: `${st.site}:${st.node}`, kind: 'external', label: st.name, place: st.site, net: st.site });
-    bay.addPort({ id: STATION_OUT(st), label: st.label, dir: 'out', medium: 'audio', transports: ['https'] });
+    addNodes(bay, S, [{ name: 'station', site: st.site, as: st.node, label: st.name }],
+      { ports: { [STATION_OUT(st)]: { label: st.label } } });
+    // not in nodes.mjs yet: the relay hop, cf-shout:<mount>, is left out of the catalogue on purpose.
     bay.addNode({ id: `cf-shout:${st.mount}`, kind: 'endpoint', label: 'relay', place: 'cf-shout' });
     bay.addPort({ id: RELAY_IN(st), label: 'relay', dir: 'in', medium: 'audio', transports: ['https'] });
     bay.addPort({ id: RELAY_OUT(st), label: 'relay', dir: 'out', medium: 'audio', transports: ['https'], address: srcOf(st) });
   }
-  bay.addNode({ id: `${S}:level`, kind: 'engine', label: 'level', place: 'browser' });
-  bay.addPort({ id: PLAYER_IN, label: 'level', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: PLAYER_OUT, label: 'level', dir: 'out', medium: 'audio' });
-  // The station's rough energy, its loudness after levelling, eased, as a value.
-  bay.addPort({ id: ENERGY_OUT, label: 'energy', dir: 'out', medium: 'value' });
-  bay.addNode({ id: `${S}:wave`, kind: 'screen', label: 'wave', place: 'browser' });
-  bay.addPort({ id: WAVE_IN, label: 'wave', dir: 'in', medium: 'audio' });
-  bay.addNode({ id: `${S}:key`, kind: 'engine', label: 'key detector', place: 'browser' });
-  bay.addPort({ id: KEY_IN, label: 'key detector', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: KEY_EV, label: 'key', dir: 'out', medium: 'value' });
+  // The station's rough energy, its loudness after levelling, eased, leaves on level:value-out.
+  addNodes(bay, S, ['level', 'wave', 'key'], { ports: { [PLAYER_IN]: { label: 'level' }, [PLAYER_OUT]: { label: 'level' },
+    [ENERGY_OUT]: { label: 'energy' }, [WAVE_IN]: { label: 'wave' }, [KEY_IN]: { label: 'key detector' }, [KEY_EV]: { label: 'key' } } });
   // The keyboard. Nothing paints it but what is delivered on its ins: the
   // detector never touches it, nor does the pad or autoplay.
+  // not in nodes.mjs yet: the catalogue adds keys:midi-in before value-in and
+  // value-in-2, and this page draws the lights last.
   bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
   bay.addPort({ id: KEYS_OUT, label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
   bay.addPort({ id: DISPLAY_IN, label: 'key', dir: 'in', medium: 'value', deliver: (ev) => shown(ev) });
   bay.addPort({ id: KEYS_CHORD, label: 'chord', dir: 'in', medium: 'value', deliver: (ev) => { if (ev?.of === 'param' && ev.name === 'chord') autoMark(ev.notes || []); } });
   bay.addPort({ id: KEYS_LIGHTS, label: 'lights', dir: 'in', medium: 'midi', accepts: ['note'], deliver: (ev) => { if (ev?.cls === 'note') kb.lightNote(ev.d1, ev.d2 > 0); } });
-  bay.addNode({ id: `${S}:autoplay`, kind: 'engine', label: 'autoplay', place: 'browser' });
-  // Autoplay knows the key only from what arrives on its value-in, the key
-  // detector's readings on a link of their own.
-  bay.addPort({ id: AUTO_KEY, label: 'key', dir: 'in', medium: 'value', deliver: (ev) => autoKey(ev) });
-  bay.addPort({ id: AUTO_OUT, label: 'autoplay', dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
-  bay.addPort({ id: AUTO_CHORD, label: 'chord', dir: 'out', medium: 'value' });
-  // The chord's root, on a port of its own, for the bass.
-  bay.addPort({ id: AUTO_BASS, label: 'bass', dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
-  bay.addNode({ id: `${S}:bass`, kind: 'engine', label: 'bass', place: 'browser' });
-  bay.addPort({ id: BASS_IN, label: 'bass', dir: 'in', medium: 'midi', accepts: ['note', 'cc'], deliver: (ev) => bassEvent(ev) });
-  bay.addPort({ id: BASS_OUT, label: 'bass', dir: 'out', medium: 'audio' });
-  bay.addNode({ id: `${S}:pad`, kind: 'engine', label: 'pad synth', place: 'browser' });
-  bay.addPort({ id: PAD_IN, label: 'pad synth', dir: 'in', medium: 'midi', accepts: ['note', 'cc'], deliver: (ev) => padEvent(ev) });
-  // What the pad is sounding, every note on and off, for whoever shows it.
-  bay.addPort({ id: PAD_NOTES, label: 'sounding', dir: 'out', medium: 'midi', emits: ['note'] });
-  bay.addPort({ id: PAD_OUT, label: 'pad synth', dir: 'out', medium: 'audio' });
-  bay.addPort({ id: PAD_LEVEL, label: 'level', dir: 'in', medium: 'value', deliver: (ev) => padLevel(ev) });
-  // Wet and dry: the station is dry, the pad is wet, one knob between them.
-  bay.addNode({ id: `${S}:mixer`, kind: 'engine', label: 'wet / dry', place: 'browser' });
-  bay.addPort({ id: MIXER_DRY, label: 'dry', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: MIXER_WET, label: 'wet', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: MIXER_MIX, label: 'mix', dir: 'in', medium: 'value', deliver: (ev) => mixSet(ev) });
-  bay.addPort({ id: MIXER_OUT, label: 'wet / dry', dir: 'out', medium: 'audio' });
-  bay.addNode({ id: `${S}:knob-mix`, kind: 'engine', label: 'mix knob', place: 'browser' });
-  bay.addPort({ id: KNOB_MIX, label: 'mix', dir: 'out', medium: 'value' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
+  // Autoplay knows the key only from its value-in; the chord's root leaves on
+  // midi-out-2 for the bass. The pad's midi-out is every note it sounds. Wet and
+  // dry: the station is dry, the pad is wet, one knob between them.
+  addNodes(bay, S, ['autoplay', 'bass', 'pad', 'mixer', 'knob-mix', 'speaker'], {
+    deliver: { [AUTO_KEY]: (ev) => autoKey(ev), [BASS_IN]: (ev) => bassEvent(ev), [PAD_IN]: (ev) => padEvent(ev),
+      [PAD_LEVEL]: (ev) => padLevel(ev), [MIXER_MIX]: (ev) => mixSet(ev) },
+    ports: Object.fromEntries([[AUTO_KEY, 'key'], [AUTO_OUT, 'autoplay'], [AUTO_CHORD, 'chord'], [AUTO_BASS, 'bass'],
+      [BASS_IN, 'bass'], [BASS_OUT, 'bass'], [PAD_IN, 'pad synth'], [PAD_NOTES, 'sounding'], [PAD_OUT, 'pad synth'],
+      [PAD_LEVEL, 'level'], [MIXER_DRY, 'dry'], [MIXER_WET, 'wet'], [MIXER_MIX, 'mix'], [MIXER_OUT, 'wet / dry'],
+      [KNOB_MIX, 'mix'], [SPEAKER_IN, 'speakers']].map(([k, label]) => [k, { label }])),
+  });
 
   const d = mount({ name: 'Live key', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('radio/key');

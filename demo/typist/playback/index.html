@@ -31,6 +31,7 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { makeLogDeck } from '/timeline/logdeck.mjs';
   import { createSamples, createVoice } from '../sampler.mjs';
@@ -263,20 +264,11 @@
   // paper on a link of its own, as the recorder on /synth/dots/ does.
   const S = 'web';
   const bay = createBay();
-  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
-  bay.addNode({ id: `${S}:rec`, kind: 'store', label: 'recorder', place: 'browser' });
-  bay.addNode({ id: `${S}:paper`, kind: 'screen', label: 'paper', place: 'browser' });
   // The typewriter sounds what reaches it: live keys on one link, the
   // recorder's playback on another, so both are heard and the picture says so.
-  bay.addNode({ id: `${S}:typewriter`, kind: 'engine', label: 'typewriter', place: 'browser' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addPort({ id: `${S}:keys:value-out`, dir: 'out', medium: 'value', shape: { of: 'text' } });
-  bay.addPort({ id: `${S}:rec:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: () => {} });
-  bay.addPort({ id: `${S}:rec:value-out`, dir: 'out', medium: 'value', shape: { of: 'text' } });
-  bay.addPort({ id: `${S}:paper:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: () => {} });
-  bay.addPort({ id: `${S}:typewriter:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: (e) => strike(e) });
-  bay.addPort({ id: `${S}:typewriter:audio-out`, dir: 'out', medium: 'audio' });
-  bay.addPort({ id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' });
+  addNodes(bay, S, ['typing', 'rec-text', 'paper', 'typewriter', 'speaker'], {
+    deliver: { 'rec:value-in': () => {}, 'paper:value-in': () => {}, 'typewriter:value-in': (e) => strike(e) },
+  });
   for (const [a, b] of [[`${S}:keys:value-out`, `${S}:paper:value-in`], [`${S}:keys:value-out`, `${S}:rec:value-in`], [`${S}:rec:value-out`, `${S}:paper:value-in`],
     [`${S}:keys:value-out`, `${S}:typewriter:value-in`], [`${S}:rec:value-out`, `${S}:typewriter:value-in`], [`${S}:typewriter:audio-out`, `${S}:speaker:audio-in`]]) {
     const r = bay.link(a, b);

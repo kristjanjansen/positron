@@ -22,6 +22,7 @@
   import { mount, el } from '/shell/shell.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createIconButton } from '/shell/icon-button.mjs';
 
@@ -157,18 +158,10 @@
   // nothing (asked: *"web:typewriter has lins to cf storate"*).
   const S = 'web', CF = 'cf-r2';
   const bay = createBay();
-  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
-  bay.addNode({ id: `${S}:paper`, kind: 'screen', label: 'paper', place: 'browser' });
-  bay.addNode({ id: `${S}:typewriter`, kind: 'engine', label: 'typewriter', place: 'browser' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addNode({ id: `${CF}:typewriter`, kind: 'store', label: 'samples', place: 'cloudflare', net: 'cloudflare' });
-  bay.addPort({ id: `${S}:keys:value-out`, dir: 'out', medium: 'value', shape: { of: 'text' } });
-  bay.addPort({ id: `${S}:paper:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: () => {} });
-  bay.addPort({ id: `${S}:typewriter:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: () => {} });
-  bay.addPort({ id: `${S}:typewriter:file-in`, dir: 'in', medium: 'file' });
-  bay.addPort({ id: `${S}:typewriter:audio-out`, dir: 'out', medium: 'audio' });
-  bay.addPort({ id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' });
-  bay.addPort({ id: `${CF}:typewriter:file-out`, dir: 'out', medium: 'file', transports: ['https'] });
+  addNodes(bay, S, ['typing', 'paper', 'typewriter', 'speaker', 'typewriter-samples'], {
+    deliver: { 'web:paper:value-in': () => {}, 'web:typewriter:value-in': () => {} },
+    ports: { 'web:typewriter:file-in': {} },
+  });
   for (const [a, b] of [
     [`${S}:keys:value-out`, `${S}:paper:value-in`],
     [`${S}:keys:value-out`, `${S}:typewriter:value-in`],

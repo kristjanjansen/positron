@@ -19,6 +19,7 @@
   import { compile } from '/shell/sclang-lite.mjs';
   import { createPanelValues } from '/shell/video-panel.mjs';
   import { createGrainRig, WINDOW_S } from '/granulator/grain-rig.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { PROGRAM, PATCHES, RING_SECONDS, valuesOf } from '/granulator/grain-ring.mjs';
   import { createTempoDetector, STEADY, steady } from '/radio/tempo.mjs';
 
@@ -212,9 +213,9 @@
     // not one more on the knobs' run into web:grains:value-in. Asked
     // 2026-10-13 on a phone: *"Do not see how tempo feeds into grains"*.
     TEMPO_GRAINS = `${S}:grains:tempo-in`;
-    bay.addNode({ id: `${S}:tempo`, kind: 'engine', label: 'tempo detector', place: 'browser' });
-    bay.addPort({ id: TEMPO_IN, label: 'tempo detector', dir: 'in', medium: 'audio' });
-    bay.addPort({ id: TEMPO_OUT, label: 'tempo', dir: 'out', medium: 'value' });
+    addNodes(bay, S, ['tempo'], { ports: { 'tempo:audio-in': { label: 'tempo detector' }, 'tempo:value-out': { label: 'tempo' } } });
+    // not in nodes.mjs yet: addNodes cannot add a port to a node the rig already
+    // built, so the grains' tempo-in and the wave's value-in-2 stay inline.
     bay.addPort({ id: TEMPO_GRAINS, label: 'tempo', dir: 'in', medium: 'value', deliver: (ev) => tempoIn(ev) });
     bay.addPort({ id: WAVE_BEATS, label: 'beats', dir: 'in', medium: 'value', deliver: (ev) => beatsIn(ev) });
     hold(RADIO_OUT, TEMPO_IN);

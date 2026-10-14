@@ -22,6 +22,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
@@ -56,20 +57,18 @@
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
   for (const st of STATIONS) {
-    bay.addNode({ id: `${st.site}:${st.node}`, kind: 'external', label: st.label, place: st.site, net: st.site });
-    bay.addPort({ id: outOf(st), label: st.label, dir: 'out', medium: 'audio', transports: ['https'] });
+    addNodes(bay, S, [{ name: 'station', site: st.site, as: st.node, label: st.label }],
+      { ports: { [outOf(st)]: { label: st.label } } });
+    // not in nodes.mjs yet: the relay hop, cf-shout:<mount>, is left out of the catalogue on purpose.
     bay.addNode({ id: `cf-shout:${st.mount}`, kind: 'endpoint', label: 'relay', place: 'cf-shout' });
     bay.addPort({ id: relayIn(st), label: 'relay', dir: 'in', medium: 'audio', transports: ['https'] });
     bay.addPort({ id: relayOut(st), label: 'relay', dir: 'out', medium: 'audio', transports: ['https'],
       address: `${BASE}/${st.mount}` });
-    bay.addNode({ id: `${S}:wave-${st.key}`, kind: 'screen', label: `${st.key === 'err' ? 'ERR' : 'Ida'} wave`, place: 'browser' });
-    bay.addPort({ id: waveIn(st), label: 'wave', dir: 'in', medium: 'audio' });
+    addNodes(bay, S, [{ name: 'wave', as: `wave-${st.key}`, label: `${st.key === 'err' ? 'ERR' : 'Ida'} wave` }],
+      { ports: { [waveIn(st)]: { label: 'wave' } } });
   }
-  bay.addNode({ id: `${S}:fader`, kind: 'engine', label: 'crossfader', place: 'browser' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addPort({ id: FADER_IN, label: 'crossfader', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: FADER_OUT, label: 'crossfader', dir: 'out', medium: 'audio' });
-  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
+  addNodes(bay, S, ['blend-fader', 'speaker'], { ports: {
+    [FADER_IN]: { label: 'crossfader' }, [FADER_OUT]: { label: 'crossfader' }, [SPEAKER_IN]: { label: 'speakers' } } });
 
   const d = mount({ name: 'Blend', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('radio/blend');

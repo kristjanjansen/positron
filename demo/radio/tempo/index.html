@@ -24,6 +24,7 @@
   import { mount } from '/shell/shell.mjs';
   import { fromFirstFrame } from '/shell/mp3-frames.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createTempoRig } from '/radio/rig.mjs';
 
   // concepts radio/020 (beats/000 for an afternoon, 2026-10-11: *"move radio 020 to beats group into 000"*, then *"move beats concepts to radio, rename accordingly"*), TEMPO, 2026-10-11. Recordings of ERR's Raadio 2 and 4
@@ -70,12 +71,10 @@
   // `audio-out` feeds the wave, the speakers and the detector.
   const bay = createBay();
   for (const st of STATIONS) {
-    bay.addNode({ id: `${CF}:${st.id}`, kind: 'store', label: st.label, place: 'cloudflare', net: 'cloudflare' });
-    bay.addPort({ id: FILE_OUT(st), label: 'recording', dir: 'out', medium: 'file', transports: ['https'], address: srcOf(st) });
+    addNodes(bay, S, [{ name: 'recording', site: CF, as: st.id, label: st.label }],
+      { ports: { [FILE_OUT(st)]: { label: 'recording', address: srcOf(st) } } });
   }
-  bay.addNode({ id: `${S}:player`, kind: 'engine', label: 'player', place: 'browser' });
-  bay.addPort({ id: PLAYER_IN, label: 'player', dir: 'in', medium: 'file' });
-  bay.addPort({ id: PLAYER_OUT, label: 'player', dir: 'out', medium: 'audio' });
+  addNodes(bay, S, ['player'], { ports: { [PLAYER_IN]: { label: 'player' }, [PLAYER_OUT]: { label: 'player' } } });
   // The wave, the detector, the tempo scope and the fx box are /radio/rig.mjs.
 
   const d = mount({ name: 'Tempo', what: '', readout: null, index: '/', indexLabel: 'positron' });

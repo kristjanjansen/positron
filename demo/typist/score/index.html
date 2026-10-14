@@ -42,6 +42,7 @@
   import { makeLogDeck } from '/timeline/logdeck.mjs';
   import { createChatGrid } from '/shell/chat-ui.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createIconButton } from '/shell/icon-button.mjs';
   import { createStepper } from '/shell/stepper.mjs';
@@ -153,33 +154,27 @@
   const nth = (base, k) => (k === 1 ? base : `${base}-${k}`);
   const arrivals = [];
 
-  bay.addNode({ id: `${S}:machines`, kind: 'person', label: 'machines', place: 'browser' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addNode({ id: `${CF}:typewriter`, kind: 'store', label: 'samples', place: 'cloudflare', net: 'cloudflare' });
-  bay.addPort({ id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' });
-  bay.addPort({ id: `${CF}:typewriter:file-out`, dir: 'out', medium: 'file', transports: ['https'] });
+  // One `value-out` per paper on machines: value-out, value-out-2 .. value-out-<MAX>.
+  const outs = Object.fromEntries(Array.from({ length: MAX - 1 }, (_, i) => [`machines:value-out-${i + 2}`, {}]));
+  addNodes(bay, S, ['machines', 'speaker', 'typewriter-samples'], { ports: outs });
 
   const papers = [];
   for (let k = 1; k <= MAX; k++) {
-    bay.addNode({ id: P(k, 'keys'), kind: 'person', label: `typist ${k}`, place: 'browser' });
-    bay.addNode({ id: P(k, 'paper'), kind: 'screen', label: `paper ${k}`, place: 'browser' });
-    bay.addNode({ id: P(k, 'typewriter'), kind: 'engine', label: `typewriter ${k}`, place: 'browser' });
-    bay.addNode({ id: P(k, 'fx'), kind: 'engine', label: `fx ${k}`, place: 'browser' });
-    bay.addPort({ id: `${S}:machines:${nth('value-out', k)}`, dir: 'out', medium: 'value', shape: { of: 'index' } });
-    bay.addPort({ id: `${P(k, 'keys')}:value-out`, dir: 'out', medium: 'value', shape: { of: 'text' } });
     // The paper draws what ARRIVES: a typist's character is put on the sheet
     // here. A person's typing is already in the textarea, so it is not put twice.
-    bay.addPort({ id: `${P(k, 'paper')}:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' },
-      deliver: (e) => { if (e?.by !== 'typist') return; if (e.kind === 'deleteContentBackward') papers[k].back(); else papers[k].type(e.text); } });
+    addNodes(bay, S, [{ name: 'typing', as: `keys-${k}`, label: `typist ${k}` }, { name: 'paper', as: `paper-${k}`, label: `paper ${k}` }], {
+      deliver: { [`paper-${k}:value-in`]: (e) => { if (e?.by !== 'typist') return; if (e.kind === 'deleteContentBackward') papers[k].back(); else papers[k].type(e.text); } },
+    });
+    // not in nodes.mjs yet: addNodes adds value-in, file-in, value-in-2 in
+    // catalogue order, and this page draws value-in-2 above file-in.
+    bay.addNode({ id: P(k, 'typewriter'), kind: 'engine', label: `typewriter ${k}`, place: 'browser' });
     // The typewriter sounds what arrives, whoever typed it.
     bay.addPort({ id: `${P(k, 'typewriter')}:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' },
       deliver: (e) => typed(k, e) });
     bay.addPort({ id: `${P(k, 'typewriter')}:value-in-2`, dir: 'in', medium: 'value', shape: { of: 'index' }, deliver: deliverIndex(k, 'typewriter') });
     bay.addPort({ id: `${P(k, 'typewriter')}:file-in`, dir: 'in', medium: 'file' });
     bay.addPort({ id: `${P(k, 'typewriter')}:audio-out`, dir: 'out', medium: 'audio' });
-    bay.addPort({ id: `${P(k, 'fx')}:audio-in`, dir: 'in', medium: 'audio' });
-    bay.addPort({ id: `${P(k, 'fx')}:value-in`, dir: 'in', medium: 'value', shape: { of: 'index' }, deliver: deliverIndex(k, 'fx') });
-    bay.addPort({ id: `${P(k, 'fx')}:audio-out`, dir: 'out', medium: 'audio' });
+    addNodes(bay, S, [{ name: 'fx-typewriter', as: `fx-${k}`, label: `fx ${k}` }], { deliver: { [`fx-${k}:value-in`]: deliverIndex(k, 'fx') } });
   }
 
   function deliverIndex(k, where) {

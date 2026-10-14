@@ -89,6 +89,7 @@ import { el } from '/shell/shell.mjs';
 import { fromFirstFrame } from '/shell/mp3-frames.mjs';
 import { SELFCHECK } from '/shell/selfcheck.mjs';
 import { createBay } from '/shell/bay.mjs';
+import { addNodes } from '/shell/nodes.mjs';
 import { createPatchbay } from '/shell/patchbay.mjs';
 import { createVideoPanel } from '/shell/video-panel.mjs';
 import { createGrainScope } from '/shell/grain-scope.mjs';
@@ -256,41 +257,31 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   const outside = !engine.mixes;
 
   const bay = createBay();
+  // Every port carries a label of its own, which the catalogue leaves to the page.
+  const lab = (o) => Object.fromEntries(Object.entries(o).map(([k, label]) => [k, { label }]));
   for (const s of SOURCES) {
-    bay.addNode({ id: `${s.store}:${s.id}`, kind: 'store', label: s.label, place: 'cloudflare', net: 'cloudflare' });
-    bay.addPort({ id: FILE_OUT(s), label: 'recording', dir: 'out', medium: 'file', transports: ['https'], address: s.url });
+    addNodes(bay, S, [{ name: 'recording', site: s.store, as: s.id, label: s.label }],
+      { ports: { [`${s.id}:file-out`]: { label: 'recording', address: s.url } } });
   }
-  bay.addNode({ id: `${S}:radio`, kind: 'engine', label: 'radio', place: 'browser' });
-  bay.addPort({ id: RADIO_IN, label: 'radio', dir: 'in', medium: 'file' });
-  bay.addPort({ id: RADIO_OUT, label: 'radio', dir: 'out', medium: 'audio' });
-  bay.addNode({ id: `${S}:grains`, kind: 'engine', label: engine.label, place: 'browser' });
-  bay.addPort({ id: GRAINS_IN, label: 'grains', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: GRAINS_OUT, label: 'grains', dir: 'out', medium: 'audio' });
-  // Every knob's value comes in here, one port for all of them, as on
-  // /code/collide/; the event names its control.
-  bay.addPort({ id: GRAINS_VAL, label: 'values', dir: 'in', medium: 'value', deliver: (ev) => valueIn(ev) });
-  // Every grain the engine reports leaves here as one event, so anything that
-  // wants to follow the grains (the two scopes today, a picture later) holds a
-  // link from this port rather than reaching into the engine.
-  bay.addPort({ id: GRAINS_EV, label: 'grains', dir: 'out', medium: 'value' });
-  bay.addNode({ id: `${S}:wave`, kind: 'screen', label: 'source scope', place: 'browser' });
-  bay.addPort({ id: WAVE_IN, label: 'wave', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: WAVE_EV, label: 'grains', dir: 'in', medium: 'value', deliver: (ev) => waveGrain(ev) });
-  if (outputScope) {
-    bay.addNode({ id: `${S}:scope`, kind: 'screen', label: 'output scope', place: 'browser' });
-    bay.addPort({ id: SCOPE_IN, label: 'scope', dir: 'in', medium: 'audio' });
-    bay.addPort({ id: SCOPE_EV, label: 'grains', dir: 'in', medium: 'value', deliver: (ev) => scopeGrain(ev) });
-  }
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
-  bay.addNode({ id: `${S}:patch`, kind: 'engine', label: 'patch', place: 'browser' });
-  bay.addPort({ id: PATCH_OUT, label: 'patch', dir: 'out', medium: 'value' });
-  bay.addPort({ id: PATCH_FIXED, label: 'fixed', dir: 'out', medium: 'value' });
+  // Every knob's value comes in on grains:value-in, one port for all of them,
+  // as on /code/collide/; the event names its control. Every grain the engine
+  // reports leaves on grains:value-out, so a scope follows the grains by a link.
+  addNodes(bay, S, ['radio', 'grains', 'wave', ...(outputScope ? ['scope'] : []), 'speaker', 'patch-values'], {
+    label: { grains: engine.label, wave: 'source scope', ...(outputScope ? { scope: 'output scope' } : {}) },
+    deliver: { 'grains:value-in': (ev) => valueIn(ev), 'wave:value-in': (ev) => waveGrain(ev),
+      ...(outputScope ? { 'scope:value-in': (ev) => scopeGrain(ev) } : {}) },
+    ports: { ...lab({ 'radio:file-in': 'radio', 'radio:audio-out': 'radio', 'grains:audio-in': 'grains',
+      'grains:audio-out': 'grains', 'grains:value-in': 'values', 'grains:value-out': 'grains', 'wave:audio-in': 'wave',
+      'wave:value-in': 'grains', 'speaker:audio-in': 'speakers', 'patch:value-out': 'patch', 'patch:value-out-2': 'fixed' }),
+    ...(outputScope ? lab({ 'scope:audio-in': 'scope', 'scope:value-in': 'grains' }) : {}) },
+  });
   for (const c of [MIX, ...controls]) {
-    bay.addNode({ id: `${S}:knob-${c.name}`, kind: 'person', label: c.label, place: 'browser' });
     // The wet/dry is no patch's, so it has nothing coming in.
-    if (c !== MIX) bay.addPort({ id: KNOB_IN(c.name), label: c.label, dir: 'in', medium: 'value', deliver: (ev) => patchIn(c.name, ev) });
-    bay.addPort({ id: KNOB_OUT(c.name), label: c.label, dir: 'out', medium: 'value' });
+    addNodes(bay, S, [{ name: 'knob', as: `knob-${c.name}`, label: c.label }], {
+      ...(c !== MIX ? { deliver: { [`knob-${c.name}:value-in`]: (ev) => patchIn(c.name, ev) } } : {}),
+      ports: { [`knob-${c.name}:value-out`]: { label: c.label, shape: {} },
+        ...(c !== MIX ? { [`knob-${c.name}:value-in`]: { label: c.label } } : {}) },
+    });
   }
 
   // The links, held from load so the picture does not change with play.
