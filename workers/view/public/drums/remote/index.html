@@ -130,11 +130,36 @@
   const path = createPathChoice({ log: d.log, onPick: () => switchPath() });
   const ASK_MS = 3000;
   const UP_MS = 36, DOWN_MS = 139;
+  // THE PI'S SOUND IS LIFTED BY PI_LIFT BEFORE THIS PAGE METERS, DRAWS OR
+  // PLAYS IT. Asked 2026-10-14 (*"fix"*, on HANDOFF session 76's "every voice
+  // still about 5 dB under the tab"). MEASURED, not a meter artefact: both
+  // chains rendered on wasm scsynth in one context (the tab's as
+  // drum-machine.mjs builds it, the board's as scollide.mjs does, fold 0.5 and
+  // Limiter 0.49) read the board 0.6 to 1.0 dB OVER the tab on every voice,
+  // by peak, by whole-hit energy and by this page's own 512-sample meter
+  // polled every 5 ms, which reads within 0.2 dB of the true window maximum.
+  // The real Pi read 4.9 to 5.5 dB UNDER after the fix and 6.7 to 13.4 under
+  // before it, and the model minus 6.02 dB gives 5.0 to 5.4 and 6.9 to 13.4:
+  // a clean factor of two lost on the Pi's side of the wire, in both limiter
+  // regimes. The suspect it fits is the board's capture (rig/board/jacksynth.mjs
+  // `ensureCapture`): `ffmpeg -f jack` registers TWO ports by default
+  // (`-channels` 2), the board sums everything into `input_1` only, and
+  // `-ac 1` AVERAGES that with the silent `input_2`. ffmpeg 9 here halves a
+  // stereo input with one silent channel exactly (0.500 in, 0.250 out); the
+  // Pi's own ffmpeg was not asked. `inputs.mjs` passes `-channels 1` for the
+  // same demuxer; `ensureCapture` does not.
+  //   2    the capture's halving, undone.
+  //   0.9  bootScsynth's `out` gain, which this tab's drums pass through and
+  //        the board's never do (the simulated Pi passes it too, so it is not
+  //        lifted).
+  // ⚠️ IF THE BOARD'S CAPTURE IS EVER GIVEN `-channels 1`, THIS GOES BACK TO
+  // 0.9, or the Pi reads 6 dB over the tab.
+  const PI_LIFT = 2 * 0.9;
   const STATS_MS = 2000;
   const NAME_OF = new Map(VOICES.map((v) => [v.note, v.name]));
 
   // ── the context: the page's, at the board's rate, made on the first press ─
-  let ctx = null, master = null, xmix = null, mixMeter = null, mixBuf = null, localTap = null;
+  let ctx = null, master = null, xmix = null, mixMeter = null, mixBuf = null, localTap = null, piLift = null;
   /** Per side: where its sound comes from, the scope, the meter and its fade gain. */
   const SIDES = {
     local: { out: () => localTap, from: 'web:mix:audio-out', scope: 'web:scope:audio-in', fadeIn: 'web:xfade:audio-in' },
@@ -148,6 +173,7 @@
     master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination);
     const pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
     localTap = ctx.createGain();
+    piLift = ctx.createGain(); piLift.gain.value = PI_LIFT;
     xmix = ctx.createGain();
     mixMeter = ctx.createAnalyser(); mixMeter.fftSize = 2048; mixMeter.connect(pull);
     mixBuf = new Float32Array(mixMeter.fftSize);
@@ -276,7 +302,7 @@
         joining ??= (async () => {
           say('checking');
           const r = await tryBoard(c).catch((e) => e.message);
-          if (typeof r === 'object') { say(r.via); timer = setInterval(poll, STATS_MS); poll(); return; }
+          if (typeof r === 'object') { board.playout().connect(piLift); say(r.via); timer = setInterval(poll, STATS_MS); poll(); return; }
           log(`Pi side simulated in this tab: ${r}`);
           kit?.stop(); board?.close(); board = null; kit = null;
           try { sim = await createSimulatedPi(c, log); } catch (e) { log(`the simulated Pi did not start: ${e.message}`, 'bad'); say('idle'); return; }
@@ -287,11 +313,12 @@
       leave() {
         clearInterval(timer); timer = 0;
         if (real()) kit.panic();
+        try { board?.playout()?.disconnect(piLift); } catch { /* not connected */ }
         kit?.stop(); board?.close(); sim?.close();
         board = null; kit = null; sim = null; last = null; base = null;
         say('idle');
       },
-      out: () => (real() ? board.playout() : sim ? sim.out() : null),
+      out: () => (real() ? piLift : sim ? sim.out() : null),
       /** One step's hits, `[{ name, perfAt, choke? }]`, as one message. */
       hits(list) {
         if (real()) return kit.hits(list);
@@ -497,7 +524,7 @@
   const level = (s) => (s?.meter && s.out() ? rmsOf(s.meter, s.mbuf) : 0);
   window.__rhythm = m.api;
   window.__demo.drums = {
-    m: m.api, bay, pi, fader, lags, AHEAD,
+    m: m.api, bay, pi, fader, lags, AHEAD, piLift: PI_LIFT,
     /** The scope: each side's held window, how many were taken, and the Pi's lag behind this tab as matched. */
     scope: overlay,
     /** Each side's meter, for a check that reads the returned sound itself (the choke). */
