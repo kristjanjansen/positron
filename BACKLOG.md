@@ -1,8 +1,10 @@
 ## Open
 
+- **/connect/ from the catalogue (only real nodes, each with its pages), examples as lowercase Geist pills in a new "human input" colour** (2026-10-14, agent). Asked: *"lowercase. fully round. geist. find nonused color to sigify human inout / pronpot / voice"*, *"still have those imaginary ones?"*.
+
 - ~~**GitHub button in the front page header**~~ (2026-10-14, DONE). Asked: *"add gh button to frontpage header"*. Points at github.com/positron-studio/positron.
 
-- **Scrub history, transfer the repo to positron-studio, push** (2026-10-14). Chosen: *"Scrub, then push"* and *"Yes, transfer it"*.
+- **Scrub history, transfer the repo to positron-studio, push** (2026-10-14; TRANSFERRED to positron-studio/positron; the filter-repo rewrite was stopped by the owner before it ran, nothing pushed, a mirror backup is at ~/personal/positron-backup-2026-10-14.git). Chosen: *"Scrub, then push"* and *"Yes, transfer it"*.
 
 - ~~**/connect/: make connections, by saying what should play what (the wish worker proposes, you confirm) and by picking an out then an in; the linked part drawn as a patchbay**~~ (2026-10-14, DONE, local only; open: the wish worker's 64-port limit, a MIDI-desk prompt that drops the audio link to the speaker, and Ask stretching on a phone). Asked: *"just move on what you need. can we also work on http://127.0.0.1:8890/connect/"*.
 
