@@ -37,7 +37,7 @@
   /* What a person says, in --voice (shell.css). Round, lowercase and in
      Geist, because a sentence is read through rather than named. */
   .cn-ex > button.cn-pill { text-transform: none; font-family: var(--sans); font-weight: 400; border-radius: 999px;
-    padding: 0 12px; color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
+    padding: 0 var(--pad-seg); color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
     background: transparent; }
   .cn-ex > button.cn-pill:hover { border-color: var(--voice); background: transparent; }
 
@@ -335,7 +335,7 @@
     const lines = [`as on /${ex.page}/`];
     if (r.press.length) lines.push(`runs on a person's press only: ${r.press.map((n) => PRESS_ONLY[n]).join(', ')}`);
     if (r.missing.length) lines.push(`drawn, not running yet: ${r.missing.join(', ')}`);
-    const b = el('button', 'pos-sm cn-pill', ex.say, { type: 'button', title: lines.join('\n') });
+    const b = el('button', 'cn-pill', ex.say, { type: 'button', title: lines.join('\n') });
     b.dataset.runs = r.press.length ? 'press' : r.missing.length ? 'marked' : 'runs';
     if (r.missing.length) b.dataset.missing = r.missing.join(' ');
     b.addEventListener('click', (e) => build(ex, e.isTrusted));
