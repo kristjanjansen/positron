@@ -1,5 +1,7 @@
 ## Open
 
+- **Docs consolidation, steps 2 and 3 of plans/plan-consolidate-docs-2026-10-14.md** (2026-10-14, a background agent). Asked: *"do all"*. Five merges that break nothing, ten moves to archive/plans/ with stubs, indexes updated.
+
 - ~~**/social/typist/: lower line as far from the bottom as the site name from the top, bottom aligned; bigger main type; columns flipped with more gap**~~ (2026-10-14, DONE). Asked: *"lower text same y padding as sitename, align to bottom. make main font size bigger"*, *"flip cols, add more gap between"*.
 
 - ~~**/social/typist/: icon buttons, its own textarea for the lower line, transport at the top**~~ (2026-10-14, DONE). Asked: *"use icon buttons. lower posittron studio makes no sense, haev a separate textartea. put transport bar to top"*.
