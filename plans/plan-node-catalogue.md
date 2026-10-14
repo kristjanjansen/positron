@@ -269,6 +269,13 @@ that stops `mount()` ever running still publishes a `__demo` with `failed` set.
 - drums/drum-machine.mjs's grouped view (`GID`), a picture of the bay rather
   than a bay.
 
+## The naming rule across sites (decided by the owner, 2026-10-14)
+
+*"Perhaps shader is better than gpu? Should also match web:shader?"* A node keeps
+its catalogue name on every site and only the site prefix changes: `pi-1:shader`
+beside `web:shader`, `pi-1:collide` beside `web:collide`. A name says what a node
+does, never which chip runs it.
+
 ## Open questions for the owner
 
 - **`pi-1:camera` (remote/circuit) and `pi-1:shader` (shader/remote) are not in
