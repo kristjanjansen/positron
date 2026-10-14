@@ -20,6 +20,9 @@
     font: 400 14px/1.5 var(--mono); color: var(--fg); background: var(--card);
     border: 1px solid var(--line2); border-radius: var(--r, 4px); padding: 10px 12px;
   }
+  .tw-bar { display: flex; align-items: center; gap: 16px; }
+  .tw-clock { font: 400 13px/1 var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; min-width: 16ch; }
+  .tw-clock.tw-rec { color: var(--bad, #ff5a5a); }
   .tw-note { margin: 0; font: 400 12px/1.5 var(--mono); color: var(--dim); }
 </style>
 <script type="module">
@@ -82,7 +85,9 @@
   side.append(main.wrap, lower.wrap, note);
   const stage = el('div', 'tw-stage');
   stage.append(side, cv);
-  d.el.append(transport.el, stage);
+  const bar = el('div', 'tw-bar');
+  bar.append(transport.el);
+  d.el.append(bar, stage);
 
   const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'monospace';
   const font = (w, px) => `${w} ${px}px ${mono}`;
@@ -170,6 +175,7 @@
     const ac = new AudioContext();
     const samples = createSamples();
     const out = ac.createGain();
+    out.gain.value = 0.7;   // a recorded take peaked at 0.0 dB at full gain
     const tap = ac.createMediaStreamDestination();
     out.connect(ac.destination);
     out.connect(tap);
@@ -180,13 +186,23 @@
     return audio;
   }
 
-  let running = null;
-  // Types the text once, in real time; resolves at the end of the hold.
+  let running = null;   // 'play' | 'rec' | null
+  let halt = false;     // set by a stop press; ends the take where it is
+  const clock = el('span', 'tw-clock');
+  bar.append(clock);
+  const showClock = (ms, end) => {
+    clock.textContent = running ? `${running === 'rec' ? 'REC ' : ''}${(ms / 1000).toFixed(1)} / ${(end / 1000).toFixed(1)} s` : '';
+    clock.classList.toggle('tw-rec', running === 'rec');
+  };
+  // Types the text once, in real time; resolves at the end of the hold or on a stop.
   async function run() {
     const text = ta.value;
     const { ev, end } = schedule(text);
-    const a = await sound();
-    if (a.ac.state === 'suspended') await a.ac.resume();
+    // the first press fetches and decodes the samples: the pressed button sweeps until they are in
+    const btn = running === 'rec' ? rec : play;
+    btn.dataset.busy = '';
+    let a;
+    try { a = await sound(); if (a.ac.state === 'suspended') await a.ac.resume(); } finally { delete btn.dataset.busy; }
     return new Promise((resolve) => {
       const t0 = performance.now();
       let next = 0;
@@ -197,28 +213,43 @@
           a.voice.sound(e.kind, e.ch, e.col || 0);
         }
         draw(text, next, ms, next < ev.length);
-        if (ms < end && running) requestAnimationFrame(frame);
-        else resolve();
+        showClock(ms, end);
+        if (ms < end && !halt) requestAnimationFrame(frame);
+        else resolve(ms);
       };
       requestAnimationFrame(frame);
     });
   }
 
+  // While one runs, its own button is a stop and the other waits.
+  function begin(kind) {
+    running = kind; halt = false;
+    const btn = kind === 'rec' ? 'rec' : 'play';
+    transport.setIcon(btn, 'stop', kind === 'rec' ? 'stop recording' : 'stop');
+    transport.enable(kind === 'rec' ? 'play' : 'rec', false, 'a take is running');
+  }
+  function finish() {
+    transport.setIcon('play', 'play', 'play');
+    transport.setIcon('rec', 'record', 'record');
+    transport.enable('play', true); transport.enable('rec', true);
+    running = null; halt = false;
+    showClock(0, 0);
+  }
+
   play.onclick = async () => {
-    if (running) return;
-    running = 'play';
-    play.dataset.busy = '';
-    try { await run(); } finally { running = null; delete play.dataset.busy; }
+    if (running) { halt = true; return; }
+    begin('play');
+    try { await run(); } finally { finish(); }
   };
 
   const TYPES = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
   rec.onclick = async () => {
-    if (running) return;
-    running = 'rec';
-    rec.dataset.busy = '';
+    if (running) { halt = true; return; }
+    begin('rec');
     transport.enable('dl', false, 'recording');
     try {
-      const a = await sound();
+      rec.dataset.busy = '';
+      const a = await sound().finally(() => { delete rec.dataset.busy; });
       const type = TYPES.find((t) => MediaRecorder.isTypeSupported(t)) || '';
       const stream = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...a.tap.stream.getAudioTracks()]);
       const mr = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8e6, audioBitsPerSecond: 192e3 });
@@ -226,7 +257,8 @@
       mr.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
       const stopped = new Promise((r) => { mr.onstop = r; });
       mr.start(250);
-      await run();
+      d.log(`recording ${type || 'the browser default'}`);
+      const ms = await run();
       mr.stop();
       await stopped;
       stream.getTracks().forEach((t) => t.kind === 'video' && t.stop());
@@ -236,12 +268,13 @@
       dl.href = URL.createObjectURL(blob);
       dl.download = `positron-typist.${ext}`;
       transport.enable('dl', true);
-      dlBtn.title = `download ${ext.toUpperCase()}, ${(blob.size / 1e6).toFixed(1)} MB`;
-      d.log(`recorded ${blob.type}, ${(blob.size / 1e6).toFixed(2)} MB`);
+      dlBtn.title = `download ${ext.toUpperCase()}, ${(ms / 1000).toFixed(1)} s, ${(blob.size / 1e6).toFixed(1)} MB`;
+      d.log(`recorded ${(ms / 1000).toFixed(1)} s of ${blob.type}, ${(blob.size / 1e6).toFixed(2)} MB; the download button has it`);
       if (ext !== 'mp4') d.log('this browser records WebM; Instagram wants MP4, so convert it or record in Chrome', 'warn');
+      window.__demo.take = { type: blob.type, bytes: blob.size, ms, url: dl.href };
     } catch (e) {
       d.log(`recording failed: ${e.message}`, 'bad');
-    } finally { running = null; delete rec.dataset.busy; }
+    } finally { finish(); }
   };
 
   // The finished frame, drawn once the face is in.
