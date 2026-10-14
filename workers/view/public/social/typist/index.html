@@ -31,16 +31,15 @@
     font: 400 14px/1.5 var(--mono); color: var(--fg); background: var(--card);
     border: 1px solid var(--line2); border-radius: var(--r, 4px); padding: 10px 12px;
   }
-  .tw-bar { display: flex; align-items: center; gap: 16px; }
-  .tw-clock { font: 400 13px/1 var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; min-width: 16ch; }
-  .tw-clock.tw-rec { color: var(--bad, #ff5a5a); }
   .tw-note { margin: 0; font: 400 12px/1.5 var(--mono); color: var(--dim); }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createSamples, createVoice } from '/typist/sampler.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createTransportBar, barButton } from '/shell/transport-bar.mjs';
+  import { setIcon } from '/shell/icon-button.mjs';
+  import { makeLogDeck } from '/timeline/logdeck.mjs';
 
   // A typewriter reel for a story: the text types itself onto a 1080 x 1920
   // frame with the Hermes Precisa's own key sounds, and Record makes the file.
@@ -81,14 +80,12 @@
   const main = field('typed', 'Connect anything\nto everything.', 4);
   const lower = field('lower line', '', 2);
   const ta = main.t;
-  // play, record, and the take's download, as the kit's square icon buttons
-  const transport = createButtonGroup({ buttons: [
-    { id: 'play', icon: 'play', label: 'play' },
-    { id: 'rec', icon: 'record', label: 'record' },
-    { id: 'dl', icon: 'download', label: 'download the take' },
-  ] });
-  const play = transport.button('play'), rec = transport.button('rec'), dlBtn = transport.button('dl');
-  transport.enable('dl', false, 'record a take first');
+  // record and the take's download sit at the right of the standard bar
+  const rec = barButton({ aria: 'record' });
+  setIcon(rec, 'record', 'record');
+  const dlBtn = barButton({ aria: 'download the take' });
+  setIcon(dlBtn, 'download', 'download the take');
+  dlBtn.disabled = true;
   const dl = el('a');
   dlBtn.onclick = () => { if (dl.href) dl.click(); };
   const note = el('p', 'tw-note', '1080 x 1920, 30 fps, with sound. The typed words stay clear of the top 14% and the bottom 35%; the lower line sits as low as the site name sits high.');
@@ -96,9 +93,8 @@
   side.append(main.wrap, lower.wrap, note);
   const stage = el('div', 'tw-stage');
   stage.append(side, cv);
-  const bar = el('div', 'tw-bar');
-  bar.append(transport.el);
-  d.el.append(bar, stage);
+  const barHost = el('div', 'tw-bar');
+  d.el.append(barHost, stage);
 
   const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'monospace';
   const font = (w, px) => `${w} ${px}px ${mono}`;
@@ -197,101 +193,96 @@
     return audio;
   }
 
-  let running = null;   // 'play' | 'rec' | null
-  let halt = false;     // set by a stop press; ends the take where it is
-  const clock = el('span', 'tw-clock');
-  bar.append(clock);
-  const showClock = (ms, end) => {
-    clock.textContent = running ? `${running === 'rec' ? 'REC ' : ''}${(ms / 1000).toFixed(1)} / ${(end / 1000).toFixed(1)} s` : '';
-    clock.classList.toggle('tw-rec', running === 'rec');
-  };
-  // Types the text once, in real time; resolves at the end of the hold or on a stop.
-  async function run() {
-    const text = ta.value;
-    const { ev, end } = schedule(text);
-    // the first press fetches and decodes the samples: the pressed button sweeps until they are in
-    const btn = running === 'rec' ? rec : play;
-    btn.dataset.busy = '';
-    let a;
-    try { a = await sound(); if (a.ac.state === 'suspended') await a.ac.resume(); } finally { delete btn.dataset.busy; }
-    return new Promise((resolve) => {
-      const t0 = performance.now();
-      let next = 0;
-      const frame = () => {
-        const ms = performance.now() - t0;
-        while (next < ev.length && ev[next].t <= ms) {
-          const e = ev[next++];
-          a.voice.sound(e.kind, e.ch, e.col || 0);
-        }
-        draw(text, next, ms, next < ev.length);
-        showClock(ms, end);
-        if (ms < end && !halt) requestAnimationFrame(frame);
-        else resolve(ms);
-      };
-      requestAnimationFrame(frame);
-    });
+  // The take is a log of key presses on a deck, so the standard bar plays,
+  // pauses and seeks it; the frame is drawn from the deck's position.
+  const KIND = 'key';
+  let recording = null;   // { mr, stopped, parts, type } while a take is being recorded
+  let deck = null, bar = null, take = null;
+
+  function build() {
+    const { ev, end } = schedule(ta.value);
+    const items = ev.map((e, i) => ({ at: Math.round(e.t), kind: KIND, id: `k${i}`, payload: e }));
+    take = { text: ta.value, ev, end };
+    const adapter = {
+      caps: { discrete: true, continuous: false, interpolate: false, stateful: true,
+              seek: true, rate: true, catchUp: 'reduce', assertOnSeek: true, rates: [1] },
+      actuate(p) { audio?.voice.sound(p.kind, p.ch, p.col || 0); },
+      reduce(payloads, pos) { return { pos }; },
+      assertState() {},
+    };
+    bar?.destroy?.();
+    barHost.replaceChildren();
+    deck = makeLogDeck({ lanes: [{ kind: KIND, rows: [], adapter }], items, leadInMs: 0, tailMs: 0, range: [0, end] });
+    bar = createTransportBar(barHost, deck, { loop: false, right: [rec, dlBtn], command: {
+      // the first play fetches and decodes the samples; the bar sweeps until they are in
+      play: async () => {
+        if (!audio) { barHost.dataset.busy = '1'; try { await sound(); } finally { delete barHost.dataset.busy; } }
+        if (audio.ac.state === 'suspended') await audio.ac.resume();
+        return deck.play();
+      },
+    } });
   }
 
-  // While one runs, its own button is a stop and the other waits.
-  function begin(kind) {
-    running = kind; halt = false;
-    const btn = kind === 'rec' ? 'rec' : 'play';
-    transport.setIcon(btn, 'stop', kind === 'rec' ? 'stop recording' : 'stop');
-    transport.enable(kind === 'rec' ? 'play' : 'rec', false, 'a take is running');
+  // The frame follows the deck every animation frame; a finished take stops the recorder.
+  function tick() {
+    const pos = deck.position();
+    // idle at either end, the frame shows the finished text
+    const idle = !deck.playing() && (pos <= 0 || pos >= take.end);
+    const typed = idle ? take.ev.length : take.ev.filter((e) => e.t <= pos).length;
+    draw(take.text, typed, deck.playing() ? pos : performance.now(), deck.playing() && typed < take.ev.length);
+    if (recording && performance.now() - recording.t0 > 300 && (!deck.playing() || pos >= take.end)) stopRecording();
+    requestAnimationFrame(tick);
   }
-  function finish() {
-    transport.setIcon('play', 'play', 'play');
-    transport.setIcon('rec', 'record', 'record');
-    transport.enable('play', true); transport.enable('rec', true);
-    running = null; halt = false;
-    showClock(0, 0);
-  }
-
-  play.onclick = async () => {
-    if (running) { halt = true; return; }
-    begin('play');
-    try { await run(); } finally { finish(); }
-  };
 
   const TYPES = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
-  rec.onclick = async () => {
-    if (running) { halt = true; return; }
-    begin('rec');
-    transport.enable('dl', false, 'recording');
-    try {
-      rec.dataset.busy = '';
-      const a = await sound().finally(() => { delete rec.dataset.busy; });
-      const type = TYPES.find((t) => MediaRecorder.isTypeSupported(t)) || '';
-      const stream = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...a.tap.stream.getAudioTracks()]);
-      const mr = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8e6, audioBitsPerSecond: 192e3 });
-      const parts = [];
-      mr.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
-      const stopped = new Promise((r) => { mr.onstop = r; });
-      mr.start(250);
-      d.log(`recording ${type || 'the browser default'}`);
-      const ms = await run();
-      mr.stop();
-      await stopped;
-      stream.getTracks().forEach((t) => t.kind === 'video' && t.stop());
-      const blob = new Blob(parts, { type: type.split(';')[0] || 'video/webm' });
-      const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-      if (dl.href) URL.revokeObjectURL(dl.href);
-      dl.href = URL.createObjectURL(blob);
-      dl.download = `positron-typist.${ext}`;
-      transport.enable('dl', true);
-      dlBtn.title = `download ${ext.toUpperCase()}, ${(ms / 1000).toFixed(1)} s, ${(blob.size / 1e6).toFixed(1)} MB`;
-      d.log(`recorded ${(ms / 1000).toFixed(1)} s of ${blob.type}, ${(blob.size / 1e6).toFixed(2)} MB; the download button has it`);
-      if (ext !== 'mp4') d.log('this browser records WebM; Instagram wants MP4, so convert it or record in Chrome', 'warn');
-      window.__demo.take = { type: blob.type, bytes: blob.size, ms, url: dl.href };
-    } catch (e) {
-      d.log(`recording failed: ${e.message}`, 'bad');
-    } finally { finish(); }
-  };
+  async function startRecording() {
+    rec.dataset.busy = '';
+    try { await sound(); if (audio.ac.state === 'suspended') await audio.ac.resume(); } finally { delete rec.dataset.busy; }
+    const type = TYPES.find((t) => MediaRecorder.isTypeSupported(t)) || '';
+    const stream = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...audio.tap.stream.getAudioTracks()]);
+    const mr = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8e6, audioBitsPerSecond: 192e3 });
+    const parts = [];
+    mr.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+    const stopped = new Promise((r) => { mr.onstop = r; });
+    deck.seek(0);
+    mr.start(250);
+    deck.play();
+    recording = { mr, stopped, parts, type, stream, t0: performance.now() };
+    setIcon(rec, 'stop', 'stop recording');
+    dlBtn.disabled = true;
+    d.log(`recording ${type || 'the browser default'}`);
+  }
+  async function stopRecording() {
+    const r = recording;
+    if (!r) return;
+    recording = null;
+    if (deck.playing()) deck.pause();
+    r.mr.stop();
+    await r.stopped;
+    r.stream.getTracks().forEach((t) => t.kind === 'video' && t.stop());
+    const ms = performance.now() - r.t0;
+    const blob = new Blob(r.parts, { type: r.type.split(';')[0] || 'video/webm' });
+    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    if (dl.href) URL.revokeObjectURL(dl.href);
+    dl.href = URL.createObjectURL(blob);
+    dl.download = `positron-typist.${ext}`;
+    dlBtn.disabled = false;
+    dlBtn.title = `download ${ext.toUpperCase()}, ${(ms / 1000).toFixed(1)} s, ${(blob.size / 1e6).toFixed(1)} MB`;
+    setIcon(rec, 'record', 'record');
+    d.log(`recorded ${(ms / 1000).toFixed(1)} s of ${blob.type}, ${(blob.size / 1e6).toFixed(2)} MB; the download button has it`);
+    if (ext !== 'mp4') d.log('this browser records WebM; Instagram wants MP4, so convert it or record in Chrome', 'warn');
+    window.__demo.take = { type: blob.type, bytes: blob.size, ms, url: dl.href };
+  }
+  rec.onclick = () => (recording ? stopRecording() : startRecording().catch((e) => d.log(`recording failed: ${e.message}`, 'bad')));
 
   // The finished frame, drawn once the face is in.
-  ta.oninput = lower.t.oninput = () => { if (!running) draw(ta.value, ta.value.length, 0, false); };
+  // A new text is a new take: rebuilt when nothing is playing or recording.
+  let rebuild = 0;
+  ta.oninput = () => { clearTimeout(rebuild); rebuild = setTimeout(() => { if (!recording && !deck.playing()) build(); }, 300); };
   await document.fonts.load(font(600, SIZE)).catch(() => {});
-  draw(ta.value, ta.value.length, 0, false);
+  build();
+  draw(take.text, take.ev.length, 0, false);
+  requestAnimationFrame(tick);
 
   if (SELFCHECK) {
     fit(ta.value);
