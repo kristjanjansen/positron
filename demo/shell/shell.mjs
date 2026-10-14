@@ -795,13 +795,13 @@ if ((TAP_LOCAL || TAP_FAR) && typeof addEventListener === 'function') {
 }
 
 /**
- * The favicon: the brand mark, β+ with the + inline, since 2026-10-06 (asked
- * as *"update favicon to brand one"*, the inline mark chosen on the brand
- * deck's favicon slide as *"keep these for icons"*). It was an `e+` drawn twice
- * by hand, an SVG here and a pixel loop in the build, kept in sync by a
- * comment. Now there is ONE file, `demo/favicon.ico` (16, 32 and 48 px),
- * rendered in Chrome by `drawMark()` in demo/shell/brand-slides.mjs with the brand
- * face, served at `/favicon.ico` by the dev server and copied by the build.
+ * The favicon: p.s since 2026-10-14, replacing β+ (2026-10-06), chosen from
+ * the trials on /kit/logo/#p-s: ps with no dot at 16, p.s at 32 and 48, the
+ * mono face at 600 tracked -0.12 em with the dot in the accent, on #0b0e14.
+ * `psIcons()` in workers/view/build.mjs draws it with no browser (resvg) and
+ * writes `/favicon.ico` with the apple touch icon and the manifest beside it.
+ * `demo/favicon.ico` is the same bytes, kept only because the dev server
+ * serves files off disk; the build says when the two differ.
  * Declared here so a page that declares nothing does not leave the browser to
  * guess, and so nothing logs a 404 for it.
  */

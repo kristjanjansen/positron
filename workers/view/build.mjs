@@ -833,15 +833,91 @@ async function queryHash(queryParams) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
 }
 
-// ── favicon: a 32x32 PNG wrapped in an ICO container, built here ────────────
-// e+ — the positron. A bold lowercase 'e' (a ring with a lower-right aperture
-// plus a crossbar) and a superscript plus, in the menu's palette.
-function favicon() {
-  // 🔴 THE BRAND MARK SINCE 2026-10-06, ONE FILE. It was an `e+` plotted here
-  // pixel by pixel and drawn again as an SVG in shell.mjs. Now both serve
-  // `demo/favicon.ico`, β+ rendered in Chrome with the brand face at 16, 32
-  // and 48 px (see the favicon note in demo/shell/shell.mjs).
-  return readFileSync(join(REPO, 'demo/favicon.ico'));
+// ── the icons: p.s, drawn here with no browser ─────────────────────────────
+//
+// 🔴 p.s SINCE 2026-10-14, REPLACING β+. The owner said yes to the trials on
+// /kit/logo/#p-s (`PS_ICONS` in demo/kit/logo/index.html), and these are those
+// trials made here, the way the avatars below are: SVG text through resvg
+// (`renderPng`), centred on resvg's own ink box (`inkBox`). The mark is the
+// mono face at 600, tracked -0.12 em, the dot in the accent #ffd400, on
+// #0b0e14, clipped to the shape the trial names: `square` is a 0.18 radius,
+// `ios` 0.225, `circle` a circle. `ps` has no dot (two pixels at 16) and keeps
+// the face's own spacing, as `drawPs` does.
+//
+//   /favicon.ico                    16 ps, 32 p.s, 48 p.s, one ICO, never renamed
+//   /icons/apple-touch-<hash>.png   180, ios
+//   /icons/android-<hash>.png       192, circle, in the manifest
+//   /icons/store-<hash>.png         512, ios, in the manifest
+//   /icons/manifest-<hash>.webmanifest
+//
+// ⚠️ demo/favicon.ico IS THE DEV SERVER'S COPY, AND ONLY THAT. demo/server.mjs
+// serves files off disk and has no build step, so a page on :8890 asking for
+// /favicon.ico needs a file there (a 404 has turned harnesses red before, see
+// demo/partitur/index.html). The build never reads it: it compares, and says
+// so when the two differ.
+const PS_ICON_SPECS = {
+  favicon16: [16, 'square', 0.86, 'ps'],
+  favicon32: [32, 'square', 0.86, 'p.s'],
+  favicon48: [48, 'square', 0.8, 'p.s'],
+  'apple-touch': [180, 'ios', 0.62, 'p.s'],
+  android: [192, 'circle', 0.56, 'p.s'],
+  store: [512, 'ios', 0.62, 'p.s'],
+};
+
+async function psIconSvg(S, shape, fill, text) {
+  const track = text.includes('.') ? -0.12 : 0;
+  const mark = (size, dx = 0, dy = 0) => `<text x="${dx.toFixed(2)}" y="${dy.toFixed(2)}" font-family="'Brand JetBrains Mono', 'JetBrains Mono', monospace" font-weight="600" font-size="${size.toFixed(2)}" letter-spacing="${(track * size).toFixed(2)}" fill="#e6e6e6">${text.replace('.', '<tspan fill="#ffd400">.</tspan>')}</text>`;
+  const tile = shape === 'circle' ? `<circle cx="${S / 2}" cy="${S / 2}" r="${S / 2}" fill="#0b0e14"/>`
+    : `<rect width="${S}" height="${S}" rx="${(S * (shape === 'ios' ? 0.225 : 0.18)).toFixed(2)}" fill="#0b0e14"/>`;
+  const wrap = (body, bg) => `<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">${bg ? tile : ''}${body}</svg>`;
+  const b0 = await inkBox(wrap(mark(100, 0, 200)));
+  const size = 100 * fill * S / b0.width;
+  const b1 = await inkBox(wrap(mark(size, 0, 200)));
+  return wrap(mark(size, (S - b1.width) / 2 - b1.x, 200 + (S - b1.height) / 2 - b1.y), true);
+}
+
+/** PNGs as ICO entries: a 6 byte header, a 16 byte directory row per image,
+ *  then the PNGs as they are. A PNG payload is valid in an ICO since Vista. */
+function icoOf(pngs) {
+  const head = Buffer.alloc(6 + 16 * pngs.length);
+  head.writeUInt16LE(0, 0); head.writeUInt16LE(1, 2); head.writeUInt16LE(pngs.length, 4);
+  let at = head.length;
+  pngs.forEach(({ px, png }, i) => {
+    const o = 6 + 16 * i;
+    head.writeUInt8(px >= 256 ? 0 : px, o); head.writeUInt8(px >= 256 ? 0 : px, o + 1);
+    head.writeUInt8(0, o + 2); head.writeUInt8(0, o + 3);
+    head.writeUInt16LE(1, o + 4); head.writeUInt16LE(32, o + 6);
+    head.writeUInt32LE(png.length, o + 8); head.writeUInt32LE(at, o + 12);
+    at += png.length;
+  });
+  return Buffer.concat([head, ...pngs.map(({ png }) => Buffer.from(png))]);
+}
+
+/** Every icon rendered once: `{ ico, files: [[path, bytes]], links }`. */
+async function psIcons() {
+  const { fnv } = await import(new URL('../../demo/shell/share-card.mjs', import.meta.url));
+  const out = {};
+  for (const [name, [S, shape, fill, text]] of Object.entries(PS_ICON_SPECS)) {
+    const svg = await psIconSvg(S, shape, fill, text);
+    out[name] = { px: S, svg, png: await renderPng(svg, S), path: `/icons/${name}-${fnv(svg)}.png` };
+  }
+  const ico = icoOf([out.favicon16, out.favicon32, out.favicon48]);
+  const manifest = JSON.stringify({
+    id: '/', name: SITE_NAME, short_name: 'positron', start_url: '/', scope: '/',
+    display: 'browser', background_color: '#0b0e14', theme_color: '#0b0e14',
+    icons: [
+      { src: out.android.path, sizes: '192x192', type: 'image/png' },
+      { src: out.store.path, sizes: '512x512', type: 'image/png' },
+    ],
+  }, null, 2) + '\n';
+  const manifestPath = `/icons/manifest-${fnv(manifest)}.webmanifest`;
+  return {
+    ico,
+    files: [...['apple-touch', 'android', 'store'].map((n) => [out[n].path, out[n].png, `${out[n].px}x${out[n].px}`]),
+      [manifestPath, manifest, 'manifest']],
+    links: [`<link rel="apple-touch-icon" sizes="180x180" href="${out['apple-touch'].path}">`,
+      `<link rel="manifest" href="${manifestPath}">`],
+  };
 }
 
 // ── run ─────────────────────────────────────────────────────────────────────
@@ -881,11 +957,27 @@ await mkdir(OUT, { recursive: true });
 // public/index.html. The front page is demo/index.html now, copied by the list
 // above like any other page, and menu.html is archive/frontpage/menu.html.
 
-// favicon.ico — generated, not committed. Browsers request /favicon.ico for
-// every page whether or not the HTML asks for one; without this the four
-// protos (which declare no icon, and three of which we must not edit) each log
-// a 404 to the console, and "zero console errors" stops being true.
-await writeFile(join(OUT, 'favicon.ico'), favicon());
+// favicon.ico, generated here. Browsers request /favicon.ico for every page
+// whether or not the HTML asks for one; without this the four protos (which
+// declare no icon, and three of which we must not edit) each log a 404 to the
+// console, and "zero console errors" stops being true. The apple touch icon and
+// the manifest are written beside it under /icons/, hashed, and named in every
+// page by `withIconLinks` below.
+const ICONS = await psIcons();
+await writeFile(join(OUT, 'favicon.ico'), ICONS.ico);
+console.log(`  favicon /favicon.ico: p.s at 16 (ps), 32, 48, ${ICONS.ico.length} bytes`);
+{
+  let dev = null;
+  try { dev = readFileSync(join(REPO, 'demo/favicon.ico')); } catch {}
+  if (!dev || !ICONS.ico.equals(dev)) {
+    console.log(`  NOTE demo/favicon.ico (the dev server's copy) differs from the built one: cp ${join(OUT, 'favicon.ico')} demo/favicon.ico`);
+  }
+}
+await mkdir(join(OUT, 'icons'), { recursive: true });
+for (const [path, bytes, what] of ICONS.files) {
+  await writeFile(join(OUT, path.slice(1)), bytes);
+  console.log(`  icon ${path}: ${what}, ${bytes.length} bytes`);
+}
 
 // ── the share card, og/site-<hash>.png ───────────────────────────────────────
 //
@@ -959,7 +1051,8 @@ for (const [NET, S, FILL] of [['instagram', 320, 0.56], ['github', 460, 0.62], [
 // The third serves the share card for a year: its name changes when it does.
 await writeFile(join(OUT, '_headers'), '/*\n  X-Robots-Tag: noindex, nofollow\n'
   + '/archive/*.md\n  Content-Type: text/plain; charset=utf-8\n'
-  + '/og/*\n  Cache-Control: public, max-age=31536000, immutable\n');
+  + '/og/*\n  Cache-Control: public, max-age=31536000, immutable\n'
+  + '/icons/*\n  Cache-Control: public, max-age=31536000, immutable\n');
 
 // ── the noindex meta, on every page, whoever wrote the page ─────────────────
 //
@@ -1031,6 +1124,19 @@ function withShareMeta(src, dst, text) {
       : `${block}\n${text}`;
 }
 
+// The apple touch icon and the manifest, named in every page after its share
+// tags (or its charset). A page that names its own keeps them.
+let iconLinked = 0;
+function withIconLinks(text) {
+  if (/rel="(apple-touch-icon|manifest)"/.test(text)) return text;
+  iconLinked++;
+  const block = ICONS.links.join('\n');
+  const anchor = [...text.matchAll(/<meta property="og:[^>]*>|<meta name="twitter:card"[^>]*>/g)].pop()?.[0];
+  return anchor ? text.replace(anchor, `${anchor}\n${block}`)
+    : text.includes(CHARSET) ? text.replace(CHARSET, `${CHARSET}\n${block}`)
+      : `${block}\n${text}`;
+}
+
 for (const [src, dst] of FILES) {
   const to = join(OUT, dst);
   await mkdir(dirname(to), { recursive: true });
@@ -1044,7 +1150,7 @@ for (const [src, dst] of FILES) {
       text = text.split(from).join(into);
     }
     if (append) text += '\n' + append + '\n';
-    if (isPage) text = withShareMeta(src, dst, withRobotsMeta(src, text));
+    if (isPage) text = withIconLinks(withShareMeta(src, dst, withRobotsMeta(src, text)));
     await writeFile(to, text);
     if (rewrites || append) {
       console.log(`  ${rewrites ? `rewrote ${dst} (${rewrites.length} substitution(s))` : `copied ${dst}`}${append ? ' + back link' : ''}`);
@@ -1056,6 +1162,7 @@ for (const [src, dst] of FILES) {
 console.log(patched.length
   ? `  noindex meta added to ${patched.length} page(s) that lacked it: ${patched.join(', ')}`
   : '  noindex meta: every page carried it already');
+console.log(`  icon links written into ${iconLinked} page(s)`);
 console.log(`  share tags written into ${shared.length} page(s), every one naming ${CARD.path}`
   + (ownShare.length ? `; ${ownShare.length} carried their own og:image and were left alone: ${ownShare.join(', ')}` : ''));
 {
