@@ -4,7 +4,7 @@
 
 - ~~**/connect/: no typed request and no ask button for now; an example press is the request**~~ (2026-10-14, DONE). Asked: *"rm ask button and input atm. no need for spoecial ui for it yet"*.
 
-- **Plan: /connect/ builds the actual working UI from the patch (keys, knobs, synths, scopes, pictures appear and work as nodes are linked)** (2026-10-14, agent). Asked: *"we are missing actual ui that builds based on patchbay. plan it."*
+- ~~**Plan: /connect/ builds the actual working UI from the patch (keys, knobs, synths, scopes, pictures appear and work as nodes are linked)**~~ (2026-10-14, DONE as plans/plan-connect-ui.md; slices wait for D1 to D7). Asked: *"we are missing actual ui that builds based on patchbay. plan it."*
 
 - **Node catalogue step 2: every concept page builds its nodes with addNodes() from nodes.mjs** (2026-10-14, four agents by group). Asked: *"do these"*.
 
