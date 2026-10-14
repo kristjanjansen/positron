@@ -628,10 +628,10 @@ Local at http://127.0.0.1:8890/connect/. Not committed, not deployed.
 - **Slice 3.** `rt-scope.mjs`: the kit wave shape over an AnalyserNode pulled
   by a silent sink.
 
-**A catalogue field that does not exist**: `synth` has no `value-in` in
-`nodes.mjs`. It lives in `EXTRA_PORTS` in `node-runtime.mjs` until the
-catalogue pass lands, and `node-runtime-test.mjs` goes red the day the
-catalogue grows it, so it is moved rather than doubled.
+**The synth's value-in is in the catalogue since dc0c1a5c**, an optional port
+named `wave, cutoff, q, attack, release`; `EXTRA_PORTS` stays exported as `{}`
+because /connect/ still imports it. The catalogue's default synth label is now
+`sine`; recorder, timeline and dots pass `saw`.
 
 **Measured** in headless Chrome with `--autoplay-policy=no-user-gesture-required
 --mute-audio` (U2, answered for the check only by a scratch launcher on
@@ -639,7 +639,7 @@ catalogue grows it, so it is moved rather than doubled.
 speakers read 0.11 RMS with the speaker linked and 0.00000 with it unlinked
 while the scope on the same synth read a 0.17 peak.
 
-## Pages to move onto the lifted modules, once the catalogue pass lands
+## Pages to move onto the lifted modules (moved in dc0c1a5c unless marked open)
 
 The plan's rule (*"its page moves onto the lifted copy in the same change"*) was
 deferred on 2026-10-14 because another agent was editing these pages. Each move
@@ -647,7 +647,7 @@ is one page at a time, with its own check before and after.
 
 | lifted module | pages that still carry their own copy |
 | --- | --- |
-| `demo/shell/audio-router.mjs` (`routeAudio`) | `demo/synth/patch-synth.mjs` (`route()`, so /synth/sound/), then the other private routers: `demo/radio/blend/`, `demo/radio/tuner/`, `demo/radio/key/`, `demo/radio/rig.mjs`, `demo/granulator/grain-rig.mjs`, `demo/granulator/beat/`, `demo/drums/drum-machine.mjs`, `demo/drums/remote/`, `demo/code/collide/`, `demo/code/faust/`, `demo/code/plaits/`, `demo/remote/collide/`, `demo/shader/landscape/`, `demo/typist/machines/`, `demo/typist/score/`, `demo/video/camera/`, `demo/synth/recorder/`, `demo/synth/timeline/`, `demo/synth/dots/`, `demo/room/words/` (`grep -rlE "function route\(\|function audio\("`, not every one is an audio router) |
-| `demo/shell/synth-voice.mjs` | `demo/synth/keyboard/` (the copy it was lifted from, a direct swap); then the saw copies, which need `{ wave: 'sawtooth', level: 0.08 }`: `demo/synth/recorder/`, `demo/synth/timeline/`, `demo/synth/dots/`, `demo/room/words/` |
-| `demo/shell/synth-params.mjs` | `demo/synth/patch-synth.mjs` (`WAVES`, `hz`, `expo`, `hzText`, `sText`, and the `wave`, `cutoff`, `q`, `attack`, `release` rows of `KNOBS`; its own defaults stay its own) |
-| `demo/shell/rt-scope.mjs` (the window from the first rising zero crossing) | `demo/synth/module-page.mjs` `frame()` |
+| `demo/shell/audio-router.mjs` (`routeAudio`) | MOVED: `demo/synth/patch-synth.mjs`. OPEN, the other private routers: `demo/radio/blend/`, `demo/radio/tuner/`, `demo/radio/key/`, `demo/radio/rig.mjs`, `demo/granulator/grain-rig.mjs`, `demo/granulator/beat/`, `demo/drums/drum-machine.mjs`, `demo/drums/remote/`, `demo/code/collide/`, `demo/code/faust/`, `demo/code/plaits/`, `demo/remote/collide/`, `demo/shader/landscape/`, `demo/typist/machines/`, `demo/typist/score/`, `demo/video/camera/`, `demo/synth/recorder/`, `demo/synth/timeline/`, `demo/synth/dots/`, `demo/room/words/` (`grep -rlE "function route\(\|function audio\("`, not every one is an audio router) |
+| `demo/shell/synth-voice.mjs` | MOVED, all of them, the saw copies with `cutoff: null` so they stay filterless: `demo/synth/keyboard/`, `demo/synth/recorder/`, `demo/synth/timeline/`, `demo/synth/dots/`, `demo/room/words/` |
+| `demo/shell/synth-params.mjs` | MOVED: `demo/synth/patch-synth.mjs` (`WAVES`, `hz`, `expo`, `hzText`, `sText`, and the `wave`, `cutoff`, `q`, `attack`, `release` rows of `KNOBS`; its own defaults stay its own) |
+| `demo/shell/rt-scope.mjs` (`scopeWindow`, from the first rising zero crossing) | MOVED: `demo/synth/module-page.mjs` `frame()` |
