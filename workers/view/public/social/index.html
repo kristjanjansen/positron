@@ -47,7 +47,9 @@
   const grid = el('div', 'soc-cards');
   for (const r of rows) {
     const a = el('a', 'soc-card', '', { href: targetOf(r) });
-    a.append(el('h3', 'soc-card-t', r.title || r.name.slice(7)), el('p', 'soc-card-s', r.one || ''));
+    // a manifest `one` line is lowercase with no stop; a card reads as a sentence
+    const say = (r.one || '').replace(/^./, (c) => c.toUpperCase()).replace(/([^.])$/, '$1.');
+    a.append(el('h3', 'soc-card-t', r.title || r.name.slice(7)), el('p', 'soc-card-s', say));
     grid.append(a);
   }
   d.el.append(grid);

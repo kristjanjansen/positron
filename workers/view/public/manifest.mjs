@@ -955,7 +955,7 @@ export const DEMOS = [
   { name: 'social', group: 'kit', act: 0, created: '2026-10-14', built: true,
     one: 'pictures and reels the site makes of itself, to download and post',
     tags: ['shell', 'no network'] },
-  { name: 'social/typewriter', title: 'typewriter', group: 'kit', act: 0, created: '2026-10-14', built: true, unlisted: true,
+  { name: 'social/typist', title: 'typist', group: 'kit', act: 0, created: '2026-10-14', built: true, unlisted: true,
     one: 'a line types itself onto a story frame with a real typewriter, recorded to a file',
     tags: ['shell', 'MediaRecorder'] },
 

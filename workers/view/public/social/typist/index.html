@@ -5,9 +5,9 @@
 <meta name="robots" content="noindex, nofollow">
 <meta property="og:site_name" content="positron.studio">
 <meta property="og:type" content="website">
-<meta property="og:title" content="typewriter">
+<meta property="og:title" content="typist">
 <meta property="og:description" content="A line types itself onto a story frame with a real typewriter, recorded to a file">
-<meta property="og:url" content="https://positron.studio/social/typewriter/">
+<meta property="og:url" content="https://positron.studio/social/typist/">
 <meta property="og:image" content="https://positron.studio/og/site-98871a52.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -16,7 +16,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON social/typewriter</title>
+<title>POSITRON social/typist</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* The reel is drawn at 1080 x 1920 and shown at a phone's size. */
@@ -50,12 +50,12 @@
   const SIZE = 88, LINE = 1.22;   // "Connect anything" fits one line at 88
 
   const d = mount({
-    name: 'social/typewriter',
+    name: 'social/typist',
     what: 'Type a line and it types itself onto a story frame, with a real typewriter. Record makes the file.',
     readout: null, index: '/social/', indexLabel: 'social',
   });
   const h1 = d.head.querySelector('.pos-name');
-  if (h1) h1.textContent = 'typewriter';
+  if (h1) h1.textContent = 'typist';
 
   const cv = el('canvas', 'tw-cv');
   cv.width = W; cv.height = H;
@@ -218,7 +218,7 @@
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
       if (dl.href) URL.revokeObjectURL(dl.href);
       dl.href = URL.createObjectURL(blob);
-      dl.download = `positron-typewriter.${ext}`;
+      dl.download = `positron-typist.${ext}`;
       dl.textContent = `Download ${ext.toUpperCase()}, ${(blob.size / 1e6).toFixed(1)} MB`;
       dl.hidden = false;
       d.log(`recorded ${blob.type}, ${(blob.size / 1e6).toFixed(2)} MB`);
