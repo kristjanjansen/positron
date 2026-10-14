@@ -2041,7 +2041,7 @@ as two different controls both sitting at x 608.**
 **From `demo/grains/index.html`, the page half of the `text-wrap: balance` rule.**
 
 ⚠️ **THE HEADING IS BALANCED AND THE PARAGRAPH UNDER IT IS NOT, AND THAT IS
-WHERE THE LINE GOES. `shell.css` carries the argument at `.pos-lr-say`:
+WHERE THE LINE GOES. `lessons/css-shell.md#pos-lr-say` carries the argument (the `.pos-lr-say` rule left shell.css with local-remote):
 `text-wrap: balance` is for short centred prose, and Chromium stops
 balancing past a handful of lines, so the span below, which holds four
 sentences at 62 characters a line, is a paragraph and gets nothing.
