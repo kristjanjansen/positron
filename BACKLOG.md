@@ -1,12 +1,14 @@
 ## Open
 
+- **Node catalogue: one pass applying what step 2 collected** (2026-10-14, agent): portLabel option, relabel, addPorts, three port reorders, refuse ambiguous knob names, the stream and shout hops as entries, addNodes failures visible, ports grouped by node as the rule; then the pages drop their helpers and inline leftovers.
+
 - ~~**/connect/: an example press builds its patch straight away (no model asked), and the picture's room is held from the first frame**~~ (2026-10-14, DONE). Asked: *"clickig on voice pill actally builds patchbay"*, *"reserve space for it iitally"*.
 
 - ~~**/connect/: no typed request and no ask button for now; an example press is the request**~~ (2026-10-14, DONE). Asked: *"rm ask button and input atm. no need for spoecial ui for it yet"*.
 
 - ~~**Plan: /connect/ builds the actual working UI from the patch (keys, knobs, synths, scopes, pictures appear and work as nodes are linked)**~~ (2026-10-14, DONE as plans/plan-connect-ui.md; slices wait for D1 to D7). Asked: *"we are missing actual ui that builds based on patchbay. plan it."*
 
-- **Node catalogue step 2: every concept page builds its nodes with addNodes() from nodes.mjs** (2026-10-14, four agents by group). Asked: *"do these"*.
+- ~~**Node catalogue step 2: every concept page builds its nodes with addNodes() from nodes.mjs**~~ (2026-10-14, DONE in four commits; the catalogue pass of what the groups collected follows). Asked: *"do these"*.
 
 - **Live announce: every page announces its nodes (bay-node graph.announce) so /connect/ can show what is present now** (2026-10-14). Asked: *"do these"*. After step 2.
 
