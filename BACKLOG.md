@@ -1,5 +1,7 @@
 ## Open
 
+- **/connect/ live: on the Pi's own group, not a separate list; announced Pi nodes with no page become boxes ("no page yet"), never "not in the catalogue"** (2026-10-14, passed to the announce agent). Asked: *"do not get it. should it be next to pi?"* after Listen in studio-1 showed synth, pappus, capture, gpu, midi-fasttrack-pro as not in the catalogue.
+
 - ~~**WebMCP kept as a plan, experiment code archived**~~ (2026-10-14, DONE: plans/plan-webmcp.md, archive/webmcp/). Asked: *"just keep mcp as plan. archie code"*.
 
 - **The Pi announces collide, drums and camera (and the shader question), so /connect/ and the live layer can see them** (2026-10-14; board side committed, the four pages go in with the live announce, then the push to the Pi). Asked: *"Make pi announce"*. boardGraph() in graph-registry.mjs and rig/board; tested on fake-board; the push to the Pi is done by the session after.
