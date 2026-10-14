@@ -20,7 +20,7 @@
 
 - **Archived demo pages read `← demos`: fix** (2026-10-14). Asked: *"← demos - fix"*.
 
-- **Drums on the Pi plays about 5 dB quiet: fix** (2026-10-14, agent). Asked: *"fix"*.
+- ~~**Drums on the Pi plays about 5 dB quiet: fix**~~ (2026-10-14, DONE on the page: PI_LIFT 2 x 0.9; the board's capture likely halves by averaging an empty second JACK port. Needs the real Pi to confirm; the source fix is `-channels 1` in jacksynth.mjs ensureCapture). Asked: *"fix"*.
 
 - **Collide on Pi scopes: propose what to do** (2026-10-14). Asked: *"the Collide on Pi scopes - what to do?"*.
 
