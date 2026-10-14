@@ -1,6 +1,6 @@
 ## Open
 
-- **/connect/: make connections, by saying what should play what (the wish worker proposes, you confirm) and by picking an out then an in; the linked part drawn as a patchbay** (2026-10-14, agent). Asked: *"just move on what you need. can we also work on http://127.0.0.1:8890/connect/"*.
+- ~~**/connect/: make connections, by saying what should play what (the wish worker proposes, you confirm) and by picking an out then an in; the linked part drawn as a patchbay**~~ (2026-10-14, DONE, local only; open: the wish worker's 64-port limit, a MIDI-desk prompt that drops the audio link to the speaker, and Ask stretching on a phone). Asked: *"just move on what you need. can we also work on http://127.0.0.1:8890/connect/"*.
 
 - **One node catalogue, `demo/shell/nodes.mjs`: pages take their nodes from it, /connect/ reads it** (2026-10-14). Asked: *"can we not centralize is somehow?"*, then *"do it"*. Plan: `plans/plan-node-catalogue.md`. Step 1 (nodes.mjs from the pages' source) started 2026-10-14 (*"just move on"*); the page moves wait for review phase 5.
 
