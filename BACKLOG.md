@@ -1,5 +1,7 @@
 ## Open
 
+- **Plan: /connect/ builds the actual working UI from the patch (keys, knobs, synths, scopes, pictures appear and work as nodes are linked)** (2026-10-14, agent). Asked: *"we are missing actual ui that builds based on patchbay. plan it."*
+
 - **Node catalogue step 2: every concept page builds its nodes with addNodes() from nodes.mjs** (2026-10-14, four agents by group). Asked: *"do these"*.
 
 - **Live announce: every page announces its nodes (bay-node graph.announce) so /connect/ can show what is present now** (2026-10-14). Asked: *"do these"*. After step 2.
