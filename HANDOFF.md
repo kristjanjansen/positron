@@ -1,3 +1,56 @@
+# Handoff, 2026-10-14, session 78: social reels, the review fixed, the repo made publishable
+
+## Where it is right now
+
+- **Site: BUILD `6f3e8dc0-094944-cad1`**, confirmed on the edge, deployed from a clean worktree of HEAD as every deploy this session.
+- **Committed, NOT deployed:** `ce6d3a66` (Drums on the Pi lift), `9bdae97c` and `c1acb5e1` (privacy pass 3). Deploy at the next coherent point.
+- **GitHub: 282 commits NOT pushed.** Do not push until the owner settles the public repo (`plans/plan-skills-distribution.md`): the repo is public, the plan moves it to `positron-studio/positron`, and history still holds everything removed this session.
+- **Two agents were running at handoff**, their files uncommitted in the tree: the **radio reel** (`demo/social/radio/`, `demo/shell/tuner-mix.mjs`, `demo/radio/tuner/index.html`, additions to `reel.mjs`/`reel-test.mjs`, the `social/radio` manifest row) and **review phase 5** (palette helper in `patchbay.mjs`, `concept.css`, `layoutAcross` for bay-svg/bay-view, `createMidiDevices`, `demo/radio/rig.mjs`, typist paper CSS, `workers/_lib` relay recorder, `bay-traffic` `remove()`; touched hero.mjs, kit/patchbay, room/words, synth/dots, archive/pico-router so far). Commit each by path when its report lands; nothing of theirs is verified by the session yet.
+- Counted 2026-10-14 evening: **59 demo rows, 58 built** (social, social/typist, social/radio added); **121 plans**. Two headless Chromes belong to the running agents.
+
+## What landed (deployed unless marked)
+
+| where | what |
+| --- | --- |
+| https://positron.studio/ | contact as two icon buttons (mail, Instagram) left of Feedback; footer removed; a Social card beside Kit |
+| https://positron.studio/social/ | new, a folder like /kit/, one card per `social/<name>` manifest row |
+| https://positron.studio/social/typist/ | a line types itself onto a 1080x1920 story frame with the Hermes Precisa; the standard transport bar over a log deck; record and download (MP4 in Chrome) as icon buttons; a lower line field; type fitted to its widest line. Built on **`demo/shell/reel.mjs`**, the reel library (frame, safe band, wordmark, lower line, bar, recorder, download). verify 18/18, a headless take is 7.3 s h264+aac |
+| keyboard | Panic is **Stop** and stops every loop too |
+| code/collide, code/faust | the code box sits below the keys, above the patchbay |
+| archived demos | back link reads `← archive` to /archive/ (shell default) |
+| radio/blend | titled Blend; no URL changed (decided: keep /radio/blend, /radio/live, /typist/score) |
+| icons | **p.s is the favicon** (16 ps, 32/48 p.s ICO), apple touch 180, android 192, store 512, a web manifest (`display: browser`), drawn at build; beta+ retired. GitHub and YouTube avatars at /og/ |
+| view worker | ERR proxy and `Gate` DO deleted; migration v2 ran with BUILD 6f3e8dc0, its cache is gone for good; `/icy/` kept for proto/flipper |
+| review fixes | kit audio/MIDI, network/teardown, harness (`demo/chrome.mjs` launchChrome, tests not shipped, `run-tests.mjs` 53 pass 5 skip), cleanup (19,676 lines, 1,151 files untracked). Plan: `plans/plan-code-review-2026-10-14.md` |
+| workers (committed, NOT deployed) | shout one upstream per mount, store batched writes and caps, feedback arm credits, pub and store clear routes behind secrets, relay key rate limit. Need the owner's go and `STORE_KEY`, `PUB_KEY`, `FEEDBACK_KEY` (feedback and mail) |
+| skills | rewritten around the patchbay; private lines out; every skill but `positron-studio-start` marked `internal: true` (unquoted; quoted does not hide); `npx skills add ./ --list` finds only that one |
+| privacy | three passes over skills, CLAUDE.md, standing files, code and notes; originals in `~/personal/positron-private/notes-2026-10-14.md` (outside the repo) |
+| docs | a status line on every plan and research file, `plans/README.md`, `research/README.md`, five merges and ten moves to `archive/plans/` with stubs |
+| CLAUDE.md | new rule: a comment says what the code cannot, the story moves to `lessons/` |
+
+## Open, waiting on the owner
+
+- **Repo move and push** (`plans/plan-skills-distribution.md`): create the `positron-studio` org, transfer the repo, decide on a history rewrite.
+- **Worker deploys** and the three secrets above.
+- **mail**: recommended masking full sender addresses on the public /feedback/ page; not changed.
+- **`local-remote.mjs`, `worklet.mjs`**: recommended archiving to `archive/shell/`; planned for the comment-cut wave unless the owner says no.
+- **Drums on the Pi**: the page lifts the Pi side 2 x 0.9; the source fix is `-channels 1` in `rig/board/jacksynth.mjs` `ensureCapture`, needs the real Pi (and a clip check of the sampler piano). Collide on Pi measured level on 2026-10-12, which the halving model does not explain.
+- **Collide on Pi scopes**: the held overlay is already in; proposed a display-only low-pass on the Pi line if it still reads nervous. No answer yet.
+- **Reel ideas** offered: chord names, one wire, the hero patchbay live (via bay-svg onto the canvas), drum machine, loop clock, concrete poetry, shader landscape, archive film. Radio was chosen and is being built.
+- **The M1's home path** in its launchd plist and two plans shows the username; not changed.
+
+## Next, in order
+
+1. Land the two running agents (radio reel, phase 5): read each report, verify, commit by path, deploy.
+2. **The comment cut**, asked and waiting: four agents (shell.css; kit modules; pages; workers, rig and harnesses), history verbatim to `lessons/`, proof that only comments changed (comment-stripped CSS byte-identical; acorn token streams identical for JS, acorn is in the npx cache). Fix `timeline/lab/csound-real.mjs`'s corrupted remote script in the same wave.
+3. Later, asked as later: `@layer` and a spacing scale in shell.css; social pages for the share cards and avatars now in /kit/share/ and /kit/logo/.
+
+## Traps met this session
+
+- **A pathspec commit re-adds files untracked with `git rm --cached`** (they are read from the working tree). Untrack with a plain commit of an index holding only the removals. In memory: `partial-stage-then-plain-commit`.
+- zsh does not word-split `$FILES`; use `git commit --pathspec-from-file=`.
+- The build refuses an import of an untracked shell file; commit a new kit module before deploying a page that imports it.
+
 # Handoff, 2026-10-14, session 77: one word addresses, share cards, p.s, the footer
 
 ## Where it is right now
