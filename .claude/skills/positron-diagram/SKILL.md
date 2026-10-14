@@ -7,6 +7,14 @@ description: How a hand-written diagram (demo/shell/diagram.mjs) is written, and
 
 `demo/shell/diagram.mjs` draws it. What follows decides what goes in it.
 
+## Status: not part of a new page, since 2026-10-14
+
+The owner, 2026-10-14: *"diagram is not part of new page templates any ore, it
+lives in a kit and archived pages. it might come back maybe."* So a new page
+does not get a `diagram.mjs` picture. The module stays, at `/kit/diagram/` and
+in the archived pages that carry one, and the rules below hold for those and
+for the day it comes back.
+
 ## First: on a concept page the patchbay IS the diagram
 
 Checked 2026-10-14: **no concept page calls `createDiagram`** (`grep -rl

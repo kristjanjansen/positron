@@ -1,5 +1,11 @@
 ## Open
 
+- **Profile images for GitHub and YouTube as files** (2026-10-14). Asked: *"do profile images for gh and yt. i did isnta already"*. Same pipeline as the Instagram avatar (share-card.mjs, og/render.mjs): GitHub square at 460, YouTube circle crop at 800.
+
+- ~~**Skills: the hand-written diagram is not a new-page tool any more**~~ (2026-10-14, DONE). Said: *"diagram is not part of new page templates any ore, it lives in a kit and archived pages. it might come back maybe."* Note it in positron-diagram and the CLAUDE.md trigger row.
+
+- **/social/ (named *"use social"*, over promo), a folder like /kit/, first page a simple typewriter reel you can download** (2026-10-14). Asked: *"implement simple typewriter for og reel downloadable. make a separate promo folder like kit, link from frontpage carrd next to kit -- reel.mjs. one test page, next we abstact into reusable lib"*. One test page now; the reusable `reel.mjs` lib is the next step.
+
 - **Cut comments to their essence; the history moves verbatim to `lessons/`** (2026-10-14). Asked: *"cut comments, perhaps to separare lessons md or smth. updaet claude.md for cutting down comments to essnece"*. Rule in CLAUDE.md (Conventions, "A comment says what the code cannot"). Runs AFTER the review fixes land, partitioned by directory.
 
 - **Fix the code review issues in parallel** (2026-10-14). Asked: *"fix the review issues in parallel"*. From `plans/plan-code-review-2026-10-14.md` phases 0 to 4: kit bugs, harness, workers, untracking and deletions. Phase 5 (consolidation) and the `@layer` half of phase 6 are not in this pass. Nothing pushed while the public repo question is open.

@@ -66,7 +66,7 @@ somebody broke it.
 | --- | --- |
 | `positron-compose` | deciding where anything goes, writing any padding, margin, gap, width, border or radius, or saying a layout is done. It is the composition and cascade half; `positron-ui` is the kit half, and a layout task loads both |
 | `positron-ui` | building or changing any interface, control (a control is usually a node's port), readout, table, transport bar, the patchbay block on a page, or a stylesheet rule |
-| `positron-diagram` | drawing or editing a hand-written diagram (`diagram.mjs`, a slide's picture), or choosing between one and the page's own patchbay picture |
+| `positron-diagram` | drawing or editing a hand-written diagram (`diagram.mjs`, a slide's picture). Not part of a new page since 2026-10-14: it lives in `/kit/diagram/` and archived pages, and may come back |
 | `positron-verify` | running or changing a harness, adding or removing a control, believing a red run, reporting a measurement or an absence |
 | `positron-streaming` | anything under `workers/` or `src/`, any page that plays a stream or adds an audio, video, file or state link that leaves the machine (a heavy link and its transport), quoting a latency or a bill |
 | `positron-xr` | any `gl: true` or headset page, `verify-gl.mjs`, `verify-quest.mjs`, a full screen button on any page or full screen on a phone |
