@@ -148,3 +148,13 @@ rig/moq/spike/www/*.js
 # m2m run logs and screenshots, 1,128 files. proto/m2m/NOTES.md cites them as
 # evidence; they stay on this disk, not in a clone.
 proto/m2m/logs/
+
+# Run logs and artefacts that carry LAN addresses and machine paths, untracked 2026-10-14.
+proto/m2m/artifacts/*.sdp
+proto/archive/logs/
+proto/archive/artifacts/archive-meta.json
+proto/selfrec/logs/
+rig/containers-next/run.err
+studio/last-show.json
+studio/artifacts/
+studio/runs/

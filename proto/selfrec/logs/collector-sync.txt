@@ -1,3 +1,0 @@
-selfrec-collector on :8894 -> ~/personal/positron/results/selfrec-sync.jsonl
-selfrec-collector on :8894 -> ~/personal/positron/results/selfrec-sync.jsonl
-selfrec-collector on :8894 -> ~/personal/positron/results/selfrec-sync.jsonl

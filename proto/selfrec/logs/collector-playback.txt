@@ -1,6 +1,0 @@
-selfrec-collector on :8894 -> ~/personal/positron/results/selfrec-playback.jsonl
-selfrec-collector on :8894 -> ~/personal/positron/results/selfrec-playback.jsonl
-selfrec-collector on :8894 -> ~/personal/positron/results/selfrec-playback.jsonl
-selfrec-collector on :8894 -> ~/personal/positron/results/selfrec-playback.jsonl
-selfrec-collector on :8894 -> ~/personal/positron/results/selfrec-playback.jsonl
-selfrec-collector on :8894 -> ~/personal/positron/results/selfrec-playback.jsonl
