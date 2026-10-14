@@ -1052,8 +1052,9 @@ export function createKeyboard(host, {
     ratioEl.style.minWidth = `${RATIO_CH}ch`;
     padStart.append(tempoEl, ratioEl);
   }
-  const panicBtn = make('button', '', 'Panic', {
-    type: 'button', title: 'stop every note that is still sounding',
+  // `Stop` since 2026-10-14 (was `Panic`): it stops every note and every loop.
+  const panicBtn = make('button', '', 'Stop', {
+    type: 'button', title: 'stop every note and every loop',
   });
   panicBtn.onclick = () => api.panic();
   /**
@@ -2004,8 +2005,12 @@ export function createKeyboard(host, {
       for (const t of touches.values()) if (t.raf) cancelAnimationFrame(t.raf);
       touches.clear();
       for (const k of [...held]) release(k, 'panic');
-      /* A loop's notes past the keys are not in `held`, so they are let go here.
-         The loop itself keeps going: `Panic` stops notes, not loops (see `offerLoop`). */
+      /* Every loop stops too (asked 2026-10-14, *"stop loops"*), through the same
+         walk `offerLoop(false)` uses, so the Loop button and `onLoop` follow. */
+      for (let i = 0; i < SLOTS; i++) {
+        if (machine.state(i) === 'recording') { machine.press(i); machine.settle(i); }
+        if (machine.state(i) === 'looping') { machine.press(i); machine.settle(i); }
+      }
       for (const t of takes) {
         for (const n of t.notes) onUp(n, 'panic');
         t.notes.clear();

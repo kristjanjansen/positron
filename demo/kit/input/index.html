@@ -2862,10 +2862,10 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
          this check needed no change at all. `Loop` can leave the row and come
          back under `offerLoop` and these three still find themselves. */
       const off = [...kpad.querySelectorAll('button')]
-        .find((e) => /panic/i.test(e.textContent))?.getBoundingClientRect();
+        .find((e) => /^stop$/i.test(e.textContent.trim()))?.getBoundingClientRect();
       const gap = lp && sus ? Math.round(sus.left - lp.right) : -1;
       const gap2 = sus && off ? Math.round(off.left - sus.right) : -1;
-      d.assert('Loop, Sustain and Panic sit in that order, tight against each other',
+      d.assert('Loop, Sustain and Stop sit in that order, tight against each other',
         !!(sus && lp && off) && lp.left < sus.left && sus.left < off.left
           && Math.abs(sus.top - lp.top) < 1
           && gap >= 0 && gap <= 12 && gap2 >= 0 && gap2 <= 12,

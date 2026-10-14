@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Panic stops loops too, and gets a better name**~~ (2026-10-14, DONE: `Stop`, chosen *"stop all => stop"*). Asked: *"stop loops. find better name for panic."* `demo/shell/keyboard.mjs` panic().
+
 - **Profile images for GitHub and YouTube as files** (2026-10-14). Asked: *"do profile images for gh and yt. i did isnta already"*. Same pipeline as the Instagram avatar (share-card.mjs, og/render.mjs): GitHub square at 460, YouTube circle crop at 800.
 
 - ~~**Skills: the hand-written diagram is not a new-page tool any more**~~ (2026-10-14, DONE). Said: *"diagram is not part of new page templates any ore, it lives in a kit and archived pages. it might come back maybe."* Note it in positron-diagram and the CLAUDE.md trigger row.
