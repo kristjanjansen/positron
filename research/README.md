@@ -2,15 +2,17 @@
 
 Every research document in this folder, with the status measured against the repository on 2026-10-14. Each file carries the same status as one line under its title, with the evidence for it, except the verbatim score, which is kept as supplied. For research, `done` means the question was answered and acted on, `done (reference)` means a reference or measurement record with nothing to build, and `open` means what it recommends was not acted on. The scripts in `tools/` are not documents and are not listed.
 
-82 documents, counted 2026-10-14. By status:
+76 documents, counted 2026-10-14 after the consolidation that day (`plans/plan-consolidate-docs-2026-10-14.md`, steps 2 and 3). The table lists 83 rows: one new merged document (`radio1965-2026-09.md`), 6 rows merged into other documents and 1 moved to `archive/plans/`, and each of those 7 paths here is now a three line stub naming where it went. By status, stubs not counted:
 
 | status | documents |
 | --- | --- |
 | done | 42 |
-| done (reference) | 25 |
-| partly done | 6 |
+| done (reference) | 21 |
+| partly done | 5 |
 | open | 5 |
-| retired | 4 |
+| retired | 3 |
+| stub: merged | 6 |
+| stub: moved to archive/plans/ | 1 |
 
 | file | subject | status | date |
 | --- | --- | --- | --- |
@@ -37,18 +39,18 @@ Every research document in this folder, with the status measured against the rep
 | [err-live-feeds-2026-08.md](err-live-feeds-2026-08.md) | ERR live feeds measured | done | 2026-08-27 |
 | [err-remixer-2026-08.md](err-remixer-2026-08.md) | ERR year chord remixer | retired | 2026-08-27 |
 | [err-stage-theatre-2026-09-18.md](err-stage-theatre-2026-09-18.md) | ERR stage and theatre catalogue | done (reference) | 2026-09-18 |
-| [evo-cc-smoothing-2026-09-23.md](evo-cc-smoothing-2026-09-23.md) | MK-425C rotary smoothing measured | done (reference) | 2026-09-23 |
-| [evo-mk425c-face-2026-09-21.md](evo-mk425c-face-2026-09-21.md) | MK-425C panel layout | done | 2026-09-21 |
+| [evo-cc-smoothing-2026-09-23.md](evo-cc-smoothing-2026-09-23.md) | MK-425C rotary smoothing measured | merged into [evo-mk425c-face-2026-09-21.md](evo-mk425c-face-2026-09-21.md) as its final section on 2026-10-14 (was done (reference)); a stub stays here | 2026-09-23 |
+| [evo-mk425c-face-2026-09-21.md](evo-mk425c-face-2026-09-21.md) | MK-425C panel layout, with the rotary smoothing measurement (done, reference) as its final section | done | 2026-09-21 |
 | [fasttrack-capture-2026-09-21.md](fasttrack-capture-2026-09-21.md) | Circuit capture via Fast Track | done | 2026-09-21 |
-| [free-live-tv-sources-2026-10-05.md](free-live-tv-sources-2026-10-05.md) | free live TV for now | retired | 2026-10-05 |
+| [free-live-tv-sources-2026-10-05.md](free-live-tv-sources-2026-10-05.md) | free live TV for now | moved to [archive/plans/free-live-tv-sources-2026-10-05.md](../archive/plans/free-live-tv-sources-2026-10-05.md) on 2026-10-14 (was retired); a stub stays here | 2026-10-05 |
 | [glued-containers-2026-09-26.md](glued-containers-2026-09-26.md) | glued surfaces industry survey | done | 2026-09-26 |
 | [hammond-samples-2026-09-23.md](hammond-samples-2026-09-23.md) | Hammond organ sample sets | open | 2026-09-23 |
 | [hardware-board.md](hardware-board.md) | Smallest box that plays MIDI | done | 2026-09-20 |
 | [held-in-human-score-2026-09-19.txt](held-in-human-score-2026-09-19.txt) | Held in Human score, verbatim | done (reference) | 2026-09-19 |
 | [idaidaida-2026-09.md](idaidaida-2026-09.md) | IDA Radio live feed | done | 2026-09-15 |
 | [kurenniemi-archive-2026-08.md](kurenniemi-archive-2026-08.md) | Kurenniemi public sources probe | done (reference) | 2026-08-28 |
-| [kurenniemi-audio-hunt-2026-09.md](kurenniemi-audio-hunt-2026-09.md) | Kurenniemi audio, what plays | partly done | 2026-09-15 |
-| [kurenniemi-sources-2026-09.md](kurenniemi-sources-2026-09.md) | Other digitised Kurenniemi sources | done | 2026-09-14 |
+| [kurenniemi-audio-hunt-2026-09.md](kurenniemi-audio-hunt-2026-09.md) | Kurenniemi audio, what plays | merged into [kurenniemi-sources-2026-09.md](kurenniemi-sources-2026-09.md) as its final section on 2026-10-14 (was partly done); a stub stays here | 2026-09-15 |
+| [kurenniemi-sources-2026-09.md](kurenniemi-sources-2026-09.md) | Other digitised Kurenniemi sources, with the audio hunt (partly done) as its final section | done | 2026-09-14 |
 | [layout-systems-2026-09-26.md](layout-systems-2026-09-26.md) | Layout primitives as system | done | 2026-09-26 |
 | [loops-prior-art-2026-08.md](loops-prior-art-2026-08.md) | Loop wrap prior art | done | 2026-08-28 |
 | [mattiisen-kirjutusmasinakontsert-2026-10-11.md](mattiisen-kirjutusmasinakontsert-2026-10-11.md) | Mattiisen Typewriter Concerto prior art | done (reference) | 2026-10-11 |
@@ -68,8 +70,9 @@ Every research document in this folder, with the status measured against the rep
 | [playasynth-measurement-2026-08.md](playasynth-measurement-2026-08.md) | Play-a-Synth latency attempt | done (reference) | 2026-08-28 |
 | [quest-xr-2026-09.md](quest-xr-2026-09.md) | Meta Quest 3S buying question | done | 2026-09-11 |
 | [radio-tallinn-1965-2026-08.md](radio-tallinn-1965-2026-08.md) | Radio Tallinn 1965 theses | done (reference) | 2026-08-27 |
-| [radio1965-app-2026-09.md](radio1965-app-2026-09.md) | Tarmo's radio app internals | done (reference) | 2026-09-14 |
-| [radio1965-server-2026-09-15.md](radio1965-server-2026-09-15.md) | U: radio server measured | done | 2026-09-15 |
+| [radio1965-2026-09.md](radio1965-2026-09.md) | Tarmo's radio app read and its U: server measured, merged 2026-10-14 | done | 2026-09-14 |
+| [radio1965-app-2026-09.md](radio1965-app-2026-09.md) | Tarmo's radio app internals | merged into [radio1965-2026-09.md](radio1965-2026-09.md) as section 1 on 2026-10-14 (was done (reference)); a stub stays here | 2026-09-14 |
+| [radio1965-server-2026-09-15.md](radio1965-server-2026-09-15.md) | U: radio server measured | merged into [radio1965-2026-09.md](radio1965-2026-09.md) as section 2 on 2026-10-14 (was done); a stub stays here | 2026-09-15 |
 | [rhodes-packs-2026-09-23.md](rhodes-packs-2026-09-23.md) | free Rhodes sample packs | done | 2026-09-23 |
 | [scsynth-live-input-2026-09.md](scsynth-live-input-2026-09.md) | browser audio into scsynth | retired | 2026-09-14 |
 | [scsynth-sampler-in-browser-2026-10-11.md](scsynth-sampler-in-browser-2026-10-11.md) | scsynth sampler versus WebAudio | done | 2026-10-11 |
@@ -82,9 +85,9 @@ Every research document in this folder, with the status measured against the rep
 | [synthdef-size-limit-2026-09.md](synthdef-size-limit-2026-09.md) | SynthDef 64 KiB ceiling | done | 2026-09-13 |
 | [tempo-key-eval-2026-10-12.md](tempo-key-eval-2026-10-12.md) | tempo and key evaluation | done | 2026-10-12 |
 | [timecode-sync-2026-08.md](timecode-sync-2026-08.md) | wall clock timecode survey | done (reference) | 2026-08-26 |
-| [timeline-art-prior-art.md](timeline-art-prior-art.md) | timeline artistic prior art | done (reference) | 2026-08-26 |
-| [timeline-own-prior-art-2026-08.md](timeline-own-prior-art-2026-08.md) | own timeline prior art | done (reference) | 2026-08-27 |
-| [timeline-prior-art-2026-08.md](timeline-prior-art-2026-08.md) | universal timeline prior art | done (reference) | 2026-08-26 |
+| [timeline-art-prior-art.md](timeline-art-prior-art.md) | timeline artistic prior art | merged into [timeline-own-prior-art-2026-08.md](timeline-own-prior-art-2026-08.md) as a section on 2026-10-14 (was done (reference)); a stub stays here | 2026-08-26 |
+| [timeline-own-prior-art-2026-08.md](timeline-own-prior-art-2026-08.md) | own timeline prior art, with the technical and the artistic prior art surveys as sections | done (reference) | 2026-08-27 |
+| [timeline-prior-art-2026-08.md](timeline-prior-art-2026-08.md) | universal timeline prior art | merged into [timeline-own-prior-art-2026-08.md](timeline-own-prior-art-2026-08.md) as a section on 2026-10-14 (was done (reference)); a stub stays here | 2026-08-26 |
 | [typewriter-samples-2026-10-11.md](typewriter-samples-2026-10-11.md) | free typewriter sample survey | done | 2026-10-11 |
 | [ui-corrections-taxonomy-2026-09-26.md](ui-corrections-taxonomy-2026-09-26.md) | UI corrections taxonomy | done | 2026-09-26 |
 | [ui-video-capture-2026-10-14.md](ui-video-capture-2026-10-14.md) | UI video capture for Instagram | open | 2026-10-14 |
