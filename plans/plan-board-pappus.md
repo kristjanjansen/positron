@@ -257,7 +257,7 @@ and the board has not started. Sequenced, not simultaneous, and that is the one
 thing to know before shipping the page without the board.
 
     cd rig/board && ./push.sh                 # finds the board, writes /opt, restarts
-    ssh positron@<ip> md5sum /opt/positron-board/rig/board/board.mjs
+    ssh <user>@<pi> md5sum /opt/positron-board/rig/board/board.mjs
     md5 -q rig/board/board.mjs                  # the two must match
 
 ⚠️ **THE SERVICE RUNS FROM `/opt/positron-board/`, NOT FROM `~/positron`.**

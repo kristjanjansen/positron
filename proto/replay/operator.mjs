@@ -8,8 +8,9 @@
 // persist VERBATIM (the DO never re-stamps them; its clock is untrusted).
 // Usage: BASE_MS=<epoch ms> [ROOM=replay-test] [OUT=…/operator-log.json] node operator.mjs
 import fs from "fs";
+import path from "node:path";
 
-const ROOT = "~/personal/positron";
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const ENV = fs.readFileSync(`${ROOT}/.env`, "utf8").split("\n");
 const TOKEN = ENV.find(l => l.startsWith("ROOM_TOKEN=")).slice(11).trim();
 const OP_TOKEN = (ENV.find(l => l.startsWith("OPERATOR_TOKEN=")) || "").slice(15).trim();

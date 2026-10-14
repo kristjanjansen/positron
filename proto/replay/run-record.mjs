@@ -11,12 +11,14 @@
 //   node run-record.mjs                       # full 200 s recorded run
 //   NOPUB=1 DURATION=30 OFFSETS=6,10,14 node run-record.mjs   # no-stream smoke
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync, spawn } from "child_process";
 
-const ROOT = "~/personal/positron";
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const HERE = `${ROOT}/proto/replay`;
 const BASE = "http://127.0.0.1:8885";
 const REMOTE = "https://rtc.positron.studio";
@@ -28,7 +30,7 @@ const ROOM = process.env.ROOM || `replay-test-${RUNTS}`;
 const NOPUB = process.env.NOPUB === "1";
 const DURATION_S = parseInt(process.env.DURATION || "200", 10);
 const POLL_S = parseInt(process.env.POLL_S || "300", 10);
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/replay-test-udd";
+const UDD_BASE = path.join(process.env.SCRATCH || os.tmpdir(), "replay-test-udd");
 const LOGDIR = `${HERE}/logs`;
 fs.mkdirSync(LOGDIR, { recursive: true });
 fs.mkdirSync(`${HERE}/artifacts`, { recursive: true });

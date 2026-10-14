@@ -12,9 +12,10 @@
  *   node rig/do-lag.mjs [wss://...] [n]
  */
 import { readFileSync } from 'fs';
+import path from "node:path";
 const cuesToken = () => {
   try {
-    const l = readFileSync('~/personal/positron/.env', 'utf8')
+    const l = readFileSync(path.resolve(import.meta.dirname, "../.env"), 'utf8')
       .split('\n').find((x) => x.startsWith('CUES_TOKEN='));
     return l ? l.slice(11).trim() : '';
   } catch { return ''; }

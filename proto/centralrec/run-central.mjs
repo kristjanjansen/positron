@@ -13,7 +13,9 @@
 //   SCENARIO=b2    N=4|12 DUR_S=60 LABEL=b2n4 node run-central.mjs
 //   SCENARIO=b3    N=8 DUR_S=90 KILL_AT_S=30 REJOIN_AFTER_S=10 node run-central.mjs
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync, spawn } from "child_process";
@@ -29,13 +31,13 @@ const SIMUL = process.env.SIMUL === "1";
 const REMOTE_URL = process.env.REMOTE_URL || "https://rtc.positron.studio";
 const PORT = 8893;
 const BASE = `http://127.0.0.1:${PORT}`;
-const HERE = "~/personal/positron/proto/centralrec";
-const ROOT = "~/personal/positron";
+const HERE = import.meta.dirname;
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const LOGDIR = `${HERE}/logs`;
 const ROOM = `centralrec-${LABEL}-${Date.now().toString(36)}`;   // fresh per run (rerun-poison rule)
 const RESULTS = `${ROOT}/results/centralrec-${LABEL}.jsonl`;
 const RECDIR = `${HERE}/recordings/${LABEL}`;
-const UDD_BASE = `/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/centralrec-udd-${LABEL}`;
+const UDD_BASE = `${process.env.SCRATCH || os.tmpdir()}/centralrec-udd-${LABEL}`;
 fs.mkdirSync(LOGDIR, { recursive: true });
 fs.mkdirSync(RECDIR, { recursive: true });
 

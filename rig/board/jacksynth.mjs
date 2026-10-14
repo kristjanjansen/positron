@@ -614,7 +614,7 @@ export function jackSynthAvailable(name) {
 // 🔴 NOTHING ON THIS BOARD EVER REPORTED THE JACK AUDIO GRAPH, AND THAT IS
 // WHERE ITS LEVEL FAULTS LIVE. `ports.get` answers with the ALSA SEQUENCER,
 // which is MIDI, so the audio path was visible only over ssh. The board dials
-// OUT to the relay and answers verbs from any network; `ssh positron@…` needs
+// OUT to the relay and answers verbs from any network; `ssh <user>@<pi>` needs
 // the studio LAN. So on 2026-09-17 the output peak fell from 0.0445 to 0.0010,
 // about 40x, with the page, the MIDI level and the instrument each ruled out by
 // measurement, and the one remaining suspect was the one thing nobody outside

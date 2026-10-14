@@ -4,9 +4,10 @@
 // project twice) to the RESULTS jsonl. One collector per scenario run.
 // Env: RESULTS (jsonl path, required). Port fixed at 8894 (selfrec's port).
 import http from "http";
+import path from "node:path";
 import fs from "fs";
 
-const HERE = "~/personal/positron/proto/selfrec";
+const HERE = import.meta.dirname;
 const RESULTS = process.env.RESULTS;
 const PORT = 8894;
 if (!RESULTS) { console.error("collector: RESULTS env required"); process.exit(1); }
@@ -41,11 +42,11 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url.startsWith("/timeline/")) {
     const rel = req.url.split("?")[0].replace(/^\/+/, "").replace(/\.\./g, "");
     res.writeHead(200, { "content-type": "text/javascript", "cache-control": "no-store", ...cors });
-    return res.end(fs.readFileSync(`~/personal/positron/${rel}`));
+    return res.end(fs.readFileSync(`${path.resolve(import.meta.dirname, "../..")}/${rel}`));
   }
   if (req.method === "GET" && req.url === "/hls.min.js") {   // vendored (proto/flipper), 1.7.1
     res.writeHead(200, { "content-type": "text/javascript", ...cors });
-    return res.end(fs.readFileSync("~/personal/positron/proto/flipper/hls.min.js"));
+    return res.end(fs.readFileSync(path.resolve(import.meta.dirname, "../flipper/hls.min.js")));
   }
   if (req.method === "POST" && req.url === "/beacon") {
     const chunks = [];

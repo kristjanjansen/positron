@@ -14,7 +14,9 @@
 import { spawn, execFileSync } from 'node:child_process';
 
 const HOST = process.env.M1_HOST || 'mbp';
-const LAN_RELAY = 'https://<mbp>:4443';
+// The LAN relay's address is read from the environment, never written here:
+// LAN_RELAY=https://<lan-ip>:4443 (the M1's address on the studio LAN).
+const LAN_RELAY = process.env.LAN_RELAY || '';
 const LAN_PUB = 'https://127.0.0.1:4443';
 const CERT = process.env.MOQ_CERT || '816dec73811a251e2ab4eae785c1641f5c319e2b31e51f44e2c284b6f297f5cd';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -30,6 +32,7 @@ const CONFIGS = [
 
 function launch(cfg, relay) {
   const args = ['--ableton', '--latencyMax', cfg.latencyMax, '--groupMs', cfg.groupMs, '--frameUs', cfg.frameUs];
+  if (relay === 'lan' && !LAN_RELAY) throw new Error('set LAN_RELAY=https://<lan-ip>:4443 for the LAN rows');
   if (relay === 'lan') args.push('--relay', LAN_PUB, '--relay-for', LAN_RELAY, '--cert', CERT);
   const remote = `export PATH=/opt/homebrew/bin:$PATH; cd ~/positron
     pkill -f 'pro-synth-udd' 2>/dev/null; pkill -f launch-synth 2>/dev/null; sleep 2

@@ -57,7 +57,7 @@ the same pixels).
 | --- | --- | --- |
 | model | **Raspberry Pi 4 Model B Rev 1.5**, 4 cores, 1.8 GHz, 1,847 MB | MEASURED 2026-10-11, `plans/plan-sampler-pi-pico.md:91`; also `plans/plan-board-modulation.md:103` |
 | OS | Debian 13 trixie, aarch64, apt from `archive.raspberrypi.com trixie` (so Raspberry Pi OS packages and overlays) | MEASURED 2026-10-11, `plan-sampler-pi-pico.md:92,97` |
-| address | `positron@<pi>`, site `pi-1`, room `studio-1` | `HANDOFF.md` session 74; `demo/shell/graph-registry.mjs:40` (`BOARD_SITE = 'pi-1'`) |
+| address | `<user>@<pi>`, site `pi-1`, room `studio-1` | `HANDOFF.md` session 74; `demo/shell/graph-registry.mjs:40` (`BOARD_SITE = 'pi-1'`) |
 | service | `positron-board.service`, `User=positron`, runs `/opt/positron-board/rig/board/board.mjs`, `NoNewPrivileges=true`, no other hardening | `rig/board/positron-board.service` |
 | audio | **all USB**: Fast Track Pro 0763:2012 and the Circuit 1235:0079 behind a VIA hub, a Logitech C925e camera, all USB | MEASURED 2026-10-11, `plan-sampler-pi-pico.md:103` |
 | JACK | `jackd -r -d alsa -C hw:CARD=Pro,DEV=0 -r 48000 -p 512 -n 3`, capture only, 10.7 ms a period | MEASURED 2026-10-11, `plan-sampler-pi-pico.md:98,105-108` |

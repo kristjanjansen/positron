@@ -5,7 +5,7 @@ Status (2026-10-14): done. Yoshimi is archived in archive/yoshimi/README.md and 
 Written 2026-10-13. Asked: *"also make plan how to archive and discard yoshimi
 from pi"*. PLAN ONLY: nothing in the repository was changed and nothing on the
 Pi was changed. The VPN was off (`route -n get 8.8.8.8` said `en0`), so the
-board was read over ssh (`positron@<pi>`) and over the relay
+board was read over ssh (`<user>@<pi>`) and over the relay
 (`studio-1`), read-only.
 
 Tags: **MEASURED** (read off the Pi or the relay today, with the command),
@@ -227,12 +227,12 @@ node rig/board/ask.mjs --room studio-1 voices.list '{"source":"yoshimi"}' > arch
 
 # 1b. the config, into the repo
 mkdir -p archive/yoshimi/config
-scp positron@<pi>:'.config/yoshimi/*' archive/yoshimi/config/
-ssh positron@<pi> 'cd ~/.config/yoshimi && sha256sum *' > /tmp/pi.sha
+scp <user>@<pi>:'.config/yoshimi/*' archive/yoshimi/config/
+ssh <user>@<pi> 'cd ~/.config/yoshimi && sha256sum *' > /tmp/pi.sha
 (cd archive/yoshimi/config && sha256sum *) | diff - /tmp/pi.sha && echo config-ok
 
 # 1c. the whole state, to R2
-ssh positron@<pi> 'tar -C ~ -czf - .config/yoshimi .local/share/yoshimi' > yoshimi-state.tar.gz
+ssh <user>@<pi> 'tar -C ~ -czf - .config/yoshimi .local/share/yoshimi' > yoshimi-state.tar.gz
 shasum -a 256 yoshimi-state.tar.gz                     # write into archive/yoshimi/README.md
 tar -tzf yoshimi-state.tar.gz | wc -l                  # expect about 977 (974 + 3)
 env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN npx wrangler r2 object put \
@@ -316,7 +316,7 @@ node rig/board/test.mjs
 node rig/audit.mjs box                    # yoshimi no longer required
 # ONLY after the camera agent's rig/board work is committed:
 rig/board/push.sh <pi>
-ssh positron@<pi> md5sum /opt/positron-board/rig/board/{board,jacksynth}.mjs
+ssh <user>@<pi> md5sum /opt/positron-board/rig/board/{board,jacksynth}.mjs
 ```
 
 Verify: the md5s match the checkout; `board.alive` on `studio-1` lists **no**
@@ -329,14 +329,14 @@ reach ready and sound, one press each with `?board=1`.
 ### Step 4: purge on the Pi (a day after step 3)
 
 ```sh
-ssh positron@<pi> 'free -m; df -h /; ps -eo rss,pcpu,args --sort=-rss | head -8' > before.txt
-ssh positron@<pi> 'pgrep -a yoshimi'          # must print nothing
-ssh positron@<pi> 'apt-get -s purge yoshimi yoshimi-data yoshimi-doc libfltk1.3t64 libfltk-images1.3t64 libmxml1 libxft2'
+ssh <user>@<pi> 'free -m; df -h /; ps -eo rss,pcpu,args --sort=-rss | head -8' > before.txt
+ssh <user>@<pi> 'pgrep -a yoshimi'          # must print nothing
+ssh <user>@<pi> 'apt-get -s purge yoshimi yoshimi-data yoshimi-doc libfltk1.3t64 libfltk-images1.3t64 libmxml1 libxft2'
 #   read that list. Anything beyond these seven: stop and ask.
-ssh positron@<pi> 'sudo apt-get purge -y yoshimi yoshimi-data yoshimi-doc libfltk1.3t64 libfltk-images1.3t64 libmxml1 libxft2'
-ssh positron@<pi> 'rm -r ~/.config/yoshimi ~/.local/share/yoshimi'
-ssh positron@<pi> 'sudo systemctl restart positron-board'
-ssh positron@<pi> 'free -m; df -h /; ps -eo rss,pcpu,args --sort=-rss | head -8' > after.txt
+ssh <user>@<pi> 'sudo apt-get purge -y yoshimi yoshimi-data yoshimi-doc libfltk1.3t64 libfltk-images1.3t64 libmxml1 libxft2'
+ssh <user>@<pi> 'rm -r ~/.config/yoshimi ~/.local/share/yoshimi'
+ssh <user>@<pi> 'sudo systemctl restart positron-board'
+ssh <user>@<pi> 'free -m; df -h /; ps -eo rss,pcpu,args --sort=-rss | head -8' > after.txt
 ```
 
 Verify: `command -v yoshimi` empty; `dpkg -l | grep -i yoshimi` empty; the
@@ -371,7 +371,7 @@ From any step:
 
 1. Step 4 undone: `sudo apt-get install yoshimi yoshimi-data` (2.3.3.3-1 is
    still the trixie candidate, MEASURED `apt-cache policy`), then restore the
-   config: `scp archive/yoshimi/config/* positron@<pi>:.config/yoshimi/`
+   config: `scp archive/yoshimi/config/* <user>@<pi>:.config/yoshimi/`
    (or untar the R2 tarball into `~`). Yoshimi rebuilds `found/` on first run.
 2. Step 3 undone: `git revert` the board commit and `push.sh`. The
    `JACK_SYNTHS.yoshimi` entry and `yoshimi.mjs` come back together.

@@ -8,6 +8,7 @@
 //   node run-measure.mjs resil-cycle      StopStream/StartStream cycle timing
 //   node run-measure.mjs resil-restart    docker restart -> time back to pixels at the sink
 import { spawn, execFile } from "node:child_process";
+import os from "node:os";
 import { appendFileSync, writeFileSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -17,7 +18,7 @@ const execP = promisify(execFile);
 const now = () => performance.timeOrigin + performance.now();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const resultsDir = fileURLToPath(new URL("../../results/", import.meta.url));
-const scratch = "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/";
+const scratch = (process.env.SCRATCH || os.tmpdir()).replace(/\/?$/, "/");
 const RTMP_READ = "rtmp://127.0.0.1:1935/obsdock";
 const W = 1280, H = 720, FRAME = W * H * 3;
 const NBLOCKS = 56, BLOCK_W = 20, ROW_X = 40, ROW_Y = 100, ROW_H = 80;

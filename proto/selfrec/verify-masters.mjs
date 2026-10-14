@@ -13,14 +13,16 @@
 //     T0 + t (the linear wall mapping), bytes fetched per seek vs full file.
 // ============================================================================
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync, spawn } from "child_process";
 
-const ROOT = "~/personal/positron";
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const HERE = `${ROOT}/proto/selfrec`;
-const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
+const SCRATCH = (process.env.SCRATCH || os.tmpdir());
 const SHOW = process.env.SHOW || "sync-20260827T093613";
 const RESULTS = `${ROOT}/results/selfrec-playback.jsonl`;
 const UDD = `${SCRATCH}/selfrec-udd-masters`;

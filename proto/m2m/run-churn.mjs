@@ -14,16 +14,18 @@
 //             outage->restored per probe tile
 // Kills ONLY our own chromes (udd prefix m2m-churn-udd — sibling uses m2m-udd).
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync } from "child_process";
 
 const MODE = process.env.MODE || "happy";
 const BASE = "http://127.0.0.1:8896";
-const HERE = "~/personal/positron/proto/m2m";
+const HERE = import.meta.dirname;
 const LOGDIR = `${HERE}/logs`;
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-churn-udd";
+const UDD_BASE = path.join(process.env.SCRATCH || os.tmpdir(), "m2m-churn-udd");
 fs.mkdirSync(LOGDIR, { recursive: true });
 
 const CFG = {

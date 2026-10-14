@@ -435,7 +435,7 @@ ffprobe -hide_banner -i /tmp/ida.aac
 ffmpeg -hide_banner -i /tmp/ida.aac -af volumedetect -f null -   # against a silence control
 
 # the blocker, and its control
-node -e "import('~/personal/positron/demo/shell/mp3-frames.mjs').then(m=>{
+node -e "import('./demo/shell/mp3-frames.mjs').then(m=>{
   const b=new Uint8Array(require('fs').readFileSync('/tmp/ida.aac'));
   console.log('AAC frames found:', m.frameStarts(b,0).frames.length); })"
 ```

@@ -1,10 +1,11 @@
 // Runs a key core (the page's, or cand-core.js) over cached spectra.
 //   node run.mjs <name> [--page] [--opts json]  -> readings JSON on stdout
 import { readFileSync } from 'node:fs';
+import path from "node:path";
 const D = (process.env.KD2 ?? '/tmp/kd2') + '/';
 export function loadCore(page) {
   let src;
-  if (page) { const h = readFileSync('~/personal/positron/demo/radio/key/index.html', 'utf8'); src = h.slice(h.indexOf('// KEY CORE BEGIN'), h.indexOf('// KEY CORE END')); }
+  if (page) { const h = readFileSync(path.resolve(import.meta.dirname, "../../../../demo/radio/key/index.html"), 'utf8'); src = h.slice(h.indexOf('// KEY CORE BEGIN'), h.indexOf('// KEY CORE END')); }
   else src = readFileSync(new URL('cand-core.js', import.meta.url), 'utf8');
   return new Function(`${src}\nreturn { keyCreate, keyFrame, keyRead };`)();
 }

@@ -199,7 +199,7 @@ is('the site is allowed, with and without www',
   allowedOrigin('https://positron.studio') && allowedOrigin('https://www.positron.studio'));
 is('a page served off this machine is allowed, on any port',
   allowedOrigin('http://127.0.0.1:8890') && allowedOrigin('http://localhost:3000')
-  && allowedOrigin('http://<lan-host>:8890'));
+  && allowedOrigin('http://192.168.0.20:8890'));
 is('a page this account deployed is allowed',
   allowedOrigin('https://elektron-view.kristjan-jansen.workers.dev'));
 

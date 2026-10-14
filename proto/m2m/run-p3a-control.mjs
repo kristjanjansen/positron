@@ -8,9 +8,10 @@
 // Results -> results/m2m-p3a-control.jsonl ; status -> logs/p3a-status.json
 // (poll THAT file, never park on notifications).
 import fs from "fs";
+import path from "node:path";
 import crypto from "crypto";
 
-const ROOT = "~/personal/positron";
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const HERE = `${ROOT}/proto/m2m`;
 const RESULTS = `${ROOT}/results/m2m-p3a-control.jsonl`;
 const STATUS = `${HERE}/logs/p3a-status.json`;

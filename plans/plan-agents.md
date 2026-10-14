@@ -284,8 +284,8 @@ an uncommitted tree is how you get the failure instead of the fix.
 
 **The one that mattered most was `verify-native.mjs:31`:**
 
-    const udd = '/private/tmp/claude-501/-Users-s32863-personal-elektron/
-                 d558ee42-19e7-4e7e-b95a-63e51b4c5e37/scratchpad/native-udd';
+    const udd = '/private/tmp/claude-501/<checkout>/
+                 <session>/scratchpad/native-udd';
 
 A **dead session's UUID**, under the repo's **pre-rename name**. Checked: the
 path does not exist. Chrome creates it, so the harness "works" and nothing ever
@@ -334,7 +334,7 @@ of the guards above can exist. Minimum useful contents:
 
 - **`settings.json`** — the §2 hooks, plus a permissions allowlist for the
   read-only commands this repo runs constantly (`node demo/verify.mjs …`,
-  `git status/diff/log`, `curl` at the relay's `/stats`, `ssh positron@… <read
+  `git status/diff/log`, `curl` at the relay's `/stats`, `ssh <user>@<pi> <read
   command>`). Three agents each prompting for `git diff` is three interruptions
   for the owner, which LESSONS #80 is precisely about: **the owner's attention
   is a shared resource and an agent spends it without meaning to.**

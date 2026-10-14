@@ -10,6 +10,7 @@
 //   node run-moq.mjs player <ns> [relay] [secs]            headless-chrome player, report g2g
 //   node run-moq.mjs outputs                               GetOutputList (dual-output question)
 import { spawn, execFile } from "node:child_process";
+import os from "node:os";
 import { readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -19,7 +20,7 @@ const execP = promisify(execFile);
 const now = () => performance.timeOrigin + performance.now();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const resultsDir = fileURLToPath(new URL("../../results/", import.meta.url));
-const scratch = "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/";
+const scratch = (process.env.SCRATCH || os.tmpdir()).replace(/\/?$/, "/");
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const PLAYER = "https://moq.positron.studio/";
 

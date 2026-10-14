@@ -38,7 +38,9 @@ import { compileCsound } from '../csound.mjs';
 // two outputs are identical on both machines.
 //
 // ⚠️ `-n` is no audio, so this is a compiler comparison and never a render.
-const HOST = process.env.CSOUND_HOST || 'positron@<pi>';
+// The Pi is named by the environment and never written here: CSOUND_HOST or
+// PI_HOST=<user>@<pi>. With neither set and no local csound, the check skips.
+const HOST = process.env.CSOUND_HOST || process.env.PI_HOST || '';
 const BIN = process.env.CSOUND_BIN || 'csound';
 
 // An orchestra is required even though nothing is rendered. Sorting happens
@@ -68,6 +70,7 @@ function sortedScore(text) {
   const local = spawnSync('sh', ['-c', 'command -v csound'], { encoding: 'utf8' });
   const r = local.status === 0
     ? spawnSync('sh', ['-s'], { input: script, encoding: 'utf8' })
+    : !HOST ? { status: 255 }
     : spawnSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', HOST, 'sh -s'],
       { input: script, encoding: 'utf8' });
   if (r.error || r.status === 255) return null;
@@ -140,7 +143,8 @@ if (!files.length) {
 }
 
 if (!referenceWorks()) {
-  console.log(`SKIPPED: no csound here and ${HOST} is not answering`);
+  console.log(HOST ? `SKIPPED: no csound here and ${HOST} is not answering`
+    : 'SKIPPED: no csound here and no Pi named. Set PI_HOST=<user>@<pi> (or CSOUND_HOST) to use one.');
   process.exit(0);                 // a check nobody can run is a check nobody runs
 }
 

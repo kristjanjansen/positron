@@ -6,11 +6,12 @@ checksum-valid decodes only, per-pair warmup skip (argv[2], default 10 s from
 that pair's first sample — pairs come up at different times as the mesh builds).
 """
 import json
+import os
 import sys
 import statistics as st
 from collections import defaultdict
 
-PATH = sys.argv[1] if len(sys.argv) > 1 else "~/personal/positron/results/m2m-sfu.jsonl"
+PATH = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../results/m2m-sfu.jsonl")
 WARMUP_S = float(sys.argv[2]) if len(sys.argv) > 2 else 10.0
 
 samples, stats_rows, events, cpu_rows, mesh_rows = [], [], [], [], []

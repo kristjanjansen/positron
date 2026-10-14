@@ -28,11 +28,13 @@
 // Emits a JSON report on stdout (last line) + appends to results jsonl.
 // ============================================================================
 import fs from "fs";
+import os from "node:os";
+import path from "node:path";
 import { spawnSync } from "child_process";
 
-const ROOT = "~/personal/positron";
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const HERE = `${ROOT}/proto/selfrec`;
-const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
+const SCRATCH = (process.env.SCRATCH || os.tmpdir());
 const BASE = "https://selfrec.positron.studio";
 const PUB = "https://archive.positron.studio";
 

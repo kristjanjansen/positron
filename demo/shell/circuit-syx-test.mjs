@@ -39,7 +39,7 @@ const CANDIDATES = [
   // directory git never sees cannot be swept by a clean.
   path.join(HERE, '../../tmp/purchages'),
   path.join(HERE, '../../tmp/packs'),
-  '/private/tmp/claude-501/-Users-s32863-personal-positron/7ece5d66-afd6-4d4c-9d1b-db3bd7f3b538/scratchpad/pull',
+  ...(process.env.SCRATCH ? [path.join(process.env.SCRATCH, 'pull')] : []),
 ];
 const PULL = CANDIDATES.find((d) => fs.existsSync(d) && files.some((f) => fs.existsSync(path.join(d, f))))
   || CANDIDATES[0];

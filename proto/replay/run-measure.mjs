@@ -12,16 +12,18 @@
 //      rewind (later cues cleared to pending) and re-fire on the way back up.
 // All assertions programmatic; report -> artifacts/replay-report.json.
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync } from "child_process";
 
-const ROOT = "~/personal/positron";
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const HERE = `${ROOT}/proto/replay`;
 const BASE = "http://127.0.0.1:8885";
 const REMOTE = "https://rtc.positron.studio";
-const UDD = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/replay-test-udd-measure";
+const UDD = path.join(process.env.SCRATCH || os.tmpdir(), "replay-test-udd-measure");
 const LOGDIR = `${HERE}/logs`;
 
 function envVal(k) {

@@ -541,7 +541,7 @@ could measure*, and never let "no timer" collapse into "0 ms" — CLAUDE.md:
 
 ## 3. The Raspberry Pi 4B — MEASURED, on the board, today
 
-Board: `positron@<pi>`, **Raspberry Pi 4 Model B Rev 1.5**, revision
+Board: `<user>@<pi>`, **Raspberry Pi 4 Model B Rev 1.5**, revision
 `b03115`. All of the following was taken **with `positron-board` running** —
 jackd, jack-dssi-host/hexter, scsynth/Pappus, sclang and ffmpeg all live — and
 the service was never stopped. Contention is reported rather than removed,

@@ -38,8 +38,9 @@
 // module: await indexParticipant({ show, pid, blocks?, results? })
 // ============================================================================
 import fs from "fs";
+import path from "node:path";
 
-const ROOT = "~/personal/positron";
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const HERE = `${ROOT}/proto/selfrec`;
 const BASE = "https://selfrec.positron.studio";
 const PUB = "https://archive.positron.studio";

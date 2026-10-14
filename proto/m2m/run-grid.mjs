@@ -19,7 +19,9 @@
 //   SMOKE=1 node run-grid.mjs
 //   LABEL=main DURATION=120 node run-grid.mjs
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync } from "child_process";
@@ -31,15 +33,15 @@ const LABEL = process.env.LABEL || (SMOKE ? "smoke" : "main");
 const DURATION_S = parseInt(process.env.DURATION || (SMOKE ? "30" : "120"), 10);
 const BASE = "http://127.0.0.1:8897";
 const ROOM = `grid-${LABEL}`;
-const HERE = "~/personal/positron/proto/m2m";
+const HERE = import.meta.dirname;
 const LOGDIR = `${HERE}/logs`;
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-grid-udd";
+const UDD_BASE = path.join(process.env.SCRATCH || os.tmpdir(), "m2m-grid-udd");
 const LS = 4;                 // live page size in the rig: 6 live -> pages of 4+2
 fs.mkdirSync(LOGDIR, { recursive: true });
 
 function roomToken(key = "ROOM_TOKEN") {   // token from .env (Worker auth; never committed)
   try {
-    const line = fs.readFileSync("~/personal/positron/.env", "utf8")
+    const line = fs.readFileSync(path.resolve(import.meta.dirname, "../../.env"), "utf8")
       .split("\n").find(l => l.startsWith(key + "="));
     return line ? line.slice(key.length + 1).trim() : "";
   } catch (e) { return ""; }

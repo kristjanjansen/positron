@@ -290,7 +290,7 @@ slivers between them. **MEASURED**, and the surprise survived the check.
 - **apronus.com/music/onlinepiano.htm**: 404 at that URL. Not hunted for.
 - **quadibloc.com/other/cnv05.htm**, a page the search engine quotes on exactly
   this subject: **blocked by this machine's network**, which answered a
-  Check Point `UserCheck` portal redirect at `192.168.1.2` and then timed out.
+  Check Point `UserCheck` portal redirect at a LAN address and then timed out.
   Its substance is quoted second hand in the sources below and is not relied on
   for any number here.
 - **Native mobile apps and desktop DAWs: ANSWERED IN §5**, which was added on

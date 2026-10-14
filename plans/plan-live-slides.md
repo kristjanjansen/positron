@@ -523,7 +523,7 @@ Risks:
 ## 11. Measurement log, 2026-10-06
 
 All run from the scratchpad
-(`/private/tmp/claude-501/-Users-s32863-personal-positron/933a8596-18cd-4774-95f2-d3d822512b38/scratchpad`),
+(`<scratchpad>`),
 none of it in the repository. Chrome launched headless with a per-run profile
 in the scratchpad, killed with SIGKILL and its profile removed after each run;
 no profile was left behind (checked with `ls -d prof-*`).

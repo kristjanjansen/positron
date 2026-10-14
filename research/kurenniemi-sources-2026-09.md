@@ -1129,7 +1129,7 @@ measurement.
 
 ```sh
 # the playability breakdown, straight off the shipped corpus
-node -e "const c=require('~/personal/positron/demo/resources/corpus.json');
+node -e "const c=require('./demo/resources/corpus.json');
 const P=/\.(mp3|m4a|mp4|webm|ogg|opus|wav|aac)(\?|#|$)/i;
 const s=i=>{const h=i.http; if(h===403||(typeof h==='string'&&/DNS|ENOTFOUND/i.test(h)))return 'gone';
  if(i.file&&i.cors)return 'open'; if(i.file)return 'held'; return 'ref'};

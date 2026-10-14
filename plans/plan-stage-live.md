@@ -523,7 +523,7 @@ device that wants to watch. **That is the difference between a link that works
 tomorrow and a link that has to be handed over.**
 
 And the thing that makes selfrec the answer is not the key. It is
-`~/personal/positron/proto/selfrec/participant.html`, which already
+`proto/selfrec/participant.html`, which already
 implements **every one of the guarantees this ask asks for**:
 
 - **An IndexedDB elastic buffer.** A closed chunk is written to an object store

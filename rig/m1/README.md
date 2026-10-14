@@ -658,14 +658,14 @@ the work" — so the capture should be armed and NOT awaited by anything else.
     # on the M1
     cd ~/positron && git pull
     node demo/server.mjs &
-    MOQ_IP=<mbp> ~/lan-relay.sh run &          # fingerprint is printed
+    MOQ_IP=<m1-lan-ip> ~/lan-relay.sh run &          # fingerprint is printed
     node rig/m1/launch-synth.mjs --ableton \
       --relay https://127.0.0.1:4443 \
-      --relay-for https://<mbp>:4443 \
+      --relay-for https://<m1-lan-ip>:4443 \
       --cert <fingerprint>
 
     # from the dev Mac
-    LIVE_HOST=<mbp> node rig/m1/live-setup.mjs Drift 0
+    LIVE_HOST=<m1-lan-ip> node rig/m1/live-setup.mjs Drift 0
     node demo/server.mjs        # then open /rig/m1/play.html?room=proinst
 
 `IAC` survives reboots (it is a plist flag). Live's audio output device survives

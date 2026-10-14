@@ -5,13 +5,15 @@
 // (plan §4.2). Uses playwright 1.60.0 from the npx cache (chromium-1223 already
 // installed — no downloads).
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 
 const DURATION_S = parseInt(process.env.DURATION || "30", 10);
 const BASE = "http://127.0.0.1:8897";
-const LOGDIR = "~/personal/positron/rig/whep/logs";
+const LOGDIR = path.resolve(import.meta.dirname, "logs");
 fs.mkdirSync(LOGDIR, { recursive: true });
 
 const ARGS = [

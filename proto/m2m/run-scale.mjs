@@ -7,7 +7,9 @@
 // storm hits the SFU API within ~1 s; server.py's stderr logs every CF call.
 // Usage: N=8 DURATION=90 node run-scale.mjs   (server.py must be up on :8897)
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync } from "child_process";
@@ -15,9 +17,9 @@ import { execSync } from "child_process";
 const N = parseInt(process.env.N || "8", 10);
 const DURATION_S = parseInt(process.env.DURATION || "90", 10);
 const BASE = "http://127.0.0.1:8897";
-const HERE = "~/personal/positron/proto/m2m";
+const HERE = import.meta.dirname;
 const LOGDIR = `${HERE}/logs`;
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-udd";
+const UDD_BASE = path.join(process.env.SCRATCH || os.tmpdir(), "m2m-udd");
 fs.mkdirSync(LOGDIR, { recursive: true });
 
 const PROBES = ["1", "2"];

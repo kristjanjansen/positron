@@ -93,7 +93,7 @@ This is the ONLY way to create a relay until Cloudflare publishes the MoQ API pe
    - the **relay ID**,
    - **two default tokens**: one with `publish+subscribe` operations, one `subscribe`-only.
    Copy all three **before leaving the page**.
-5. Save them into `~/personal/positron/.env` (already chmod 600, gitignored) as:
+5. Save them into `.env` at the repository root (already chmod 600, gitignored) as:
    ```
    MOQ_RELAY_ID=…
    MOQ_TOKEN_PUBSUB=…   # publish+subscribe default token
@@ -170,7 +170,7 @@ All commands run in Docker (native builds are killed by ThreatLocker — §3.5).
 (✅ done, repeatable):
 
 ```bash
-cd ~/personal/positron/rig/moq
+cd rig/moq            # from the repository root
 docker build -t moq-dev -f Dockerfile.moq-dev .            # rust:1-bookworm + ffmpeg
 # draft-14 worktree: git -C moq-rs fetch origin draft-ietf-moq-transport-14:refs/remotes/origin/draft-ietf-moq-transport-14
 #                    git -C moq-rs worktree add ../moq-rs-draft14 origin/draft-ietf-moq-transport-14
@@ -188,9 +188,9 @@ docker run --rm -v "$PWD":/moq -v moq-target16:/target -e CARGO_TARGET_DIR=/targ
 
 ```bash
 # canned tests (clock latency / media e2e):
-docker run --rm -v ~/personal/positron/rig/moq:/moq -v moq-target14:/target \
+docker run --rm -v "$PWD"/rig/moq:/moq -v moq-target14:/target \
   moq-dev bash /moq/test-draft14-inner.sh clock 40
-docker run --rm -v ~/personal/positron/rig/moq:/moq -v moq-target14:/target \
+docker run --rm -v "$PWD"/rig/moq:/moq -v moq-target14:/target \
   moq-dev bash /moq/test-draft14-inner.sh media 30
 
 # raw shapes (inside the container; binaries at /target/release):
@@ -543,7 +543,7 @@ this is from /beacon in `wrangler tail`):
 pkill -f moq-safari-pub-udd            # the headless-Chrome publisher
 pkill -f pubserver.py                  # its page/log server on :8890
 # START (both detached, survive shell exit):
-cd ~/personal/positron/rig/moq/spike
+cd rig/moq/spike      # from the repository root
 nohup python3 pubserver.py 8890 > logs/moq-safari-pub-server.out 2>&1 & disown
 nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
   --user-data-dir="$PWD/logs/moq-safari-pub-udd" --no-first-run \
@@ -646,7 +646,7 @@ errors, g2g p50 47 / p95 66–80 ms, first frame 437 ms, catalog codec auto-pick
 
 ### 9.5 Restart commands (publisher dies with sleep/reboot — §8.6 caveat applies)
 ```bash
-cd ~/personal/positron/rig/moq/spike
+cd rig/moq/spike      # from the repository root
 # page/log server (if not already up):
 nohup python3 pubserver.py 8890 > logs/moq-safari-pub-server.out 2>&1 & disown
 # the 4K30 publisher:
@@ -790,7 +790,7 @@ WT ✓ H264 ✓ live) predate the audio deploy by 3 min — a revisit will fill 
 pkill -f moq-audio-pub-udd
 pkill -f audioserver.py
 # START again (both detached):
-cd ~/personal/positron/rig/moq/spike
+cd rig/moq/spike      # from the repository root
 nohup python3 audioserver.py 8896 > logs/moq-audio-server.out 2>&1 & disown
 nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
   --user-data-dir="$PWD/logs/moq-audio-pub-udd" --no-first-run \

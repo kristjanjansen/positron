@@ -10,7 +10,8 @@
 // waits 1500 ms for its verdict and is refused "the renderer did not answer"
 // otherwise, exactly as video.mjs; a refused line is still drained later.
 import { execFileSync } from 'node:child_process';
-const REPO = '~/personal/positron';
+import path from "node:path";
+const REPO = path.resolve(import.meta.dirname, "../../..");
 const { startRelay } = await import(`${REPO}/demo/fake-relay.mjs`);
 const { format } = await import(`${REPO}/demo/shell/wire.mjs`);
 

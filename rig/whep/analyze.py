@@ -2,10 +2,11 @@
 """Analyze results/whep.jsonl. Filters: visible-tab samples only (plan §4.2),
 checksum-valid decodes only. Optionally skip the first WARMUP seconds."""
 import json
+import os
 import sys
 import statistics as st
 
-PATH = "~/personal/positron/results/whep.jsonl"
+PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../results/whep.jsonl")
 WARMUP_S = float(sys.argv[1]) if len(sys.argv) > 1 else 10.0
 
 samples, play_stats, pub_stats, events = [], [], [], []

@@ -20,12 +20,14 @@
 //   node studio/verify-grid.mjs [--duration=50] [--participants=1]
 // ===========================================================================
 import { createRequire } from "node:module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 
-const ROOT = "~/personal/positron";
+const ROOT = path.resolve(import.meta.dirname, "..");
 const HERE = `${ROOT}/studio`;
 const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.split("=")[1] : d; };
 const DURATION = parseInt(arg("duration", "50"), 10);

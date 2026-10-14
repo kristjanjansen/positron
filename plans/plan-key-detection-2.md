@@ -403,7 +403,7 @@ still the quantity a listener would hear as "in" or "against".
 | | 4 chroma chords | 27 | 11.3% | 13% |
 
 **The WAVs**, 16 bit mono, in this session's scratchpad
-`/private/tmp/claude-501/-Users-s32863-personal-positron/e0ccd797-f07c-41de-abae-fda074f2551f/scratchpad/kd2/wav/`,
+`<scratchpad>/kd2/wav/`,
 named `<recording>-<start>-<id>.wav`, for example
 `ida1314-60-3b-follower-bars.wav` and `ida1314-60-4-chroma-chords.wav`. Nobody
 has listened to them; the table is a proxy, the ears decide.

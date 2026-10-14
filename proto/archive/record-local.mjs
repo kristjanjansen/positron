@@ -18,12 +18,14 @@
 // Usage (replay-server on :8885 first):  node record-local.mjs
 //   [ROOM=archive-test] [DURATION=190] [OFFSETS=15,36,...] [NOPUB=1 smoke]
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync, spawn } from "child_process";
 
-const ROOT = "~/personal/positron";
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const HERE = `${ROOT}/proto/archive`;
 const REPLAY = `${ROOT}/proto/replay`;
 const BASE = "http://127.0.0.1:8885";
@@ -37,7 +39,7 @@ const ROOM = process.env.ROOM || `archive-test-${RUNTS}`;
 const NOPUB = process.env.NOPUB === "1";
 const DURATION_S = parseInt(process.env.DURATION || "190", 10);
 const OFFSETS = process.env.OFFSETS || "15,36,57,78,99,120,141,162";   // 8 cues, now/sched alternating
-const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad";
+const SCRATCH = (process.env.SCRATCH || os.tmpdir());
 const RECDIR = process.env.RECDIR || `${SCRATCH}/archive-rec-${RUNTS}`;
 const UDD_BASE = `${SCRATCH}/archive-test-udd`;
 const BUCKET = "elektron-archive-test";

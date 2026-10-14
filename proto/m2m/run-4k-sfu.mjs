@@ -6,7 +6,9 @@
 //        HINT=detail DEGPREF=maintain-resolution CODEC=h264] node run-4k-sfu.mjs
 // server.py must be up on :8889 (M2M_PORT=8889 M2M_RESULTS=results/m2m-4k-sfu-<arm>.jsonl)
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync } from "child_process";
@@ -25,9 +27,9 @@ const CODEC = process.env.CODEC || "h264";
 // class as the MoQ 4K matrix). CH=chromium -> Playwright build (OpenH264 sw).
 const CH = process.env.CH || "chrome";
 const BASE = "http://127.0.0.1:8889";
-const HERE = "~/personal/positron/proto/m2m";
+const HERE = import.meta.dirname;
 const LOGDIR = `${HERE}/logs`;
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-4k-udd";
+const UDD_BASE = path.join(process.env.SCRATCH || os.tmpdir(), "m2m-4k-udd");
 fs.mkdirSync(LOGDIR, { recursive: true });
 
 const IDS = ["1", "P"];

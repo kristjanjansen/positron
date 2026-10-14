@@ -5,7 +5,7 @@
 //
 //   · macOS Local Network Privacy is granted PER APP. A terminal process
 //     inherits the grant; OBS.app and Chrome.app do not, so a browser source
-//     pointed at 192.168.1.x renders ERR_ADDRESS_UNREACHABLE — a pure black
+//     pointed at a LAN address renders ERR_ADDRESS_UNREACHABLE — a pure black
 //     frame with nothing in any OBS log. 127.0.0.1 needs no grant.
 //   · a standing test box must not stop working when a laptop sleeps.
 //

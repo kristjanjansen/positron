@@ -560,7 +560,7 @@ Related consequence from the flexbox change log: a content-based minimum makes t
 
 ## 5. Debugging: which declaration won, and from which rule
 
-This one has a definite answer and it is automatable from your existing CDP harness. A researcher wrote and **ran** four scripts against real headless Chrome; they are in the session scratchpad at `/private/tmp/claude-501/-Users-s32863-personal-positron/7cc3bd3d-b01c-45e1-a52a-75900587668f/scratchpad/cdptest/` as `probe.mjs`, `which-rule-won.mjs`, `ancestry.mjs`, `dbg.mjs`.
+This one has a definite answer and it is automatable from your existing CDP harness. A researcher wrote and **ran** four scripts against real headless Chrome; they are in the session scratchpad at `<scratchpad>/cdptest/` as `probe.mjs`, `which-rule-won.mjs`, `ancestry.mjs`, `dbg.mjs`.
 
 ### The one-line answer
 
@@ -864,7 +864,7 @@ Whether the 32 "unknown" custom properties in `shell.css` are set by JavaScript 
 
 ## Scripts produced (scratchpad only, nothing written to the repo)
 
-`/private/tmp/claude-501/-Users-s32863-personal-positron/7cc3bd3d-b01c-45e1-a52a-75900587668f/scratchpad/`
+`<scratchpad>/`
 
 - `cdptest/which-rule-won.mjs` (url, selector, property: every declaration for that property, its rule, file, line, layer, specificity, importance, whether it came via a shorthand, and which won; cross-checked against `CSS.getComputedStyleForNode`)
 - `cdptest/ancestry.mjs` (the ancestor table in section 5, also paste-able into the DevTools console)

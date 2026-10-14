@@ -67,7 +67,7 @@ const BUCKET = process.env.BUCKET || "elektron-archive-test";       // EXISTING
 const PUBBASE = process.env.PUBBASE || "https://archive.positron.studio";
 const WRANGLER_CWD = `${ROOT}/proto/archive`;   // a dir with NO .env (the trap)
 const SCRATCH = process.env.STUDIO_SCRATCH ||
-  "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
+  (process.env.SCRATCH || os.tmpdir());
 const RUNS = `${HERE}/runs`;
 const LOGS = `${HERE}/logs`;
 for (const d of [RUNS, LOGS, SCRATCH]) fs.mkdirSync(d, { recursive: true });
@@ -661,7 +661,7 @@ function gridParticipantsFromCuelog(cuelog) {
 async function launchParticipants(n, durationS) {
   if (!SELFREC_TOKEN) throw new Error("no SELFREC_TOKEN in proto/selfrec/.env.selfrec");
   const { createRequire } = await import("node:module");
-  const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+  const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
   const { chromium } = require("playwright");
   const out = [];
   for (let i = 0; i < n; i++) {
@@ -895,7 +895,7 @@ function dumpProbe(st, dir, extra) {
  *  the independent variable of the anchor experiment. */
 async function startPageSource(pageUrl, makeSinks, probeN = 0, anchorMode = ANCHOR_MODE) {
   const { createRequire } = await import("node:module");
-  const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+  const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
   const { chromium } = require("playwright");
   const udd = `${SCRATCH}/studio-udd-${S.runId}`;
   fs.rmSync(udd, { recursive: true, force: true });

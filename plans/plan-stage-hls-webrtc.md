@@ -169,7 +169,7 @@ back to software encoders whose latency *"can sometimes be an issue for
 real-time streaming applications"*. A Pi 4's BCM2711 does have the block. ⚠️
 **WHICH BOARD IS ACTUALLY ON THE DESK IS NOT RECORDED AS A MEASUREMENT.**
 `rig/board/README.md`'s Pi 4 column says in its own words that it is *"derived
-from the class of chip, not measured"*. **`ssh positron@<ip> cat
+from the class of chip, not measured"*. **`ssh <user>@<pi> cat
 /proc/cpuinfo` settles it in one command and nobody has run it for this
 purpose.** Do that before costing anything on the board.
 

@@ -78,7 +78,7 @@ inventory already exists and is already runnable.
 
 📄 READ, `rig/audit.mjs`. It declares eleven apt packages for `box` with the
 versions seen on a day it worked, three files that must exist, and two devices.
-It runs over ssh (`BOARD_SSH`, default `positron@<pi>`), asks the machine
+It runs over ssh (`BOARD_SSH`, default `<user>@<pi>`), asks the machine
 what it has, prints the difference, and `--fix` prints
 `sudo apt-get install -y --no-install-recommends <pkg>` for everything missing.
 Its own comment says it does not pin versions on purpose, and why:
@@ -302,7 +302,7 @@ What happens then, 📄 READ from `demo/shell/board.mjs`:
   and "is it not my own echo" (`board.mjs:1202-1206`). There is no target field.
 
 And `BOARD_NAME=$(hostname)`. 📄 READ from today's own traffic: the studio board
-reports `"name":"raspberrypi"`. A friend's Pi is also called `raspberrypi` unless
+reports its hostname as `"name"`, which is the Pi OS default. A friend's Pi carries the same default unless
 they changed it, so the only human label on the wire does not distinguish them
 either.
 
@@ -348,7 +348,7 @@ controllers seen on the wire:
    d2ysxd ch0 cc71 = 63
    d2ysxd ch0 cc7  = 22
 ctl.meter  in 5387  out 5245  folded 25  on yoshimi  from box-u5pg1m
-board.alive  name raspberrypi  upSec 8180  audio yoshimi  voices 0  frames 330449  fx null
+board.alive  name <hostname>  upSec 8180  audio yoshimi  voices 0  frames 330449  fx null
 ```
 
 An 8 s listen before it showed the same client `d2ysxd` sending
@@ -812,7 +812,7 @@ list, and it is short because of §1.4.
 friend owns is a board nobody here can walk over to**, and today's board proves
 the gap: 📄 READ, `BACKLOG.md` records that the output level collapsed to about
 1/40th, every page reported correct counters, an `audio.stop` and `audio.start`
-over the relay did not fix it, and `ssh positron@<pi>` does not answer
+over the relay did not fix it, and `ssh <user>@<pi>` does not answer
 from outside the studio LAN.
 
 ### 8.1 What the board can be asked today, and what it cannot

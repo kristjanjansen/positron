@@ -67,7 +67,7 @@ none of them is the model:
   realtime, 15% of one core."*
 
 🔌 **ONE COMMAND SETTLES IT AND IT IS FREE:**
-`ssh positron@<ip> cat /proc/device-tree/model`. Worth doing before anybody buys
+`ssh <user>@<pi> cat /proc/device-tree/model`. Worth doing before anybody buys
 a HAT, because a Pi 4 HAT and a Pi 5 HAT are not the same part.
 
 ⚠️ **A PI 4 DOES HAVE A 3.5 MM JACK ON THE BOARD, SO THERE MAY BE A PHYSICAL

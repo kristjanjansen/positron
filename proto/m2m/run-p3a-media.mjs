@@ -17,7 +17,9 @@
 //        FEATFPS=30 FEATKBPS=2500] node run-heavy.mjs
 // (server.py must be up on :8897 with M2M_RESULTS pointing at this rung's file)
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync } from "child_process";
@@ -35,11 +37,11 @@ const FEAT = { w: process.env.FEATW || "1280", h: process.env.FEATH || "720",
                fps: process.env.FEATFPS || "30", kbps: process.env.FEATKBPS || "2500",
                hint: "motion", cls: "feat" };
 const BASE = "http://127.0.0.1:8894";
-const HERE = "~/personal/positron/proto/m2m";
+const HERE = import.meta.dirname;
 const LOGDIR = `${HERE}/logs`;
 // DISTINCT prefix from run.mjs/run-scale.mjs AND from the churn sibling — we
 // kill stale chromes ONLY under this exact prefix.
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-p3a-udd";
+const UDD_BASE = path.join(process.env.SCRATCH || os.tmpdir(), "m2m-p3a-udd");
 fs.mkdirSync(LOGDIR, { recursive: true });
 
 const PROBES = ["1", "2"];

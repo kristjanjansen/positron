@@ -456,13 +456,13 @@ is `main`, HEAD is `61ad3b6`.
 
 **The push dance.** CLAUDE.md documents it: `git push` answers
 `Repository not found`, which is a 404 wearing an auth failure, because
-`<work-account>` is the active `gh` account and `kristjanjansen` owns the
+the work account is the active `gh` account and `kristjanjansen` owns the
 repo. On two machines that is two independent keychains and two independent
 active accounts, so the dance has to be learned twice and forgotten twice.
 
 ⚠️ **MEASURED today and worth a line: `gh auth status` on m1 currently reports
 `Logged in to github.com as kristjanjansen`.** CLAUDE.md says the active account
-must be switched back to `<work-account>` after a push, quoting
+must be switched back to the work account after a push, quoting
 *"ASKED FOR 2026-09-17"*, and it is not switched back right now. Nothing was
 changed about it here, because the active account is machine-wide and changing it
 was not asked for. It is reported rather than fixed.

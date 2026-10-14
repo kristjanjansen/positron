@@ -1,15 +1,19 @@
 // remote/040 (was rhythm/030) against the REAL Pi (studio-1), via the dev server on :8890. One headless Chrome, closed on every path.
 // node pi030.mjs relay|direct
 import { spawn, execSync } from 'node:child_process';
+import os from "node:os";
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const PATH = process.argv[2] === 'direct' ? 'direct' : 'relay';
 const ONLY_CHOKE = process.argv.includes('choke');
-const OUTF = `/private/tmp/claude-501/-Users-s32863-personal-positron/0f3a0353-ddeb-41fa-a915-9abf8aa2d34d/scratchpad/r030lv-${process.argv[3] ?? 'before'}.json`;
+const OUTF = `${process.env.SCRATCH || os.tmpdir()}/r030lv-${process.argv[3] ?? 'before'}.json`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const routeOk = () => /interface: en0/.test(execSync('route -n get <pi>').toString());
+// The Pi's LAN address is read from the environment, never written here.
+const PI_IP = process.env.PI_IP;
+if (!PI_IP) { console.error('set PI_IP=<pi> (the board\'s LAN address) and run again'); process.exit(2); }
+const routeOk = () => /interface: en0/.test(execSync(`route -n get ${PI_IP}`).toString());
 const out = { path: PATH, phases: {} };
 const save = () => writeFile(OUTF, JSON.stringify(out, null, 1));
 const PROFILE = await mkdtemp(join(tmpdir(), 'positron-pi030-'));

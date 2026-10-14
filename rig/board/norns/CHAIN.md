@@ -419,21 +419,22 @@ comparing two different builds.
     #    nothing yet
     ./rig/board/push.sh --no-restart            # or: ./rig/board/push.sh <ip>
     BOX=<the address push.sh printed>
+    BOARD_USER=<user>                            # the board's login
 
     # 2. the board's own audio has to be out of the way: one exclusive card,
     #    one scsynth. Check, do not assume.
-    ssh positron@$BOX 'sudo systemctl stop positron-board; \
+    ssh "$BOARD_USER@$BOX" 'sudo systemctl stop positron-board; \
       pkill -9 -x sclang; pkill -9 -x scsynth; sleep 1; \
       echo "sclang $(pgrep -cx sclang) scsynth $(pgrep -cx scsynth)"'
 
     # 3. a dummy JACK — a clock, no soundcard. ⚠️ JACK's control socket is
     #    per-user: this must be the SAME user sclang runs as.
-    ssh positron@$BOX 'pgrep -x jackd >/dev/null || \
+    ssh "$BOARD_USER@$BOX" 'pgrep -x jackd >/dev/null || \
       (setsid jackd -r -d dummy -r 48000 -p 1024 >/tmp/jackd.log 2>&1 &); \
       sleep 2; pgrep -cx jackd'
 
     # 4. somewhere for Qt's runtime dir, and the weighing script below
-    ssh positron@$BOX 'mkdir -p /tmp/rt'
+    ssh "$BOARD_USER@$BOX" 'mkdir -p /tmp/rt'
 
 ⚠️ **Put the script on the board as its own file — do not wrap it in a heredoc
 inside the block above.** The block is indented, so the indentation would go
@@ -469,14 +470,14 @@ s.waitForBoot({
     # 5. FOUR ARMS, ONE AT A TIME, each in its own sclang. A fixed server port
     #    is a shared mutable global: two of these at once measure each other.
     for F in "" "PAPPUS_LITE=1" "PAPPUS_TINY=1" "PAPPUS_BARE=1"; do
-      ssh positron@$BOX "env $F XDG_RUNTIME_DIR=/tmp/rt \
+      ssh "$BOARD_USER@$BOX" "env $F XDG_RUNTIME_DIR=/tmp/rt \
         QT_QPA_PLATFORM=offscreen QTWEBENGINE_DISABLE_SANDBOX=1 \
         sclang /tmp/weigh.scd 2>&1 | grep -E '^(WEIGH|Engine_Pappus|ERROR)'"
     done
 
     # 6. PUT THE BOARD BACK. It is a service that dials out on boot; leaving it
     #    stopped is an outage nobody is standing next to.
-    ssh positron@$BOX 'sudo systemctl start positron-board; sleep 3; \
+    ssh "$BOARD_USER@$BOX" 'sudo systemctl start positron-board; sleep 3; \
       systemctl is-active positron-board'
 
 ⚠️ **Confirm the arms are actually different before believing any of them.** The

@@ -15,12 +15,13 @@
  *   node rig/overlay-bridge.mjs [room] [file]
  */
 import { writeFileSync, readFileSync } from 'node:fs';
+import path from "node:path";
 
 const ROOM = process.argv[2] || 'burnin';
 const FILE = process.argv[3] || '/tmp/overlay.txt';
 const cuesToken = () => {
   try {
-    const l = readFileSync('~/personal/positron/.env', 'utf8')
+    const l = readFileSync(path.resolve(import.meta.dirname, "../.env"), 'utf8')
       .split('\n').find((x) => x.startsWith('CUES_TOKEN='));
     return l ? l.slice(11).trim() : '';
   } catch { return ''; }

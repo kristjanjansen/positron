@@ -7,7 +7,7 @@
      skill written the same day, and it is kept whole because a condensed rule
      reads as an opinion. -->
 
-# An empirical taxonomy of the repeated UI corrections in ~/personal/positron
+# An empirical taxonomy of the repeated UI corrections in this repository
 
 Status (2026-10-14): done. It is the empirical base of the positron-compose skill (.claude/skills/positron-compose/SKILL.md cites it) and of plans/plan-instrument-audit.md.
 

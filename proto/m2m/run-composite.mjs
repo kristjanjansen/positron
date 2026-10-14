@@ -18,7 +18,9 @@
 //   ROUTE=A LABEL=a DURATION=180 node run-composite.mjs
 //   ROUTE=B LABEL=b DURATION=600 node run-composite.mjs
 import { createRequire } from "module";
-const require = createRequire("~/.npm/_npx/705bc6b22212b352/node_modules/");
+import os from "node:os";
+import path from "node:path";
+const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
 const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync, spawn } from "child_process";
@@ -30,10 +32,10 @@ const POLL_S = parseInt(process.env.POLL_S || "300", 10);   // recording-poll bu
 const NOPUB = process.env.NOPUB === "1";                    // smoke: no WHIP/ffmpeg at all
 const BASE = "http://127.0.0.1:8895";
 const ROOM = `p3b-${LABEL}`;
-const HERE = "~/personal/positron/proto/m2m";
-const ROOT = "~/personal/positron";
+const HERE = import.meta.dirname;
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const LOGDIR = `${HERE}/logs`;
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-p3b-udd";
+const UDD_BASE = path.join(process.env.SCRATCH || os.tmpdir(), "m2m-p3b-udd");
 const REMOTE_URL = "https://rtc.positron.studio";
 fs.mkdirSync(LOGDIR, { recursive: true });
 

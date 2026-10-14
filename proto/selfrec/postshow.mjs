@@ -29,10 +29,11 @@
 // Emits REPORT json (last stdout line) + appends to results jsonl.
 // ============================================================================
 import fs from "fs";
+import path from "node:path";
 import { repackageParticipant } from "./repackage.mjs";
 import { indexParticipant } from "./indexer.mjs";
 
-const ROOT = "~/personal/positron";
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const HERE = `${ROOT}/proto/selfrec`;
 const BASE = "https://selfrec.positron.studio";
 const PUB = "https://archive.positron.studio";

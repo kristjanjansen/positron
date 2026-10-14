@@ -112,7 +112,7 @@ static void mktarget(int w,int h,GLuint*t,GLuint*f){
 // written on a laptop that SIGKILLs locally compiled binaries, so nothing here
 // has been through a compiler. On the board:
 //
-//   scp rig/vis/v3dpipe.c positron@<board>:/tmp/ && ssh positron@<board> '
+//   scp rig/vis/v3dpipe.c <user>@<pi>:/tmp/ && ssh <user>@<pi> '
 //     cd /tmp && gcc -O2 -o v3dpipe v3dpipe.c -lEGL -lGLESv2 -lgbm'
 //
 //   # a defined still picture with no data at all: uData reads zero, not noise

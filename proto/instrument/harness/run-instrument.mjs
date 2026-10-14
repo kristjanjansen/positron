@@ -18,6 +18,7 @@
 // Kills only its own: the `instr-` process prefix and the instr-udd profile.
 
 import { spawn, execSync } from 'node:child_process';
+import os from "node:os";
 import { writeFile, mkdir, readdir, readFile } from 'node:fs/promises';
 import { openSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -26,7 +27,7 @@ import { CDP } from '../../jam/harness/cdp.mjs';     // reused verbatim, not cop
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
-const SCRATCH = '/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad';
+const SCRATCH = (process.env.SCRATCH || os.tmpdir());
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 8899, DBG = 9241;
 const BASE = `http://127.0.0.1:${PORT}`;

@@ -5,6 +5,7 @@
 // deployed player in headless Chrome and reports time-to-first-decoded-frame.
 //   node run-cloud-cold.mjs <workerBase> [playerSecs]
 import { spawn } from "node:child_process";
+import os from "node:os";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ObsClient } from "../obs-docker/control.mjs";
@@ -13,7 +14,7 @@ const BASE = process.argv[2] || "https://positron-obscloud.kristjan-jansen.worke
 const SECS = Number(process.argv[3] || 60);
 const WS = BASE.replace("https://", "wss://") + "/obsws";
 const PLAYER = "https://moq.positron.studio/";
-const scratch = "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/";
+const scratch = (process.env.SCRATCH || os.tmpdir()).replace(/\/?$/, "/");
 const resultsDir = fileURLToPath(new URL("../../results/", import.meta.url));
 const now = () => performance.timeOrigin + performance.now();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

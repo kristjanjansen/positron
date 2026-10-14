@@ -25,7 +25,7 @@ are worth anything.
 `demo/shell/chords.mjs`, `demo/shell/roll.mjs`, `demo/shell/keyboard.mjs` and
 `demo/shell/shell.css` were read and not touched. The prototypes live in this
 session's scratchpad at
-`/private/tmp/claude-501/-Users-s32863-personal-positron/8aa92fb5-6f69-4e25-8221-038b95849dcd/scratchpad/`
+`<scratchpad>/`
 as fourteen small `.mjs` files, they import the repository's chord table read
 only, and they are disposable.
 

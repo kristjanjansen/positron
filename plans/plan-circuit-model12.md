@@ -1187,8 +1187,8 @@ The reasoning, 📁 REPO and machine readings:
 - The studio machine is an **M1**. `rig/m1/README.md` measures the rack agent at
   *"4.2% of one core (M1 Pro)"*, and
   `rig/m1/studio.positron.rack-agent.plist` runs
-  `/Users/kristjanjansen/positron-rack/live-agent.mjs`. This checkout's user is
-  `s32863`. **Two machines, two accounts.**
+  `~/positron-rack/live-agent.mjs` under the M1's own user. This checkout's user
+  is a different, work-issued one. **Two machines, two accounts.**
 - This project's own memory records that this laptop is
   ThreatLock and Microsoft Defender managed, and that **it SIGKILLs any locally
   compiled binary**, confirmed down to a trivial `int main(){return 7;}`.

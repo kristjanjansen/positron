@@ -254,23 +254,21 @@ remove from the working tree before the next push, and whether history
 matters.
 
 - **The owner's first name, attached to a third party's words.**
-  `positron-verify` (about line 181): *"ERR SAID SO, 2026-09-16, RELAYED TO
-  KRISTJAN"* followed by ERR's own sentence in Estonian. A public
+  `positron-verify` (about line 181): the ERR attribution line and its Estonian quote followed by ERR's own sentence in Estonian. A public
   broadcaster's private remark about its audience figures, attributed and
   dated. The rule it supports can stay; the quote and the name should not be
   in a public file. The same quote is in `CLAUDE.md` and `AGENTS.md` paraphrases
   it, so this is a repo question, not only a skills one.
 - **The pack and the private repo that holds it.** `positron-hardware` (about
-  line 101) names `<private-pack-repo>` and the path
-  `circuit/2026-09-20-circuit.circuitpack` inside it; `positron-verify` (about
+  line 101) names the owner's private pack repository and the pack's path
+  inside it; `positron-verify` (about
   1416 and 1442) names `New Pack.circuitpack` and `session_0`. The pack
   itself is NOT in any skill. Naming a private repo and the file in it is a
   pointer, not the content, and a low risk, but CLAUDE.md treats the owner's
   sessions as *"mine. very important"*, so the pointer does not belong in a
   file written for strangers.
 - **Machine and network facts.** `positron-hardware` line 56
-  `ssh positron@<ip> hostname -s` (the Pi's login user), the hostname
-  `raspberrypi`, and *"a Raspberry Pi in another building"*;
+  `ssh <user>@<pi> hostname -s` (the Pi's login user), the Pi's hostname, and *"a Raspberry Pi in another building"*;
   `positron-verify` and `positron-hardware` name the machines `studio-1` and
   `m1-1`. No IP address, key or token appears in any skill (grepped for key
   prefixes, 40+ character tokens and IPv4 addresses 2026-10-14; the only long
@@ -401,7 +399,7 @@ about history, or anything on GitHub.
      skill's commits since the fork's recorded `metadata.source-commit`, so
      the owner sees what changed upstream and decides what to carry over.
    - **A deny gate that fails the export** if any output contains `KRISTJAN`,
-     `<private-pack-repo>`, `circuitpack`, `session_`, `studio-1`, `m1-1`,
+     the private pack repository's name, `circuitpack`, `session_`, `studio-1`, `m1-1`,
      `positron@`, `ERRil`, a `/Users/` path, or an IPv4 address other than
      127.0.0.1. Prove it fires once by exporting a file with one planted
      (CLAUDE.md's own rule for guards).

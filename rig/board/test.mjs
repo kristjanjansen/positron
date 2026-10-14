@@ -927,7 +927,7 @@ console.log('\nrtc: the direct path, against a fake peer');
     constructor(name, cfg) { this.name = name; this.cfg = cfg; this.cands = []; this.closed = false; pcs.push(this); }
     onLocalDescription(f) { this.ld = f; } onLocalCandidate(f) { this.lc = f; }
     onStateChange(f) { this.sc = f; } onDataChannel(f) { this.dcf = f; }
-    setRemoteDescription(sdp, kind) { this.remote = [sdp, kind]; this.ld('v=0 answer', 'answer'); this.lc('candidate:1 1 UDP 1 <pi> 5000 typ host', '0'); }
+    setRemoteDescription(sdp, kind) { this.remote = [sdp, kind]; this.ld('v=0 answer', 'answer'); this.lc('candidate:1 1 UDP 1 192.168.0.20 5000 typ host', '0'); }
     addRemoteCandidate(c, mid) { this.cands.push([c, mid]); }
     close() { this.closed = true; }
     // what the page's two createDataChannel calls look like from here
@@ -1085,7 +1085,7 @@ console.log('\nrtc: the MAIN socket\'s direct path (studio-1, the synth capture)
     constructor(name, cfg) { this.name = name; this.cfg = cfg; this.cands = []; this.closed = false; pcs.push(this); }
     onLocalDescription(f) { this.ld = f; } onLocalCandidate(f) { this.lc = f; }
     onStateChange(f) { this.sc = f; } onDataChannel(f) { this.dcf = f; }
-    setRemoteDescription(sdp, kind) { this.remote = [sdp, kind]; this.ld('v=0 answer', 'answer'); this.lc('candidate:1 1 UDP 1 <pi> 5000 typ host', '0'); }
+    setRemoteDescription(sdp, kind) { this.remote = [sdp, kind]; this.ld('v=0 answer', 'answer'); this.lc('candidate:1 1 UDP 1 192.168.0.20 5000 typ host', '0'); }
     addRemoteCandidate(c, mid) { this.cands.push([c, mid]); }
     close() { this.closed = true; }
     channels() { const pcm = new FakeDC('pcm'), ctl = new FakeDC('ctl'); this.dcf(pcm); this.dcf(ctl); return { pcm, ctl }; }

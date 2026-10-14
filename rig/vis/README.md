@@ -5,7 +5,7 @@ Three small C programs that produced every number in `plans/plan-visuals.md` §3
 A measurement whose instrument cannot be rebuilt is an anecdote, so they live
 here now.
 
-    scp rig/vis/*.c positron@<board>:/tmp/ && ssh positron@<board> '
+    scp rig/vis/*.c <user>@<pi>:/tmp/ && ssh <user>@<pi> '
       cd /tmp && gcc -O2 -o v3dbench v3dbench.c -lEGL -lGLESv2 -lgbm &&
                  gcc -O2 -o v3dpipe  v3dpipe.c  -lEGL -lGLESv2 -lgbm'
 
