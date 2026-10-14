@@ -7,23 +7,18 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Circuit on Pi</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
 <style>
   /* Play alone at the top left. No status label: what the board says goes to
      the log (060's rule, asked 2026-10-11). */
   .cc-top { display: flex; align-items: center; gap: 12px; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
-  /* The patch selector is a full width block under the scope (asked
-     2026-10-11, *"patch selctor is full w blokc under scope"*): the name cell
-     takes the width between the two arrows. (0,2,0) beats the cell's own width. */
-  .pos-pick.cc-patch { display: flex; width: 100%; }
-  .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
-  .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createMidiDevices } from '/shell/midi-devices.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createChoice } from '/shell/choice.mjs';
@@ -466,9 +461,9 @@
 
   // ── MIDI in: keyboards and controllers plugged into this machine ────────
   // Asked 2026-10-13: *"add midi in to https://positron.studio/concepts/remote/010"*.
-  // The same shape as /code/plaits/ and 000/ (there is no kit module for
-  // it yet): every input is a node, `web:midi`, `web:midi-2`, ..., with a
-  // midi wire into `pi-1:circuit:midi-in`, the path the on-screen keys take,
+  // The kit's createMidiDevices, as /code/plaits/ uses it: every input is a
+  // node, `web:midi`, `web:midi-2`, ..., with a midi wire into
+  // `pi-1:circuit:midi-in`, the path the on-screen keys take,
   // so its notes land on Synth 1's channel like theirs.
   // 🔴 ASKED FOR ON THE PLAY PRESS, NEVER ON LOAD, AND WITH `sysex: false`.
   // 🔴 WHAT PASSES: note on, note off, and a control change whose number is
@@ -480,14 +475,6 @@
   // macro's knob on screen (`receive`, which sends nothing), so it is sent
   // once, by the device's wire.
   const SYNTH_CCS = new Set(CIRCUIT_CC.filter((r) => r.ch === '1/2').map((r) => r.cc));
-  const plugged = new Set();
-  const shown = (pid) => !pid.startsWith(`${S}:midi`) || plugged.has(pid.split(':').slice(0, 2).join(':'));
-  const slots = new Map(), devHeld = new Map(), devLinks = new Map();
-  const slotFor = (p) => {
-    if (!slots.has(p.id)) slots.set(p.id, slots.size ? `${S}:midi-${slots.size + 1}` : `${S}:midi`);
-    return slots.get(p.id);
-  };
-  const wired = new WeakSet();
   const devIn = { note: 0, cc: 0, dropped: 0 };
   const droppedSaid = new Set();
   function drop(what) {
@@ -496,63 +483,41 @@
     droppedSaid.add(what);
     d.log(`MIDI in: ${what} is not passed to the Circuit`, 'warn');
   }
-  function fromDevice(e) {
-    const node = slots.get(e.target.id);
-    if (!node || !plugged.has(node)) return;
-    const data = e.data;
-    const st = data[0] & 0xF0;
-    if (data[0] >= 0xF0) { if (data[0] !== 0xF8 && data[0] !== 0xFE) drop(data[0] === 0xF0 ? 'SysEx' : 'a system message'); return; }
-    if (data.length !== 3) { drop(st === 0xC0 ? 'program change' : st === 0xD0 ? 'channel pressure' : 'a short message'); return; }
-    const [, d1, d2] = data;
-    if (st === 0x90 || st === 0x80) {
-      const on = st === 0x90 && d2 > 0;
-      const h = devHeld.get(node);
-      if (on) h.add(d1); else h.delete(d1);
-      kb.lightNote?.(d1, on);
-      devIn.note++;
-      bay.send(`${node}:midi-out`, { cls: 'note', ch: CH, d1, d2: on ? d2 : 0 });
-      return;
-    }
-    if (st === 0xB0) {
-      if (!SYNTH_CCS.has(d1)) { drop(`CC ${d1}`); return; }
-      const m = MACROS.find((x) => x.cc === d1);
-      if (m) knobs.get(m.name).receive(d2, { from: 'midi' });
-      devIn.cc++;
-      bay.send(`${node}:midi-out`, { cls: 'cc', ch: CH, d1, d2 });
-      return;
-    }
-    drop(st === 0xE0 ? 'pitch bend' : st === 0xA0 ? 'aftertouch' : 'that message');
-  }
-  function plug(p) {
-    const node = slotFor(p);
-    bay.addNode({ id: node, kind: 'device', label: p.name || 'MIDI keyboard', place: 'browser' });
-    if (plugged.has(node)) return;
-    bay.addPort({ id: `${node}:midi-out`, label: `${node.split(':')[1]}:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
-    const r = bay.link(`${node}:midi-out`, CIRCUIT_IN, [], { site: S });
-    if (!r.ok) d.log(`${node}:midi-out -> ${CIRCUIT_IN} refused: ${r.why}`, 'warn');
-    plugged.add(node); devHeld.set(node, new Set()); devLinks.set(node, r.ok ? [r.id] : []);
-    if (!wired.has(p)) { p.addEventListener('midimessage', fromDevice); wired.add(p); }
-    d.log(`MIDI in: ${p.name || 'unnamed port'} as ${node}`);
-  }
-  function unplug(node) {
-    for (const n of devHeld.get(node) || []) { kb.lightNote?.(n, false); bay.send(`${node}:midi-out`, { cls: 'note', ch: CH, d1: n, d2: 0 }); }
-    for (const lid of devLinks.get(node) || []) bay.unlink(lid);
-    plugged.delete(node); devHeld.delete(node); devLinks.delete(node);
-    d.log(`MIDI in gone: ${bay.node?.(node)?.label || node}`);
-  }
-  function devices(access) {
-    const now = new Set();
-    for (const p of access.inputs.values()) if (p.state !== 'disconnected') { plug(p); now.add(slotFor(p)); }
-    for (const node of [...plugged]) if (!now.has(node)) unplug(node);
-    pb.refresh?.();
-  }
+  const { plugged, attach } = createMidiDevices({ bay, site: S, to: [CIRCUIT_IN], emits: ['note', 'cc'],
+    portLabel: (node) => `${node.split(':')[1]}:midi-out`,
+    message: (e, { send, hold }) => {
+      const data = e.data;
+      const st = data[0] & 0xF0;
+      if (data[0] >= 0xF0) { if (data[0] !== 0xF8 && data[0] !== 0xFE) drop(data[0] === 0xF0 ? 'SysEx' : 'a system message'); return; }
+      if (data.length !== 3) { drop(st === 0xC0 ? 'program change' : st === 0xD0 ? 'channel pressure' : 'a short message'); return; }
+      const [, d1, d2] = data;
+      if (st === 0x90 || st === 0x80) {
+        const on = st === 0x90 && d2 > 0;
+        hold(d1, on);
+        kb.lightNote?.(d1, on);
+        devIn.note++;
+        send({ cls: 'note', ch: CH, d1, d2: on ? d2 : 0 });
+        return;
+      }
+      if (st === 0xB0) {
+        if (!SYNTH_CCS.has(d1)) { drop(`CC ${d1}`); return; }
+        const m = MACROS.find((x) => x.cc === d1);
+        if (m) knobs.get(m.name).receive(d2, { from: 'midi' });
+        devIn.cc++;
+        send({ cls: 'cc', ch: CH, d1, d2 });
+        return;
+      }
+      drop(st === 0xE0 ? 'pitch bend' : st === 0xA0 ? 'aftertouch' : 'that message');
+    },
+    noteOff: (n) => ({ cls: 'note', ch: CH, d1: n, d2: 0 }), onRelease: (n) => kb.lightNote?.(n, false),
+    onChange: () => pb.refresh?.(), log: (line, kind) => d.log(line, kind) });
+  const shown = (pid) => !pid.startsWith(`${S}:midi`) || plugged.has(pid.split(':').slice(0, 2).join(':'));
   let midiAsked = false;
   function askMidi() {
     if (midiAsked || !navigator.requestMIDIAccess) return;
     midiAsked = true;
     navigator.requestMIDIAccess({ sysex: false }).then((access) => {
-      devices(access);
-      access.onstatechange = () => devices(access);
+      attach(access);
       if (!access.inputs.size) d.log('MIDI in: no keyboard or controller is plugged into this machine');
     }, (e) => d.log(`MIDI in: the browser did not give access (${e?.message || 'refused'})`, 'warn'));
   }

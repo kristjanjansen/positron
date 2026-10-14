@@ -7,23 +7,14 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Keyboard</title>
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  /* The same medium colours as /concepts/misc/000/. */
-  :root {
-    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
-  }
-  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
-  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
-  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
-  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
-</style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
-  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
+  import { createMidiDevices } from '/shell/midi-devices.mjs';
+  useMediumColours();
 
   // The on-screen keyboard and a sine synth as patchbay nodes, all in this tab.
   // Named from the bay's side: what the keyboard PLAYS leaves it (an out), what
@@ -100,7 +91,10 @@
   // The picture reads only nodes(), ports() and links(), and the bay has no way
   // to forget a node, so an unplugged device is hidden here and its links are
   // dropped. With nothing plugged in the picture is the three nodes it always was.
-  const plugged = new Set();    // node ids of the devices plugged in now
+  // Keyboards plugged into this machine: each a `device` node whose midi-out is
+  // linked to the synth (it sounds) and to the keys (they light).
+  const { plugged, ask: askMidi } = createMidiDevices({ bay, site: S, to: [`${S}:synth:midi-in`, `${S}:keys:midi-in`],
+    onChange: () => pb.refresh(), log: (line, kind) => d.log(line, kind) });
   const shown = (id) => !id.startsWith(`${S}:midi`) || plugged.has(id.split(':').slice(0, 2).join(':'));
   const pb = createPatchbay({
     nodes: () => bay.nodes().filter((n) => shown(n.id)),
@@ -119,63 +113,8 @@
 
   patch(true);
 
-  // ── keyboards plugged into this machine ────────────────────────────────
-  // One `device` node per MIDI input, named after the device, with one out
-  // port linked to the synth (it sounds) and to the keys (they light). A device
-  // keeps its node id across a replug, so web:midi stays web:midi.
-  const slots = new Map();      // MIDI port id -> node id
-  const devHeld = new Map();    // node id -> Set of notes held on it
-  const devLinks = new Map();   // node id -> link ids
-  const slotFor = (p) => {
-    if (!slots.has(p.id)) slots.set(p.id, slots.size ? `${S}:midi-${slots.size + 1}` : `${S}:midi`);
-    return slots.get(p.id);
-  };
-  const wired = new WeakSet();
-  function fromDevice(e) {
-    const node = slots.get(e.target.id);
-    if (!node || !plugged.has(node)) return;
-    const [b0, d1, d2 = 0] = e.data;
-    const st = b0 & 0xf0, ch = (b0 & 0x0f) + 1;
-    if (st !== 0x90 && st !== 0x80) return;
-    const on = st === 0x90 && d2 > 0;
-    const held = devHeld.get(node);
-    if (on) held.add(d1); else held.delete(d1);
-    bay.send(`${node}:midi-out`, { cls: 'note', ch, d1, d2: on ? d2 : 0 });
-  }
-  function plug(p) {
-    const node = slotFor(p);
-    bay.addNode({ id: node, kind: 'device', label: p.name || 'MIDI keyboard', place: 'browser' });
-    if (plugged.has(node)) return;
-    bay.addPort({ id: `${node}:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] });
-    const ids = [];
-    for (const to of [`${S}:synth:midi-in`, `${S}:keys:midi-in`]) {
-      const r = bay.link(`${node}:midi-out`, to, [], { site: S });
-      if (r.ok) ids.push(r.id); else d.log(`${node}:midi-out -> ${to} refused: ${r.why}`, 'warn');
-    }
-    plugged.add(node); devHeld.set(node, new Set()); devLinks.set(node, ids);
-    if (!wired.has(p)) { p.addEventListener('midimessage', fromDevice); wired.add(p); }
-    d.log(`MIDI in: ${p.name || 'unnamed port'} as ${node}`);
-  }
-  function unplug(node) {
-    // Let go of what it was holding first, so nothing hangs or stays lit.
-    for (const n of devHeld.get(node) || []) bay.send(`${node}:midi-out`, { cls: 'note', ch: 1, d1: n, d2: 0 });
-    for (const id of devLinks.get(node) || []) bay.unlink(id);
-    plugged.delete(node); devHeld.delete(node); devLinks.delete(node);
-    d.log(`MIDI in gone: ${bay.node(node)?.label || node}`);
-  }
-  function devices(access) {
-    const now = new Set();
-    for (const p of access.inputs.values()) if (p.state !== 'disconnected') { plug(p); now.add(slotFor(p)); }
-    for (const node of [...plugged]) if (!now.has(node)) unplug(node);
-    pb.refresh();
-  }
   // Asking for MIDI shows the browser's prompt once; nothing else opens on a visit.
-  if (navigator.requestMIDIAccess) {
-    navigator.requestMIDIAccess({ sysex: false }).then((access) => {
-      devices(access);
-      access.onstatechange = () => devices(access);
-    }, () => {});   // refused: the page stays as it is with no device, and says nothing
-  }
+  askMidi();
 
   // Blocks in the shell's stack, at the shell's gap.
   d.stack.add(host, pb.el);

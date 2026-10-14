@@ -7,21 +7,16 @@
 <meta name="theme-color" content="#0b0e14">
 <title>MoQ loopback</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
 <style>
   /* Start and stop on their own row at the left, the camera picker after them
      once there is more than one camera, as on /video/camera/. */
   .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
-  .cc-top > .pos-pick[hidden] { display: none; }
   /* The picture as it leaves and the same picture back over MoQ, each half
      the content width as on /video/webrtc/. On a phone they stack, the
      original first. */
   .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
   @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
-  .cc-pair canvas { display: block; width: 100%; height: 100%; }
-  .cc-say { font-size: 12px; color: var(--dim); }
-  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
-  .cc-proto { color: var(--fg); }
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';

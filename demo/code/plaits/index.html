@@ -7,17 +7,13 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Plaits</title>
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  /* The patch selector is a full width block under the scope, as 110. */
-  .pos-pick.cc-patch { display: flex; width: 100%; }
-  .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
-  .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
-</style>
+<link rel="stylesheet" href="/shell/concept.css">
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createMidiDevices } from '/shell/midi-devices.mjs';
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
@@ -201,51 +197,9 @@
   for (const ev of ['pointerenter', 'focusin', 'touchstart']) host.addEventListener(ev, () => { voice.warm().catch(() => {}); }, { once: true, passive: true });
 
   // ── keyboards plugged into this machine, as /synth/keyboard/ ────────
-  const plugged = new Set();
+  const { plugged, ask: askMidi } = createMidiDevices({ bay, site: S, to: [ID('plaits', 'midi-in'), ID('keys', 'midi-in')],
+    onChange: () => pb.refresh(), log: (line, kind) => d.log(line, kind) });
   const shown = (id) => !id.startsWith(`${S}:midi`) || plugged.has(id.split(':').slice(0, 2).join(':'));
-  const slots = new Map(), devHeld = new Map(), devLinks = new Map();
-  const slotFor = (p) => {
-    if (!slots.has(p.id)) slots.set(p.id, slots.size ? `${S}:midi-${slots.size + 1}` : `${S}:midi`);
-    return slots.get(p.id);
-  };
-  const wired = new WeakSet();
-  function fromDevice(e) {
-    const node = slots.get(e.target.id);
-    if (!node || !plugged.has(node)) return;
-    const [b0, d1, d2 = 0] = e.data;
-    const st = b0 & 0xf0, ch = (b0 & 0x0f) + 1;
-    if (st !== 0x90 && st !== 0x80) return;
-    const on = st === 0x90 && d2 > 0;
-    const h = devHeld.get(node);
-    if (on) h.add(d1); else h.delete(d1);
-    bay.send(`${node}:midi-out`, { cls: 'note', ch, d1, d2: on ? d2 : 0 });
-  }
-  function plug(p) {
-    const node = slotFor(p);
-    bay.addNode({ id: node, kind: 'device', label: p.name || 'MIDI keyboard', place: 'browser' });
-    if (plugged.has(node)) return;
-    bay.addPort({ id: `${node}:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] });
-    const ids = [];
-    for (const to of [ID('plaits', 'midi-in'), ID('keys', 'midi-in')]) {
-      const r = bay.link(`${node}:midi-out`, to, [], { site: S });
-      if (r.ok) ids.push(r.id); else d.log(`${node}:midi-out -> ${to} refused: ${r.why}`, 'warn');
-    }
-    plugged.add(node); devHeld.set(node, new Set()); devLinks.set(node, ids);
-    if (!wired.has(p)) { p.addEventListener('midimessage', fromDevice); wired.add(p); }
-    d.log(`MIDI in: ${p.name || 'unnamed port'} as ${node}`);
-  }
-  function unplug(node) {
-    for (const n of devHeld.get(node) || []) bay.send(`${node}:midi-out`, { cls: 'note', ch: 1, d1: n, d2: 0 });
-    for (const id of devLinks.get(node) || []) bay.unlink(id);
-    plugged.delete(node); devHeld.delete(node); devLinks.delete(node);
-    d.log(`MIDI in gone: ${bay.node(node)?.label || node}`);
-  }
-  function devices(access) {
-    const now = new Set();
-    for (const p of access.inputs.values()) if (p.state !== 'disconnected') { plug(p); now.add(slotFor(p)); }
-    for (const node of [...plugged]) if (!now.has(node)) unplug(node);
-    pb.refresh();
-  }
 
   // ── the page ─────────────────────────────────────────────────────────────
   const pb = createPatchbay({
@@ -254,12 +208,7 @@
     links: () => bay.links(),
   }, { flowing: (l) => (l.from === ID('plaits', 'audio-out') ? voice.level() > 0.002 : playing.size > 0) });
   setInterval(() => pb.refresh?.(), 500);
-  if (navigator.requestMIDIAccess) {
-    navigator.requestMIDIAccess({ sysex: false }).then((access) => {
-      devices(access);
-      access.onstatechange = () => devices(access);
-    }, () => {});
-  }
+  askMidi();
   d.stack.add(voice.scope.el, patchPick.el, grid.el, host, pb.el);
 
   window.__demo.keyboard = kb;

@@ -7,27 +7,16 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Recorder</title>
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  /* record is red, the one control that starts writing (shell.css --rec) */
-  .cc-rec { color: var(--rec, #e5484d); }
-  /* The same medium colours as /concepts/misc/000/. */
-  :root {
-    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
-  }
-  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
-  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
-  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
-  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
-</style>
+<link rel="stylesheet" href="/shell/concept.css">
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
-  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  useMediumColours();
 
   // /synth/keyboard/ plus a RECORDER, a node of its own: `rec:midi-in` takes the
   // keyboard's notes along a link while armed, `rec:midi-out` plays them back

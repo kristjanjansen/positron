@@ -7,12 +7,11 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Camera recorder</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
 <style>
   /* Start and stop on their own row at the left, the camera picker after them
      once there is more than one camera. */
   .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
-  .cc-top > .pos-pick[hidden] { display: none; }
   /* The camera on the left, the playback on the right, each half the content
      width. On a phone they stack, the camera first. */
   .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
@@ -21,10 +20,6 @@
   /* The right picture is the page's ground OR the stored take, never both, and
      `display` above would otherwise beat the browser's own [hidden]. */
   .cc-pair .pos-vp-stage > [hidden] { display: none; }
-  .cc-say { font-size: 12px; color: var(--dim); }
-  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
-  /* record is red, the one control that starts writing, as /synth/timeline/ */
-  .cc-rec { color: var(--rec, #e5484d); }
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';

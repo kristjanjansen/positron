@@ -23,7 +23,7 @@ import { createBayView, BAY_VIEW_CSS } from './bay-view.mjs';
 import { createBayTraffic } from './bay-traffic.mjs';
 import { createPortInk } from './port-ink.mjs';
 import { MEDIA } from './bay.mjs';
-import { MEDIUM_COLOURS } from './patchbay.mjs';
+import { useMediumColours } from './patchbay.mjs';
 
 // The owner's copy, word for word. /kit/frontpage/'s type specimens set the
 // same four lines, so they read them from here.
@@ -140,11 +140,9 @@ let styled = false;
 function style() {
   if (styled) return;
   styled = true;
-  // The standard medium colours, as every patchbay on the site draws them
-  // (patchbay.mjs MEDIUM_COLOURS); without them every wire is one grey.
-  const MD = `:root { ${Object.entries(MEDIUM_COLOURS).map(([m, c]) => `--md-${m}: ${c};`).join(' ')} }\n`
-    + MEDIA.map((m) => `.md-${m} { color: var(--md-${m}); }`).join('\n');
-  document.head.append(Object.assign(document.createElement('style'), { id: 'pos-hero-css', textContent: BAY_VIEW_CSS + MD }));
+  // Without the medium colours every wire is one grey.
+  useMediumColours();
+  document.head.append(Object.assign(document.createElement('style'), { id: 'pos-hero-css', textContent: BAY_VIEW_CSS }));
 }
 
 /**

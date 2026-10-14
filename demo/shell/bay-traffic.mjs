@@ -165,5 +165,20 @@ export function createBayTraffic() {
     wires.push({ i: ++seq, view, linkId, medium, read, streamy: STREAMY.includes(medium),
       path: null, level: 0 });
   }
-  return { add };
+  /** Stop shading the wire `linkId` in `view`: its row is no longer read
+   *  and what it put in the picture goes. Answers how many rows went. */
+  function remove(view, linkId) {
+    let gone = 0;
+    for (let i = wires.length - 1; i >= 0; i--) {
+      const row = wires[i];
+      if (row.view !== view || row.linkId !== linkId) continue;
+      row.defs?.remove();
+      row.glow?.remove();
+      for (const p of row.pool || []) p.e.remove();
+      wires.splice(i, 1);
+      gone++;
+    }
+    return gone;
+  }
+  return { add, remove, size: () => wires.length };
 }

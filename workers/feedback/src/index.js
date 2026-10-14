@@ -50,6 +50,7 @@
  */
 
 import { json as baseJson, OPEN, preflight, callerIp, keyMatches } from '../../_lib/http.mjs';
+import { RelayRecorder } from '../../_lib/relay-recorder.mjs';
 
 const RELAY = 'https://ws.positron.studio';
 
@@ -84,18 +85,9 @@ const ARMS = {
   [DEV_ROOM]: { perAddress: 600, total: 2000 },  // the harness arms once per send
 };
 
-export class Feedback {
+export class Feedback extends RelayRecorder {
   constructor(state, env) {
-    this.state = state;
-    this.env = env;
-    this.sql = state.storage.sql;
-    this.ws = null;
-    this.room = null;
-    // ORDER IS THE PRODUCT, so handling is serialised through one chain. A DO's
-    // input gate holds events back across a STORAGE await and NOT across
-    // anything else, so two frames a millisecond apart would otherwise race
-    // each other into the table. positron-store learned this the same way.
-    this.chain = Promise.resolve();
+    super(state, env, { relay: RELAY, alarmMs: ALARM_MS, idleStopMs: IDLE_STOP_MS });
     this.credits = [];         // expiry times, one per arm not yet spent
     this.refused = 0;
     this.sql.exec(`CREATE TABLE IF NOT EXISTS note(
@@ -120,21 +112,7 @@ export class Feedback {
     meta.lastUse = Date.now();
     await this.state.storage.put('meta', meta);
     await this.state.storage.put('room', room);
-
-    if (this.ws && this.ws.readyState === WebSocket.READY_STATE_OPEN) return true;
-
-    const res = await fetch(`${RELAY}/room/${room}/ws`, { headers: { Upgrade: 'websocket' } });
-    if (res.status !== 101 || !res.webSocket) return false;
-    const ws = res.webSocket;
-    ws.accept();
-    ws.addEventListener('message', (e) => {
-      this.chain = this.chain.then(() => this.#onMessage(e.data)).catch(() => {});
-    });
-    ws.addEventListener('close', () => { if (this.ws === ws) this.ws = null; });
-    ws.addEventListener('error', () => { if (this.ws === ws) this.ws = null; });
-    this.ws = ws;
-    await this.state.storage.setAlarm(Date.now() + ALARM_MS);
-    return true;
+    return this.join(room);
   }
 
   /** Count this arm against its address and its room for the past hour.
@@ -158,7 +136,7 @@ export class Feedback {
     return this.credits.shift() !== undefined;
   }
 
-  async #onMessage(data) {
+  async onMessage(data) {
     if (typeof data !== 'string') return;    // a feedback note is never binary
     let m = null;
     try { m = JSON.parse(data); } catch { return; }
@@ -214,19 +192,9 @@ export class Feedback {
     );
   }
 
-  async alarm() {
-    const meta = await this.#meta();
-    const room = this.room || (await this.state.storage.get('room'));
-    if (!room) return;
-    this.room = room;
-    if (Date.now() - meta.lastUse > IDLE_STOP_MS) {
-      try { this.ws?.close(1000, 'idle'); } catch { /* already gone */ }
-      this.ws = null;
-      return;                                // let the object sleep
-    }
-    if (!this.ws) await this.#arm(room);
-    await this.state.storage.setAlarm(Date.now() + ALARM_MS);
-  }
+  recorderMeta() { return this.#meta(); }
+
+  rejoin(room) { return this.#arm(room); }
 
   #rows(url) {
     const q = url.searchParams;
@@ -236,16 +204,7 @@ export class Feedback {
     if (q.get('slug')) { where.push('slug = ?'); args.push(q.get('slug')); }
     if (q.get('since')) { where.push('at >= ?'); args.push(Number(q.get('since'))); }
     if (q.get('to')) { where.push('at <= ?'); args.push(Number(q.get('to'))); }
-    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-    const last = Number(q.get('last'));
-    if (Number.isFinite(last) && last > 0) {
-      // newest N, handed back OLDEST FIRST, which is the order they were written
-      return [...this.sql.exec(
-        `SELECT * FROM (SELECT * FROM note${w} ORDER BY n DESC LIMIT ?) ORDER BY n ASC`,
-        ...args, last,
-      )];
-    }
-    return [...this.sql.exec(`SELECT * FROM note${w} ORDER BY n ASC`, ...args)];
+    return this.rows('note', where, args, Number(q.get('last')));
   }
 
   async #counts() {

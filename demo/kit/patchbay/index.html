@@ -9,21 +9,18 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/kit-page.css">
 <style>
-  /* The medium colours the concept pages use, for the port ink. */
-  :root {
-    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
-  }
   .kit-n a { color: inherit; }
 </style>
 <script type="module">
   import { el } from '/shell/shell.mjs';
   import { MEDIA } from '/shell/bay.mjs';
+  import { useMediumColours } from '/shell/patchbay.mjs';
   import { createBayView, BAY_VIEW_CSS } from '/shell/bay-view.mjs';
   import { createPortInk } from '/shell/port-ink.mjs';
   import { createBayTraffic } from '/shell/bay-traffic.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createKitPage } from '/shell/kit-page.mjs';
+  useMediumColours();
 
   /**
    * kit/patchbay, 2026-10-10: what was `/concepts/21/`, asked as *"move 21 to

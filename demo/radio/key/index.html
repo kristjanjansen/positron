@@ -7,15 +7,8 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Live key</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
 <style>
-  .cc-say { font-size: 12px; color: var(--dim); }
-  /* A footer line never wraps: one line, cut at the slot's edge. */
-  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
-  /* The kit's live wave (grain-scope) as a panel's picture, as /radio/blend/
-     draws it: the panel's stage is the edge and the ground, so the scope gives up
-     its own margin, border and corner, and its always-empty caption takes no room. */
-  .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
-  .cc-wave .pos-scope-gut { display: none; }
   /* The keyboard sits in the panel's stage, so the panel is its box: the
      keyboard's own border, ground and margins come off, and so does the gap
      its pad row would have needed (this keyboard has no pad row). */
@@ -41,7 +34,6 @@
   }
   /* Play on its own row: the button's own size, at the left. */
   .cc-top { display: flex; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';

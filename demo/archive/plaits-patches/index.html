@@ -7,14 +7,7 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Plaits patches</title>
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  /* The patch selector is a full width block under the scope, as 070: the
-     name cell takes the width between the two arrows. (0,2,0) beats the
-     cell's own width. */
-  .pos-pick.cc-patch { display: flex; width: 100%; }
-  .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
-  .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
-</style>
+<link rel="stylesheet" href="/shell/concept.css">
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';

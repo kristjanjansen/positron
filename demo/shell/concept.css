@@ -1,0 +1,31 @@
+/* demo/shell/concept.css: the furniture rules three or more concept pages had
+   each written out the same, moved here verbatim. A page links it after
+   shell.css; a page whose own version of a rule differs keeps that rule inline. */
+
+/* The button group in a page's top row at its own size, and a picker that
+   is hidden takes no room in that row. */
+.cc-top > .pos-bgroup { flex: none; width: auto; }
+.cc-top > .pos-pick[hidden] { display: none; }
+
+/* A short note beside a control, and in a picture's footer one line cut at the
+   slot's edge. */
+.cc-say { font-size: 12px; color: var(--dim); }
+.pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
+
+/* A word read against a picture, so full ink. */
+.cc-proto { color: var(--fg); }
+.cc-rec { color: var(--rec, #e5484d); }
+
+/* The patch picker across the full width, its cells sharing it. */
+.pos-pick.cc-patch { display: flex; width: 100%; }
+.cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
+.cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
+
+/* The live wave as a panel's picture: the panel's stage is the edge and the
+   ground, and the scope's always-empty caption takes no room. */
+.cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
+.cc-wave .pos-scope-gut { display: none; }
+
+/* A canvas fills its half of a pair, and a beat overlay covers its host. */
+.cc-pair canvas { display: block; width: 100%; height: 100%; }
+.cc-beats { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }

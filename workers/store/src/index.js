@@ -38,6 +38,7 @@
 
 import { STORE_GRAPH } from './graph.js';
 import { json as baseJson, OPEN, preflight, ourOrigin, keyMatches } from '../../_lib/http.mjs';
+import { RelayRecorder } from '../../_lib/relay-recorder.mjs';
 
 const RELAY = 'https://ws.positron.studio';
 const CAP_DEFAULT = 1000;
@@ -59,14 +60,9 @@ const SIZE = 'IFNULL(length(CAST(body AS BLOB)), 0) + IFNULL(length(raw), 0) AS 
 // does it with no storage write.
 const REANNOUNCE_MS = 10 * 1000;
 
-export class Store {
+export class Store extends RelayRecorder {
   constructor(state, env) {
-    this.state = state;
-    this.env = env;
-    this.sql = state.storage.sql;
-    this.ws = null;
-    this.room = null;
-    this.chain = Promise.resolve();
+    super(state, env, { relay: RELAY, alarmMs: ALARM_MS, idleStopMs: IDLE_STOP_MS });
     this.from = null;          // this socket's envelope id, minted per connection like wire.mjs
     this.seq = 0;
     this.beat = null;          // the re-announce interval, alive only while the socket is
@@ -121,34 +117,20 @@ export class Store {
     meta.lastUse = Date.now();
     await this.#saveMeta(meta);
     await this.state.storage.put('room', room);
+    return this.join(room);
+  }
 
-    if (this.ws && this.ws.readyState === WebSocket.READY_STATE_OPEN) return true;
-
-    const res = await fetch(`${RELAY}/room/${room}/ws`, { headers: { Upgrade: 'websocket' } });
-    if (res.status !== 101 || !res.webSocket) return false;
-    const ws = res.webSocket;
-    ws.accept();
-    // ORDER IS THE PRODUCT here, so handling is serialised through one chain.
-    // A DO's input gate holds events back across a STORAGE await, but not
-    // across `blob.arrayBuffer()` — and two frames a millisecond apart would
-    // then race each other into the table in the wrong order.
-    ws.addEventListener('message', (e) => {
-      this.chain = this.chain.then(() => this.#onMessage(e.data)).catch(() => {});
-    });
-    ws.addEventListener('close', () => { if (this.ws === ws) this.#gone(); });
-    ws.addEventListener('error', () => { if (this.ws === ws) this.#gone(); });
-    this.ws = ws;
+  /** A new socket gets a new envelope id and starts announcing itself. */
+  opened() {
     this.from = crypto.randomUUID().replace(/-/g, '').slice(0, 6);
     this.seq = 0;
     this.#announce();
     clearInterval(this.beat);
     this.beat = setInterval(() => this.#announce(), REANNOUNCE_MS);
-    await this.state.storage.setAlarm(Date.now() + ALARM_MS);
-    return true;
   }
 
   /** The socket is gone, so the store stops saying it is here. */
-  #gone() {
+  gone() {
     clearInterval(this.beat);
     this.beat = null;
     this.ws = null;
@@ -179,7 +161,7 @@ export class Store {
    * whenever recording is on. That asymmetry is real and the page prints it
    * rather than pretending the two paths are the same.
    */
-  async #onMessage(data) {
+  async onMessage(data) {
     const meta = await this.#meta();
     meta.seen++;
     this.dirty = true;
@@ -249,19 +231,14 @@ export class Store {
     return gone;
   }
 
-  async alarm() {
+  /** The meta for the alarm, which is also when the counts held in memory are written. */
+  async recorderMeta() {
     const meta = await this.#meta();
     await this.#flushMeta();
-    const room = this.room || (await this.state.storage.get('room'));
-    if (!room) return;
-    if (Date.now() - meta.lastUse > IDLE_STOP_MS) {
-      try { this.ws?.close(1000, 'idle'); } catch { /* already gone */ }
-      this.#gone();
-      return;                              // let the DO sleep
-    }
-    if (!this.ws) await this.#record(room, meta.cap);
-    await this.state.storage.setAlarm(Date.now() + ALARM_MS);
+    return meta;
   }
+
+  rejoin(room, meta) { return this.#record(room, meta.cap); }
 
   #rows(url) {
     const q = url.searchParams;
@@ -271,17 +248,9 @@ export class Store {
     if (q.get('from')) { where.push('at >= ?'); args.push(Number(q.get('from'))); }
     if (q.get('to')) { where.push('at <= ?'); args.push(Number(q.get('to'))); }
     if (q.get('type')) { where.push('type = ?'); args.push(q.get('type')); }
-    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-    const last = Number(q.get('last'));
-    if (Number.isFinite(last) && last > 0) {
-      // newest N, then handed back OLDEST FIRST, which is the order they were
-      // delivered in and the order a reader merges into a live list
-      return [...this.sql.exec(
-        `SELECT * FROM (SELECT * FROM msg${w} ORDER BY n DESC LIMIT ?) ORDER BY n ASC`,
-        ...args, last,
-      )];
-    }
-    return [...this.sql.exec(`SELECT * FROM msg${w} ORDER BY n ASC`, ...args)];
+    // newest N with `last`, handed back OLDEST FIRST either way, which is the
+    // order they were delivered in and the order a reader merges into a live list
+    return this.rows('msg', where, args, Number(q.get('last')));
   }
 
   async fetch(request) {

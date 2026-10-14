@@ -18,7 +18,7 @@
 
 - ~~**Delete view's ERR proxy and the Gate Durable Object (migration)**~~ (2026-10-14, DONE, 75fcd59a; the migration runs on the next deploy). Asked: *"view's ERR proxy: delete it? - yes"*.
 
-- **Review phase 5: consolidate repeated code into the kit, and bay-traffic remove()** (2026-10-14, agent). Asked: *"do review"*.
+- ~~**Review phase 5: consolidate repeated code into the kit, and bay-traffic remove()**~~ (2026-10-14, DONE). Asked: *"do review"*.
 
 - ~~**reel.mjs: the typist page's frame, recording and download as a kit library**~~ (2026-10-14, DONE: demo/shell/reel.mjs, typist 297 to 139 lines). Asked: *"do reel.mjs"*.
 
