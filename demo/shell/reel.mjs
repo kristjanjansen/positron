@@ -49,6 +49,39 @@ export function drawLowerLine(ctx, text, pad) {
   lines.forEach((ln, i) => ctx.fillText(ln, X, base - (lines.length - 1 - i) * 46));
 }
 
+// The site's two faces at 400, as shell.css declares them: an SVG drawn as an image
+// cannot reach the page's @font-face, so they ride inside it.
+export const SVG_FACES = [
+  ['Brand JetBrains Mono', '/shell/vendor/jetbrains-mono-latin-400-normal.woff2'],
+  ['Brand Geist', '/shell/vendor/geist-latin-400-normal.woff2'],
+];
+const dataUrl = (blob) => new Promise((ok, no) => {
+  const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(r.error); r.readAsDataURL(blob);
+});
+
+/** SVG markup (`body` in a `width` x `height` user space) as an Image `scale` times that size, for
+ *  `ctx.drawImage`. The faces come from this origin's cache, the ones the page already set its text in. */
+export async function svgImage(body, { width, height, scale = 1, pad = 1, faces = SVG_FACES } = {}) {
+  const css = (await Promise.all(faces.map(async ([family, url]) => {
+    try {
+      const r = await fetch(url, { cache: 'force-cache' });
+      if (!r.ok) return '';
+      return `@font-face{font-family:'${family}';font-weight:400;src:url(${await dataUrl(await r.blob())}) format('woff2')}`;
+    } catch { return ''; }
+  }))).join('');
+  const w = width + 2 * pad, h = height + 2 * pad;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w * scale}" height="${h * scale}" viewBox="${-pad} ${-pad} ${w} ${h}"><style>${css}</style>${body}</svg>`;
+  const img = new Image();
+  img.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  await img.decode();
+  // Rasterised once: drawing the SVG itself every frame re-renders it every frame.
+  const cv = document.createElement('canvas');
+  cv.width = Math.ceil(w * scale); cv.height = Math.ceil(h * scale);
+  cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+  URL.revokeObjectURL(img.src);
+  return { img: cv, w: cv.width, h: cv.height, pad: pad * scale };
+}
+
 // Instagram wants MP4; Chrome records H.264 and AAC into one, others fall back to WebM.
 export const TYPES = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
 export const pickType = (supported) => TYPES.find((t) => supported(t)) || '';
