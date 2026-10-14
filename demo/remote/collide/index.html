@@ -26,8 +26,9 @@
   import { createCodeBox } from '/shell/code-box.mjs';
   import { createSlider } from '/shell/slider.mjs';
   import { createHueBook } from '/shell/code-lang.mjs';
-  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { BOARD_SITE, boardGraph, addBoardNode } from '/shell/graph-registry.mjs';
   import { createBoard, BOARD_FRAME_MS, BOARD_CHANNELS, BOARD_RATE } from '/shell/board.mjs';
+  import { announceOn } from '/shell/announce.mjs';
   import { createBoardCollide } from '/shell/board-collide.mjs';
   import { createCollideVoice, PROGRAM, rmsOf, dbfs } from '/code/collide-voice.mjs';
 
@@ -170,6 +171,7 @@
     async function tryBoard(ctx) {
       board = createBoard({ room: 'studio-1', of: 'Raspberry Pi', showName: false, audioContext: ctx, toDestination: false,
         direct: path.mode() === 'direct', directCushionMs: 40, log: (line, kind) => log(`Pi: ${line}`, kind) });
+      announceOn(board, bay, { label: 'Collide here and on the Pi' });
       kit = createBoardCollide({ board, log: (line, kind) => log(`Pi: ${line}`, kind) });
       // A harness may not drive the board (`createBoard`'s guard), so it is
       // simulated under a check without a word on the wire.
@@ -266,20 +268,21 @@
       'collide:value-in': (e) => { if (e?.of === 'param' && local.param(e.name, e.v)) paramSends++; },
     },
   });
-  // The Pi's node is boardGraph's, not the catalogue's, so it is drawn here.
-  const piNode = bay.addNode({ id: `${BOARD_SITE}:collide`, kind: 'engine', label: 'SuperCollider on the Pi', place: 'studio-1' });
-  const PORTS = [
-    { id: PI('midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
-      if (e?.cls !== 'note') return;
-      piNotesIn++;
-      if (e.d2) pi.noteOn(e.d1, e.d2); else pi.noteOff(e.d1);
-    } },
-    { id: PI('value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: NAMES }, deliver: (e) => {
-      if (e?.of === 'param' && pi.param(e.name, e.v)) piParamSends++;
-    } },
-    { id: PI('audio-out'), dir: 'out', medium: 'audio' },
-  ];
-  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  // The Pi's node is the one the board announces (graph-registry.mjs `boardGraph`,
+  // `pi-1:collide` with the catalogue's ports), drawn here with this page's label,
+  // the knob names of the program it loads, and what each port does here.
+  const piNode = addBoardNode(bay, boardGraph({ room: 'studio-1', instruments: { collide: true }, gpu: false }), 'collide', {
+    label: 'SuperCollider on the Pi',
+    ports: { 'value-in': { shape: { of: 'param', names: NAMES } } },
+    deliver: {
+      'midi-in': (e) => {
+        if (e?.cls !== 'note') return;
+        piNotesIn++;
+        if (e.d2) pi.noteOn(e.d1, e.d2); else pi.noteOff(e.d1);
+      },
+      'value-in': (e) => { if (e?.of === 'param' && pi.param(e.name, e.v)) piParamSends++; },
+    },
+  });
   addNodes(bay, S, ['fader', 'xfade'], {
     portLabel: 'node:port',
     deliver: { 'xfade:value-in': (e) => {

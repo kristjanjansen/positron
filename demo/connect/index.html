@@ -64,6 +64,22 @@
   .cn-faces { display: flex; flex-direction: column; gap: 24px; }
   .cn-faces[hidden] { display: none; }
   .cn-face { min-width: 0; }
+
+  /* The listen control sits in the raspberry pi group, under its heading. */
+  .cn-live { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .cn-live-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ctl-gap); }
+  .cn-live-row > .pos-field { flex: 0 1 220px; }
+  /* Listen and Stop in one case, as the proposal buttons above. */
+  .cn-live-row button { text-transform: none; }
+  .cn-live-st { margin: 0; font: 400 12px/1.4 var(--sans); color: var(--dim); }
+  .cn-site h3 .cn-site-st { margin-left: 10px; letter-spacing: normal; text-transform: none; font-weight: 400; color: var(--dim); }
+  .cn-site h3 .cn-site-st:empty { display: none; }
+  /* The kit's presence dot: green when its site answered inside STALE_MS, an empty ring once quiet. */
+  .cn-dot { display: inline-block; vertical-align: middle; color: var(--ok); margin-left: 6px; }
+  .cn-dot.cn-ring { color: var(--dim2); }
+  .cn-dot.cn-ring::after { display: none; }
+  .cn-port.cn-inert { color: var(--c); white-space: nowrap; }
+  .cn-livemark { fill: var(--ok); }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
@@ -77,6 +93,20 @@
   import { sharedAudio, claim, release, contexts } from '/shell/audio.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { knobRaw } from '/shell/synth-params.mjs';
+  import { createBayNode, roomFor, ROOM_RE, STUDIO_ROOM } from '/shell/bay-node.mjs';
+  import { createRegistry, STALE_MS } from '/shell/graph-registry.mjs';
+  import { RELAY_BASE, DEFAULT_RELAY, openWire } from '/shell/wire.mjs';
+  import { pageGraph } from '/shell/announce.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+
+  // Every socket this page opens, counted from its first line, so "a visit opens
+  // nothing" is an assert over a counter rather than a reading of the file.
+  const OPENED = [];
+  if (SELFCHECK) {
+    const Native = window.WebSocket;
+    window.WebSocket = class extends Native { constructor(u, p) { super(u, p); OPENED.push(String(u)); } };
+  }
 
   // ── what the site has, read rather than typed ───────────────────────────
   // Every node in the grid is one the site's own pages build, each shown ONCE
@@ -94,9 +124,10 @@
   //   3. The hops between sites, which are catalogue entries too (shout,
   //      stream-live, stream-hls, moq-relay), drawn after the Pi as before.
   //      cf-relay is not one: the patchbay draws it from a link.
-  const PI = boardGraph({ room: 'studio-1', instruments: { synth: true, pappusFx: true, sampler: true }, jack: true, gpu: true,
-    inputs: [{ name: 'circuit', channels: 2, jack: true, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
-  const PI_PAGES = { circuit: ['remote/circuit'], sampler: ['remote/piano'] };
+  const PI = boardGraph({ room: 'studio-1', instruments: { synth: true, pappusFx: true, sampler: true, collide: true }, jack: true, gpu: true,
+    camera: true, inputs: [{ name: 'circuit', channels: 2, jack: true, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
+  const PI_PAGES = { circuit: ['remote/circuit'], sampler: ['remote/piano'], collide: ['remote/collide'], drums: ['drums/remote'],
+    shader: ['shader/remote'], camera: ['remote/circuit'] };
   const HOPS = Object.keys(CATALOGUE).filter((n) => CATALOGUE[n].kind === 'endpoint');
   // A box is `<site>:<name>`, except where the name is not what the pages draw:
   // the hops, and the two knobs renamed so they cannot read as a knob instance.
@@ -413,6 +444,7 @@
       svg.append(hit);
     }
     lightArmed();
+    markPicture();
   }
   // A wire's key is its printed form; a relayed link is two hops through the drawn relay box.
   function linkFor(key) {
@@ -433,41 +465,185 @@
     if (site !== 'web') return GROUPS[6];
     return { person: GROUPS[0], device: GROUPS[0], engine: GROUPS[1], store: GROUPS[2] }[n.kind] ?? GROUPS[3];
   }
+
+  // ── the live layer: what is present in a room right now ─────────────────
+  // A person presses Listen in a room they choose. The Pi puts its graph on
+  // every beat and a page in the room announces its own (announce.mjs). Live
+  // is a state on the boxes: a green dot when heard inside STALE_MS, an empty
+  // ring once quiet, nothing when never heard. A node the Pi has and no page
+  // here draws yet is a box of its own; another tab is a group of its own.
+  const Q = new URLSearchParams(location.search);
+  const STALE = SELFCHECK && Number(Q.get('stale')) > 0 ? Number(Q.get('stale')) : STALE_MS;
+  // studio-1 is the owner's desk: only a person's own press listens there, and never a check.
+  const mayListen = (room, person) => ROOM_RE.test(room) && (room !== STUDIO_ROOM || (person && !SELFCHECK));
+  let listener = null, liveTimer = null, shape = '';
+  const said = new Set();
+  /** Every site heard, freshest per site, and every node's state by id. */
+  function liveNow() {
+    const sites = new Map(), state = new Map();
+    if (!listener) return { sites, state };
+    for (const e of listener.registry.graphs()) {
+      if (e.from === 'self') continue;
+      const was = sites.get(e.site);
+      if (!was || e.at > was.at) sites.set(e.site, e);
+    }
+    for (const e of sites.values()) {
+      if (e.stale) {
+        for (const n of e.graph.nodes) if (!state.has(n.id)) state.set(n.id, 'stale');
+        continue;
+      }
+      for (const n of e.graph.nodes) state.set(n.id, 'live');
+    }
+    return { sites, state };
+  }
+  let live = liveNow();
+  const dot = (on) => el('span', `pos-pres-dot cn-dot${on ? '' : ' cn-ring'}`);
+  const ago = (e) => Math.round((Date.now() - e.at) / 1000);
+  const siteSays = (e) => (e ? (e.stale ? `quiet for ${ago(e)} s` : `heard ${ago(e)} s ago`) : '');
+  const groupName = (e) => (e.graph.kind === 'board' ? `raspberry pi ${e.site}` : e.graph.kind === 'browser' ? `tab ${e.site}` : `${e.graph.kind || 'site'} ${e.site}`);
+
+  const roomField = createField({ label: 'room', value: roomFor({ slug: 'connect' }) });
+  let lastPressTrusted = false;
+  const listenBtns = createButtonGroup({ buttons: [
+    { id: 'listen', label: 'Listen', primary: true, onPress: () => listen(roomField.value().trim()) },
+    { id: 'stop', label: 'Stop', onPress: () => stopListening() },
+  ] });
+  listenBtns.button('listen').addEventListener('click', (e) => { lastPressTrusted = e.isTrusted; }, { capture: true });
+  listenBtns.enable('stop', false, 'not listening');
+  const liveSt = el('p', 'cn-live-st', 'Listen joins a room and marks what answers in it now');
+  const liveCtl = el('div', 'cn-live');
+  const liveRow = el('div', 'cn-live-row');
+  liveRow.append(roomField.el, listenBtns.el);
+  liveCtl.append(liveRow, liveSt);
+
+  function card(n, ports, { pressable = true, note = '' } = {}) {
+    const box = el('div', 'cn-box');
+    box.dataset.node = n.id;
+    const head = el('div', 'cn-head');
+    const id = el('span', 'cn-id', n.id);
+    if (INSTANCE.has(n.id)) id.title = `one box for the type: ${INSTANCE.get(n.id)}`;
+    const st = live.state.get(n.id);
+    if (st) {
+      box.dataset.live = st;
+      const dt = dot(st === 'live');
+      dt.title = st === 'live' ? `answering in ${listener?.room}` : `quiet for more than ${STALE / 1000} s`;
+      id.append(dt);
+    }
+    head.append(id, el('span', 'cn-label', [n.label || '', note].filter(Boolean).join(', ')));
+    const row = el('div', 'cn-ports'), ins = el('div'), outs = el('div');
+    for (const p of ports) {
+      const name = p.id.split(':')[2];
+      const b = pressable ? el('button', 'pos-linkbtn cn-port', name, { type: 'button', 'aria-pressed': 'false' }) : el('span', 'cn-port cn-inert', name);
+      b.style.setProperty('--c', `var(--md-${p.medium})`);
+      if (pressable) {
+        b.dataset.port = p.id;
+        b.title = p.dir === 'out' ? 'press, then press an in port' : 'press an out port first, then this';
+        b.addEventListener('click', (e) => pick(p.id, e));
+      } else b.title = 'announced, and no page here links to it yet';
+      (p.dir === 'out' ? outs : ins).append(b);
+    }
+    row.append(ins, outs);
+    box.append(head, row);
+    return box;
+  }
+  function section(title, e, cards, extra = null) {
+    const box = el('section', 'cn-site');
+    const h = el('h3', '', title);
+    if (e) { const t = el('span', 'cn-site-st', siteSays(e)); t.dataset.site = e.site; h.append(t); box.dataset.site = e.site; }
+    box.append(h);
+    if (extra) box.append(extra);
+    const grid = el('div', 'cn-grid');
+    grid.append(...cards);
+    if (cards.length) box.append(grid);
+    return box;
+  }
   const groups = el('div');
   function drawGrid() {
     const inPic = linkedNodes();
     const byGroup = new Map(GROUPS.map((g) => [g, []]));
-    for (const n of bay.nodes()) if (!inPic.has(n.id) && !isInstance(n.id)) byGroup.get(groupOf(n)).push(n);
+    for (const n of bay.nodes()) if (!inPic.has(n.id) && !isInstance(n.id)) byGroup.get(groupOf(n)).push(card(n, bay.ports().filter((q) => nodeOf(q.id) === n.id)));
+    const pi = live.sites.get(BOARD_SITE);
+    // What the Pi says it has and no page here draws: a box of its own, quietly marked.
+    for (const n of pi?.graph.nodes || []) {
+      if (bay.node(n.id)) continue;
+      byGroup.get(GROUPS[4]).push(card(n, pi.graph.ports.filter((p) => nodeOf(p.id) === n.id), { pressable: false, note: 'no page yet' }));
+    }
     const out = [];
-    for (const [where, nodes] of byGroup) {
-      if (!nodes.length) continue;
-      const box = el('section', 'cn-site');
-      box.append(el('h3', '', where));
-      const grid = el('div', 'cn-grid');
-      for (const n of nodes) {
-        const card = el('div', 'cn-box');
-        card.dataset.node = n.id;
-        const head = el('div', 'cn-head');
-        const id = el('span', 'cn-id', n.id);
-        if (INSTANCE.has(n.id)) id.title = `one box for the type: ${INSTANCE.get(n.id)}`;
-        head.append(id, el('span', 'cn-label', n.label || ''));
-        const ports = el('div', 'cn-ports'), ins = el('div'), outs = el('div');
-        for (const p of bay.ports().filter((q) => nodeOf(q.id) === n.id)) {
-          const b = el('button', 'pos-linkbtn cn-port', p.id.split(':')[2], { type: 'button', 'aria-pressed': 'false' });
-          b.dataset.port = p.id;
-          b.style.setProperty('--c', `var(--md-${p.medium})`);
-          b.title = p.dir === 'out' ? 'press, then press an in port' : 'press an out port first, then this';
-          b.addEventListener('click', (e) => pick(p.id, e));
-          (p.dir === 'out' ? outs : ins).append(b);
+    for (const [where, cards] of byGroup) {
+      if (where === GROUPS[4]) {
+        out.push(section(where, pi, cards, liveCtl));
+        // Every other site heard, a group each, after the Pi.
+        for (const e of live.sites.values()) {
+          if (e.site === BOARD_SITE) continue;
+          out.push(section(groupName(e), e, e.graph.nodes.map((n) => card(n, e.graph.ports.filter((p) => nodeOf(p.id) === n.id), { pressable: false }))));
         }
-        ports.append(ins, outs);
-        card.append(head, ports);
-        grid.append(card);
+        continue;
       }
-      box.append(grid);
-      out.push(box);
+      if (cards.length) out.push(section(where, null, cards));
     }
     groups.replaceChildren(...out);
+    lightArmed();
+  }
+
+  /** Join `room` and collect what is said there. `person` is a press the browser made. */
+  function listen(room, person = lastPressTrusted) {
+    lastPressTrusted = false;
+    if (!mayListen(room, person)) {
+      d.log(!ROOM_RE.test(room) ? `${JSON.stringify(room)} is not a room name` : `${STUDIO_ROOM} is the studio's own room, so only a person's own press listens there`, 'warn');
+      return false;
+    }
+    stopListening();
+    listener = createBayNode({ room, graphs: [], registry: createRegistry({ staleMs: STALE }),
+      onGraph: () => drawLive(), onJoin: () => drawLive(), log: (m) => d.log(m) });
+    listener.join();
+    liveTimer = setInterval(drawLive, 1000);
+    listenBtns.enable('stop', true);
+    liveSt.textContent = `joining ${room}`;
+    return true;
+  }
+  function stopListening() {
+    if (!listener) return;
+    clearInterval(liveTimer); liveTimer = null;
+    listener.leave();
+    d.log(`left ${listener.room}`);
+    listener = null;
+    said.clear();
+    listenBtns.enable('stop', false, 'not listening');
+    liveSt.textContent = 'not listening';
+    drawLive();
+  }
+
+  // Redraws the grid only when what is heard changes; the ages tick in place.
+  function drawLive() {
+    live = liveNow();
+    const heard = [...live.sites.values()];
+    for (const e of heard) {
+      if (!said.has(e.from + e.site)) { said.add(e.from + e.site); d.log(`heard ${e.site}${e.graph.label ? ` (${e.graph.label})` : ''}, ${e.graph.nodes.length} nodes`); }
+    }
+    if (listener) {
+      const n = heard.filter((e) => !e.stale).length;
+      liveSt.textContent = !listener.joined() ? `joining ${listener.room}`
+        : !heard.length ? `listening in ${listener.room}, nothing heard yet` : `listening in ${listener.room}, ${n} of ${heard.length} sites answering`;
+    }
+    const next = JSON.stringify([...live.state], null) + heard.map((e) => e.site + JSON.stringify(e.graph)).join();
+    if (next !== shape) { shape = next; drawGrid(); markPicture(); }
+    for (const t of groups.querySelectorAll('.cn-site-st')) t.textContent = siteSays(live.sites.get(t.dataset.site));
+  }
+  // A green dot after the title of every box in the picture that is answering now.
+  function markPicture() {
+    const svg = svgOf();
+    if (!svg) return;
+    for (const m of svg.querySelectorAll('.cn-livemark')) m.remove();
+    for (const t of svg.querySelectorAll('text.lv-title')) {
+      if (live.state.get(t.textContent) !== 'live') continue;
+      const b = t.getBBox();
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('class', 'cn-livemark');
+      c.setAttribute('cx', String(b.x + b.width + 8)); c.setAttribute('cy', String(b.y + b.height / 2)); c.setAttribute('r', '3.5');
+      c.dataset.live = t.textContent;
+      c.append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'title'), { textContent: `answering in ${listener?.room}` }));
+      svg.append(c);
+    }
   }
 
   function redraw() {
@@ -524,6 +700,11 @@
     // Before anything is pressed: no runtime, no face, no sound device.
     A('a visit opens no sound device and shows no face', contexts() === 0 && runtime.list().length === 0
       && faces.hidden && getComputedStyle(faces).display === 'none', `contexts ${contexts()}, runtimes ${runtime.list().length}`);
+
+    A('a visit joins no room and opens no socket', OPENED.length === 0 && listener === null && !groups.querySelector('.cn-box[data-live]'),
+      OPENED.join(' ') || 'none opened');
+    A('a check never listens in the studio\'s room, even on a trusted press', !mayListen(STUDIO_ROOM, false) && !mayListen(STUDIO_ROOM, true)
+      && roomField.value() !== STUDIO_ROOM, `the field reads ${roomField.value()}`);
 
     A('every node made it into the bay', failed.length === 0 && bay.nodes().length === EXPECTED,
       `${bay.nodes().length} of ${EXPECTED}: ${Object.keys(CATALOGUE).length} catalogue types (${HOPS.length} of them hops), ${PI_KEPT} Pi`
@@ -698,5 +879,93 @@
     A('with nothing linked every runtime is closed and the faces take no room', runtime.list().length === 0 && faces.hidden);
 
     A('the self-check asked the wish worker nothing', reached === 0, `${reached} calls`);
+
+    await checkLive();
+  }
+
+  // ── the live layer, against the stand-ins ─────────────────────────────────
+  // Only with `?relay=` on this machine (demo/fake-relay.mjs) and a private
+  // room, where demo/fake-board.mjs answers as the Pi. Without them these are
+  // left out and the log says so, because a check never reaches the real relay.
+  async function checkLive() {
+    const A = d.assert;
+    const room = roomField.value();
+    if (RELAY_BASE === DEFAULT_RELAY || room === STUDIO_ROOM) {
+      d.log('left out: the live layer is checked only against a stand-in relay (?relay=ws://127.0.0.1:...) in a private room', 'dim');
+      return;
+    }
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const runtimes = async () => { await runtime.idle(); await new Promise((r) => requestAnimationFrame(() => r())); };
+    const until = async (fn, ms) => { const t0 = performance.now(); while (!fn() && performance.now() - t0 < ms) await sleep(100); return fn(); };
+    const card = (id) => groups.querySelector(`.cn-box[data-node="${id}"]`);
+    const liveCard = (id) => card(id)?.dataset.live === 'live' && !!card(id).querySelector('.cn-dot:not(.cn-ring)');
+    const staleCard = (id) => card(id)?.dataset.live === 'stale' && !!card(id).querySelector('.cn-dot.cn-ring');
+    const group = (site) => groups.querySelector(`.cn-site[data-site="${site}"]`);
+    const markedInPicture = (id) => !!svgOf()?.querySelector(`.cn-livemark[data-live="${id}"]`);
+
+    // NEGATIVE CONTROL first: a room on the same stand-in relay where nobody is.
+    const quiet = `${room}-empty`;
+    listen(quiet);
+    await until(() => listener?.joined(), 4000);
+    await sleep(2500);
+    A('NEGATIVE CONTROL: listening where no stand-in answers, no box is marked and no group is added', listener?.joined()
+      && live.sites.size === 0 && !groups.querySelector('.cn-box[data-live]') && !groups.querySelector('.cn-site[data-site]'),
+      `${live.sites.size} sites heard in ${quiet}, joined ${listener?.joined()}`);
+
+    // The stand-in board, in the private room the runner started it in.
+    listen(room);
+    A('the room listened in is the private one, never the studio\'s', listener?.room === room && room !== STUDIO_ROOM
+      && OPENED.every((u) => !u.includes(`/room/${STUDIO_ROOM}/`)), `${listener?.room}`);
+    await until(() => live.sites.get(BOARD_SITE) && !live.sites.get(BOARD_SITE).stale, 8000);
+    const pi = live.sites.get(BOARD_SITE);
+    const piIds = (pi?.graph.nodes || []).map((n) => n.id);
+    const ofPi = (id) => !!group(BOARD_SITE)?.querySelector(`.cn-box[data-node="${id}"]`);
+    A('after Listen, the stand-in board\'s boxes in the raspberry pi group carry a live dot, and its heading says when it was heard',
+      !!pi && piIds.includes(`${BOARD_SITE}:circuit`) && ofPi(`${BOARD_SITE}:circuit`) && liveCard(`${BOARD_SITE}:circuit`)
+        && /heard \d+ s ago/.test(group(BOARD_SITE)?.querySelector('h3')?.textContent || ''),
+      pi ? `${piIds.join(' ')}; heading "${group(BOARD_SITE)?.querySelector('h3')?.textContent}"` : 'no pi-1 heard');
+    A('a box the Pi did not announce carries no dot', !!card(`${BOARD_SITE}:sampler`) && !piIds.includes(`${BOARD_SITE}:sampler`)
+      && !card(`${BOARD_SITE}:sampler`).dataset.live, `sampler announced ${piIds.includes(`${BOARD_SITE}:sampler`)}`);
+    const extra = piIds.filter((id) => !bay.node(id));
+    A('a node the Pi has and no page here draws is a box in its group, quietly "no page yet", never "not in the catalogue"',
+      extra.length > 0 && extra.every((id) => ofPi(id) && liveCard(id) && /no page yet/.test(card(id).querySelector('.cn-label').textContent))
+        && !/not in the catalogue/.test(groups.textContent),
+      extra.join(', ') || 'none extra');
+    // A Pi box in the picture is marked too.
+    [...exRow.children].find((b) => b.textContent === 'play the circuit in the studio').click();
+    await runtimes();
+    await until(() => markedInPicture(`${BOARD_SITE}:circuit`), 2000);
+    A('a live Pi box drawn in the picture carries the mark there', markedInPicture(`${BOARD_SITE}:circuit`) && !markedInPicture('web:keys'));
+
+    // A second tab: another socket in the room announcing a page's bay, as announce.mjs does.
+    const tab = createBay();
+    tab.addNode({ id: 'web:keys', kind: 'person', label: 'keyboard' });
+    tab.addPort({ id: 'web:keys:midi-out', dir: 'out', medium: 'midi', emits: ['note'] });
+    tab.addNode({ id: 'web:theremin', kind: 'person', label: 'theremin' });
+    tab.addPort({ id: 'web:theremin:midi-out', dir: 'out', medium: 'midi' });
+    const { graph } = pageGraph(tab, { label: 'a second tab' });
+    const other = await new Promise((resolve) => { const w = openWire(room, { by: 'tool', reconnect: false, onOpen: () => resolve(w) }); });
+    other.send({ type: 'graph.announce', graph });
+    other.close();
+    await until(() => !!group(graph.site), 4000);
+    A('a second tab\'s announce shows up as a group of its own, "tab <site>", with a live box per node',
+      !!group(graph.site) && group(graph.site).querySelector('h3').textContent.startsWith(`tab ${graph.site}`)
+        && graph.nodes.every((n) => liveCard(n.id)), `site ${graph.site}, ${graph.nodes.map((n) => `${n.id} ${card(n.id)?.dataset.live}`).join(', ')}`);
+
+    // It said it once and its socket is gone, so it ages out; the board beats on.
+    await until(() => live.sites.get(graph.site)?.stale, STALE + 3000);
+    await sleep(1100);
+    A(`a node goes stale after STALE_MS (${STALE} ms here): its dot turns to an empty ring, while the board stays live`,
+      graph.nodes.every((n) => staleCard(n.id)) && /quiet for \d+ s/.test(group(graph.site)?.querySelector('h3')?.textContent || '')
+        && live.state.get(`${BOARD_SITE}:circuit`) === 'live' && markedInPicture(`${BOARD_SITE}:circuit`),
+      `tab ${graph.nodes.map((n) => card(n.id)?.dataset.live).join(' ')}, board in picture ${markedInPicture(`${BOARD_SITE}:circuit`)}`);
+
+    stopListening();
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
+    A('Stop leaves the room, the heard groups and boxes go, and nothing is marked', !listener && live.sites.size === 0
+      && !groups.querySelector('.cn-box[data-live]') && !groups.querySelector('.cn-site[data-site]') && !svgOf()?.querySelector('.cn-livemark')
+      && !card(`${BOARD_SITE}:synth`));
   }
 </script>

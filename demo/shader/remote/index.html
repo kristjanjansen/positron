@@ -27,8 +27,9 @@
   import { createCodeBox } from '/shell/code-box.mjs';
   import { PARAM_HUES } from '/shell/code-lang.mjs';
   import { createCompileIdle } from '/shell/compile-idle.mjs';
-  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { BOARD_SITE, boardGraph, addBoardNode, addBoardPorts } from '/shell/graph-registry.mjs';
   import { createBoard } from '/shell/board.mjs';
+  import { announceOn } from '/shell/announce.mjs';
   import { createBoardVideo, BOARD_VIDEO_ASK } from '/shell/board-video.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createPathChoice, hintCell, PATH_HINT, NETWORK_HINT, viaOf } from '/remote/path.mjs';
@@ -501,6 +502,7 @@ void main(){
           if (m.type === 'video.shader.applied' && !m.ok && pending?.what === 'shader') pending = null;
           if (m.type === 'video.stopped') { log('Pi: the board stopped its picture'); leave(false); }
         } });
+      announceOn(board, bay, { label: 'Mirror shader here and on the Pi' });
       if (!board.driving()) return 'this run may not drive the board';
       if (typeof VideoDecoder !== 'function') return 'this browser has no WebCodecs, so the Pi’s picture cannot be decoded here';
       const t0 = performance.now();
@@ -713,9 +715,8 @@ void main(){
   const PI = (port) => `${BOARD_SITE}:shader:${port}`;
   const KNOB_OUT = ID('knob-segments', 'value-out'), CODE_OUT = ID('code', 'program-out');
   const bay = createBay();
-  const PROG_SHAPE = { of: 'glsl' };
   // The browser's nodes are /shell/nodes.mjs's, each port labelled `node:port`;
-  // the Pi's is not in boardGraph() (`gpu` is), so it stays here.
+  // the Pi's is the one the board announces, `pi-1:shader` (boardGraph, below).
   addNodes(bay, S, ['knob-segments', 'code', 'shader', 'screen'], {
     portLabel: 'node:port',
     label: { 'knob-segments': 'knob', shader: 'mirror shader here', screen: 'picture here' },
@@ -734,24 +735,26 @@ void main(){
       },
     },
   });
-  // not in nodes.mjs yet: pi-1:shader is simulated and boardGraph() has no node for it
-  piNode = bay.addNode({ id: `${BOARD_SITE}:shader`, kind: 'engine', label: 'v3dpipe on the Pi, simulated', place: 'studio-1' });
+  // The Pi's node is the one the board announces (graph-registry.mjs `boardGraph`):
+  // `pi-1:shader`, v3dpipe rendering the mirror shader on the Pi's GPU, its
+  // picture on the relay's H.264 room or the `vid` data channel on the direct
+  // link. Simulated in this tab until a real board answers (`showMode`).
+  // ⚠️ THE NODE IS ADDED BEFORE `screen-pi` AND ITS PORTS AFTER, as they always
+  // were, so the picture's order does not move.
+  const PI_GRAPH = boardGraph({ room: 'studio-1', gpu: true });
+  piNode = addBoardNode(bay, PI_GRAPH, 'shader', { label: 'v3dpipe on the Pi, simulated', withPorts: false });
   addNodes(bay, S, ['screen-pi'], { label: { 'screen-pi': 'Pi picture' }, portLabel: 'node:port' });
-  const PORTS = [
-    { id: PI('value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['segments'] }, deliver: (e) => {
+  addBoardPorts(bay, PI_GRAPH, 'shader', { deliver: {
+    'value-in': (e) => {
       if (e?.of !== 'param' || e.name !== 'segments') return;
       piDelivered++;
       // ⚠️ `mirrors` IS THE BOARD'S WIRE NAME AND STAYS: the page calls it
-      // segments, `video.params` has always said `mirrors`, and /mirror/ sends it.
+      // segments, `video.params` has always said `mirrors` (it takes `segments`
+      // too since 2026-10-14), and /mirror/ sends it.
       pi.send({ type: 'video.params', mirrors: Math.round(e.v) }, e.at);
-    } },
-    { id: PI('program-in'), dir: 'in', medium: 'program', shape: PROG_SHAPE, deliver: (e) => {
-      pi.send({ type: 'video.shader', body: bodyOf(e.source) }, e.at);
-    } },
-    // The relay's H.264 room, or the `vid` data channel on the direct link.
-    { id: PI('video-out'), dir: 'out', medium: 'video', transports: ['relay-h264', 'datachannel'] },
-  ];
-  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+    },
+    'program-in': (e) => { pi.send({ type: 'video.shader', body: bodyOf(e.source) }, e.at); },
+  } });
   const held = new Set();
   function hold(a, b, opts = {}) {
     bay.seen(a); bay.seen(b);

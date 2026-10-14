@@ -1,6 +1,6 @@
 ## Open
 
-- **/connect/ live: on the Pi's own group, not a separate list; announced Pi nodes with no page become boxes ("no page yet"), never "not in the catalogue"** (2026-10-14, passed to the announce agent). Asked: *"do not get it. should it be next to pi?"* after Listen in studio-1 showed synth, pappus, capture, gpu, midi-fasttrack-pro as not in the catalogue.
+- ~~**/connect/ live: on the Pi's own group, not a separate list; announced Pi nodes with no page become boxes ("no page yet"), never "not in the catalogue"**~~ (2026-10-14, DONE). Asked: *"do not get it. should it be next to pi?"* after Listen in studio-1 showed synth, pappus, capture, gpu, midi-fasttrack-pro as not in the catalogue.
 
 - ~~**WebMCP kept as a plan, experiment code archived**~~ (2026-10-14, DONE: plans/plan-webmcp.md, archive/webmcp/). Asked: *"just keep mcp as plan. archie code"*.
 
@@ -24,7 +24,7 @@
 
 - ~~**Node catalogue step 2: every concept page builds its nodes with addNodes() from nodes.mjs**~~ (2026-10-14, DONE in four commits; the catalogue pass of what the groups collected follows). Asked: *"do these"*.
 
-- **Live announce: every page announces its nodes (bay-node graph.announce) so /connect/ can show what is present now** (2026-10-14). Asked: *"do these"*. After step 2.
+- ~~**Live announce: every page announces its nodes (bay-node graph.announce) so /connect/ can show what is present now**~~ (2026-10-14, DONE). Asked: *"do these"*. After step 2.
 
 - ~~**/connect/ from the catalogue (only real nodes, each with its pages), examples as lowercase Geist pills in a new "human input" colour**~~ (2026-10-14, DONE: --voice #4bd2c7). Asked: *"lowercase. fully round. geist. find nonused color to sigify human inout / pronpot / voice"*, *"still have those imaginary ones?"*.
 

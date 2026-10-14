@@ -51,6 +51,7 @@
   import { createBay } from '/shell/bay.mjs';
   import { addNodes } from '/shell/nodes.mjs';
   import { createBoard } from '/shell/board.mjs';
+  import { announceOn } from '/shell/announce.mjs';
   import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
 
   const d = mount({ name: 'Piano and Rhodes on Pi', what: '', index: '/', indexLabel: 'positron',
@@ -285,6 +286,7 @@
       log: (line, kind) => d.log(line, kind),
       onOpen: () => open(true),
     });
+    announceOn(board, bay, { label: 'Piano and Rhodes on Pi' });
   }
 
   async function start() {
