@@ -13,10 +13,10 @@ const WIRES = [
   { mod: 'VCC', pin: 1, c: C.v3, what: 'power in, 3.3 V from the Pi', long: 'power supply Voltage' },
   { mod: 'SCL', pin: 5, c: C.scl, what: 'I2C clock (GPIO3), the Pi sets the pace', long: 'Serial CLock' },
   { mod: 'SDA', pin: 3, c: C.sda, what: 'I2C data (GPIO2), pictures to the screen', long: 'Serial DAta' },
-  { mod: 'K4', pin: 37, c: C.key, what: 'button 4 (GPIO26)', long: 'Key 4, a button' },
-  { mod: 'K3', pin: 33, c: C.key, what: 'button 3 (GPIO13)', long: 'Key 3, a button' },
-  { mod: 'K2', pin: 31, c: C.key, what: 'button 2 (GPIO6)', long: 'Key 2, a button' },
-  { mod: 'K1', pin: 29, c: C.key, what: 'button 1 (GPIO5)', long: 'Key 1, a button' },
+  { mod: 'K4', pin: 37, c: C.key, what: 'the * button (GPIO26)', long: 'Key 4, a button' },
+  { mod: 'K3', pin: 33, c: C.key, what: 'the # button (GPIO13)', long: 'Key 3, a button' },
+  { mod: 'K2', pin: 31, c: C.key, what: 'the v button (GPIO6)', long: 'Key 2, a button' },
+  { mod: 'K1', pin: 29, c: C.key, what: 'the ^ button (GPIO5)', long: 'Key 1, a button' },
 ];
 
 const W = 1200, H = 1150;
@@ -103,7 +103,7 @@ rows.forEach((r, i) => {
 });
 t(TX, TY + 9 * 26 + 10, 'I2C (Inter-Integrated Circuit) is the two wire bus the screen talks on. GPIO (General Purpose Input/Output) is a Pi pin a program reads or sets.', { size: 13, fill: '#555' });
 t(TX, TY + 9 * 26 + 30, 'Nothing on the top row but GND. Pin 35, 3rd from the right on the bottom row, stays empty.', { size: 13, fill: '#555' });
-t(TX, TY + 9 * 26 + 50, 'Which K is which of the ^ v # * buttons is not printed on the module: pressing each one and reading the pins tells. A press should read low; not measured yet.', { size: 13, fill: '#555' });
+t(TX, TY + 9 * 26 + 50, 'MEASURED 2026-10-15: K1 is ^, K2 v, K3 #, K4 *. A press reads low, the module pulls each K line up.', { size: 13, fill: '#555' });
 t(TX, TY + 9 * 26 + 70, 'The two top-left pins are 5 V and would put 5 V on the screen and the Pi\'s I2C pins.', { size: 13, fill: C.v5 });
 o.push('</svg>');
 
