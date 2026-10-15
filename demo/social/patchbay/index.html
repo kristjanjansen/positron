@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON social/patchbay</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .post-row { display: flex; flex-wrap: wrap; gap: 24px; }
+  .post { display: flex; flex-direction: column; gap: 10px; width: 300px; max-width: 100%; }
+  .post canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line2); border-radius: var(--r, 4px); }
+  .post button { align-self: flex-start; }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { font, drawWordmark, svgImage, X, TEXT_W, C } from '/shell/reel.mjs';
+  import { drawBay } from '/shell/bay-svg.mjs';
+  import { PAIR_EXAMPLES, pairBay } from '/shell/pair-examples.mjs';
+
+  // Instagram posts of the two column patchbay (/kit/patchbay/#two-columns-on-a-phone), one per
+  // example: 4:5, the feed's tallest still, which suits two columns of boxes.
+  const PW = 1080, PH = 1350, TITLE_Y = 236, SAY_Y = 296, SAY_LH = 44, BAY_TOP = 400, BAY_BOTTOM = PH - 90, MAX_SCALE = 2;
+  // A canvas cannot read var(--sans); the token is resolved once, as reel.mjs does for the mono.
+  const sans = getComputedStyle(document.documentElement).getPropertyValue('--sans').trim() || 'sans-serif';
+  const SAY_FONT = `400 32px ${sans}`;
+  // Greedy wrap into the text width; a post's line is at most two lines.
+  function wrap(ctx, text) {
+    const lines = [''];
+    for (const w of text.split(' ')) {
+      const t = lines.at(-1) ? `${lines.at(-1)} ${w}` : w;
+      if (ctx.measureText(t).width > TEXT_W && lines.at(-1)) lines.push(w); else lines[lines.length - 1] = t;
+    }
+    return lines;
+  }
+
+  const d = mount({ name: 'social/patchbay', what: 'Three patches in two facing columns, each a 4:5 picture to save and post.',
+    readout: null, index: '/social/', indexLabel: 'social' });
+  const h1 = d.head.querySelector('.pos-name');
+  if (h1) h1.textContent = 'patchbay';
+
+  await document.fonts.ready;
+  const row = el('div', 'post-row');
+  d.el.append(row);
+  const posts = [];
+  for (const x of PAIR_EXAMPLES) {
+    const bay = pairBay(x);
+    const opts = { arrange: 'pair', detail: (n) => [{ text: n.label || '', sans: true }] };
+    // A pair's height does not depend on its width, so it is drawn as wide as the band's shape asks.
+    const band = BAY_BOTTOM - BAY_TOP, probe = drawBay(bay, { ...opts, width: 480 });
+    const drawn = drawBay(bay, { ...opts, width: Math.max(320, Math.round((probe.height + 2) * TEXT_W / band) - 2) });
+    const scale = Math.min(MAX_SCALE, TEXT_W / (drawn.width + 2), band / (drawn.height + 2));
+    const pic = await svgImage(drawn.body, { width: drawn.width, height: drawn.height, scale });
+
+    const cv = el('canvas');
+    cv.width = PW; cv.height = PH;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, PW, PH);
+    drawWordmark(ctx, 130);
+    ctx.fillStyle = C.fg; ctx.font = font(600, 64); ctx.fillText(x.title, X, TITLE_Y);
+    ctx.fillStyle = C.dim; ctx.font = SAY_FONT;
+    const lines = wrap(ctx, x.say);
+    lines.forEach((ln, i) => ctx.fillText(ln, X, SAY_Y + i * SAY_LH));
+    const bx = Math.round(X + (TEXT_W - pic.w) / 2), by = Math.round(BAY_TOP + (band - pic.h) / 2);
+    ctx.drawImage(pic.img, bx, by, pic.w, pic.h);
+
+    const save = el('button', '', 'Download PNG');
+    save.addEventListener('click', () => cv.toBlob((b) => {
+      const a = el('a', '', '', { href: URL.createObjectURL(b), download: `positron-patchbay-${x.id}.png` });
+      a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      d.log(`saved positron-patchbay-${x.id}.png`);
+    }, 'image/png'));
+    const fig = el('div', 'post');
+    fig.append(cv, save);
+    row.append(fig);
+    posts.push({ x, cv, ctx, bx, by, pic, lines, sayW: (ctx.font = SAY_FONT, Math.max(...lines.map((l) => ctx.measureText(l).width))) });
+  }
+
+  if (SELFCHECK) {
+    d.assert('one 1080 x 1350 post per example', posts.length === PAIR_EXAMPLES.length && posts.every((p) => p.cv.width === PW && p.cv.height === PH),
+      `${posts.length} posts`);
+    const out = posts.filter((p) => p.bx < X - 1 || p.bx + p.pic.w > PW - X + 1 || p.by < BAY_TOP - 1 || p.by + p.pic.h > BAY_BOTTOM + 1 || p.sayW > TEXT_W || p.lines.length > 2);
+    d.assert('every patch and line stays inside the margins', !out.length, out.map((p) => p.x.id).join(', ') || 'all inside');
+    const ink = posts.map((p) => {
+      const px = p.ctx.getImageData(p.bx, p.by, p.pic.w, p.pic.h).data;
+      let n = 0; for (let i = 0; i < px.length; i += 4) if (px[i] > 40 || px[i + 1] > 40 || px[i + 2] > 50) n++;
+      return n;
+    });
+    d.assert('every patch is drawn', ink.every((n) => n > 20000), ink.join(', '));
+  }
+  d.ready();
+</script>

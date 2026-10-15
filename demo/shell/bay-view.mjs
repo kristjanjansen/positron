@@ -4,7 +4,7 @@
 // why: lessons/kit-bay-view.md#header
 
 import { TIMING_NAMES, printOptions } from './link-options.mjs';
-import { BAY_GEOMETRY, ranks, rounded, nodeOf, portName, layoutBay, acrossWire } from './bay-layout.mjs';
+import { BAY_GEOMETRY, ranks, rounded, nodeOf, portName, layoutBay, layoutPair, acrossWire } from './bay-layout.mjs';
 
 const NS = 'http://www.w3.org/2000/svg';
 const s = (tag, attrs = {}, text) => {
@@ -18,8 +18,9 @@ const { FONT, TITLE, ROW, PAD, TGAP, DROW, PLANE } = BAY_GEOMETRY;
 // bay-svg.mjs and older callers read these from here.
 export { BAY_GEOMETRY, ranks, rounded };
 
-export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infinity, detail = null } = {}) {
+export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infinity, detail = null, arrange = 'auto' } = {}) {
   // stretch, sizeAs, maxWire and detail size the boxes and wires; see the lesson for each.
+  // `arrange: 'pair'` is two facing columns at any width (lessons/kit-bay-layout.md#pair).
   // why: lessons/kit-bay-view.md#options
   const el = document.createElement('div');
   el.className = 'lv';
@@ -43,7 +44,7 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
     let avail = el.clientWidth;
     if (!avail) return;
     const ports = bay.ports(), links = bay.links();
-    const L = layoutBay({ nodes: bay.nodes(), ports, links }, { avail, stretch, sizeAs, maxWire, fieldsOf, width });
+    const L = (arrange === 'pair' ? layoutPair : layoutBay)({ nodes: bay.nodes(), ports, links }, { avail, stretch, sizeAs, maxWire, fieldsOf, width });
     const { across, need, boxes, at, fieldsR, portsOf, order, backs, pairCount, longest } = L;
     avail = L.avail;
     el.style.overflowX = across && need > el.clientWidth ? 'auto' : '';
@@ -142,6 +143,7 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
       const field = (f, x, y, anchor) => f && g.append(s('text',
         { x, y, 'text-anchor': anchor, class: 'lv-f' }, f.text));
       if (b.phone) { field(f1, b.x + PAD, b.y + PAD / 2 + ROW * 1.5 + 4, 'start'); svg.append(g); continue; }
+      if (b.pair) { field(f1, b.x + PAD, ty + DROW, 'start'); svg.append(g); continue; }
       field(f1, b.x + b.w - PAD, ty, 'end');
       field(f2, b.x + PAD, fy, 'start');
       field(f3, b.x + b.w - PAD, fy, 'end');
@@ -170,7 +172,8 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
       const medium = ports.find((p) => p.id === l.from)?.medium || '';
       const j = backs.indexOf(l) + 1;
       let d;
-      if (!across) {                // phone: out the right edge, into its lane, along, back in
+      if (L.wire) ({ d } = L.wire(l, o));
+      else if (!across) {           // phone: out the right edge, into its lane, along, back in
         const x = laneX(laneOf.get(l.id));
         d = rounded([[a.x, a.y], [x, a.y], [x, b.y], [b.x, b.y]], 5);
       } else ({ d } = acrossWire(a, b, o, j, L));
