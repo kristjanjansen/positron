@@ -10,11 +10,13 @@
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
   .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-  /* the simulated panel at a whole number scale, so a panel pixel stays square */
-  .ol-sim { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
-  .ol-sim canvas { display: block; width: 384px; max-width: 100%; aspect-ratio: 2 / 1; image-rendering: pixelated;
-    border: var(--edge, 1px solid var(--line2)); border-radius: var(--r, 4px); background: #05070c; }
-  @media (min-width: 600px) { .ol-sim canvas { width: 512px; } }
+  /* The simulated module as the video panel's picture: the panel at a whole number scale (2x, or 4x
+     zoomed), so a panel pixel stays square, and its four keys in a column on its right as on the module. */
+  .ol-media { display: flex; justify-content: center; align-items: stretch; gap: 16px; padding: 24px 16px; background: #05070c; overflow-x: auto; }
+  .ol-media canvas { display: block; flex: none; width: calc(128px * var(--ol-k, 2)); height: calc(64px * var(--ol-k, 2)); image-rendering: pixelated; }
+  .ol-media .pos-bgroup { flex: none; }
+  .ol-media .pos-bgroup-row { height: 100%; justify-content: space-between; }
+  .ol-say { font-size: 12px; color: var(--dim); }
 </style>
 <script type="module">
   // The 0.96" OLED and its four keys on the Pi's header (rig/board/panel.mjs), as two nodes of the
@@ -32,6 +34,8 @@
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
   import { paintFrame } from '/shell/panel-screen.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createIconButton } from '/shell/icon-button.mjs';
 
   const d = mount({ name: 'OLED on Pi', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('remote/oled');
@@ -102,9 +106,12 @@
     { id: 'send', label: 'Send', onPress: () => send() },
   ] });
   buttons.enable('send', false, 'connect first');
-  // The simulated keys: down on press, up on release, as the module's keys arrive from the Pi.
-  const SYMS = ['^', 'v', '#', '*'];
-  const simKeys = createButtonGroup({ buttons: SYMS.map((s, i) => ({ id: `k${i + 1}`, label: s })) });
+  // The simulated keys, a column on the screen's right as on the module: down on press, up on release.
+  // Feather has no asterisk, so * is the one key drawn as text.
+  const SYMS = ['^', 'v', '#', '*'], ICONS = ['chevron-up', 'chevron-down', 'hash', null];
+  const simKeys = createButtonGroup({ orient: 'column', buttons: SYMS.map((s, i) => ({ id: `k${i + 1}`,
+    ...(ICONS[i] ? { icon: ICONS[i], label: `K${i + 1}, the ${s} key` } : { label: s }) })) });
+  simKeys.button('k4').dataset.glyph = '1';      // * as a square like the three icons beside it
   SYMS.forEach((s, i) => {
     const b = simKeys.button(`k${i + 1}`), k = i + 1;
     const edge = (down) => { lit(SIMKEYS_OUT); bay.send(SIMKEYS_OUT, { of: 'key', cls: 'key', k, sym: s, gpio: 0, down }); };
@@ -165,9 +172,20 @@
 
   const top = el('div', 'cc-top');
   top.append(text.el, buttons.el);
-  const simBox = el('div', 'ol-sim');
-  simBox.append(simCv, simKeys.el);
-  d.stack.add(simBox, top, keys.el, pb.el);
+  // The simulated module in a video panel, as the kit shows a picture; the zoom button is 2x or 4x.
+  const media = el('div', 'ol-media');
+  media.append(simCv, simKeys.el);
+  let zoom = 2;
+  const zoomBtn = createIconButton({ icon: 'zoom-in', label: 'show the panel at 4x', pressed: false, onPress: () => {
+    zoom = zoom === 2 ? 4 : 2;
+    media.style.setProperty('--ol-k', String(zoom));
+    zoomBtn.set(zoom === 2 ? 'zoom-in' : 'zoom-out', zoom === 2 ? 'show the panel at 4x' : 'show the panel at 2x');
+    zoomBtn.el.setAttribute('aria-pressed', String(zoom === 4));
+  } });
+  const simPanel = createVideoPanel({ media, left: el('span', 'ol-say', 'web:oled, simulated'), centre: el('span', 'ol-say', '128\u00d764'), right: zoomBtn.el,
+    // the module's own height at either zoom, not a 16:9 box around it
+    aspect: 'auto' });
+  d.stack.add(simPanel.el, top, keys.el, pb.el);
   window.__demo.bay = bay;
   window.__demo.probe = () => ({ connected, sent, shown, simFrames: sim.frames });
 

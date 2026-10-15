@@ -15,18 +15,18 @@ const LIT = [0x4f, 0xc3, 0xff], DARK = [0x05, 0x07, 0x0c];
  * `{ text, held }`, `held` the keys down as numbers 1 to 4.
  */
 export function drawPanel(ui, state) {
-  const top = ui.header('pi-1', 'oled');
-  // the message, word wrapped to the width, three lines at most
-  const per = Math.max(1, Math.floor(W / ui.adv)), lines = [''];
+  // The keys down the right edge, ^ at the top, level with the module's buttons; a held key lit.
+  // No header: at 0.96" its line is too small to read.
+  let hot = 0;
+  for (const k of state.held || []) hot |= 1 << (k - 1);
+  const right = ui.keysRight(KEY_SYMBOLS, hot, 0);
+  // the message in what is left, word wrapped, as many lines as fit
+  const per = Math.max(1, Math.floor((right - 3) / ui.adv)), step = ui.cap + 4, lines = [''];
   for (const w of String(state.text || '').split(/\s+/)) {
     const next = lines.at(-1) ? `${lines.at(-1)} ${w}` : w;
     if (next.length > per && lines.at(-1)) lines.push(w.slice(0, per)); else lines[lines.length - 1] = next.slice(0, per);
   }
-  lines.slice(0, 3).forEach((ln, i) => ui.text(0, top + 4 + i * (ui.cap + 4), ln));
-  // the keys as the firmware's footer, a held key lit
-  let hot = 0;
-  for (const k of state.held || []) hot |= 1 << (k - 1);
-  ui.footer(KEY_SYMBOLS, hot);
+  lines.slice(0, Math.floor((H - 2) / step)).forEach((ln, i) => ui.text(1, 2 + i * step, ln));
 }
 
 /** oled-ui.wasm's bytes to `{ frame(state) }`, a 1024 byte page major frame as the SSD1306 takes it. */
@@ -53,6 +53,7 @@ export async function loadPanelUi(bytes) {
     fill: (x, y, w, h, c = 1) => U.fill(x, y, w, h, c),
     footer: (labels, hot = 0) => { four(labels); return U.footer(hot); },
     footerH: () => U.footer_h(),
+    keysRight: (labels, hot = 0, top = 0) => { four(labels); return U.keys_right(hot, top); },
   };
   return {
     frame(state) {

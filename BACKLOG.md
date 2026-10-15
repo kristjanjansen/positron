@@ -1,5 +1,8 @@
 ## Open
 
+- **OLED layout: no header, the keys down the right** (2026-10-15). Asked: *"scren: rm header. its unreadable in small size. move buttons to rigt side"*. drawPanel in demo/shell/panel-screen.mjs; ui.c has keys_right.
+- **/remote/oled/: the simulated screen in a video panel like the kit's, keys as icon buttons, a 2x button** (2026-10-15). Asked: *"in demo add videpanel like kit thing for web simulator with keys (use icons if possible), 2x button (zoom icon or reuse fullscreen or ?)"*.
+
 - **/remote/oled/: a simulated screen beside the real one, to design the panel UI live** (2026-10-15). Asked: *"we need to decide whtats in ui first. can we run simulator screen also in https://positron.studio/remote/oled/ do develop it live? run local dev"*. The drawing moves to demo/shell/panel-screen.mjs, shared by rig/board/panel.mjs and the page, same oled-ui.wasm, so the page draws the device's exact bytes; local server for live edits; push to the Pi when chosen.
 - **The Pi's OLED and keys in the announced patch, and bay.event on the board** (2026-10-15). Asked: *"2nd is fine"*, about pi-1:oled:value-in and pi-1:keys:value-out in boardGraph and the board handling bay.event (plan-pi-oled steps 5 and 6). Shared: graph-registry.mjs and the board's message handling, one change.
 
