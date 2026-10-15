@@ -34,6 +34,8 @@ export function drawPanel(ui, state) {
     if (next.length > per && lines.at(-1)) lines.push(w.slice(0, per)); else lines[lines.length - 1] = next.slice(0, per);
   }
   lines.slice(0, Math.floor((H - 2) / step)).forEach((ln, i) => ui.text(1, 2 + i * step, ln));
+  // For testing: * held lights every pixel, to see the panel's whole extent and any dead pixel.
+  if (held.has(4)) ui.fill(0, 0, W, H, 1);
 }
 
 // A 7 by 4 chevron two pixels thick, centred on (cx, cy).
