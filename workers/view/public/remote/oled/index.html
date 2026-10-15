@@ -25,12 +25,13 @@
   .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
   /* The simulated module as the video panel's picture: the panel at a whole number scale (2x, or 4x
      zoomed), so a panel pixel stays square, and its four keys in a column on its right as on the module. */
-  .ol-media { display: flex; justify-content: center; align-items: stretch; gap: 16px; padding: 24px 16px; background: #000; overflow-x: auto; }
+  /* One height at every zoom, the 4x panel's, so zooming never moves what is under it. */
+  .ol-media { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 24px 16px; height: calc(64px * 4 + 48px); background: #000; overflow-x: auto; }
   .ol-media canvas { display: block; flex: none; width: calc(128px * var(--ol-k, 2)); height: calc(64px * var(--ol-k, 2)); image-rendering: pixelated; }
-  .ol-media .pos-bgroup { flex: none; margin-left: auto; }
+  /* one joined column at its own height, centred beside the screen at every zoom */
+  .ol-media .pos-bgroup { flex: none; margin-left: auto; align-self: center; }
   /* the screen centred in what the key column at the right edge leaves */
   .ol-screen { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-width: 0; }
-  .ol-media .pos-bgroup-row { height: 100%; justify-content: space-between; }
   .ol-say { font-size: 12px; color: var(--dim); }
 </style>
 <script type="module">
