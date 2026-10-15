@@ -10,10 +10,8 @@
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
   /* One card a patch: its name, the screen as the Pi draws it at 2x, and a footer like the video panel's with the send button. */
-  /* --pt-k is the screens' scale, 1, 2 or 3; a card is at least as wide as its screen and its black border. */
+  /* The screens at 2x; a card is at least as wide as its screen and its black border. */
   .pt-grid { --pt-k: 2; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(calc(128px * var(--pt-k) + 44px), 100%), 1fr)); gap: 16px; }
-  .pt-tools { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
-  .pt-scale { font-size: 12px; color: var(--dim); }
   .pt-card { display: flex; flex-direction: column; background: var(--card); border: var(--edge, 1px solid var(--line));
     border-radius: var(--r, 4px); overflow: hidden; min-width: 0; }
   .pt-head { display: flex; flex-direction: column; gap: 6px; padding: 12px; }
@@ -137,28 +135,9 @@
     requestAnimationFrame(run);
   })(0);
 
-  // ── scale: every screen at 1x, 2x or 3x, as the simulated screen's zoom on the other device pages ──
-  const ZOOMS = [1, 2, 3];
-  let zi = 1;
-  const scaleSay = el('span', 'pt-scale', '');
-  const zoomBtns = createButtonGroup({ buttons: [
-    { id: 'out', icon: 'zoom-out', label: 'smaller screens', onPress: () => setZoom(zi - 1) },
-    { id: 'in', icon: 'zoom-in', label: 'larger screens', onPress: () => setZoom(zi + 1) },
-  ] });
-  function setZoom(i) {
-    zi = Math.max(0, Math.min(ZOOMS.length - 1, i));
-    for (const b of blocks) b.querySelector('.pt-grid')?.style.setProperty('--pt-k', String(ZOOMS[zi]));
-    scaleSay.textContent = `128×64 at ${ZOOMS[zi]}x`;
-    zoomBtns.enable('out', zi > 0, 'smallest');
-    zoomBtns.enable('in', zi < ZOOMS.length - 1, 'largest');
-  }
-  const tools = el('div', 'pt-tools');
-  tools.append(scaleSay, zoomBtns.el);
-  setZoom(zi);
-
   const pb = createPatchbay(bay, { room: ROOM, flowing: (l) => (flash.get(l.id) || 0) > performance.now() });
   setInterval(() => pb.refresh?.(), 200);
-  d.stack.add(tools, ...blocks, pb.el);
+  d.stack.add(...blocks, pb.el);
   window.__demo.bay = bay;
   window.__demo.probe = () => ({ connected, sent, landed, cuts });
 
