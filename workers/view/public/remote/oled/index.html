@@ -27,7 +27,9 @@
      zoomed), so a panel pixel stays square, and its four keys in a column on its right as on the module. */
   .ol-media { display: flex; justify-content: center; align-items: stretch; gap: 16px; padding: 24px 16px; background: #05070c; overflow-x: auto; }
   .ol-media canvas { display: block; flex: none; width: calc(128px * var(--ol-k, 2)); height: calc(64px * var(--ol-k, 2)); image-rendering: pixelated; }
-  .ol-media .pos-bgroup { flex: none; }
+  .ol-media .pos-bgroup { flex: none; margin-left: auto; }
+  /* the screen centred in what the key column at the right edge leaves */
+  .ol-screen { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-width: 0; }
   .ol-media .pos-bgroup-row { height: 100%; justify-content: space-between; }
   .ol-say { font-size: 12px; color: var(--dim); }
 </style>
@@ -187,7 +189,9 @@
   top.append(text.el, buttons.el);
   // The simulated module in a video panel, as the kit shows a picture; the zoom button is 2x or 4x.
   const media = el('div', 'ol-media');
-  media.append(simCv, simKeys.el);
+  const screenBox = el('div', 'ol-screen');
+  screenBox.append(simCv);
+  media.append(screenBox, simKeys.el);
   let zoom = 2;
   const zoomBtn = createIconButton({ icon: 'zoom-in', label: 'show the panel at 4x', pressed: false, onPress: () => {
     zoom = zoom === 2 ? 4 : 2;
