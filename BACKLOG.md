@@ -1,5 +1,6 @@
 ## Open
 
+- **Research: drums on tiny screens, built up from basics** (2026-10-15; a background agent writes the plan). Asked: *"do good reseach on drums on tiny screens. we need to build it up from basics"*. Prior art (Teenage Engineering, Elektron, Polyend, Pico and OLED grooveboxes, monome, Norns), what a 128x64 one bit screen and four keys can show and edit, a ladder of small steps from what /devices/drums/ and steps-oled.mjs do today.
 - ~~**/devices/patches/: a footer like the panel's with send in it, no light border, equal air around the screen, the well edge to edge**~~ (2026-10-15, DONE). Asked: *"crete footer (like panel). put send there. rm lite border. add exual padding around screen. screen bg goes edge to edge h-ly"*.
 - ~~**/devices/patches/: "The knobs to Plaits" made no sense**~~ (2026-10-15, DONE: Evolution to Plaits, Plaits to web:speaker; the drums card's capture also to web:speaker). Asked: *"makes no sense"* on a crop of evo to plaits to capture.
 - ~~**The MK-425C is evo**~~ (2026-10-15, DONE: the board announces ALSA's `MK-425C USB MIDI Keyboard` as `pi-1:evo`, labelled Evolution MK-425C, KNOWN_MIDI in graph-registry.mjs; pushed). Asked: *"MK-425C is evo"*.
