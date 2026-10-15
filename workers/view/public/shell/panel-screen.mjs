@@ -19,7 +19,11 @@ export function drawPanel(ui, state) {
   // No header: at 0.96" its line is too small to read.
   let hot = 0;
   for (const k of state.held || []) hot |= 1 << (k - 1);
-  const right = ui.keysRight(KEY_SYMBOLS, hot, 0);
+  // ^ and v are drawn as chevrons rather than typed: in the 5x7 font they are a caret and a letter.
+  const right = ui.keysRight(['', '', KEY_SYMBOLS[2], KEY_SYMBOLS[3]], hot, 0);
+  const cell = H / 4, cx = Math.round((right + W) / 2);
+  chevron(ui, cx, Math.round(cell / 2), 'up');
+  chevron(ui, cx, Math.round(cell * 1.5), 'down');
   // the message in what is left, word wrapped, as many lines as fit
   const per = Math.max(1, Math.floor((right - 3) / ui.adv)), step = ui.cap + 4, lines = [''];
   for (const w of String(state.text || '').split(/\s+/)) {
@@ -27,6 +31,16 @@ export function drawPanel(ui, state) {
     if (next.length > per && lines.at(-1)) lines.push(w.slice(0, per)); else lines[lines.length - 1] = next.slice(0, per);
   }
   lines.slice(0, Math.floor((H - 2) / step)).forEach((ln, i) => ui.text(1, 2 + i * step, ln));
+}
+
+// A 7 by 4 chevron two pixels thick, centred on (cx, cy). Drawn by flipping pixels, so it reads on a
+// dark cell and on a lit (held) one alike.
+const CHEVRON = [[3, 3], [2, 4], [1, 2, 4, 5], [0, 1, 5, 6]];
+function chevron(ui, cx, cy, dir) {
+  CHEVRON.forEach((runs, r) => {
+    const y = cy - 2 + (dir === 'up' ? r : 3 - r);
+    for (let i = 0; i < runs.length; i += 2) ui.fill(cx - 3 + runs[i], y, runs[i + 1] - runs[i] + 1, 1, 2);
+  });
 }
 
 /** oled-ui.wasm's bytes to `{ frame(state) }`, a 1024 byte page major frame as the SSD1306 takes it. */
