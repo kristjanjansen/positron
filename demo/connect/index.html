@@ -32,11 +32,7 @@
   .cn-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
 
   .cn-say { display: flex; flex-direction: column; gap: 12px; }
-  .cn-ex { --fade: 16px; display: grid; grid-template-rows: auto auto; grid-auto-flow: column; grid-auto-columns: max-content;
-    justify-items: start; gap: var(--ctl-gap); overflow-x: auto; scrollbar-width: none;
-    margin-inline: calc(-1 * var(--fade)); padding: 2px var(--fade);
-    mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); }
-  .cn-ex::-webkit-scrollbar { display: none; }
+  .cn-ex { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); }
   .cn-ex > button.cn-pill { flex: none; }
 
   /* What a person says, in --voice (shell.css). Round, lowercase and in

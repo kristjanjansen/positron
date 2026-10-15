@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**/connect/: pills wrap as a row, not a grid**~~ (2026-10-15, DONE). Asked: *"use flex wrap for pills, no awakard spacing in grid"*.
+
 - ~~**/connect/: Feedback carries the last request, how it came in and the patch**~~ (2026-10-15, DONE: mount's `feedback.context` and `onSent`, shown read-only in the panel, appended to the note, and the note echoed to the device log as [feedback]). Asked: *"can we use feedback field where you tie the current input, method and patchbay so i can comment on it?"*.
 
 - ~~**/connect/: more realistic example pills**~~ (2026-10-15, DONE: eight, all local and running, verify 98/98). Asked: *"add more realistic pills"*. Sentences a player says, local, each a patch no page makes, including a split and an octave double.
