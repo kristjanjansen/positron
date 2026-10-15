@@ -1,5 +1,9 @@
 ## Open
 
+- ~~**/connect/: example pills on two lines**~~ (2026-10-15, DONE). Asked: *"make it 2 lines pills"*. Two rows that flow sideways and scroll, edges still faded.
+
+- ~~**/connect/: only local example pills**~~ (2026-10-15, DONE; typed and spoken requests still reach the Pi when they name it). Asked: *"suggestions pill only locals, no remote ones"*. The Pi examples leave the pills; the model gets the Pi's ports only when the sentence names the Pi.
+
 - ~~**/connect/: a focused pill shows one lighter edge, not a second ring**~~ (2026-10-15, DONE). Asked: *"fix focus. no doubles, just lighter outline"*.
 
 - ~~**/connect/: on a Pi node, play and stop before the status**~~ (2026-10-15, DONE, rt-pi.mjs). Asked: *"switch order"*.
