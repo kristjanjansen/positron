@@ -1,5 +1,5 @@
 // node rig/board/panel-sync.mjs [<pi>]: copy demo/shell/panel-screen.mjs to the board on every save,
-// where panel.mjs reloads it within a second. For designing the OLED live beside /devices/screen/?live=1.
+// where panel.mjs reloads it within a second. For designing the OLED live beside /devices/text/?live=1.
 // The address defaults to the one the board answered on 2026-10-15; push.sh finds it if it moved.
 import { watch, statSync } from 'node:fs';
 import { execFile } from 'node:child_process';
