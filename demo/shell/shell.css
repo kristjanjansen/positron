@@ -370,7 +370,8 @@ button.pos-pri:disabled, button.pos-pri[data-busy="1"] { box-shadow: none; }
 
 /* A control at work, while its handler promise is pending. Paint only:
    resizing the button would move the next control under the pointer. Reduced
-   motion gets a steady dim instead. */
+   motion gets a steady dim instead. The sweep is the button's own ink, so an
+   accent button (a voice pill, the send) shimmers in its accent. */
 /* why: lessons/css-shell.md#button-data-end-1 */
 /* pushed to the far right of the control row — see `end` in shell.mjs */
 button[data-end="1"] { margin-left: auto; }
@@ -379,7 +380,7 @@ button[data-busy="1"] {
   cursor: progress;
   background-image: linear-gradient(100deg,
     transparent 0%, transparent 35%,
-    color-mix(in oklab, var(--fg) 22%, transparent) 50%,
+    color-mix(in oklab, currentColor 28%, transparent) 50%,
     transparent 65%, transparent 100%);
   background-size: 220% 100%;
   background-repeat: no-repeat;
