@@ -36,10 +36,12 @@
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
   import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
-  import { stepCell, EMPTIES, HEADS, MAX_ROWS } from '/shell/steps-oled.mjs';
+  import { stepCell, EMPTIES, HEADS } from '/shell/steps-oled.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDrumMachine } from '/drums/drum-machine.mjs';
-  import { VOICES } from '/drums/voices.mjs';
+  import { voices } from '/drums/voices.mjs';
+  // Eight rows: the four drums of /drums/machine/ and the first four of its extras, as many as the Pi's screen holds.
+  const VOICES = voices({ extras: true }).slice(0, 8);
 
   const d = mount({ name: 'Drums on Pi screen', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('devices/drums');
@@ -117,21 +119,19 @@
   }
   // ── the ways to draw it: every empty style with each cursor, and the grid at its most rows ──
   let look = { empty: 'dot', head: 'frame' };
-  const SAMPLE8 = ['1000100010001000', '0000100000001000', '0010001000100010', '1011101110111011',
-    '0000000100000001', '0100000001000000', '0001000000010000', '1000000010000010'];
-  const OPTS = [...EMPTIES.flatMap((empty) => HEADS.map((head) => ({ empty, head }))), { empty: 'dot', head: 'frame', rows: MAX_ROWS }];
+  const OPTS = EMPTIES.flatMap((empty) => HEADS.map((head) => ({ empty, head })));
   const opts = el('div', 'dr-opts');
   const tiles = OPTS.map((o) => {
     const b = el('button', 'dr-opt'), cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
-    b.append(cv, el('span', '', o.rows ? `${o.rows} rows, a sample` : `${o.empty}, ${o.head}`));
+    b.append(cv, el('span', '', `${o.empty}, ${o.head}`));
     b.addEventListener('click', () => { look = { empty: o.empty, head: o.head }; for (const t of tiles) t.b.setAttribute('aria-pressed', String(t.o === o)); });
-    b.setAttribute('aria-pressed', String(!o.rows && o.empty === look.empty && o.head === look.head));
+    b.setAttribute('aria-pressed', String(o.empty === look.empty && o.head === look.head));
     opts.append(b);
     return { o, b, cv };
   });
   const paintOpts = (st) => {
     if (!ui) return;
-    for (const t of tiles) paintFrame(t.cv, ui.frame({ mode: 'steps', steps: { ...st, ...(t.o.rows ? { pattern: SAMPLE8 } : {}), look: { empty: t.o.empty, head: t.o.head } } }));
+    for (const t of tiles) paintFrame(t.cv, ui.frame({ mode: 'steps', steps: { ...st, look: { empty: t.o.empty, head: t.o.head } } }));
   };
   let said = '';
   (function tick() {

@@ -4,9 +4,10 @@
 // why: lessons/kit-steps-oled.md#header
 
 export const W = 128, H = 64;
-/** 16 square steps across the whole width: an 8 px pitch, a 6 px cell, 1 px clear of each edge. */
-const PITCH = 8, CW = 6, X0 = 1;
-/** 8 rows of squares fill the 64 px height exactly; a lane cursor takes the last band. */
+/** 16 square steps: a 7 px pitch, a 5 px cell, the grid 9 px in from each side, so nothing sits at the
+ *  panel's outermost pixels (the real screen read as cut at its edges). */
+const PITCH = 7, CW = 5, X0 = Math.floor((128 - 15 * PITCH - CW) / 2);
+/** 8 rows of squares, 56 px, 4 px clear top and bottom; with a lane cursor the grid rides up 2 px. */
 export const MAX_ROWS = 8;
 /** How an empty step is drawn, and how the running step is marked. */
 export const EMPTIES = ['outline', 'dot', 'pixel', 'underline', 'none'];
@@ -22,8 +23,8 @@ const rowOn = (row, n) => {
 
 /** Where step `c` of row `r` is drawn when there are `rows` rows: `{ x, y, w, h }`, a square, the grid centred. */
 export function stepCell(r, c, rows, head = 'frame') {
-  const R = Math.max(1, Math.min(MAX_ROWS, rows)), room = head === 'lane' ? H - PITCH : H;
-  const top = Math.floor((room - R * PITCH) / 2) + 1;
+  const R = Math.max(1, Math.min(MAX_ROWS, rows)), room = head === 'lane' ? H - 4 : H;
+  const top = Math.floor((room - R * PITCH + 2) / 2);
   return { x: X0 + c * PITCH, y: top + r * PITCH, w: CW, h: CW };
 }
 
@@ -56,5 +57,5 @@ export function drawStepsOled(ui, s) {
   const a = stepCell(0, step, R, head), z = stepCell(R - 1, step, R, head);
   // the frame sits in the 2 px gutter round the column, so it never touches a square
   if (head === 'frame') box(ui, a.x - 1, a.y - 1, a.w + 2, z.y + z.h - a.y + 2);
-  else ui.fill(a.x, H - 4, a.w, 3, 1);
+  else ui.fill(a.x, H - 4, a.w, 2, 1);
 }
