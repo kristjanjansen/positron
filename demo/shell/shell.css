@@ -1615,6 +1615,8 @@ button.pos-pg-lab:hover { color: var(--fg); }
 }
 .pos-bgroup[data-orient="column"] .pos-bgroup-row {
   flex-direction: column; align-items: stretch; width: auto; overflow: visible;
+  /* `.step`'s 34 px is one row's height; a column is as tall as its buttons */
+  height: auto;
 }
 .pos-bgroup[data-orient="column"] .pos-seg > * { border-radius: 0; margin-left: 0; }
 .pos-bgroup[data-orient="column"] .pos-seg > * + * { margin-top: -1px; }
