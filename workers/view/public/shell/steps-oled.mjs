@@ -4,10 +4,14 @@
 // why: lessons/kit-steps-oled.md#header
 
 export const W = 128, H = 64;
-/** Where the grid starts, one step's pitch and width: 16 steps end at x 126. */
-const X0 = 16, PITCH = 7, CW = 6;
-/** The grid's height above the playhead lane. */
-const GRID_H = 52, LANE_Y = 56;
+/** 16 square steps: a 7 px pitch, a 5 px cell, the grid 9 px in from each side, so nothing sits at the
+ *  panel's outermost pixels (the real screen read as cut at its edges). */
+const PITCH = 7, CW = 5, X0 = Math.floor((128 - 15 * PITCH - CW) / 2);
+/** 8 rows of squares, 56 px, 4 px clear top and bottom; with a lane cursor the grid rides up 2 px. */
+export const MAX_ROWS = 8;
+/** How an empty step is drawn, and how the running step is marked. */
+export const EMPTIES = ['outline', 'dot', 'pixel', 'underline', 'none'];
+export const HEADS = ['frame', 'lane'];
 
 /** A row as a list of on steps, from a '1010' string or an array of truthy values. */
 const rowOn = (row, n) => {
@@ -17,39 +21,41 @@ const rowOn = (row, n) => {
   return out;
 };
 
+/** Where step `c` of row `r` is drawn when there are `rows` rows: `{ x, y, w, h }`, a square, the grid centred. */
+export function stepCell(r, c, rows, head = 'frame') {
+  const R = Math.max(1, Math.min(MAX_ROWS, rows)), room = head === 'lane' ? H - 4 : H;
+  const top = Math.floor((room - R * PITCH + 2) / 2);
+  return { x: X0 + c * PITCH, y: top + r * PITCH, w: CW, h: CW };
+}
+
+const box = (ui, x, y, w, h) => { ui.fill(x, y, w, 1, 1); ui.fill(x, y + h - 1, w, 1, 1); ui.fill(x, y, 1, h, 1); ui.fill(x + w - 1, y, 1, h, 1); };
+
 /**
- * `drawStepsOled(ui, s)`: `s` is `{ voices, pattern, step, voice, playing }`. `voices` are short
- * labels (two letters fit), `pattern` one row per voice, `step` the playhead (-1 none), `voice` the
- * row the keys edit (-1 none), `playing` false draws the playhead hollow, as a cursor.
+ * `drawStepsOled(ui, s)`: `s` is `{ pattern, steps, step, look: { empty, head } }`, one row of the grid
+ * a voice. An on step is a filled square; `empty` says how an off one is drawn; `step` (-1 none) is
+ * the running step, marked by `head`: a frame round its column, or a bar in a lane under the grid.
  */
 export function drawStepsOled(ui, s) {
-  const voices = (s.voices || []).slice(0, 6), R = Math.max(1, voices.length);
+  const R = Math.max(1, Math.min(MAX_ROWS, (s.pattern || s.voices || []).length || 1));
   const steps = Math.max(1, Math.min(16, s.steps || 16));
-  const pitch = Math.floor(GRID_H / R), ch = Math.max(3, pitch - 3);
-  const step = Number.isInteger(s.step) ? s.step : -1;
+  const empty = EMPTIES.includes(s.look?.empty) ? s.look.empty : 'outline';
+  const head = HEADS.includes(s.look?.head) ? s.look.head : 'frame';
   const pattern = s.pattern || [];
-  voices.forEach((label, r) => {
-    const y = r * pitch, mid = y + Math.floor(ch / 2);
-    // the row the keys edit: a small lit triangle left of its label
-    if (r === s.voice) for (let i = 0; i < 3; i++) ui.fill(i, mid - 2 + i, 1, 5 - 2 * i, 1);
-    ui.text(4, y + Math.max(0, Math.floor((ch - ui.cap) / 2)), String(label).slice(0, 2));
+  for (let r = 0; r < R; r++) {
     const on = rowOn(pattern[r], steps);
     for (let c = 0; c < steps; c++) {
-      const x = X0 + c * PITCH;
-      if (on[c]) ui.fill(x, y, CW, ch, 1);
-      // the playhead's column: an off step is an outline, so the column reads without a fill
-      else if (c === step) { ui.fill(x, y, CW, 1, 1); ui.fill(x, y + ch - 1, CW, 1, 1); ui.fill(x, y, 1, ch, 1); ui.fill(x + CW - 1, y, 1, ch, 1); }
-      // an off step: a 2x2 dot on a beat, one pixel elsewhere
-      else if (c % 4 === 0) ui.fill(x + 2, mid, 2, 2, 1);
-      else ui.fill(x + 2, mid, 1, 1, 1);
+      const { x, y, w, h } = stepCell(r, c, R, head);
+      if (on[c]) ui.fill(x, y, w, h, 1);
+      else if (empty === 'outline') box(ui, x, y, w, h);
+      else if (empty === 'dot') ui.fill(x + 2, y + 2, 2, 2, 1);
+      else if (empty === 'pixel') ui.fill(x + 2, y + 2, 1, 1, 1);
+      else if (empty === 'underline') ui.fill(x, y + h - 1, w, 1, 1);
     }
-  });
-  // the playhead lane: a bar under the step, filled while playing, hollow as a cursor when stopped
-  if (step >= 0 && step < steps) {
-    const x = X0 + step * PITCH;
-    if (s.playing) ui.fill(x, LANE_Y, CW, 4, 1);
-    else { ui.fill(x, LANE_Y, CW, 1, 1); ui.fill(x, LANE_Y + 3, CW, 1, 1); ui.fill(x, LANE_Y, 1, 4, 1); ui.fill(x + CW - 1, LANE_Y, 1, 4, 1); }
   }
-  // the beats under the lane, a short tick at each
-  for (let c = 0; c < steps; c += 4) ui.fill(X0 + c * PITCH, H - 2, 2, 1, 1);
+  const step = Number.isInteger(s.step) ? s.step : -1;
+  if (step < 0 || step >= steps) return;
+  const a = stepCell(0, step, R, head), z = stepCell(R - 1, step, R, head);
+  // the frame sits in the 2 px gutter round the column, so it never touches a square
+  if (head === 'frame') box(ui, a.x - 1, a.y - 1, a.w + 2, z.y + z.h - a.y + 2);
+  else ui.fill(a.x, H - 4, a.w, 2, 1);
 }

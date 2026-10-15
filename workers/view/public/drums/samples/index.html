@@ -20,13 +20,6 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Sample drums</title>
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  /* Label column: a fifth of the screen and at most 22 letters, a longer name ellipsed with the
-     whole in the hover. 75 px beside 16 pads at 375, 132 px at 1280.
-     See lessons/page-drums.md#drums-34 */
-  .rh-samples .pos-pg-labs { max-width: min(22ch, 20vw); }
-  .rh-samples .pos-pg-lab { text-overflow: ellipsis; }
-</style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
@@ -75,7 +68,6 @@
     group: { over: 8, node: 'samples', label: (n) => `${n} samples, SuperCollider` },
     onWake: async (e) => { const got = await bank.wake(e); if (got.length !== files.length) offer(got, { fresh: true }); },
   });
-  m.surface.classList.add('rh-samples');
 
   // ── the way in ───────────────────────────────────────────────────────────
   const loader = createSampleLoader({ say: (s, k) => drop.say(s, k), log: d.log });

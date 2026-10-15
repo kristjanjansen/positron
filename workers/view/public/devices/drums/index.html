@@ -32,20 +32,26 @@
   .ol-say { font-size: 12px; color: var(--dim); }
 </style>
 <script type="module">
-  // The kit's drum machine in this tab, its pattern and playing step along links to pi-1:screen and
-  // to web:screen, drawn by steps-oled.mjs; the Pi's four keys edit the grid. The Pi is reached on
-  // the first play, never on load.
-  // why: lessons/page-devices.md#drums
+  // The kit's drum machine, its pattern and step along links to pi-1:screen and web:screen; the Pi's keys edit
+  // the grid. On the Circuit the board's own sequencer plays (`seq.*`) and this tab is silent. The Pi is
+  // reached on the first play, never on load. why: lessons/page-devices.md#drums
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createBoard } from '/shell/board.mjs';
-  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { BOARD_SITE, boardGraph, addBoardNode } from '/shell/graph-registry.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { DRUM_MAPS, drumRows, plays } from '/shell/drum-maps.mjs';
+  import { patternOf } from '/shell/drum-pattern.mjs';
   import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
+  import { stepCell } from '/shell/steps-oled.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDrumMachine } from '/drums/drum-machine.mjs';
-  import { VOICES } from '/drums/voices.mjs';
+  import { voices } from '/drums/voices.mjs';
+  // Eight rows: the four drums of /drums/machine/ and the first four of its extras, as many as the Pi's screen holds.
+  const VOICES = voices({ extras: true }).slice(0, 8);
 
   const d = mount({ name: 'Drums on Pi screen', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('devices/drums');
@@ -55,6 +61,19 @@
   const MAY_SEND = !SELFCHECK || q.get('board') === '1';
   // Two letters a row, the drum machine abbreviations: what fits beside 16 steps on 128 pixels.
   const SHORT = { kick: 'BD', snare: 'SD', hho: 'OH', hhc: 'CH' };
+
+  // ── where the notes sound: this tab's SuperCollider, or the Circuit on the Pi by the board's own sequencer ──
+  // On the Circuit the board keeps time and Play and Stop drive it; the tab plays nothing and its grid mirrors.
+  // why: lessons/page-devices.md#drums-circuit
+  let target = q.get('target') === 'circuit' ? 'circuit' : 'tab';
+  const CMAP = DRUM_MAPS.circuit;
+  const onCircuit = () => target === 'circuit';
+  const mute = (v) => onCircuit() && !plays(CMAP, v.note);
+  // Closing the tab leaves the board's sequencer running; only a press on Stop stops it.
+  let leaving = false;
+  addEventListener('pagehide', () => { leaving = true; });
+  const PISEQ = `${BOARD_SITE}:sequencer`, PICIRCUIT = `${BOARD_SITE}:circuit`;
+  const PISEQ_OUT = `${PISEQ}:midi-out`, PISEQ_IN = `${PISEQ}:value-in`, PISEQ_STEPS = `${PISEQ}:value-out`, CIRCUIT_IN = `${PICIRCUIT}:midi-in`;
 
   // ── the edit state the keys move: the row they edit, and a cursor while stopped ──
   let voice = 0, cursor = 0, edits = 0;
@@ -77,9 +96,15 @@
   // the page's own links, and when each last carried something (declared before the patchbay draws)
   const flash = new Map(), OURS = new Set();
   const m = createDrumMachine(d, { voices: VOICES, onValue: onKey,
-    onStart: async () => { connect(); },
-    onStop: () => { cursor = 0; },
-    flowing: (l, playing) => (flash.get(l.id) || 0) > performance.now() || (playing && !OURS.has(l.id)) });
+    local: () => !onCircuit(), silent: mute,
+    // On the Circuit the grid's clock only mirrors: each note goes along the drawn Pi link, which delivers nothing here.
+    sequence: (ev) => bay.send(onCircuit() ? PISEQ_OUT : 'web:sequencer:midi-out', ev),
+    hide: (id) => (onCircuit() ? /^web:/.test(id) && VOICES.some((v) => id === `web:${v.key}`) || id === 'web:speaker'
+      : id === PISEQ || id === PICIRCUIT),
+    onStart: async () => { connect(); if (onCircuit()) await boardPlay(); },
+    onStop: () => { cursor = 0; if (onCircuit() && !leaving) boardStop(); },
+    flowing: (l, playing) => (flash.get(l.id) || 0) > performance.now()
+      || (playing && (onCircuit() ? l.from === PISEQ_OUT : !OURS.has(l.id))) });
   const bay = m.api.bay;
 
   // ── the screens and the keys, on the drum machine's own bay ──
@@ -91,25 +116,63 @@
   // Mirrored by name: web:screen and web:keys are this tab's copies of pi-1:screen and pi-1:keys.
   bay.addNode({ id: 'web:screen', kind: 'screen', label: 'simulated OLED', place: 'browser' });
   bay.addNode({ id: 'web:keys', kind: 'person', label: 'simulated keys', place: 'browser' });
+  // The board's sequencer and the Circuit's MIDI in, as boardGraph announces them: the drum map is on the port.
+  // The Circuit input's channels are the board's BOARD_INPUTS (1, 2 and 10 on this desk).
+  const G = boardGraph({ room: ROOM, gpu: false, sequencer: true, drums: { circuit: CMAP },
+    inputs: [{ name: 'circuit', channels: 2, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
+  addBoardNode(bay, G, 'sequencer', { label: 'sequencer on the Pi', deliver: { 'value-in': (ev) => toBoard(ev) } });
+  addBoardNode(bay, G, 'circuit', { label: 'Circuit on the Pi', withPorts: false });
+  bay.addPort({ ...G.ports.find((p) => p.id === CIRCUIT_IN), label: 'circuit:midi-in' });
 
   let board = null, connected = false, sent = 0;
   const lit = (from) => { for (const l of bay.links()) if (l.from === from) flash.set(l.id, performance.now() + 250); };
 
   const simCv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
   let ui = null, frames = 0, lastFrame = null;
-  bay.addPort({ id: SEQ_OUT, dir: 'out', medium: 'value', emits: ['steps'], label: 'sequencer:value-out' });
+  bay.addPort({ id: SEQ_OUT, dir: 'out', medium: 'value', emits: ['steps', 'pattern'], label: 'sequencer:value-out' });
   // What reaches the Pi's screen leaves for the board as `screen.steps`, sent and not asked.
   bay.addPort({ id: PI_IN, dir: 'in', medium: 'value', accepts: ['steps'], label: 'screen:value-in',
-    deliver: (ev) => { if (board && connected && MAY_SEND) board.send({ type: 'screen.steps', steps: ev.steps }); } });
+    deliver: (ev, l) => {
+      if (ev?.of !== 'steps' || l?.from !== SEQ_OUT) return;          // the board's own steps never come back through the tab
+      if (board && connected && MAY_SEND) board.send({ type: 'screen.steps', steps: ev.steps });
+    } });
   bay.addPort({ id: SIM_IN, dir: 'in', medium: 'value', accepts: ['steps'], label: 'screen:value-in',
-    deliver: (ev) => { if (ui) { lastFrame = ui.frame({ mode: 'steps', steps: ev.steps }); paintFrame(simCv, lastFrame); frames++; } } });
+    deliver: (ev) => { if (ev?.of === 'steps' && ui) { lastFrame = ui.frame({ mode: 'steps', steps: ev.steps }); paintFrame(simCv, lastFrame); frames++; } } });
   bay.addPort({ id: KEYS_OUT, dir: 'out', medium: 'value', emits: ['key'], label: 'keys:value-out' });
   bay.addPort({ id: SIMKEYS_OUT, dir: 'out', medium: 'value', emits: ['key'], label: 'keys:value-out' });
   for (const [from, to] of [[SEQ_OUT, PI_IN], [SEQ_OUT, SIM_IN], [KEYS_OUT, SEQ_IN], [SIMKEYS_OUT, SEQ_IN]]) {
     const r = bay.link(from, to);
     if (r.ok) OURS.add(r.id); else d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
   }
-  m.api.refresh();
+  // On the Circuit: the pattern goes to the board's sequencer, its notes into the Circuit by the drum map,
+  // and the Pi's screen follows the board's own clock instead of this tab's.
+  const PI_LINKS = [[SEQ_OUT, PISEQ_IN], [PISEQ_OUT, CIRCUIT_IN, [{ op: 'drummap', name: 'circuit' }]], [PISEQ_STEPS, PI_IN]];
+  let mapLink = null;
+  function relink() {
+    for (const l of bay.links()) {
+      const pi = PI_LINKS.some(([f, t]) => l.from === f && l.to === t);
+      if (pi || (l.from === SEQ_OUT && l.to === PI_IN)) bay.unlink(l.id);
+    }
+    OURS.forEach((id) => { if (!bay.links().some((l) => l.id === id)) OURS.delete(id); });
+    mapLink = null;
+    if (onCircuit()) {
+      for (const [from, to, tf] of PI_LINKS) {
+        const r = bay.link(from, to, tf || [], { site: 'web' });
+        if (!r.ok) { d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); continue; }
+        if (to === CIRCUIT_IN) mapLink = bay.links().find((l) => l.id === r.id);
+      }
+    } else {
+      const r = bay.link(SEQ_OUT, PI_IN);
+      if (r.ok) OURS.add(r.id);
+    }
+    // The grid greys the rows the Circuit has no drum for.
+    const g = m.api.grid;
+    for (let r = 0; r < m.api.VOICES.length; r++) for (let st = 0; st < g.steps; st++) if (g.get(r, st)) g.set(r, st, true, 'quiet');
+    mapBox.hidden = !onCircuit();
+    if (mapLink) mapT.set([...drumRows(mapLink.transforms[0]).map((x) => ({ line: x.line })),
+      ...VOICES.filter((v) => !plays(CMAP, v.note)).map((v) => ({ line: `${v.note} ${v.label}, no drum on the Circuit, silent` }))]);
+    m.api.refresh();
+  }
   m.api.grid.lit(voice);
 
   // ── what the screens show: sent along the links whenever it changes ──
@@ -118,21 +181,34 @@
     return {
       voices: a.VOICES.map((v) => SHORT[v.key] ?? v.label.slice(0, 2)),
       pattern: g.pattern().map((row) => Array.from(row, (x) => (x ? '1' : '0')).join('')),
-      step: a.playing() ? g.step() : cursor, voice, playing: a.playing(),
+      step: a.playing() ? g.step() : cursor, voice, playing: a.playing(), look,
     };
   }
-  let said = '';
+  // One look on both screens, as the owner chose: dotted empty steps, the running step framed.
+  const look = { empty: 'dot', head: 'frame' };
+  let said = '', toldBoard = '';
+  /** The grid as a pattern (demo/shell/drum-pattern.mjs), and the screen's two letter names and look. */
+  const patternNow = () => patternOf(VOICES.map((v) => v.key), m.api.grid.pattern(), m.api.bpm(), 'devices/drums');
+  const screenNow = () => ({ voices: steps().voices, look });
   (function tick() {
     const s = steps(), sig = JSON.stringify(s);
     if (ui && sig !== said) { said = sig; sent++; lit(SEQ_OUT); bay.send(SEQ_OUT, { of: 'steps', cls: 'steps', steps: s }); }
+    // On the Circuit, a changed pattern or tempo goes to the board, which plays it from the next bar.
+    if (onCircuit() && board && connected) {
+      const p = patternNow(), sc = screenNow(), psig = JSON.stringify([p, sc]);
+      if (psig !== toldBoard) { toldBoard = psig; lit(SEQ_OUT); bay.send(SEQ_OUT, { of: 'pattern', cls: 'pattern', pattern: p, screen: sc }); }
+    }
     requestAnimationFrame(tick);
   })();
   loadPanelUi(await (await fetch('/resources/pico/oled-ui.wasm')).arrayBuffer()).then((u) => { ui = u; });
 
+  let opened = null, boardSaid = null, toBoardN = 0;
   function connect() {
-    if (board || !MAY_SEND) return;
+    if (board || !MAY_SEND) return opened;
+    let open;
+    opened = new Promise((r) => { open = r; });
     board = createBoard({ room: ROOM, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind),
-      onOpen: () => { connected = true; said = ''; d.log(`the Pi's screen follows the pattern`); },
+      onOpen: () => { connected = true; said = ''; toldBoard = ''; open(true); d.log(onCircuit() ? 'the Pi is reached' : `the Pi's screen follows the pattern`); },
       // A key on the Pi is a `panel.key` to the whole room; it enters this bay at the keys' out-port.
       onMessage: (msg) => {
         if (msg.type !== 'panel.key') return;
@@ -140,6 +216,29 @@
         bay.send(KEYS_OUT, { of: 'key', cls: 'key', k: msg.k, sym: msg.sym, down: msg.down });
       } });
     d.log(`reaching ${ROOM}`);
+    return opened;
+  }
+  /** What arrives at pi-1:sequencer:value-in leaves for the board as `seq.pattern`. */
+  function toBoard(ev) {
+    if (ev?.of !== 'pattern' || !board || !connected || !MAY_SEND) return;
+    toBoardN++;
+    board.send({ type: 'seq.pattern', pattern: ev.pattern, screen: ev.screen });
+  }
+  const said2 = (st) => (st?.ok ? `${st.running ? 'running' : 'stopped'} at ${st.bpm} bpm, ${st.counts?.on ?? 0} notes, ${st.dropped ?? 0} dropped by the map${st.late?.n ? `, timer late p50 ${st.late.p50} p99 ${st.late.p99} worst ${st.late.max} ms` : ''}`
+    : `refused: ${st?.why || 'no answer'}`);
+  async function boardPlay() {
+    if (!MAY_SEND) { d.log('this run may not drive the board, add board=1 to the address', 'dim'); return; }
+    const ok = await Promise.race([opened, new Promise((r) => setTimeout(() => r(false), 6000))]);
+    if (!ok) { d.log('the Pi did not answer, so the Circuit is not playing', 'warn'); return; }
+    toldBoard = JSON.stringify([patternNow(), screenNow()]);
+    boardSaid = await board.ask({ type: 'seq.start', pattern: patternNow(), screen: screenNow() }, 'seq.state', 6000);
+    d.log(`the Pi's sequencer: ${said2(boardSaid)}`, boardSaid?.ok ? '' : 'warn');
+    if (boardSaid?.link) d.log(boardSaid.link);
+  }
+  async function boardStop() {
+    if (!board || !connected) return;
+    boardSaid = await board.ask({ type: 'seq.stop' }, 'seq.state', 6000);
+    d.log(`the Pi's sequencer: ${said2(boardSaid)}`, boardSaid?.ok ? '' : 'warn');
   }
 
   // ── the simulated module: the screen and its four keys, as on /devices/text/ ──
@@ -176,23 +275,61 @@
   }
   setZoom(zi);
   const simPanel = createVideoPanel({ media, left: scale, right: zoomBtns.el, aspect: 'auto' });
-  d.stack.add(simPanel.el, m.surface, m.patchbay);
+  const pick = createChoice({ label: 'plays on', options: [['this tab', 'tab'], ['Circuit on the Pi', 'circuit']], at: onCircuit() ? 1 : 0,
+    title: (v) => (v === 'tab' ? 'SuperCollider in this tab' : 'the Pi keeps time and plays the Circuit\'s four drums, Record off on the Circuit first'),
+    onPick: async (v) => {
+      if (v === target) return;
+      if (m.api.playing()) await m.api.stop();
+      target = v; relink();
+      d.log(onCircuit() ? 'Play now starts the Pi\'s sequencer into the Circuit, nothing sounds in this tab' : 'Play now sounds in this tab');
+    } });
+  const mapT = createTable({ columns: [{ key: 'line', label: 'drummap circuit', grow: true, hi: true, clip: true, hover: 'line' }], minRows: 8 });
+  const mapBox = el('div', 'cc-stack');
+  mapBox.append(el('h3', 'pos-sec-h', 'drum map'), mapT.el);
+  relink();
+  d.stack.add(simPanel.el, pick.el, m.surface, m.patchbay, mapBox);
   setInterval(() => { if (m.api.playing() || flash.size) m.api.refresh(); }, 200);
   window.__demo.bay = bay;
-  window.__demo.probe = () => ({ connected, sent, frames, edits, voice, cursor });
+  window.__demo.grid = m.api.grid;
+  window.__demo.probe = () => ({ connected, sent, frames, edits, voice, cursor, target, toBoard: toBoardN, board: boardSaid });
+  window.__demo.target = (v) => { pick.buttons[v === 'circuit' ? 1 : 0].click(); return target; };
 
   if (SELFCHECK) {
     await new Promise((r) => setTimeout(r, 400));
     d.assert('four links of the page: the pattern to both screens, both sets of keys to the sequencer', OURS.size === 4, [...OURS].join(', '));
     d.assert('the simulated screen drew the pattern', frames > 0 && !!lastFrame, `${frames} frames`);
-    // the kick is on at step 1, so the top left pixel of the grid (x 16, y 0) is lit
-    d.assert('the kick on step 1 is lit on the screen', !!lastFrame && (lastFrame[16] & 1) === 1);
+    // the kick is on at step 1, so the middle of the grid's first cell is lit
+    const k1 = stepCell(0, 0, VOICES.length), kx = k1.x + 2, ky = k1.y + (k1.h >> 1);
+    d.assert('the kick on step 1 is lit on the screen', !!lastFrame && ((lastFrame[(ky >> 3) * 128 + kx] >> (ky & 7)) & 1) === 1);
     const was = m.api.grid.get(1, 0);
     bay.send(SIMKEYS_OUT, { of: 'key', cls: 'key', k: 2, down: true });
     bay.send(SIMKEYS_OUT, { of: 'key', cls: 'key', k: 3, down: true });
     d.assert('v then # on the keys toggles the snare\'s step 1 and moves the cursor', m.api.grid.get(1, 0) === !was && voice === 1 && cursor === 1);
     m.api.grid.set(1, 0, was, 'quiet'); voice = 0; cursor = 0; m.api.grid.at(0); m.api.grid.lit(0);
     d.assert('a visit reaches nothing until play', !board);
+    // The Circuit as the target: the board's links drawn, the map resolved, the extras grey, nothing reached.
+    const was2 = target;
+    if (target !== 'circuit') { target = 'circuit'; relink(); }
+    const L = mapLink;
+    d.assert('on the Circuit the patchbay holds pi-1:sequencer -> pi-1:circuit with the drum map',
+      !!L && L.from === PISEQ_OUT && L.to === CIRCUIT_IN && L.transforms[0]?.op === 'drummap' && L.transforms[0].map?.[36] === 60, L ? L.id : 'no link');
+    d.assert('the map\'s rows read 36 kick -> 60 drum 1', mapT.el.textContent.includes('36 kick -> 60 drum 1') && mapT.el.textContent.includes('46 open hat -> 65 drum 4'));
+    d.assert('the pattern goes to the board\'s sequencer and the Pi\'s screen follows the board, not this tab',
+      bay.links().some((l) => l.from === SEQ_OUT && l.to === PISEQ_IN) && bay.links().some((l) => l.from === PISEQ_STEPS && l.to === PI_IN)
+      && !bay.links().some((l) => l.from === SEQ_OUT && l.to === PI_IN));
+    const clapRow = VOICES.findIndex((v) => v.key === 'clap');
+    m.api.grid.set(clapRow, 0, true, 'quiet');
+    const pad = m.surface.querySelector(`.pos-pg-pad[data-row="${clapRow}"][data-step="0"]`);
+    d.assert('a clap step is grey: the Circuit has no drum for it', pad?.dataset.mute === '1', pad ? JSON.stringify(pad.dataset) : 'no pad');
+    m.api.grid.set(clapRow, 0, false, 'quiet');
+    const s0 = L.sent, d0 = L.dropped;
+    bay.send(PISEQ_OUT, { cls: 'note', ch: 10, d1: 36, d2: 100 });
+    bay.send(PISEQ_OUT, { cls: 'note', ch: 10, d1: 39, d2: 100 });
+    d.assert('a kick passes the drawn map and a clap is dropped on it', L.sent === s0 + 1 && L.dropped === d0 + 1, `sent ${L.sent - s0}, dropped ${L.dropped - d0}`);
+    d.assert('NEGATIVE CONTROL: choosing the Circuit reaches nothing until play, and the tab boots no SuperCollider', !board && !m.api.engine());
+    if (was2 !== 'circuit') { target = was2; relink(); }
+    d.assert('back on this tab: the four links again, and no Pi link left', OURS.size === 4 && !bay.links().some((l) => l.from === PISEQ_OUT),
+      `${OURS.size} links`);
   }
   d.ready();
 </script>

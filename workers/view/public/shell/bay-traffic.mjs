@@ -29,6 +29,15 @@ const PULSE_STOPS = [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2];   // in pulse width
 const WAVE_STOPS = 12;              // one sine period, repeated along the wire
 const POOL = 8;                     // pulses alive at once on one wire; 900 ms each is 9 a second
 let seq = 0;
+// How traffic is drawn, chosen by `?wires=` while the options are compared: `glow` (the shading above),
+// or `beads` (dots moving out to in). A stream moves along the whole wire while
+// it flows; an event sends one bead from outlet to inlet.
+export const WIRE_STYLES = ['glow', 'beads'];
+const STYLE = (() => {
+  try { const v = new URLSearchParams(globalThis.location?.search || '').get('wires'); return WIRE_STYLES.includes(v) ? v : 'glow'; } catch { return 'glow'; }
+})();
+const DASH = { beads: { w: 4, on: 0, off: 14, cap: 'round' } };
+const MARCH = 24;                   // px a second the beads move
 
 const make = (tag, attrs) => {
   const e = document.createElementNS(NS, tag);
@@ -66,6 +75,33 @@ export function createBayTraffic() {
     path.style.strokeWidth = W;
     path.style.opacity = row.streamy ? IDLE : EVENT_LINE;
     row.op = null;
+    if (STYLE !== 'glow') {
+      const D = DASH[STYLE];
+      row.len = len;
+      const dash = (pattern) => {
+        const e = path.cloneNode();
+        e.removeAttribute('class');
+        e.setAttribute('fill', 'none');
+        e.style.stroke = `var(--md-${row.medium})`;
+        e.style.strokeWidth = D.w; e.style.strokeLinecap = D.cap; e.style.strokeDasharray = pattern;
+        return e;
+      };
+      if (row.streamy) {
+        row.glow = dash(`${D.on} ${D.off}`); row.glow.style.opacity = 0; row.glowOp = '0'; row.off = '';
+        path.after(row.glow);
+      } else {
+        // one bead, then a gap longer than the wire
+        const run = `0 ${len + 20}`;
+        row.pool = Array.from({ length: POOL }, () => {
+          const e = dash(run);
+          e.setAttribute('display', 'none');
+          path.after(e);
+          return { e, t0: 0, live: false };
+        });
+      }
+      row.path = path;
+      return true;
+    }
     const glow = (g) => {
       const e = path.cloneNode();
       e.removeAttribute('class');
@@ -119,6 +155,13 @@ export function createBayTraffic() {
         if (op !== row.op) { row.path.style.opacity = op; row.op = op; }
         const gop = (row.level * WAVE.depth).toFixed(3);
         if (gop !== row.glowOp) { row.glow.style.opacity = gop; row.glowOp = gop; }
+        if (STYLE !== 'glow') {
+          if (row.level > 0) {
+            const D = DASH[STYLE], off = (-((t / 1000) * MARCH) % (D.on + D.off)).toFixed(1);
+            if (off !== row.off) { row.glow.style.strokeDashoffset = off; row.off = off; }
+          }
+          continue;
+        }
         if (row.level > 0) {
           // shade(x) = sin(2 pi (x k - ph)): the bands move out to in by ph / k of the wire
           const f = ((t / 1000) * WAVE.perSec) % 1 / WAVE.k;
@@ -136,6 +179,7 @@ export function createBayTraffic() {
           if (!p.live) continue;
           const u = (t - p.t0) / PULSE.ms;
           if (u >= 1 || !shown) { p.live = false; p.e.setAttribute('display', 'none'); continue; }
+          if (STYLE !== 'glow') { p.e.style.strokeDashoffset = (-(u * row.len)).toFixed(1); continue; }
           // from just before the outlet to just past the inlet, as before
           const c = -PULSE.w * 2 + (1 + PULSE.w * 4) * u - 0.5;
           p.g.setAttribute('gradientTransform', `translate(${(row.d.x * c).toFixed(2)} ${(row.d.y * c).toFixed(2)})`);

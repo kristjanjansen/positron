@@ -21,33 +21,42 @@
 <title>POSITRON social/patchbay</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .sp-row { display: flex; gap: 0; overflow-x: auto; min-width: 0; }
-  .sp-row canvas { display: block; width: 300px; height: auto; flex: none; }
-  .sp-row canvas + canvas { border-left: 1px dashed var(--line2); }
-  .sp-wrap { border: 1px solid var(--line2); border-radius: var(--r, 4px); overflow: hidden; max-width: 100%; width: max-content; }
-  .sp-tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-  .sp-note { color: var(--dim); font: 400 13px/1.5 var(--mono); margin: 0; }
+  /* One patch a row: its name, a line of facts, a download button, then its slides. The slides butt with no gap,
+     so the patch runs across them as it will across a carousel; on a desk the row scrolls sideways, on a phone
+     each slide is the column's full width and snaps, one swipe a slide (the eccm social page's arrangement). */
+  .sp-list { display: flex; flex-direction: column; gap: 40px; }
+  .sp-item { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .sp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .sp-name { margin: 0; font: 600 14px/1.3 var(--mono); }
+  .sp-note { margin: 0; color: var(--dim); font: 400 12px/1.5 var(--mono); }
+  /* A row in the page column, as wide as its slides, scrolling sideways when wider than the column; a 1 px seam in the
+     line colour between slides and a frame round the row show where each slide ends. */
+  .sp-car { --slide: 336px; display: flex; gap: 1px; overflow-x: auto; scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain; min-width: 0; width: max-content; max-width: 100%; background: var(--line);
+    border: 1px solid var(--line); border-radius: var(--r, 4px); }
+  .sp-car img, .sp-car .sp-ph { flex: 0 0 var(--slide); width: var(--slide); aspect-ratio: 4 / 5; display: block; scroll-snap-align: start; background: #0b0e14; }
+  @media (max-width: 560px) { .sp-car { --slide: calc(100vw - 34px); scrollbar-width: none; } .sp-car::-webkit-scrollbar { display: none; } }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { createPicker } from '/shell/picker.mjs';
-  import { font, drawWordmark, svgImage, X, TEXT_W, C } from '/shell/reel.mjs';
-  import { drawBay } from '/shell/bay-svg.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { font, drawWordmark, X, TEXT_W, C } from '/shell/reel.mjs';
+  import { MEDIUM_COLOURS } from '/shell/patchbay.mjs';
   import { ranks } from '/shell/bay-layout.mjs';
 
-  // Every concept page's patch (demo/resources/bays.json) as Instagram pictures at 4:5. A patch that
-  // fits at a readable size is one post in two facing columns; one that does not is a carousel: the
-  // left to right layout drawn once across several slides, so its wires carry on as you swipe.
+  // Every concept page's patch (demo/resources/bays.json) drawn once, left to right as the page builds it,
+  // on 4:5 slides that are each a board of two columns, running on to the next board when a column is full.
   const PW = 1080, PH = 1350, TITLE_Y = 236, SAY_Y = 296, SAY_LH = 44, BAY_TOP = 400, BAY_BOTTOM = PH - 90, BAND = BAY_BOTTOM - BAY_TOP;
-  // Instagram shows a 1080 px post about 390 px wide on a phone. 2.7 puts an 11 px port name at
-  // about 10.7 px there; 2 is the floor a carousel accepts before it gives up height.
+  // Instagram shows a 1080 px slide about 390 px wide on a phone. 2.7 puts an 11 px port name at about
+  // 10.7 px there. A patch taller than the band at that size is drawn smaller, and its row says so.
   const PHONE = 390 / PW, READ = 2.7, MIN = 2;
+  // Slides on this page are drawn at a fraction of their size; a download draws them whole.
+  const VIEW = 0.5;
   const sans = getComputedStyle(document.documentElement).getPropertyValue('--sans').trim() || 'sans-serif';
-  const SAY_FONT = `400 32px ${sans}`;
   const onPhone = (k) => +(11 * k * PHONE).toFixed(1);
 
-  const d = mount({ name: 'social/patchbay', what: 'Every concept page’s patch as a 4:5 post, or a carousel when it is too big to read in one.',
+  const d = mount({ name: 'social/patchbay', what: 'Every concept page’s patch on slides of two columns each, running on to the next slide when it does not fit.',
     readout: null, index: '/social/', indexLabel: 'social' });
   const h1 = d.head.querySelector('.pos-name');
   if (h1) h1.textContent = 'patchbay';
@@ -55,138 +64,180 @@
   const { bays: BAYS } = await (await fetch('/resources/bays.json')).json();
   const asBay = (b) => ({ nodes: b.nodes, ports: b.ports, links: b.links.map((l, i) => ({ id: `l${i}`, ...l })) });
 
-  /** How a patch is laid out: `pair` (one post) or `across` (a carousel of `slides`), at scale `k`. */
+  // Each slide is a board of two columns of boxes, drawn at READ so port names read on a phone. The boxes go in rank
+  // order, sources first, in as few columns as the height allows; after two columns the next board.
+  const K = READ, FONT = Math.round(11 * K), TITLE = Math.round(13 * K), ROW = Math.round(20 * K), PAD = Math.round(10 * K);
+  const HEAD = PAD + TITLE + Math.round(6 * K), FIELD = 140, COL_W = (PW - 2 * X - FIELD) / 2, VGAP = 40, GAP0 = 28, LANE = 12;
+  const colX = (c) => Math.floor(c / 2) * PW + X + (c % 2) * (COL_W + FIELD);
   function plan(b) {
-    const bay = asBay(b);
-    const pair = drawBay(bay, { width: 480, arrange: 'pair' }), kPair = Math.min(READ, BAND / (pair.height + 2));
-    const across = drawBay(bay, { width: 480 }), kAcross = Math.min(READ, BAND / (across.height + 2));
-    // Too tall either way: the boxes in rank order, as many per slide as fit two columns at READ,
-    // each slide its own pair; a wire to a box on another slide is left out, its port name stays.
-    if (Math.max(kPair, kAcross) < MIN) {
-      const { rank } = ranks(bay.nodes, bay.links), groups = [[]];
-      const order = bay.nodes.map((n, i) => [n, i]).sort((x, y) => rank.get(x[0].id) - rank.get(y[0].id) || x[1] - y[1]).map(([n]) => n);
-      const sub = (ids) => {
-        const set = new Set(ids), of = (id) => id.split(':').slice(0, 2).join(':');
-        return { nodes: bay.nodes.filter((n) => set.has(n.id)), ports: bay.ports.filter((q) => set.has(of(q.id))),
-          links: bay.links.filter((l) => set.has(of(l.from)) && set.has(of(l.to))) };
-      };
-      for (const n of order) {
-        const g = [...groups.at(-1), n.id];
-        if (groups.at(-1).length && drawBay(sub(g), { width: 480, arrange: 'pair' }).height * READ > BAND) groups.push([n.id]);
-        else groups[groups.length - 1] = g;
+    const bay = asBay(b), { rank } = ranks(bay.nodes, bay.links);
+    const portsOf = (id) => bay.ports.filter((q) => q.id.split(':').slice(0, 2).join(':') === id);
+    const order = bay.nodes.map((n, i) => [n, i]).sort((x, y) => rank.get(x[0].id) - rank.get(y[0].id) || x[1] - y[1]).map(([n]) => n);
+    const items = order.map((n) => {
+      const ps = portsOf(n.id), ins = ps.filter((q) => q.dir === 'in'), outs = ps.filter((q) => q.dir === 'out');
+      return { n, ins, outs, h: HEAD + Math.max(ins.length, outs.length, 1) * ROW + Math.round(PAD / 2) };
+    });
+    // as few columns as the band's height allows, at least two, then the boxes split evenly between them in order
+    const fill = (limit) => { const cs = [[]]; let u = -VGAP; for (const q of items) { if (cs.at(-1).length && u + VGAP + q.h > limit) { cs.push([]); u = -VGAP; } cs.at(-1).push(q); u += VGAP + q.h; } return cs; };
+    const need = Math.max(Math.min(2, items.length), fill(BAND).length);
+    let cols = fill(BAND);    // then the height lowered while the count holds, which evens the columns
+    for (let lim = BAND; lim > 0 && fill(lim).length <= need; lim -= 10) cols = fill(lim);
+    // the gap above a box is GAP0, plus a LANE for every wire inside its column that comes into it there
+    const where = new Map();
+    cols.forEach((col, c) => col.forEach((q, i) => where.set(q.n.id, [c, i])));
+    const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
+    const into = new Map();
+    for (const l of bay.links) {
+      const a = where.get(nodeOf(l.from)), z = where.get(nodeOf(l.to));
+      if (a && z && a[0] === z[0]) into.set(nodeOf(l.to), (into.get(nodeOf(l.to)) || 0) + 1);
+    }
+    const gapAbove = (q) => GAP0 + LANE * (into.get(q.n.id) || 0);
+    // each column centred in the band; a box's ports at its left (in) and right (out) edge
+    const boxes = [], at = new Map();
+    cols.forEach((col, c) => {
+      const total = col.reduce((t, q, i) => t + q.h + (i ? gapAbove(q) : 0), 0);
+      let y = BAY_TOP + Math.max(0, (BAND - total) / 2);
+      for (const [i, q] of col.entries()) {
+        if (i) y += gapAbove(q);
+        const x = colX(c);
+        boxes.push({ ...q, x, y, w: COL_W });
+        q.ins.forEach((pt, i) => at.set(pt.id, { x, y: y + HEAD + i * ROW + ROW / 2, medium: pt.medium, top: y, gap: gapAbove(q) }));
+        q.outs.forEach((pt, i) => at.set(pt.id, { x: x + COL_W, y: y + HEAD + i * ROW + ROW / 2, medium: pt.medium }));
+        y += q.h;
       }
-      const pages = groups.map(sub);
-      return { mode: 'pages', k: READ, slides: pages.length, pages,
-        draw: () => pages.map((pg) => drawBay(pg, { arrange: 'pair', width: Math.round(TEXT_W / READ) - 2 })) };
-    }
-    if (kPair >= READ * 0.95 || kPair >= kAcross) {
-      return { mode: 'pair', k: kPair, slides: 1, draw: () => drawBay(bay, { arrange: 'pair', width: Math.round(TEXT_W / kPair) - 2 }) };
-    }
-    // The panorama runs X in from the first slide's left and the last slide's right, edge to edge between.
-    const slides = Math.max(2, Math.ceil((across.width * kAcross + 2 * X) / PW));
-    return { mode: 'across', k: kAcross, slides, draw: () => drawBay(bay, { width: Math.round((slides * PW - 2 * X) / kAcross) - 2 }) };
+    });
+    return { n: Math.max(1, Math.ceil(cols.length / 2)), k: K, boxes, at, links: bay.links, cols: cols.length };
   }
 
   function wrap(ctx, text) {
     const lines = [''];
-    for (const w of text.split(' ')) {
+    for (const w of String(text || '').split(' ')) {
       const t = lines.at(-1) ? `${lines.at(-1)} ${w}` : w;
       if (ctx.measureText(t).width > TEXT_W && lines.at(-1)) lines.push(w); else lines[lines.length - 1] = t;
     }
     return lines;
   }
 
-  /** The slides of one patch, each a 1080 x 1350 canvas. */
-  async function render(b) {
-    const p = plan(b), drawn = p.draw();
-    const scale = p.mode === 'pages' ? p.k : Math.min((p.slides * PW - 2 * X) / (drawn.width + 2), BAND / (drawn.height + 2));
-    let picW = TEXT_W, tallest = 0;
-    const wide = el('canvas');
-    wide.width = p.slides * PW; wide.height = PH;
+  /** One patch's slides as canvases at scale `s` of 1080 x 1350, and where its boxes landed. */
+  async function render(b, s) {
+    const p = plan(b), { n } = p;
+    const wide = document.createElement('canvas');
+    wide.width = Math.round(n * PW * s); wide.height = Math.round(PH * s);
     const ctx = wide.getContext('2d');
-    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, wide.width, PH);
+    ctx.setTransform(s, 0, 0, s, 0, 0);
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, n * PW, PH);
     drawWordmark(ctx, 130);
     ctx.fillStyle = C.fg; ctx.font = font(600, 64); ctx.fillText(b.title, X, TITLE_Y);
-    ctx.fillStyle = C.dim; ctx.font = SAY_FONT;
+    ctx.fillStyle = C.dim; ctx.font = `400 32px ${sans}`;
     const lines = wrap(ctx, b.say).slice(0, 2);
     lines.forEach((ln, i) => ctx.fillText(ln, X, SAY_Y + i * SAY_LH));
-    // later slides carry their place, top right, in the wordmark's ink
-    ctx.font = font(400, 30); ctx.fillStyle = C.dim; ctx.textAlign = 'right';
-    for (let i = 1; i < p.slides; i++) ctx.fillText(`${i + 1} / ${p.slides}`, (i + 1) * PW - X, 130);
+    ctx.font = font(400, 30); ctx.textAlign = 'right';
+    for (let i = 1; i < n; i++) ctx.fillText(`${i + 1} / ${n}`, (i + 1) * PW - X, 130);
     ctx.textAlign = 'left';
-    let bx, by;
-    if (p.mode === 'pages') {
-      // each slide its own pair, at READ, at the band's top
-      for (const [i, pg] of drawn.entries()) {
-        const pic = await svgImage(pg.body, { width: pg.width, height: pg.height, scale: p.k });
-        bx = Math.round(X + (TEXT_W - pic.w) / 2); by = BAY_TOP;
-        ctx.drawImage(pic.img, i * PW + bx, by, pic.w, pic.h);
-        tallest = Math.max(tallest, pic.h);
+    // wires under the boxes, in the out port's medium colour
+    ctx.lineWidth = 3;
+    // wires inside one column, laned so none crosses another: on the right, a higher port takes an outer lane; on the
+    // left, a lower target takes an outer lane; each its own height in the gap
+    const inner = p.links.map((l) => [l, p.at.get(l.from), p.at.get(l.to)]).filter(([, a, z]) => a && z && z.x <= a.x);
+    const lane = new Map();
+    for (const col of new Set(inner.map(([, a]) => a.x))) {
+      const here = inner.filter(([, a]) => a.x === col);
+      [...here].sort((u, v) => u[1].y - v[1].y).forEach(([l], i, all) => lane.set(l, { r: all.length - 1 - i, n: all.length }));
+      [...here].sort((u, v) => u[2].y - v[2].y).forEach(([l], i) => Object.assign(lane.get(l), { l: i }));
+    }
+    for (const l of p.links) {
+      const a = p.at.get(l.from), z = p.at.get(l.to);
+      if (!a || !z) continue;
+      ctx.strokeStyle = MEDIUM_COLOURS[a.medium] || C.dim;
+      ctx.beginPath();
+      if (z.x > a.x) {
+        const dx = Math.max(80, Math.abs(z.x - a.x) / 2);
+        ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(a.x + dx, a.y, z.x - dx, z.y, z.x, z.y);
+      } else {
+        // a box below in the same column: out to the right, back through the gap above the target, in from the left
+        // each corner an arc, as the patchbay's own wires bend
+        const L = lane.get(l), xr = a.x + 24 + 12 * L.r, xl = z.x - 24 - 12 * L.l;
+        // the wires into one box share the gap above it, LANE apart
+        const sib = inner.filter(([, , zz]) => zz.top === z.top && zz.x === z.x).map(([w]) => w), j = sib.indexOf(l);
+        const gy = z.top - z.gap / 2 + (j - (sib.length - 1) / 2) * LANE, rr = 10;
+        const pts = [[a.x, a.y], [xr, a.y], [xr, gy], [xl, gy], [xl, z.y], [z.x, z.y]];
+        ctx.moveTo(...pts[0]);
+        for (let i = 1; i < pts.length - 1; i++) ctx.arcTo(...pts[i], ...pts[i + 1], rr);
+        ctx.lineTo(...pts.at(-1));
       }
-    } else {
-      const pic = await svgImage(drawn.body, { width: drawn.width, height: drawn.height, scale });
-      bx = Math.round(X + (p.slides * PW - 2 * X - pic.w) / 2); by = Math.round(BAY_TOP + (BAND - pic.h) / 2);
-      ctx.drawImage(pic.img, bx, by, pic.w, pic.h);
-      picW = pic.w; tallest = pic.h;
+      ctx.stroke();
+    }
+    for (const q of p.boxes) {
+      ctx.fillStyle = '#151b26'; ctx.strokeStyle = '#2a3240'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(q.x, q.y, q.w, q.h, 10); ctx.fill(); ctx.stroke();
+      // a name wider than the box is set smaller until it fits
+      let tsize = TITLE;
+      ctx.font = font(600, tsize);
+      while (tsize > FONT && ctx.measureText(q.n.id).width > q.w - 2 * PAD) ctx.font = font(600, --tsize);
+      ctx.fillStyle = C.fg; ctx.fillText(q.n.id, q.x + PAD, q.y + PAD + TITLE * 0.8);
+      ctx.font = font(400, FONT);
+      const name = (pt) => pt.id.split(':').slice(2).join(':');
+      q.ins.forEach((pt, i) => { ctx.fillStyle = MEDIUM_COLOURS[pt.medium] || C.dim; ctx.fillText(name(pt), q.x + PAD, q.y + HEAD + i * ROW + ROW / 2 + FONT * 0.35); });
+      ctx.textAlign = 'right';
+      q.outs.forEach((pt, i) => { ctx.fillStyle = MEDIUM_COLOURS[pt.medium] || C.dim; ctx.fillText(name(pt), q.x + q.w - PAD, q.y + HEAD + i * ROW + ROW / 2 + FONT * 0.35); });
+      ctx.textAlign = 'left';
     }
     const slides = [];
-    for (let i = 0; i < p.slides; i++) {
-      const cv = el('canvas');
-      cv.width = PW; cv.height = PH;
-      cv.getContext('2d').drawImage(wide, i * PW, 0, PW, PH, 0, 0, PW, PH);
+    for (let i = 0; i < n; i++) {
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(PW * s); cv.height = Math.round(PH * s);
+      cv.getContext('2d').drawImage(wide, Math.round(i * PW * s), 0, cv.width, cv.height, 0, 0, cv.width, cv.height);
       slides.push(cv);
     }
-    return { p, slides, box: { bx, by, w: picW, h: tallest, total: wide.width }, lines };
+    return { p, slides, lines };
   }
+  const blobOf = (cv) => new Promise((r) => cv.toBlob(r, 'image/png'));
 
-  const tools = el('div', 'sp-tools');
-  const note = el('p', 'sp-note', '');
-  const row = el('div', 'sp-row'), frame = el('div', 'sp-wrap');
-  frame.append(row);
-  const save = el('button', '', 'Download PNG');
-  let at = 0, current = null;
-  const go = async (i) => {
-    at = (i + BAYS.length) % BAYS.length;
-    pick.show(BAYS[at].title, at);
-    current = await render(BAYS[at]);
-    row.replaceChildren(...current.slides);
-    const { p } = current;
-    note.textContent = `/${BAYS[at].id}/  ${BAYS[at].nodes.length} boxes  ${p.mode === 'pair' ? 'one post' : p.mode === 'pages' ? `${p.slides} slides, cut between boxes` : `${p.slides} slide panorama`}  port names about ${onPhone(p.k)} px on a phone`;
-    save.textContent = p.slides > 1 ? `Download ${p.slides} PNGs` : 'Download PNG';
-  };
-  const pick = createPicker({ what: 'patch', prev: () => go(at - 1), next: () => go(at + 1), onPick: (i) => go(i) });
-  pick.options(BAYS.map((b) => b.title));
-  save.addEventListener('click', async () => {
-    const name = `positron-${BAYS[at].id.replace('/', '-')}`;
-    for (const [i, cv] of current.slides.entries()) {
-      const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
-      const a = el('a', '', '', { href: URL.createObjectURL(blob), download: current.slides.length > 1 ? `${name}-${i + 1}.png` : `${name}.png` });
+  async function save(b) {
+    const { slides } = await render(b, 1), name = `positron-${b.id.replace('/', '-')}`;
+    for (const [i, cv] of slides.entries()) {
+      const a = el('a', '', '', { href: URL.createObjectURL(await blobOf(cv)), download: `${name}-${i + 1}.png` });
       a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
       await new Promise((r) => setTimeout(r, 300));
     }
-    d.log(`saved ${name}, ${current.slides.length} picture(s)`);
-  });
-  tools.append(pick.el, save);
-  d.el.append(tools, note, frame);
+    d.log(`saved ${name}, ${slides.length} pictures`);
+  }
+
+  // One row a patch; its slides are drawn when the row comes near the screen, as images, so a long page
+  // holds compressed pictures and not hundreds of canvases.
+  const list = el('div', 'sp-list'), rows = new Map();
+  for (const b of BAYS) {
+    const p = plan(b);
+    const item = el('section', 'sp-item'), head = el('div', 'sp-head'), car = el('div', 'sp-car');
+    const dl = createButtonGroup({ buttons: [{ id: 'save', icon: 'download', label: `download ${b.title}, ${p.n} pictures`, onPress: () => save(b) }] });
+    head.append(el('h3', 'sp-name', b.title), dl.el);
+    car.append(...Array.from({ length: p.n }, () => el('div', 'sp-ph')));
+    item.append(head, el('p', 'sp-note', `/${b.id}/  ${b.nodes.length} boxes  ${p.n} slides  port names about ${onPhone(p.k)} px on a phone`), car);
+    list.append(item);
+    rows.set(car, b);
+  }
+  d.el.append(list);
   await document.fonts.ready;
-  await go(0);
+  const drawRow = async (car) => {
+    const b = rows.get(car);
+    if (!b) return;
+    rows.delete(car);
+    const { slides } = await render(b, VIEW);
+    const imgs = await Promise.all(slides.map(async (cv, i) => el('img', '', '', { src: URL.createObjectURL(await blobOf(cv)), alt: `${b.title}, ${i + 1} of ${slides.length}` })));
+    car.replaceChildren(...imgs);
+  };
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { io.unobserve(e.target); drawRow(e.target); } }), { rootMargin: '600px 0px' });
+  for (const car of rows.keys()) io.observe(car);
 
   if (SELFCHECK) {
     const plans = BAYS.map((b) => ({ id: b.id, ...plan(b) }));
     d.assert('every concept page has a patch here', BAYS.length >= 40, `${BAYS.length} patches`);
-    const low = plans.filter((p) => p.k < MIN);
-    d.assert(`every patch draws at ${MIN}x or more, ports ${onPhone(MIN)} px or more on a phone`, !low.length,
-      low.map((p) => `${p.id} ${p.k.toFixed(2)}`).join(', ') || `lowest ${Math.min(...plans.map((p) => p.k)).toFixed(2)}`);
-    const counts = plans.reduce((m, p) => ((m[p.mode] += 1), m), { pair: 0, across: 0, pages: 0 });
-    d.assert('small patches are one post and big ones carousels', counts.pair > 0 && counts.across + counts.pages > 0,
-      `${counts.pair} posts, ${counts.across} panoramas, ${counts.pages} cut into pages, up to ${Math.max(...plans.map((p) => p.slides))} slides`);
-    const tall = plans.filter((p) => p.mode === 'pages' && p.draw().some((pg) => (pg.height + 2) * p.k > BAND + 1 && pg.boxes.length > 1));
-    d.assert('a page never holds more than the band', !tall.length, tall.map((p) => p.id).join(', ') || 'all fit');
-    // The page's own first patch, rendered: slides are 1080 x 1350 and the patch stays inside its band.
-    const { slides, box, lines } = current;
-    d.assert('the shown patch is whole slides with the patch inside the margins',
-      slides.every((c) => c.width === PW && c.height === PH) && box.bx >= X - 1 && box.bx + box.w <= box.total - X + 1 && box.by >= BAY_TOP - 1 && box.by + box.h <= BAY_BOTTOM + 1 && lines.length <= 2,
-      `${slides.length} slide(s), patch ${box.w} x ${box.h} at ${box.bx},${box.by}`);
+    const counts = plans.reduce((m, p) => ((m[p.n] = (m[p.n] || 0) + 1), m), {});
+    const over = plans.filter((p) => p.boxes.some((q) => q.y < BAY_TOP - 1 || q.y + q.h > BAY_BOTTOM + 1));
+    d.assert('every box sits inside a board\'s band, two columns a slide', !over.length,
+      over.map((p) => p.id).join(', ') || Object.entries(counts).map(([n, c]) => `${c} on ${n}`).join(', '));
+    const { slides, lines } = await render(BAYS[0], VIEW);
+    d.assert('the first patch is whole 4:5 slides', slides.every((c) => Math.abs(c.width / c.height - PW / PH) < 0.01) && lines.length <= 2, `${slides.length} slides`);
   }
   d.ready();
 </script>
