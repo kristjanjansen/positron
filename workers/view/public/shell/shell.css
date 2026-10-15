@@ -4150,31 +4150,38 @@ a.pos-hero-secret, a.pos-hero-secret:hover, a.pos-hero-secret:visited { color: i
 .pos-hero-bay { display: flex; justify-content: center; margin-top: 32px; }
 .pos-hero-bay-in { flex: none; }
 
-/* The ask bar (ask-bar.mjs), lifted from /connect/'s ask field and example pills: a sentence a
+/* The wish bar (wish-bar.mjs), lifted from /connect/'s ask field and example pills: a sentence a
    person says, in --voice, round and in Geist because it is read through rather than named.
    The send button sits inside the field one inset from its edge, radii concentric. A pill sets
    background-color, never the shorthand, or it would wipe the busy sweep's background-image. */
-.pos-ask { display: flex; flex-direction: column; gap: 12px; }
-.pos-ask-row { --send-in: 4px; position: relative; }
-.pos-ask-row > .pos-field { display: block; margin: 0; }
-.pos-ask-row .pos-field input { width: 100%; box-sizing: border-box; font-family: var(--sans); color: var(--voice);
+.pos-wish { display: flex; flex-direction: column; gap: 12px; }
+.pos-wish-row { --send-in: 4px; position: relative; }
+.pos-wish-row > .pos-field { display: block; margin: 0; }
+.pos-wish-row .pos-field input { width: 100%; box-sizing: border-box; font-family: var(--sans); color: var(--voice);
   min-height: calc(var(--ctl-sm) + 2 * var(--send-in)); padding-right: calc(var(--ctl-sm) + 3 * var(--send-in));
   border-radius: calc(var(--r) + var(--send-in)); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
-.pos-ask-row .pos-field input:focus { border-color: var(--voice); }
-.pos-ask-row > button { position: absolute; bottom: var(--send-in); right: var(--send-in); border-radius: var(--r);
+.pos-wish-row .pos-field input:focus { border-color: var(--voice); }
+.pos-wish-row > button { position: absolute; bottom: var(--send-in); right: var(--send-in); border-radius: var(--r);
   color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
-.pos-ask-row > button[aria-pressed="true"] { color: var(--bg); background: var(--voice); border-color: var(--voice); }
-.pos-pills { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); }
+.pos-wish-row > button[aria-pressed="true"] { color: var(--bg); background: var(--voice); border-color: var(--voice); }
+/* One line that scrolls sideways; the fade sits in the gutter, so at rest the first pill lines up with the column. */
+.pos-pills { --fade: 16px; display: flex; flex-wrap: nowrap; gap: var(--ctl-gap); overflow-x: auto; scrollbar-width: none; min-width: 0;
+  margin-inline: calc(-1 * var(--fade)); padding: 2px var(--fade);
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); }
+.pos-pills::-webkit-scrollbar { display: none; }
 .pos-pills[hidden] { display: none; }
 .pos-pills > button.pos-pill { flex: none; text-transform: none; font-family: var(--sans); font-weight: 400; border-radius: 999px;
   padding: 0 var(--pad-seg); color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
   background-color: transparent; }
 .pos-pills > button.pos-pill:hover { border-color: var(--voice); background-color: transparent; }
-/* A pill with nothing to do yet (start new before there is anything) is not drawn and keeps no gap. */
+/* The reset pill, always last, is not drawn while there is nothing to reset, and keeps no gap. */
 .pos-pills > button.pos-pill[hidden] { display: none; }
 /* Focus colours the pill's own edge, lighter; no second ring outside it. */
 .pos-pills > button.pos-pill:focus-visible { outline: none; border-color: color-mix(in oklab, var(--voice) 60%, #fff); }
 /* What came of an ask, centred and balanced like /connect/'s empty picture; hidden until something is said. */
-.pos-ask-say { margin: 0; text-align: center; text-wrap: balance; overflow-wrap: anywhere; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
-.pos-ask-say[hidden] { display: none; }
-.pos-ask-say[data-kind="bad"] { color: var(--dim); }
+.pos-wish-say { margin: 0; text-align: center; text-wrap: balance; overflow-wrap: anywhere; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
+.pos-wish-say[hidden] { display: none; }
+.pos-wish-say[data-kind="bad"] { color: var(--dim); }
+/* The speech engine switcher under the bar, temporary (BACKLOG.md, "Wish bar speech switcher"). */
+.pos-wish-engine { display: flex; justify-content: flex-end; }
+.pos-wish-engine[hidden] { display: none; }

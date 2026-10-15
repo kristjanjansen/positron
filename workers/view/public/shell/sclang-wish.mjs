@@ -1,10 +1,10 @@
-// demo/shell/sclang-writer.mjs: the SuperCollider half of code-writer.mjs's loop, a sentence into a
+// demo/shell/sclang-wish.mjs: the SuperCollider half of wish-loop.mjs's loop, a sentence into a
 // synth a person plays from the keys (plans/plan-text-to-code.md slice 2): the contract, read off
 // sclang-lite's own tables, the adapter, the sound check and the judge. Pure; graded in node by
-// sclang-writer-test.mjs. The render itself is sclang-trial.mjs, in the browser.
+// sclang-wish-test.mjs. The render itself is sclang-wish-trial.mjs, in the browser.
 
 import { UGENS, ENVS, UNARY, RANGES, MAX_CHANNELS, MAX_DUP } from './sclang-lite.mjs';
-import { writeLoop, ATTEMPTS, BUDGET_MS } from './code-writer.mjs';
+import { writeLoop, ATTEMPTS, BUDGET_MS } from './wish-loop.mjs';
 
 /** UGens in the subset that need a buffer, a bus or a reply this page has none of; never offered. */
 export const NOT_FOR_KEYS = ['BufFrames', 'BufDur', 'In', 'BufWr', 'GrainBuf', 'SendReply', 'LocalIn', 'LocalOut'];
@@ -210,7 +210,7 @@ export function judgeSclang(r) {
   return { pass: true, fields };
 }
 
-/** Ask, adapt, compile, render and judge, as code-writer.mjs does it. */
+/** Ask, adapt, compile, render and judge, as wish-loop.mjs does it. */
 export function writeSclang({ text, base = null, ask, trial, attempts = ATTEMPTS, budgetMs = BUDGET_MS, now = () => Date.now(), onTry = () => {} }) {
   // The shape copied back costs no render: it is refused before the trial.
   const tried = (src) => (copiesShape(src) ? { ok: true, copy: true } : trial(src));

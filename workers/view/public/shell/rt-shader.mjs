@@ -9,7 +9,7 @@ import { createCodeBox } from './code-box.mjs';
 import { PARAM_HUES } from './code-lang.mjs';
 import { createCompileIdle } from './compile-idle.mjs';
 import { createMirrorShader, MIRROR_FS, GLSL } from './mirror-shader.mjs';
-import { VERSION, bodyError } from './glsl-writer.mjs';
+import { VERSION, bodyError } from './glsl-wish.mjs';
 
 export function make({ log }) {
   let segments = null, delivered = 0, frames = 0, programs = 0, refused = 0, lastProgram = null;

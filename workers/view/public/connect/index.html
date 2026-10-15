@@ -44,36 +44,7 @@
   .lv-pname.cn-pick[aria-pressed="true"] { font-weight: 600; }
   .cn-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
 
-  .cn-say { display: flex; flex-direction: column; gap: 12px; }
-  /* One line that scrolls sideways; the fade sits in the gutter, so at rest the first pill lines up with the column. */
-  .cn-ex { --fade: 16px; display: flex; flex-wrap: nowrap; gap: var(--ctl-gap); overflow-x: auto; scrollbar-width: none; min-width: 0;
-    margin-inline: calc(-1 * var(--fade)); padding: 2px var(--fade);
-    mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); }
-  .cn-ex::-webkit-scrollbar { display: none; }
-  /* start new is not drawn while there is nothing to clear, so the row keeps no gap for it. */
-  .cn-ex > button.cn-pill[hidden] { display: none; }
-  .cn-ex > button.cn-pill { flex: none; }
-
-  /* What a person says, in --voice (shell.css). Round, lowercase and in
-     Geist, because a sentence is read through rather than named. */
-  .cn-ex > button.cn-pill { text-transform: none; font-family: var(--sans); font-weight: 400; border-radius: 999px;
-    padding: 0 var(--pad-seg); color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
-    background: transparent; }
-  .cn-ex > button.cn-pill:hover { border-color: var(--voice); background: transparent; }
-  /* Focus colours the pill's own edge, lighter; no second ring outside it. */
-  .cn-ex > button.cn-pill:focus-visible { outline: none; border-color: color-mix(in oklab, var(--voice) 60%, #fff); }
-  /* The ask field in the pills' voice: a sentence a person says. */
-  /* The send button sits inside the field one inset from its edge, radii concentric, as chat-ui's compose. */
-  .cn-ask { --send-in: 4px; position: relative; }
-  .cn-ask > .pos-field { display: block; margin: 0; }
-  .cn-ask .pos-field input { width: 100%; box-sizing: border-box; font-family: var(--sans); color: var(--voice);
-    min-height: calc(var(--ctl-sm) + 2 * var(--send-in)); padding-right: calc(var(--ctl-sm) + 3 * var(--send-in));
-    border-radius: calc(var(--r) + var(--send-in)); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
-  .cn-ask .pos-field input:focus { border-color: var(--voice); }
-  .cn-ask > button[aria-pressed="true"] { color: var(--bg); background: var(--voice); border-color: var(--voice); }
-  .cn-ask > button { position: absolute; bottom: var(--send-in); border-radius: var(--r); right: var(--send-in);
-    color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
-
+  /* The wish bar and its pills are wish-bar.mjs's (.pos-wish*, .pos-pills in shell.css); these are this page's pill states. */
   /* The picture's room is held from the first frame, 4/5 as tall as wide, so linking moves
      nothing above or below it; a taller patch grows it. */
   .cn-pic { aspect-ratio: 5 / 4; }
@@ -83,11 +54,11 @@
   /* A refused request over a standing patch says why under the drawing; the patch stays. */
   .cn-pic[data-why]:not(.cn-pic-empty) > .cn-empty { display: block; margin: 0 auto 12px; color: var(--dim); }
   .cn-empty { margin: 0; max-width: 46ch; padding: 0 16px; text-align: center; text-wrap: balance; overflow-wrap: anywhere; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
-  .cn-ex > button.cn-pill[aria-pressed="true"] { border-color: var(--voice); }
+  .pos-pills > button.pos-pill[aria-pressed="true"] { border-color: var(--voice); }
   /* An example whose patch does not run yet is dimmed, never disabled: it still
      builds its picture, and its title says what is missing. */
-  .cn-ex > button.cn-pill[data-runs="marked"] { opacity: .5; }
-  .cn-ex > button.cn-pill[data-runs="marked"]:hover, .cn-ex > button.cn-pill[data-runs="marked"]:focus-visible { opacity: 1; }
+  .pos-pills > button.pos-pill[data-runs="marked"] { opacity: .5; }
+  .pos-pills > button.pos-pill[data-runs="marked"]:hover, .pos-pills > button.pos-pill[data-runs="marked"]:focus-visible { opacity: 1; }
 
   /* The faces of the linked nodes, in a concept page's order: pictures, panels, the
      knob row, the keys. Empty paints nothing. */
@@ -130,7 +101,7 @@
 </style>
 <script type="module">
   import { mount, el, createShipper } from '/shell/shell.mjs';
-  import { createIconButton } from '/shell/icon-button.mjs';
+  import { createWishBar } from '/shell/wish-bar.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay, checkTransforms, printLink, parseLink, patchOf } from '/shell/bay.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
@@ -456,27 +427,29 @@
     const nodes = [...new Set(ex.links.flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]))];
     return { nodes, missing: nodes.filter((n) => !PRESS_ONLY[n] && !loaderOf(n, typeOf)), press: nodes.filter((n) => PRESS_ONLY[n]) };
   }
-  const exRow = el('div', 'cn-ex');
-  // The first pill starts a new patch: no conversation, nothing linked, nothing asked.
-  const startPill = el('button', 'cn-pill', 'start new', { type: 'button', title: 'forget the earlier sentences and clear the patch' });
-  startPill.addEventListener('click', () => { via = 'typed'; newPatch('pressed start new'); logAsk('[new] pressed start new, history cleared'); });
-  exRow.append(startPill);
-  /** Shown once there is a patch or a conversation to clear. */
-  const showStart = () => { startPill.hidden = !(bay.links().length || turns.length); };
-  for (const ex of EXAMPLES) {
-    const r = runsOf(ex);
-    const lines = [`builds ${r.nodes.join(', ')}`];
-    if (r.press.length) lines.push(`runs on a person's press only: ${r.press.map((n) => PRESS_ONLY[n]).join(', ')}`);
-    if (r.missing.length) lines.push(`drawn, not running yet: ${r.missing.join(', ')}`);
-    const b = el('button', 'cn-pill', ex.say, { type: 'button', title: lines.join('\n') });
-    b.dataset.runs = r.press.length ? 'press' : r.missing.length ? 'marked' : 'runs';
-    if (r.missing.length) b.dataset.missing = r.missing.join(' ');
-    b.addEventListener('click', (e) => {
+  // The wish bar (wish-bar.mjs): the field, its microphone and talk keys, the example pills on one
+  // scrolling line, and start new, always the last pill, which forgets the conversation and the patch.
+  const bar = createWishBar({ placeholder: 'say which part should play which', api: API, selfcheck: SELFCHECK,
+    log: (m, lv) => d.log(m, lv), ship: (line) => logAsk(line), vocabulary: () => vocabulary(),
+    onAsk: (text, { how, by }) => ask(text, by, how),
+    pills: EXAMPLES.map((ex) => ({ say: ex.say, onPress: (b, e) => {
       b.dataset.busy = '1'; startFresh(); build(ex, e.isTrusted);
       logAsk(`[pill] built "${ex.say}": ${bay.links().length} of ${ex.links.length} link(s)`);
       runtime.idle().finally(() => delete b.dataset.busy);
-    });
-    exRow.append(b);
+    } })),
+    reset: { say: 'start new', title: 'forget the earlier sentences and clear the patch',
+      onPress: () => { via = 'typed'; newPatch('pressed start new'); logAsk('[new] pressed start new, history cleared'); } } });
+  const exRow = bar.row, startPill = bar.reset;
+  /** start new is shown once there is a patch or a conversation to clear. */
+  const showStart = () => bar.showReset(bay.links().length || turns.length);
+  for (const [i, ex] of EXAMPLES.entries()) {
+    const r = runsOf(ex), b = bar.pills[i];
+    const lines = [`builds ${r.nodes.join(', ')}`];
+    if (r.press.length) lines.push(`runs on a person's press only: ${r.press.map((n) => PRESS_ONLY[n]).join(', ')}`);
+    if (r.missing.length) lines.push(`drawn, not running yet: ${r.missing.join(', ')}`);
+    b.title = lines.join('\n');
+    b.dataset.runs = r.press.length ? 'press' : r.missing.length ? 'marked' : 'runs';
+    if (r.missing.length) b.dataset.missing = r.missing.join(' ');
   }
 
   // A person's own requests go to the device log (pub.positron.studio/logs), never a check's.
@@ -503,7 +476,7 @@
     }
     inFlight = true;
     via = how;
-    const busy = by || askBtn.el;
+    const busy = by || bar.button.el;
     busy.dataset.busy = '1';
     // What stands now, hand-wired links too, and the turns before it: a follow-up when either is there.
     const prev = bay.links().map((l) => ({ from: l.from, to: l.to, transforms: l.transforms || [] }));
@@ -1035,91 +1008,13 @@
   const runtime = createRuntimes({ bay, typeOf, log: (m, lv) => d.log(m, lv), onChange: drawFaces, audio: { sharedAudio, claim, release } });
   window.__demo.runtime = runtime;
 
-  // Your own sentence, asked of the model like an example pill's.
-  const askRow = el('form', 'cn-ask');
-  const askField = createField({ placeholder: 'say which part should play which' });
-  // One button: the microphone while the field is empty, send once there is text.
-  const MIC_LABEL = 'Speak: hold Option or Caps Lock, or the sustain pedal, and let go to send';
-  const askBtn = createIconButton({ icon: 'mic', label: MIC_LABEL, small: true, pressed: false,
-    onPress: () => (askField.value().trim() ? askRow.requestSubmit() : micOn ? stopMic() : startMic()) });
-  const showBtn = () => { const typed = !!askField.value().trim(); askBtn.set(typed ? 'arrow-up' : 'mic', typed ? 'Ask' : MIC_LABEL); };
-  askField.input.addEventListener('input', showBtn);
-  askBtn.el.type = 'submit';
-  const micBtn = askBtn;
-  askRow.append(askField.el, askBtn.el);
-  // Spoken requests: recorded here, heard by the wish worker's /hear (Whisper), then asked as typed.
-  let micOn = false, rec = null, micStream = null, chunks = [], cancelMic = false, recAt = 0, pressAt = 0, stopAt = 0;
-  async function startMic() {
-    if (micOn || inFlight) return;
-    pressAt = performance.now();
-    micOn = true; micBtn.el.setAttribute('aria-pressed', 'true');
-    if (SELFCHECK) return;
-    try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch (e) { micOn = false; micBtn.el.setAttribute('aria-pressed', 'false'); d.log(`no microphone: ${e.message}`, 'warn'); return; }
-    if (!micOn) { micStream.getTracks().forEach((t) => t.stop()); return; }
-    chunks = [];
-    rec = new MediaRecorder(micStream);
-    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-    rec.onstop = heard;
-    rec.start();
-    recAt = performance.now(); pressAt = pressAt || recAt;
-    d.log('listening to the microphone');
-  }
-  function stopMic() {
-    if (!micOn) return;
-    stopAt = performance.now();
-    micOn = false; micBtn.el.setAttribute('aria-pressed', 'false');
-    if (rec && rec.state !== 'inactive') rec.stop(); else { micStream?.getTracks().forEach((t) => t.stop()); }
-  }
   // Names Whisper should hear as written ("Rhodes", not "roads"), sent as turbo's initial prompt: this demo's
   // own words, the ones it misheard first. No node labels: about 80 of them gave "Gradulate" and "drone machine".
   const HEAR_WORDS = ['granulate', 'drum machine', 'bass synth', 'sawtooth', 'Rhodes', 'Plaits', 'piano', 'synth',
     'sampler', 'keyboard', 'grains', 'scope', 'speakers', 'split', 'octave', 'transpose', 'record', 'loop', 'Circuit', 'SuperCollider'];
   const vocabulary = () => [...HEAR_WORDS, ...Object.values(PATCH_NAMES).flat()]
     .filter((w, i, all) => all.findIndex((x) => x.toLowerCase() === w.toLowerCase()) === i);
-  async function heard() {
-    micStream?.getTracks().forEach((t) => t.stop()); micStream = null;
-    const blob = new Blob(chunks, { type: rec?.mimeType || 'audio/webm' }); rec = null;
-    if (cancelMic) { cancelMic = false; d.log('the talk key was part of a shortcut, so nothing was sent'); return; }
-    if (!blob.size) return;
-    askBtn.el.dataset.busy = '1';
-    try {
-      const buf = new Uint8Array(await blob.arrayBuffer());
-      let b = '';
-      for (let i = 0; i < buf.length; i += 0x8000) b += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-      const r = await fetch(`${API}/hear`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ audio: btoa(b), vocabulary: vocabulary() }) });
-      const out = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
-      const text = (out.text || '').trim();
-      logAsk(`[voice] heard "${text}" from ${(blob.size / 1024).toFixed(1)} KB, mic opened ${Math.round(recAt - pressAt)} ms after the press, recorded ${Math.round(stopAt - recAt)} ms, in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
-      delete askBtn.el.dataset.busy;
-      if (!text) { d.log('nothing was heard, so nothing was asked'); return; }
-      askField.set(text); showBtn();
-      ask(text, null, 'voice');
-    } catch (e) {
-      delete askBtn.el.dataset.busy;
-      d.log(`could not hear that: ${e.message}`, 'warn');
-    }
-  }
-  // Hold to talk, let go to send. Caps Lock (macOS Chrome fires its down on turning on and its up
-  // on turning off, so there it is press to talk, press to send) or Option/Alt held on its own.
-  let altAlone = false;
-  addEventListener('keydown', (e) => {
-    if (e.repeat) return;
-    if (e.key === 'CapsLock') { startMic(); return; }
-    if (e.key === 'Alt') { altAlone = true; startMic(); return; }
-    if (altAlone) { altAlone = false; if (micOn) { cancelMic = true; stopMic(); } }   // Alt with another key is a shortcut, not a talk
-  });
-  addEventListener('keyup', (e) => {
-    if (e.key === 'CapsLock') stopMic();
-    if (e.key === 'Alt' && altAlone) { altAlone = false; stopMic(); }
-  });
-  // A plugged keyboard's sustain pedal holds to talk (rt-midi.mjs announces it once MIDI is on).
-  addEventListener('pos-sustain', (e) => (e.detail?.down ? startMic() : stopMic()));
-  askRow.addEventListener('submit', (e) => { e.preventDefault(); const t = askField.value().trim(); if (t) ask(t); });
-  const say = el('div', 'cn-say');
-  say.append(askRow, exRow);
-  d.stack.add(say, faces, pic, chooser, groups);
+  d.stack.add(bar.el, faces, pic, chooser, groups);
   redraw();
   for (const f of failed) d.log(f, 'bad');
 
@@ -1138,7 +1033,7 @@
 
     A('NEGATIVE CONTROL: on a visit there is nothing to clear, so "start new" is not drawn and takes no room',
       startPill.hidden && getComputedStyle(startPill).display === 'none' && startPill.getBoundingClientRect().width === 0
-        && exRow.querySelector('.cn-pill:not([hidden])')?.textContent === EXAMPLES[0].say, getComputedStyle(startPill).display);
+        && exRow.querySelector('.pos-pill:not([hidden])')?.textContent === EXAMPLES[0].say, getComputedStyle(startPill).display);
     // Before anything is pressed: no runtime, no face, no sound device.
     A('a visit opens no sound device and shows no face', contexts() === 0 && runtime.list().length === 0
       && faces.hidden && getComputedStyle(faces).display === 'none', `contexts ${contexts()}, runtimes ${runtime.list().length}`);
@@ -1226,10 +1121,10 @@
     const whyShown = () => pic.dataset.why === '1' && !pic.classList.contains('cn-pic-empty') && getComputedStyle(empty).display !== 'none';
     const standing = linkIds(), turnsAt = turns.length;
     const askedBusy = ask('something else');
-    const shimmered = askBtn.el.dataset.busy === '1';
+    const shimmered = bar.button.el.dataset.busy === '1';
     await askedBusy; await frame();
     A('a request whose answer cannot be made builds nothing new, keeps the standing patch and the conversation, and says why under the drawing, with the send button busy while asking',
-      shimmered && !askBtn.el.dataset.busy && !!standing && linkIds() === standing && turns.length === turnsAt && whyShown()
+      shimmered && !bar.button.el.dataset.busy && !!standing && linkIds() === standing && turns.length === turnsAt && whyShown()
         && /could not be made/.test(empty.textContent) && /transpose/.test(empty.textContent), empty.textContent);
     // A request that names an instrument but not the speakers is still heard.
     await ask('keys play the synth, nothing else'); await frame();
@@ -1337,23 +1232,24 @@
     const posted1 = posted, shownWith = getComputedStyle(startPill).display !== 'none' && !startPill.hidden;
     startPill.click(); await frame();
     const rects = [...exRow.children].filter((b) => !b.hidden).map((b) => b.getBoundingClientRect());
-    A('the first pill, "start new", is shown while a patch stands; pressed, it forgets the turns, clears the patch, asks nothing and hides again; the pills sit on one line that scrolls inside the column',
-      exRow.firstElementChild === startPill && shownWith && startPill.hidden && getComputedStyle(startPill).display === 'none'
+    A('the last pill, "start new", is shown while a patch stands; pressed, it forgets the turns, clears the patch, asks nothing and hides again; the pills sit on one line that scrolls inside the column',
+      exRow.lastElementChild === startPill && shownWith && startPill.hidden && getComputedStyle(startPill).display === 'none'
         && turns.length === 0 && bay.links().length === 0 && posted === posted1
         && /\[new\] pressed start new/.test(lastLine) && rects.every((r) => Math.abs(r.top - rects[0].top) < 1)
         && exRow.scrollWidth > exRow.clientWidth && document.documentElement.scrollWidth <= innerWidth,
       `${rects.length} pills, tops ${[...new Set(rects.map((r) => Math.round(r.top)))].join(' ')}, row ${exRow.scrollWidth} in ${exRow.clientWidth}, page ${document.documentElement.scrollWidth} in ${innerWidth}`);
     // The microphone: Caps Lock toggles it, the sustain pedal holds it, and a check opens none.
-    const mic = () => micBtn.el.getAttribute('aria-pressed') === 'true', gum0 = CAMERA_ASKED.length;
+    const mic = () => bar.button.el.getAttribute('aria-pressed') === 'true', gum0 = CAMERA_ASKED.length;
     const keyEv = (type, k) => dispatchEvent(new KeyboardEvent(type, { key: k }));
     keyEv('keydown', 'CapsLock'); const on1 = mic(); keyEv('keyup', 'CapsLock'); const off1 = !mic();
     keyEv('keydown', 'Alt'); const onAlt = mic(); keyEv('keyup', 'Alt'); const offAlt = !mic();
     keyEv('keydown', 'Alt'); keyEv('keydown', 'k'); const altCombo = !mic(); keyEv('keyup', 'k'); keyEv('keyup', 'Alt');
     dispatchEvent(new CustomEvent('pos-sustain', { detail: { down: true } })); const on2 = mic();
     dispatchEvent(new CustomEvent('pos-sustain', { detail: { down: false } })); const off2 = !mic();
-    A('Caps Lock and Option talk while down and stop on up, Option with another key is no talk, the sustain pedal holds, and a check opens no microphone',
-      on1 && off1 && onAlt && offAlt && altCombo && on2 && off2 && CAMERA_ASKED.length === gum0,
-      `${on1} ${off1} ${onAlt} ${offAlt} ${altCombo} ${on2} ${off2}, getUserMedia ${CAMERA_ASKED.length - gum0}`);
+    const st = bar.mic.started();
+    A('Caps Lock and Option talk while down and stop on up, Option with another key is no talk, the sustain pedal holds, and a check opens no microphone and starts neither speech engine',
+      on1 && off1 && onAlt && offAlt && altCombo && on2 && off2 && CAMERA_ASKED.length === gum0 && st.chrome === 0 && st.whisper === 0,
+      `${on1} ${off1} ${onAlt} ${offAlt} ${altCombo} ${on2} ${off2}, getUserMedia ${CAMERA_ASKED.length - gum0}, engines ${st.chrome} ${st.whisper}`);
     [...exRow.children].find((b) => b.textContent === ex.say).click();
 
     // Pressing a wire removes that link.
@@ -1573,8 +1469,9 @@
     const d0 = drum.heard(), s0 = seq.heard();
     seq.face.querySelector('.tbar-toggle')?.click();
     await until(() => drum.heard() > d0 + 4, 8000);
-    await sleep(600);
-    const drumsLoud = runtime.level();
+    // The loudest of half a second: one instant can fall between two hits and read silence.
+    let drumsLoud = 0;
+    for (let i = 0; i < 25; i++) { drumsLoud = Math.max(drumsLoud, runtime.level()); await sleep(20); }
     A('Play on its bar sends steps over web:sequencer -> web:drum, and the drums reach the speakers',
       seq.heard() > s0 && drum.heard() > d0 + 4 && drumsLoud > 0.005,
       `sent ${seq.heard() - s0}, drums heard ${drum.heard() - d0}, speakers ${drumsLoud.toFixed(4)}; engine ${!!drum.machine.engine?.()}, context ${runtime.context()?.state}`);
@@ -1829,7 +1726,7 @@
     let ran = 0;
     const skipped = [];
     for (const [i, ex] of EXAMPLES.entries()) {
-      const pill = exRow.children[i + 1];   // after the start new pill
+      const pill = bar.pills[i];
       const r = runsOf(ex), want = EXPECT[ex.say] ?? 'runs';
       if (want === 'press' || r.press.length) {
         A(`"${ex.say}" is marked as a person's press only`, want === 'press' && pill.dataset.runs === 'press' && /person's press only/.test(pill.title), pill.title);

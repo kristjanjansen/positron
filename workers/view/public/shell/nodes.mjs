@@ -28,7 +28,7 @@ export const NODES = {
     variantPages: { cc: ['code/piano', 'remote/piano'] },
     pages: ['synth/keyboard', 'synth/recorder', 'synth/timeline', 'synth/dots', 'synth/sound', 'code/faust',
       'code/collide', 'code/plaits', 'code/piano', 'remote/circuit', 'remote/collide', 'remote/piano',
-      'remote/plaits', 'radio/key', 'room/words', 'code/write'],
+      'remote/plaits', 'radio/key', 'room/words', 'code/wish'],
   },
   typing: {
     node: 'keys', kind: 'person', label: 'keyboard',
@@ -52,7 +52,7 @@ export const NODES = {
     variantPages: { unshaped: ['shader/landscape'] },
     pages: ['synth/sound', 'code/faust', 'code/collide', 'code/plaits', 'granulator/grains', 'granulator/beat',
       'remote/circuit', 'remote/collide', 'remote/plaits', 'video/shader', 'shader/mirror', 'shader/landscape',
-      'shader/remote', 'typist/machines', 'drums/knobs', 'radio/scenery', 'shader/write'],
+      'shader/remote', 'typist/machines', 'drums/knobs', 'shader/wish'],
     labels: { 'remote/circuit': 'macro <n>', 'drums/knobs': '<drum> <param>', 'granulator/grains': 'wet/dry (knob-mix)',
       'granulator/beat': 'wet/dry (knob-mix)' },
   },
@@ -98,13 +98,13 @@ export const NODES = {
     ports: { 'program-out': P({ shape: { of: 'glsl' } }) },
     pages: ['shader/remote'],
   },
-  // A sentence written into a program by a model; what leaves is the code box's event.
-  writer: {
-    kind: 'person', label: 'writer',
+  // A wish: a sentence a model writes into a program; what leaves is the code box's event.
+  wish: {
+    kind: 'person', label: 'wish',
     ports: { 'program-out': P({ shape: { of: 'glsl' } }) },
     variants: { sclang: { 'program-out': { shape: { of: 'sclang' } } } },
-    variantPages: { sclang: ['code/write'] },
-    pages: ['shader/write', 'code/write'],
+    variantPages: { sclang: ['code/wish'] },
+    pages: ['shader/wish', 'code/wish'],
   },
   invert: {
     kind: 'person', label: 'invert',
@@ -174,7 +174,7 @@ export const NODES = {
     kind: 'engine', label: 'SuperCollider',
     ports: { 'midi-in': P({ ...TAKES_NOTE }), 'value-in': P({ ...PARAM }),
       'program-in': P({ shape: { of: 'sclang' }, optional: true }), 'audio-out': P() },
-    pages: ['code/collide', 'remote/collide', 'code/write'],
+    pages: ['code/collide', 'remote/collide', 'code/wish'],
     labels: { 'remote/collide': 'SuperCollider here' },
   },
   plaits: {
@@ -205,7 +205,7 @@ export const NODES = {
       'program-in': P({ shape: { of: 'glsl' }, optional: true }),
       'video-out': P({ ...PAGE }),
     },
-    pages: ['shader/mirror', 'shader/remote', 'shader/write'],
+    pages: ['shader/mirror', 'shader/remote', 'shader/wish'],
     labels: { 'shader/remote': 'mirror shader here' },
   },
   'shader-dots': {
@@ -404,7 +404,7 @@ export const NODES = {
       'code/collide', 'code/plaits', 'code/piano', 'granulator/grains', 'granulator/beat', 'remote/circuit',
       'remote/collide', 'remote/piano', 'remote/plaits', 'radio/blend', 'radio/tuner', 'radio/tempo', 'radio/live', 'radio/key',
       'shader/landscape', 'radio/scenery', 'room/words', 'typist/typewriter', 'typist/machines', 'typist/playback', 'typist/score',
-      'drums/machine', 'drums/knobs', 'drums/samples', 'drums/camera', 'drums/remote', 'history/newsreels', 'code/write'],
+      'drums/machine', 'drums/knobs', 'drums/samples', 'drums/camera', 'drums/remote', 'history/newsreels', 'code/wish'],
   },
   scope: {
     kind: 'screen', label: 'waveform', match: ['scope-<name>'],
@@ -432,7 +432,7 @@ export const NODES = {
     kind: 'screen', label: 'picture', match: ['screen-<name>'],
     instance: 'screen; a second picture beside it is its own node: screen-pi (Pi picture), dither (dithered), playback, loopback (WebRTC), hls (LL-HLS), moq (MoQ), pixels',
     ports: { 'video-in': P(), 'value-in': P({ optional: true }), 'clock-out': P({ optional: true }) },
-    pages: ['synth/dots', 'shader/mirror', 'shader/remote', 'shader/landscape', 'radio/scenery', 'shader/write', 'video/camera', 'video/shader',
+    pages: ['synth/dots', 'shader/mirror', 'shader/remote', 'shader/landscape', 'radio/scenery', 'shader/wish', 'video/camera', 'video/shader',
       'video/recorder', 'video/webrtc', 'video/llhls', 'video/moq', 'drums/camera', 'remote/circuit', 'history/newsreels'],
     // `original` where a second picture beside it needs telling apart; "here" pairs with the Pi's.
     labels: { 'video/shader': 'original', 'video/webrtc': 'original', 'video/llhls': 'original', 'video/moq': 'original',
@@ -495,7 +495,7 @@ export const NODES = {
   },
   station: {
     place: 'site', net: 'site', kind: 'external', label: '<station>',
-    instance: 'a live station on its broadcaster\'s site: err:vikerraadio, err:klassikaraadio, err:raadio2, err:raadio4, ida:tallinn',
+    instance: 'a live station on its broadcaster\'s site: err:vikerraadio, err:klassikaraadio, err:raadio2, err:raadio4, err:raadiotallinn, ida:tallinn, ida:helsinki',
     ports: { 'audio-out': P({ ...HTTPS }) },
     pages: ['radio/blend', 'radio/tuner', 'radio/live', 'radio/key', 'radio/scenery'],
     labels: { 'radio/live': 'ERR Raadio 2 (with the broadcaster)', 'radio/key': 'ERR Raadio 2 (with the broadcaster)' },

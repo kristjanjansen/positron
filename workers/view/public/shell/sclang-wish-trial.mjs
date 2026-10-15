@@ -1,10 +1,10 @@
-// demo/shell/sclang-trial.mjs: the sound check a written SuperCollider program passes before it may
+// demo/shell/sclang-wish-trial.mjs: the sound check a written SuperCollider program passes before it may
 // reach a speaker. A second scsynth in the page's context, wired to nothing anybody hears, plays one
-// held note for half a second; sclang-writer.mjs's checkSound judges what came out.
+// held note for half a second; sclang-wish.mjs's checkSound judges what came out.
 
 import { bootScsynth } from './scsynth.mjs';
 import { compile } from './sclang-lite.mjs';
-import { checkSound, TRIAL_NOTE, TRIAL_VELOCITY, RENDER_S } from './sclang-writer.mjs';
+import { checkSound, TRIAL_NOTE, TRIAL_VELOCITY, RENDER_S } from './sclang-wish.mjs';
 
 const DEF = 'trial';
 /** The analyser holds the last 32768 samples, 0.68 s at 48 kHz and 0.74 s at 44.1: the whole note in one read. */
