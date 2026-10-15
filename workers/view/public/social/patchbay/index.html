@@ -61,10 +61,12 @@
   for (const x of PAIR_EXAMPLES) {
     const bay = pairBay(x);
     const opts = { arrange: 'pair', detail: (n) => [{ text: n.label || '', sans: true }] };
-    // A pair's height does not depend on its width, so it is drawn as wide as the band's shape asks.
+    // A pair's height does not depend on its width: the scale comes from the height, then the
+    // patch is drawn exactly as wide as the text at that scale, so every post's patch spans one width.
     const band = BAY_BOTTOM - BAY_TOP, probe = drawBay(bay, { ...opts, width: 480 });
-    const drawn = drawBay(bay, { ...opts, width: Math.max(320, Math.round((probe.height + 2) * TEXT_W / band) - 2) });
-    const scale = Math.min(MAX_SCALE, TEXT_W / (drawn.width + 2), band / (drawn.height + 2));
+    const k = Math.min(MAX_SCALE, band / (probe.height + 2));
+    const drawn = drawBay(bay, { ...opts, width: Math.round(TEXT_W / k) - 2 });
+    const scale = Math.min(TEXT_W / (drawn.width + 2), band / (drawn.height + 2));
     const pic = await svgImage(drawn.body, { width: drawn.width, height: drawn.height, scale });
 
     const cv = el('canvas');
