@@ -50,7 +50,6 @@
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
   import { paintFrame } from '/shell/panel-screen.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createIconButton } from '/shell/icon-button.mjs';
 
   const d = mount({ name: 'OLED on Pi', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('remote/oled');
@@ -187,19 +186,27 @@
 
   const top = el('div', 'cc-top');
   top.append(text.el, buttons.el);
-  // The simulated module in a video panel, as the kit shows a picture; the zoom button is 2x or 4x.
+  // The simulated module in a video panel, as the kit shows a picture; zoom out and in step 1x, 2x, 4x.
   const media = el('div', 'ol-media');
   const screenBox = el('div', 'ol-screen');
   screenBox.append(simCv);
   media.append(screenBox, simKeys.el);
-  let zoom = 2;
-  const zoomBtn = createIconButton({ icon: 'zoom-in', label: 'show the panel at 4x', pressed: false, onPress: () => {
-    zoom = zoom === 2 ? 4 : 2;
-    media.style.setProperty('--ol-k', String(zoom));
-    zoomBtn.set(zoom === 2 ? 'zoom-in' : 'zoom-out', zoom === 2 ? 'show the panel at 4x' : 'show the panel at 2x');
-    zoomBtn.el.setAttribute('aria-pressed', String(zoom === 4));
-  } });
-  const simPanel = createVideoPanel({ media, left: el('span', 'ol-say', 'web:oled, simulated'), centre: el('span', 'ol-say', '128\u00d764'), right: zoomBtn.el,
+  const ZOOMS = [1, 2, 4];
+  let zi = 1;
+  const scale = el('span', 'ol-say', '');
+  const zoomBtns = createButtonGroup({ buttons: [
+    { id: 'out', icon: 'zoom-out', label: 'zoom out', onPress: () => setZoom(zi - 1) },
+    { id: 'in', icon: 'zoom-in', label: 'zoom in', onPress: () => setZoom(zi + 1) },
+  ] });
+  function setZoom(i) {
+    zi = Math.max(0, Math.min(ZOOMS.length - 1, i));
+    media.style.setProperty('--ol-k', String(ZOOMS[zi]));
+    scale.textContent = `128\u00d764 at ${ZOOMS[zi]}x`;
+    zoomBtns.enable('out', zi > 0, 'smallest');
+    zoomBtns.enable('in', zi < ZOOMS.length - 1, 'largest');
+  }
+  setZoom(zi);
+  const simPanel = createVideoPanel({ media, left: el('span', 'ol-say', 'web:oled, simulated'), centre: scale, right: zoomBtns.el,
     // the module's own height at either zoom, not a 16:9 box around it
     aspect: 'auto' });
   d.stack.add(simPanel.el, top, keys.el, pb.el);
