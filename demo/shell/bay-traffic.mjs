@@ -36,7 +36,7 @@ export const WIRE_STYLES = ['glow', 'beads', 'ants'];
 const STYLE = (() => {
   try { const v = new URLSearchParams(globalThis.location?.search || '').get('wires'); return WIRE_STYLES.includes(v) ? v : 'glow'; } catch { return 'glow'; }
 })();
-const DASH = { beads: { w: 4, on: 0, off: 14, cap: 'round' }, ants: { w: 2, on: 6, off: 5, cap: 'butt' } };
+const DASH = { beads: { w: 4, on: 0, off: 14, cap: 'round' }, ants: { w: 1, on: 6, off: 5, cap: 'butt' } };
 const MARCH = 24;                   // px a second the beads or ants move
 
 const make = (tag, attrs) => {
