@@ -1,9 +1,12 @@
-// demo/shell/nodes.mjs: the one catalogue of node types a browser tab builds. Pure and import free.
-// Key = catalogue name; `node`/`site` are the id's segments when they differ. A port's dir and
-// medium come from its name unless it says otherwise. `optional`, `variants`, `pages`, `labels`,
-// `match` and `instance` are described in the lesson. Order: a node's ports come with it, in
+// demo/shell/nodes.mjs: the one catalogue of node types a browser tab builds. Pure; imports only the
+// synth's parameter names. Key = catalogue name; `node`/`site` are the id's segments when they differ.
+// A port's dir and medium come from its name unless it says otherwise. `optional`, `variants`, `pages`,
+// `labels`, `match` and `instance` are described in the lesson; `also` is what people call a type, which
+// /connect/ matches a sentence against and shows the model. Order: a node's ports come with it, in
 // entry order; addPorts lands after every port added before.
 // why: lessons/kit-nodes.md#header
+
+import { PARAM_NAMES as SYNTH_PARAMS } from './synth-params.mjs';
 
 const P = (o = {}) => o;
 const NOTE = { emits: ['note'] }, TAKES_NOTE = { accepts: ['note'] };
@@ -126,10 +129,10 @@ export const NODES = {
   // ── engines: what makes or changes a sound, a picture or an event ───────
   synth: {
     // The kit voice (synth-voice.mjs) is a sine, so that is what an unlabelled synth says.
-    kind: 'engine', label: 'sine',
-    // value-in takes the voice's parameters (synth-params.mjs PARAM_NAMES), only on /connect/ today.
+    kind: 'engine', label: 'sine', also: ['synth', 'synthesizer'],
+    // value-in takes the voice's parameters, only on /connect/ today.
     ports: { 'midi-in': P({ ...TAKES_NOTE }), 'audio-out': P(),
-      'value-in': P({ shape: { of: 'param', names: ['wave', 'cutoff', 'q', 'attack', 'release'] }, optional: true }) },
+      'value-in': P({ shape: { of: 'param', names: [...SYNTH_PARAMS] }, optional: true }) },
     pages: ['synth/keyboard', 'synth/recorder', 'synth/timeline', 'synth/dots', 'room/words'],
     labels: { 'synth/recorder': 'saw', 'synth/timeline': 'saw', 'synth/dots': 'saw', 'room/words': 'saw' },
   },
@@ -172,7 +175,8 @@ export const NODES = {
     labels: { 'remote/collide': 'SuperCollider here' },
   },
   plaits: {
-    kind: 'engine', label: 'Plaits',
+    // "plates" is how Plaits is said, and what speech recognition writes for it.
+    kind: 'engine', label: 'Plaits', also: ['plates'],
     ports: { 'midi-in': P({ ...TAKES_NOTE }), 'value-in': P({ ...PARAM }), 'audio-out': P() },
     pages: ['code/plaits'],
   },
@@ -243,7 +247,7 @@ export const NODES = {
   // Formerly `granulator`: landscape asks `{ name: 'grains', as: 'granulator' }`.
   // why: lessons/kit-nodes.md#grains-was-granulator
   grains: {
-    kind: 'engine', label: 'grain ring',
+    kind: 'engine', label: 'grain ring', also: ['granulator', 'granulate', 'grains'],
     ports: { 'audio-in': P(), 'audio-out': P(), 'value-in': P({ optional: true }), 'value-out': P(),
       'tempo-in': P({ dir: 'in', medium: 'value', optional: true }) },
     pages: ['granulator/grains', 'granulator/beat', 'shader/landscape', 'radio/scenery'],
@@ -335,7 +339,7 @@ export const NODES = {
     pages: ['radio/tuner', 'radio/scenery'],
   },
   sequencer: {
-    kind: 'engine', label: 'sequencer',
+    kind: 'engine', label: 'sequencer', also: ['drum machine', 'drums'],
     ports: { 'midi-out': P({ ...NOTE }), 'value-in': P({ shape: { of: 'pattern' }, optional: true }) },
     pages: ['drums/machine', 'drums/knobs', 'drums/samples', 'drums/camera', 'drums/remote'],
   },

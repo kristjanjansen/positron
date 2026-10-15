@@ -9,6 +9,7 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { createLimiter, addressTag } from '../workers/wish/src/limit.mjs';
 
 const exec = promisify(execFile);
 
@@ -192,6 +193,8 @@ async function run(model, payload) {
 }
 
 const PORT = Number(process.env.PORT || 8799);
+// The deployed Worker's per-visitor cap on /code and /wish, so a page meets its 429 here too.
+const limiter = createLimiter();
 
 // The deployed Worker's origin rule, from the one module.
 // why: lessons/harness.md#origin
@@ -219,6 +222,8 @@ http.createServer((req, res) => {
       }
       if (req.method !== 'POST') return send(405, { error: 'post to /hear, /wish or /code' });
       try { body = JSON.parse(raw || '{}'); } catch { return send(400, { error: 'body is JSON' }); }
+      const limited = limiter.take(await addressTag(req.socket.remoteAddress), new URL(req.url, 'http://x').pathname);
+      if (limited) { console.log(`${req.url}  429  ${limited.error}`); return send(429, { error: limited.error }); }
       const out = await mod.handle(new URL(req.url, 'http://x').pathname, body, run);
       // One line per call, so a session can be read afterwards. Never the audio
       // and never the token.
@@ -249,6 +254,6 @@ http.createServer((req, res) => {
   else if (s.exp && s.exp <= Date.now()) console.log(`  credential   the wrangler session expired at ${s.at}, and is refreshed on the first call`);
   else console.log(`  credential   the wrangler session, good to ${s.at || 'an unrecorded time'}`);
   console.log('  POST /hear  { audio: base64, model? }');
-  console.log('  POST /wish  { text, ports: [...], model?, facts? }');
-  console.log('  POST /code  { text, lang: glsl, contract?, error?, previous?, model? }');
+  console.log('  POST /wish  { text, ports: [...], model?, facts?, history?: [{ said, links, settings? }], current?: [links], currentSettings? }');
+  console.log('  POST /code  { text, lang: glsl, contract?, error?, previous? (alone: a revision of it), model? }');
 });

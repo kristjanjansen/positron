@@ -87,13 +87,40 @@ export function hearPayload(model, audio, language, vocabulary) {
 }
 // The models that turn a sentence into a patch.
 // why: lessons/workers-wish.md#patch
+// kimi-k2.6 first: 71% right against the 70B's 50% on the owner's 19 sentences, 2.4 s median, about
+// $1.06 per 1000 asks (research/stt-and-patch-models-2026-10-15.md, 646 calls).
 export const PATCH = [
+  '@cf/moonshotai/kimi-k2.6',
   '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
   '@cf/meta/llama-3.1-8b-instruct-fp8-fast',
   '@cf/meta/llama-3.2-3b-instruct',
   '@cf/mistralai/mistral-small-3.1-24b-instruct',
   '@cf/meta/llama-4-scout-17b-16e-instruct',
 ];
+
+// Per model: a thinking model spends its tokens on thought unless told not to (all of them answered
+// zero links at 400 tokens). 1500 because 400 cut 20 of 228 answers mid-JSON, which read as nothing proposed.
+const PATCH_EXTRA = { '@cf/moonshotai/kimi-k2.6': { chat_template_kwargs: { thinking: false } } };
+export const PATCH_MAX_TOKENS = 1500;
+
+/** The JSON object in a model's text: the whole text, else a fenced block, else the outermost braces; null if none. */
+export function jsonIn(text) {
+  const t = String(text || '').trim();
+  for (const c of [t, /```(?:json)?\s*([\s\S]*?)```/.exec(t)?.[1], t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1)]) {
+    if (!c) continue;
+    try { const j = JSON.parse(c); if (j && typeof j === 'object') return j; } catch { /* the next shape */ }
+  }
+  return null;
+}
+
+/** Exact repeats of a link dropped (one model wrote a speaker link 8 times), the count said in `fixed`. */
+export function dedupe(links, fixed = []) {
+  const seen = new Set();
+  const out = links.filter((l) => { const k = JSON.stringify([l.from, l.to, l.transforms]); if (seen.has(k)) return false; seen.add(k); return true; });
+  const n = links.length - out.length;
+  if (n) fixed.push({ op: 'links', said: `${n} repeated link${n === 1 ? '' : 's'}`, read: 'one of each', value: n });
+  return out;
+}
 
 // The transform vocabulary is imported from bay.mjs (pure logic, bundled by wrangler), never
 // typed here: a copy that drifts is a transform the model cannot say.
@@ -111,7 +138,7 @@ const ARG_PROPS = Object.fromEntries(
 /** Width of the widest signature, so the table lines up without a magic number. */
 const PAD = Math.max(...OP_HELP.map((o) => o.json.length));
 
-function schemaFor(outs, ins) {
+function schemaFor(outs, ins, params = null) {
   return {
     type: 'object',
     properties: {
@@ -140,6 +167,12 @@ function schemaFor(outs, ins) {
           required: ['from', 'to', 'transforms'],
         },
       },
+      // Rows like links, node and param from enums: a free object was filled with every param at 0
+      // (2026-10-15). After links, not before: listed first, "make it darker" became a link into
+      // value-in; listed here, it set cutoff 200 in 3 of 3 replays. Ranges are the page's to check.
+      ...(params ? { settings: { type: 'array', items: { type: 'object', properties: {
+        node: { type: 'string', enum: params.nodes }, param: { type: 'string', enum: params.names }, value: { type: 'number' },
+      }, required: ['node', 'param', 'value'] } } } : {}),
     },
     required: ['links'],
   };
@@ -180,7 +213,19 @@ export function relabel(links) {
 // A port may carry its room's other names (`also`), from the caller, never invented here; aliases
 // reach the prompt but never the enum. `outs` and `ins` are derived once and handed in.
 // why: lessons/workers-wish.md#aliases
-function systemFor(ports, facts, outs, ins) {
+// A value-in whose label lists `params:` takes settings; the words and the example are said only then.
+const PARAMS_RE = /\(params: ([^)]*)\)/;
+const paramsPort = (ports) => ports.find((p) => p.dir === 'in' && PARAMS_RE.test(String(p.label || '')));
+const PARAM_ROW = /^(.+?) (-?[\d.]+)\.\.(-?[\d.]+)$/;
+/** The nodes whose value-in lists params, and every param name listed, or null when none does. */
+export function paramsOf(ports) {
+  const with_ = ports.filter((p) => p.dir === 'in' && PARAMS_RE.test(String(p.label || '')));
+  if (!with_.length) return null;
+  const names = with_.flatMap((p) => PARAMS_RE.exec(p.label)[1].split(',').map((x) => (PARAM_ROW.exec(x.trim())?.[1] ?? x.trim())));
+  return { nodes: [...new Set(with_.map((p) => p.id.replace(/:[^:]+$/, '')))], names: [...new Set(names)].filter(Boolean) };
+}
+
+function systemFor(ports, facts, outs, ins, followUp = false) {
   const alsoOf = (p) => (Array.isArray(p.also) ? p.also : [])
     .filter((a) => typeof a === 'string' && a.trim());
   const line = (p) => {
@@ -190,7 +235,7 @@ function systemFor(ports, facts, outs, ins) {
   };
   const anyAlso = ports.some((p) => alsoOf(p).length > 0);
   return [
-    'You turn a spoken studio instruction into patch bay links. Output only links.',
+    `You turn a spoken studio instruction into patch bay links. Output only links${paramsPort(ports) ? ' and, where asked, settings' : ''}.`,
     'The ports on this desk:',
     ...ports.map(line),
     /* Said once and only where it applies: a desk whose ports carry no other
@@ -219,13 +264,160 @@ function systemFor(ports, facts, outs, ins) {
       + '"transforms": [{"op": "range", "lo": 0, "hi": 59}, {"op": "channel", "to": 1}]}',
     `  {"from": "${outs[0]}", "to": "${ins[0]}", `
       + '"transforms": [{"op": "range", "lo": 60, "hi": 127}, {"op": "channel", "to": 2}]}',
+    ...settingsLines(ports),
     facts || '',
+    // The one sentence a follow-up adds: the answer replaces the patch, so it must carry what stays.
+    ...(followUp ? [FOLLOW_UP] : []),
     'If the instruction names nothing on this desk, return an empty list of links.',
   ].join('\n');
 }
 
+export const FOLLOW_UP = 'This continues a conversation: answer with the whole new patch, keeping every link of the patch now '
+  + 'that the instruction does not change, and give settings only for what it changes.';
 
-// handle(path '/hear' or '/wish', parsed body, run(model, payload)) -> {status, body}.
+function settingsLines(ports) {
+  const p = paramsPort(ports);
+  if (!p) return [];
+  const node = p.id.replace(/:[^:]+$/, '');
+  const first = PARAM_ROW.exec(PARAMS_RE.exec(p.label)[1].split(',')[0].trim());
+  const mid = first ? +((Number(first[2]) + Number(first[3])) / 2).toPrecision(2) : 0;
+  return [
+    'A value-in whose label lists params takes settings, one row per param, the value a number inside its range. '
+      + 'Give settings only when the instruction asks for a change in how something sounds; most answers have none. '
+      + 'A named sound is a patch on the link, never a setting, and a setting is never a link into a value-in. '
+      + 'A setting row looks exactly like this:',
+    `  "settings": [{"node": "${node}", "param": "${first ? first[1] : 'name'}", "value": ${mid}}]`,
+  ];
+}
+
+/** History turns and the patch now, as the page sends them: the last HISTORY_MAX, each capped. */
+export const HISTORY_MAX = 4;
+const LINKS_MAX = 48, SAID_MAX = 500;
+const linkShape = (l) => l && typeof l.from === 'string' && typeof l.to === 'string'
+  && (l.transforms === undefined || Array.isArray(l.transforms));
+const linksOf = (links) => links.slice(0, LINKS_MAX).map((l) => ({ from: l.from, to: l.to, transforms: l.transforms || [] }));
+/** Settings by node, as the page keeps them, written as the rows the model answers in. */
+const rowsOf = (s) => (s && typeof s === 'object' && !Array.isArray(s)
+  ? Object.entries(s).flatMap(([node, set]) => Object.entries(set || {}).map(([param, value]) => ({ node, param, value }))) : []);
+const answerOf = (links, settings) => { const rows = rowsOf(settings); return JSON.stringify({ links: linksOf(links), ...(rows.length ? { settings: rows } : {}) }); };
+
+// A named sound written as a setting ({"patch": "sawtooth"}, measured on the first follow-up run,
+// 2026-10-15) is moved to a patch transform on the link into that node's midi-in, and said in `fixed`.
+const SOUND_KEYS = ['patch', 'wave', 'preset', 'program', 'sound'];
+
+/**
+ * The model's settings by node, as the page applies them: from rows (the schema's shape) or from an
+ * object of objects; a node written as its port id is read as the node.
+ */
+export function settingsFrom(out, fixed = [], links = []) {
+  let s = out?.settings;
+  if (Array.isArray(s)) {
+    const by = {};
+    for (const r of s) if (r && typeof r.node === 'string' && typeof r.param === 'string') (by[r.node] ||= {})[r.param] = r.value;
+    s = by;
+  }
+  if (!s || typeof s !== 'object') return {};
+  const clean = {};
+  for (const [k, v] of Object.entries(s)) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+    const node = k.replace(/:value-in$/, '');
+    if (node !== k) fixed.push({ op: 'settings', said: k, read: node, value: v });
+    const keep = { ...v };
+    for (const key of SOUND_KEYS) {
+      const name = keep[key], into = links.filter((l) => l.to === `${node}:midi-in`);
+      if (typeof name !== 'string' || !into.length) continue;
+      for (const l of into) if (!l.transforms.some((t) => t?.op === 'patch')) l.transforms.push({ op: 'patch', name });
+      delete keep[key];
+      fixed.push({ op: 'settings', said: `${key} ${name}`, read: `a patch on the link into ${node}:midi-in`, value: name });
+    }
+    if (Object.keys(keep).length) clean[node] = { ...(clean[node] || {}), ...keep };
+  }
+  return clean;
+}
+
+
+// ── /code: a sentence in, one program out (plans/plan-text-to-code.md, slice 1) ──
+// The contract is generated from the module whose program runs it, never typed here.
+import { glslContract } from '../../../demo/shell/mirror-shader.mjs';
+import { glslExamples } from '../../../demo/shell/glsl-examples.mjs';
+
+/** The models that write a program; the first is the default. MEASURED 2026-10-15 on /shader/write/, ten
+ *  sentences each: qwen2.5-coder compiled 20 of 20 first shot at 6.3 to 6.8 s median, qwen3-30b 18 of 20
+ *  at 2.3 s but answers in its reasoning field, kimi 9 of 10 at 15.5 s, which is past the 15 s budget. */
+export const CODE = [
+  '@cf/qwen/qwen2.5-coder-32b-instruct',
+  '@cf/qwen/qwen3-30b-a3b-fp8',
+  '@cf/moonshotai/kimi-k2.7-code',
+  '@cf/qwen/qwen3.8-27b',
+  '@cf/openai/gpt-oss-120b',
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+];
+/** The languages /code writes, each with the contract its runtime keeps. */
+export const CODE_LANGS = { glsl: glslContract };
+/** Short good programs per language, said after the contract; a page's own contract does not replace them. */
+export const CODE_EXAMPLES = { glsl: glslExamples };
+export const CODE_MAX_TOKENS = 1000;
+/** A page may send its own contract, a previous program and a compiler error, each capped. */
+export const CODE_TEXT_MAX = 12000;
+// Per model: a thinking model spends max_tokens on thought unless told not to.
+const CODE_EXTRA = {
+  '@cf/moonshotai/kimi-k2.7-code': { chat_template_kwargs: { thinking: false } },
+  '@cf/openai/gpt-oss-120b': { reasoning_effort: 'low' },
+  '@cf/qwen/qwen3.8-27b': { chat_template_kwargs: { enable_thinking: false } },
+  '@cf/qwen/qwen3-30b-a3b-fp8': { chat_template_kwargs: { enable_thinking: false } },
+};
+// One string field and nothing else: a grammar in a schema made the 70B loop (wish.mjs#loose-schema).
+const CODE_SCHEMA = { type: 'object', properties: { code: { type: 'string' } }, required: ['code'] };
+
+const cap = (v) => (typeof v === 'string' ? v.slice(0, CODE_TEXT_MAX) : '');
+
+/**
+ * The messages for one attempt. `previous` with an `error` is a retry (fix it); `previous` alone is a
+ * revision (change the program running now as the sentence says, rather than write a new one).
+ */
+export function codeMessages({ text, contract, examples = '', error, previous }) {
+  const system = `${contract}${examples ? `\n\n${examples}` : ''}\nAnswer as JSON: {"code": "<the whole program>"}.`;
+  if (previous && !error) {
+    return [
+      { role: 'system', content: system },
+      { role: 'user', content: `This program is running now:\n${cap(previous)}\n\nChange it: ${String(text || '')}\n`
+        + 'Keep everything the change does not mention, and answer with the whole program.' },
+    ];
+  }
+  const msgs = [
+    { role: 'system', content: system },
+    { role: 'user', content: String(text || '') },
+  ];
+  if (previous) {
+    msgs.push({ role: 'assistant', content: JSON.stringify({ code: cap(previous) }) });
+    msgs.push({ role: 'user', content: `That program was refused: ${cap(error)}\nWrite the whole program again, fixed.` });
+  }
+  return msgs;
+}
+
+/** The text a model answered, across the shapes Workers AI returns (`response`, chat choices, responses output). */
+export function textOf(r) {
+  if (r == null) return '';
+  if (r.response && typeof r.response === 'object') return JSON.stringify(r.response);
+  const m = r.choices?.[0]?.message;
+  // qwen3-30b with thinking off answers in `reasoning_content` and leaves `content` null, measured 2026-10-15.
+  const said = [r.response, m?.content, r.output_text,
+    (r.output || []).flatMap((o) => o?.content || []).map((x) => x?.text).filter((x) => typeof x === 'string').join(''),
+    m?.reasoning_content, m?.reasoning];
+  return said.find((x) => typeof x === 'string' && x.trim()) || '';
+}
+
+/** The program inside an answer: the `code` field, else a fenced block, else the text itself. */
+export function codeOf(raw) {
+  const t = String(raw || '').trim();
+  try { const j = JSON.parse(t); if (typeof j?.code === 'string') return j.code; } catch { /* not JSON */ }
+  const m = /\{\s*"code"\s*:\s*("(?:[^"\\]|\\.)*")/.exec(t);
+  if (m) { try { return JSON.parse(m[1]); } catch { /* fall through */ } }
+  const f = /```[a-z]*\n([\s\S]*?)```/.exec(t);
+  return f ? f[1] : t;
+}
+
+// handle(path '/hear', '/wish' or '/code', parsed body, run(model, payload)) -> {status, body}.
 // why: lessons/workers-wish.md#handle
 export async function handle(path, body, run) {
   const bad = (error, status = 400) => ({ status, body: { error } });
@@ -251,28 +443,79 @@ export async function handle(path, body, run) {
     const outs = ports.filter((p) => p.dir === 'out').map((p) => p.id);
     const ins = ports.filter((p) => p.dir === 'in').map((p) => p.id);
     if (!outs.length || !ins.length) return bad('a desk needs something that sends and something that receives');
+    // A follow-up: earlier turns as user and assistant messages, and the patch now (hand-wired links too).
+    const history = body.history ?? [];
+    if (!Array.isArray(history) || !history.every((t) => t && typeof t.said === 'string' && Array.isArray(t.links) && t.links.every(linkShape))) {
+      return bad('history is a list of { said, links }');
+    }
+    const current = body.current ?? null;
+    if (current !== null && !(Array.isArray(current) && current.every(linkShape))) return bad('current is a list of links');
+    const turns = history.slice(-HISTORY_MAX);
+    const followUp = turns.length > 0 || (current?.length ?? 0) > 0;
+    const text = String(body.text || '');
+    const now = followUp && current !== null
+      ? `The patch now, with any links wired by hand:\n${answerOf(current || [], body.currentSettings)}\n\n${text}` : text;
     const t0 = Date.now();
-    const r = await run(model, {
-      messages: [
-        { role: 'system', content: systemFor(ports, body.facts, outs, ins) },
-        { role: 'user', content: String(body.text || '') },
-      ],
-      response_format: { type: 'json_schema', json_schema: schemaFor(outs, ins) },
-      max_tokens: 400,
-    });
-    // Some models return an object and others a string of JSON, measured within one hour.
+    let r;
+    try {
+      r = await run(model, {
+        messages: [
+          { role: 'system', content: systemFor(ports, body.facts, outs, ins, followUp) },
+          ...turns.flatMap((t) => [
+            { role: 'user', content: t.said.slice(0, SAID_MAX) },
+            { role: 'assistant', content: answerOf(t.links, t.settings) },
+          ]),
+          { role: 'user', content: now },
+        ],
+        response_format: { type: 'json_schema', json_schema: schemaFor(outs, ins, paramsOf(ports)) },
+        max_tokens: PATCH_MAX_TOKENS,
+        ...(PATCH_EXTRA[model] || {}),
+      });
+    } catch (e) {
+      return { status: 502, body: { error: `the model did not answer: ${e?.message || e}`, ms: Date.now() - t0, model } };
+    }
+    // An object, a string of JSON (measured within one hour), or chat choices (kimi): textOf reads them all.
     // why: lessons/workers-wish.md#shape
-    let out = r.response;
-    if (typeof out === 'string') { try { out = JSON.parse(out); } catch { out = null; } }
-    const { links, fixed } = relabel(out?.links ?? []);
+    const said = textOf(r);
+    const out = r?.response && typeof r.response === 'object' ? r.response : jsonIn(said);
+    const { links: told, fixed } = relabel(out?.links ?? []);
+    const links = dedupe(told, fixed);
+    const settings = settingsFrom(out, fixed, links);
     return { status: 200, body: {
-      links,
+      links, settings, turns: turns.length,
       /* What the model actually said, where this repaired it. The page prints
          it, because a repair nobody is told about is a rewrite. */
       fixed,
-      raw: typeof r.response === 'string' ? r.response : null,
-      usage: r.usage ?? null, ms: Date.now() - t0, model,
+      raw: r?.response && typeof r.response === 'object' ? null : said || null,
+      usage: r?.usage ?? null, ms: Date.now() - t0, model,
     } };
+  }
+
+  if (path === '/code') {
+    const model = body.model || CODE[0];
+    if (!CODE.includes(model)) return bad(`not a writing model: ${model}`);
+    const lang = body.lang || 'glsl';
+    if (!Object.hasOwn(CODE_LANGS, lang)) return bad(`no contract for ${lang}`);
+    const text = String(body.text || '').trim();
+    if (!text) return bad('say what to write');
+    const contract = cap(body.contract) || CODE_LANGS[lang]();
+    const t0 = Date.now();
+    let r;
+    try {
+      r = await run(model, {
+        messages: codeMessages({ text, contract, examples: CODE_EXAMPLES[lang]?.() || '', error: body.error, previous: body.previous }),
+        response_format: { type: 'json_schema', json_schema: CODE_SCHEMA },
+        max_tokens: CODE_MAX_TOKENS,
+        ...(CODE_EXTRA[model] || {}),
+      });
+    } catch (e) {
+      return { status: 502, body: { error: `the model did not answer: ${e?.message || e}`, ms: Date.now() - t0, model } };
+    }
+    const raw = textOf(r);
+    const code = codeOf(raw);
+    // An empty program carries what the model did say (capped), so a reader can tell refusal from a shape we do not parse.
+    return { status: 200, body: { code, ms: Date.now() - t0, model, usage: r?.usage ?? null,
+      ...(code.trim() ? {} : { raw: raw.slice(0, 1000), keys: Object.keys(r || {}) }) } };
   }
 
   return bad('no such path', 404);

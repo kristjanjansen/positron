@@ -3,6 +3,10 @@
 // security), a per-address rate limit (per location, a brake not a gate) and a body ceiling.
 // why: lessons/workers-wish.md#index-header
 import { handle, corsFor, allowedOrigin } from './wish.mjs';
+import { createLimiter, addressTag } from './limit.mjs';
+
+// The paid routes' burst and per-minute cap, per visitor; kept per isolate (limit.mjs says why).
+const limiter = createLimiter();
 
 // Refused before parsing. Whisper bills by audio minute and speech is about 28 kbit/s, so 1 MB is
 // about 3.5 minutes, $0.0018 a call; at the rate limit that bounds one address near $3 an hour.
@@ -30,7 +34,7 @@ export default {
     }
 
     if (request.method !== 'POST') {
-      return json({ error: 'post to /hear or /wish' }, 405, cors);
+      return json({ error: 'post to /hear, /wish or /code' }, 405, cors);
     }
 
     // The address is `cf-connecting-ip`, which Cloudflare sets; an empty one shares one bucket.
@@ -41,6 +45,12 @@ export default {
       if (!success) {
         return json({ error: 'too many requests from here, wait a minute' }, 429, cors);
       }
+    }
+
+    const path = new URL(request.url).pathname;
+    const limited = limiter.take(await addressTag(request.headers.get('cf-connecting-ip')), path);
+    if (limited) {
+      return json({ error: limited.error }, 429, { ...cors, 'retry-after': String(limited.retryAfter) });
     }
 
     const raw = await request.text();
@@ -55,7 +65,7 @@ export default {
       return json({ error: `a desk here has at most ${MAX_PORTS} ports` }, 400, cors);
     }
 
-    const out = await handle(new URL(request.url).pathname, body, (m, p) => env.AI.run(m, p));
+    const out = await handle(path, body, (m, p) => env.AI.run(m, p));
     return json(out.body, out.status, cors);
   },
 };

@@ -2,6 +2,8 @@
 // Drives handle() with a capturing stub, so it grades the payload that would leave for a model.
 // why: lessons/workers-wish.md#test-header
 
+import { CODE, codeOf, textOf } from './wish.mjs';
+import { glslContract, UNIFORMS } from '../../../demo/shell/mirror-shader.mjs';
 import { handle, relabel, PATCH, HEAR, hearPayload, vocabularyPrompt, PROMPT_MAX, allowedOrigin, corsFor } from './wish.mjs';
 import { OP_NAMES, OP_HELP } from '../../../demo/shell/bay.mjs';
 
@@ -210,6 +212,181 @@ is('a page this account deployed is allowed',
   is('NEGATIVE CONTROL: a refused caller is never named in the allow header',
     r['access-control-allow-origin'] === 'https://positron.studio',
     r['access-control-allow-origin']);
+}
+
+// ── /code: one program out, under the contract the running shader keeps ──
+{
+  const sent = [];
+  const stub = (answer) => async (model, payload) => { sent.push({ model, payload }); return answer; };
+  const out = await handle('/code', { text: 'slow blue waves', lang: 'glsl' }, stub({ response: { code: 'void main(){}' } }));
+  const p = sent[0]?.payload;
+  is('/code asks the default writing model and returns the program', out.status === 200 && out.body.code === 'void main(){}' && sent[0]?.model === CODE[0],
+    JSON.stringify(out.body));
+  is('the system prompt is the contract generated from the shader module', p?.messages?.[0]?.content.startsWith(glslContract())
+    && UNIFORMS.every((u) => p.messages[0].content.includes(u.name)), p?.messages?.[0]?.content.slice(0, 80));
+  const schema = p?.response_format?.json_schema;
+  is('the schema is one string field and nothing else, no grammar in it', JSON.stringify(schema) === JSON.stringify({ type: 'object', properties: { code: { type: 'string' } }, required: ['code'] }),
+    JSON.stringify(schema));
+  is('the answer is capped near 1000 tokens', p?.max_tokens === 1000, `${p?.max_tokens}`);
+  is('a first ask carries only the sentence', p?.messages?.length === 2 && p.messages[1].content === 'slow blue waves');
+
+  sent.length = 0;
+  await handle('/code', { text: 'slow blue waves', previous: 'void main(){ o = x; }', error: "ERROR: 0:1: 'x' : undeclared identifier" }, stub({ response: { code: 'ok' } }));
+  const m = sent[0]?.payload?.messages || [];
+  is('a retry carries the program that failed and the compiler\'s words', m.length === 4 && m[2].role === 'assistant' && m[2].content.includes('o = x')
+    && m[3].content.includes("'x' : undeclared identifier"), JSON.stringify(m.slice(2)));
+
+  const notOurs = await handle('/code', { text: 'x', model: '@cf/some/expensive-model' }, stub({}));
+  is('NEGATIVE CONTROL: a model outside the allowlist is refused before anything runs', notOurs.status === 400 && /not a writing model/.test(notOurs.body.error)
+    && sent.length === 1, notOurs.body.error);
+  const noLang = await handle('/code', { text: 'x', lang: 'faust' }, stub({}));
+  is('NEGATIVE CONTROL: a language with no contract is refused', noLang.status === 400 && /no contract/.test(noLang.body.error), noLang.body.error);
+  const empty = await handle('/code', { text: '  ' }, stub({}));
+  is('NEGATIVE CONTROL: an empty sentence asks nothing', empty.status === 400 && sent.length === 1, empty.body.error);
+  const thrown = await handle('/code', { text: 'x' }, async () => { throw new Error('JSON Mode couldn\'t be met'); });
+  is('a model that throws is a 502 with its own words, not a crash', thrown.status === 502 && /JSON Mode/.test(thrown.body.error), JSON.stringify(thrown.body));
+
+  is('the shapes Workers AI answers in all give the text', textOf({ response: 'a' }) === 'a' && textOf({ choices: [{ message: { content: 'b' } }] }) === 'b'
+    && textOf({ choices: [{ message: { content: null, reasoning_content: 'c' } }] }) === 'c' && textOf({ response: null, choices: [{ message: { content: '' } }] }) === '');
+  is('NEGATIVE CONTROL: an empty response field does not hide the content beside it', textOf({ response: '', choices: [{ message: { content: 'd' } }] }) === 'd');
+  is('the program comes out of JSON, out of a fence, or as the text', codeOf('{"code":"a\\nb"}') === 'a\nb' && codeOf('x\n```glsl\nvoid main(){}\n```') === 'void main(){}\n' && codeOf('plain') === 'plain');
+}
+
+// ── follow-ups and settings on /wish ──
+{
+  const { FOLLOW_UP, HISTORY_MAX, settingsFrom } = await import('./wish.mjs');
+  const PORTS = [
+    { id: 'web:keys:midi-out', dir: 'out', label: 'keyboard midi-out' },
+    { id: 'web:synth:audio-out', dir: 'out', label: 'synth audio-out' },
+    { id: 'web:synth:midi-in', dir: 'in', label: 'synth midi-in' },
+    { id: 'web:synth:value-in', dir: 'in', label: 'synth value-in (params: cutoff 80..8000, q 0.7..15)' },
+    { id: 'web:speaker:audio-in', dir: 'in', label: 'speakers audio-in' },
+  ];
+  const PLAIN = PORTS.filter((p) => !p.id.endsWith('value-in'));
+  const LINKS = [{ from: 'web:keys:midi-out', to: 'web:synth:midi-in', transforms: [] }, { from: 'web:synth:audio-out', to: 'web:speaker:audio-in', transforms: [] }];
+  const call = async (body, answer = { links: [] }) => {
+    let sent = null;
+    const out = await handle('/wish', { model: PATCH[0], text: 'make it darker', ...body }, (m, p) => { sent = p; return { response: answer }; });
+    return { sent, out };
+  };
+
+  const old = await call({ ports: PLAIN });
+  is('the old request shape is unchanged: a system message and the sentence, links only in the schema',
+    old.sent.messages.length === 2 && old.sent.messages[1].content === 'make it darker'
+      && Object.keys(old.sent.response_format.json_schema.properties).join() === 'links' && !old.sent.messages[0].content.includes(FOLLOW_UP),
+    JSON.stringify(old.sent.messages.map((m) => m.role)));
+  is('NEGATIVE CONTROL: with no params on any port the model is told nothing about settings', !/settings/.test(old.sent.messages[0].content));
+  is('an answer with no settings returns an empty settings object beside the links', JSON.stringify(old.out.body.settings) === '{}' && old.out.body.turns === 0);
+
+  const turn = { said: 'keys play the synth', links: LINKS };
+  const fu = await call({ ports: PORTS, history: [turn], current: LINKS, currentSettings: { 'web:synth': { cutoff: 2000 } } });
+  const m = fu.sent.messages;
+  is('a follow-up is the system, each earlier sentence and its JSON answer, then the new sentence', m.length === 4
+    && m.map((x) => x.role).join() === 'system,user,assistant,user' && m[1].content === 'keys play the synth'
+    && JSON.parse(m[2].content).links.length === 2 && m[3].content.endsWith('make it darker'), m.map((x) => x.role).join());
+  is('the patch now, hand-wired links and settings too, rides with the new sentence, settings as rows', /The patch now/.test(m[3].content)
+    && m[3].content.includes('"web:speaker:audio-in"') && m[3].content.includes('{"node":"web:synth","param":"cutoff","value":2000}'), m[3].content.slice(0, 160));
+  is('the follow-up sentence is said once, in the system message', m[0].content.split(FOLLOW_UP).length === 2);
+  const rowSchema = fu.sent.response_format.json_schema.properties.settings;
+  is('a value-in with params adds optional setting rows to the schema, node and param from its label, and an example from it',
+    rowSchema?.type === 'array' && rowSchema.items.properties.node.enum.join() === 'web:synth' && rowSchema.items.properties.param.enum.join() === 'cutoff,q'
+      && !fu.sent.response_format.json_schema.required.includes('settings')
+      && m[0].content.includes('"settings": [{"node": "web:synth", "param": "cutoff", "value": 4000}]'), m[0].content.split('\n').find((l) => l.includes('"settings"')));
+
+  const many = Array.from({ length: 7 }, (_, i) => ({ said: `turn ${i}`, links: LINKS }));
+  const long = await call({ ports: PORTS, history: many });
+  is(`only the last ${HISTORY_MAX} turns are sent`, long.sent.messages.length === 2 + 2 * HISTORY_MAX && long.sent.messages[1].content === 'turn 3');
+  is('history with no current patch adds no patch-now line', !/The patch now/.test(long.sent.messages.at(-1).content));
+  let called = 0;
+  const badHist = await handle('/wish', { text: 'x', ports: PORTS, history: [{ said: 1 }] }, () => { called++; return {}; });
+  const badCur = await handle('/wish', { text: 'x', ports: PORTS, current: [{ from: 'a' }] }, () => { called++; return {}; });
+  is('NEGATIVE CONTROL: a malformed history or current is refused in words before any model runs', badHist.status === 400 && /history is a list/.test(badHist.body.error)
+    && badCur.status === 400 && /current is a list of links/.test(badCur.body.error) && called === 0, `${badHist.body.error}; ${badCur.body.error}`);
+
+  const rows = await call({ ports: PORTS, current: LINKS }, { links: LINKS, settings: [{ node: 'web:synth', param: 'cutoff', value: 400 }, { node: 'web:synth', param: 'q', value: 2 }] });
+  is('setting rows come back by node, as the page applies them', JSON.stringify(rows.out.body.settings) === '{"web:synth":{"cutoff":400,"q":2}}', JSON.stringify(rows.out.body.settings));
+  const got = await call({ ports: PORTS, current: LINKS }, { links: LINKS, settings: { 'web:synth:value-in': { cutoff: 400 } } });
+  is('the model\'s settings come back keyed by node, a port id read as its node and said in fixed', got.out.body.settings['web:synth']?.cutoff === 400
+    && got.out.body.fixed.some((f) => f.op === 'settings' && f.read === 'web:synth'), JSON.stringify(got.out.body));
+  const sound = await call({ ports: PORTS }, { links: [{ from: 'web:keys:midi-out', to: 'web:synth:midi-in', transforms: [] }], settings: { 'web:synth': { patch: 'sawtooth', cutoff: 900 } } });
+  is('a named sound written as a setting moves to a patch on the link into that midi-in, and the move is said', sound.out.body.links[0].transforms[0]?.name === 'sawtooth'
+    && JSON.stringify(sound.out.body.settings) === '{"web:synth":{"cutoff":900}}' && sound.out.body.fixed.some((f) => /patch on the link/.test(f.read)), JSON.stringify(sound.out.body));
+  const stray = settingsFrom({ settings: { 'web:plaits': { patch: 'Wind' } } }, [], []);
+  is('NEGATIVE CONTROL: with no link into its midi-in the sound stays a setting, for the page to refuse', stray['web:plaits']?.patch === 'Wind', JSON.stringify(stray));
+  is('NEGATIVE CONTROL: settings that are not rows or an object of objects come back empty', JSON.stringify(settingsFrom({ settings: [1] })) === '{}'
+    && JSON.stringify(settingsFrom({ settings: { 'web:synth': 4 } })) === '{}');
+}
+
+// ── the default model, its payload, the answer shapes and repeated links on /wish ──
+{
+  const { PATCH_MAX_TOKENS, dedupe, jsonIn } = await import('./wish.mjs');
+  const PORTS = [{ id: 'web:keys:midi-out', dir: 'out', label: 'keyboard' }, { id: 'web:synth:midi-in', dir: 'in', label: 'synth' },
+    { id: 'web:synth:audio-out', dir: 'out', label: 'synth' }, { id: 'web:speaker:audio-in', dir: 'in', label: 'speakers' }];
+  const go = async (model, answer) => { let sent = null; const out = await handle('/wish', { text: 'x', ports: PORTS, ...(model ? { model } : {}) }, (m, p) => { sent = { m, p }; return answer; }); return { sent, out }; };
+  const k = await go(null, { response: { links: [] } });
+  is('the default patch model is kimi-k2.6 with thinking off and room to answer', k.sent.m === '@cf/moonshotai/kimi-k2.6' && PATCH[0] === k.sent.m
+    && k.sent.p.chat_template_kwargs?.thinking === false && k.sent.p.max_tokens === PATCH_MAX_TOKENS && PATCH_MAX_TOKENS >= 1500, JSON.stringify({ m: k.sent.m, t: k.sent.p.max_tokens }));
+  const l = await go('@cf/meta/llama-3.3-70b-instruct-fp8-fast', { response: { links: [] } });
+  is('NEGATIVE CONTROL: llama stays allowed and gets no thinking switch', l.out.status === 200 && !('chat_template_kwargs' in l.sent.p));
+  const ONE = { from: 'web:keys:midi-out', to: 'web:synth:midi-in', transforms: [] };
+  const chat = await go(null, { choices: [{ message: { content: JSON.stringify({ links: [ONE] }) } }] });
+  is('an answer in chat choices (how kimi answers) is read, and its text is the raw', chat.out.body.links.length === 1 && chat.out.body.links[0].to === ONE.to
+    && typeof chat.out.body.raw === 'string', JSON.stringify(chat.out.body));
+  const fenced = await go(null, { choices: [{ message: { content: 'Here:\n```json\n{"links": []}\n```' } }] });
+  is('a fenced answer is read too, and NEGATIVE CONTROL: text with no JSON gives no links', fenced.out.status === 200 && jsonIn('no json here') === null
+    && Array.isArray(fenced.out.body.links));
+  const SPK = { from: 'web:synth:audio-out', to: 'web:speaker:audio-in', transforms: [] };
+  const rep = await go(null, { response: { links: [ONE, SPK, SPK, SPK, { ...SPK }, ONE] } });
+  is('exact repeats of a link are dropped after relabel, and how many is said in fixed', rep.out.body.links.length === 2
+    && rep.out.body.fixed.some((f) => f.op === 'links' && f.value === 4 && /4 repeated links/.test(f.said)), JSON.stringify(rep.out.body.fixed));
+  const twoWays = dedupe([ONE, { ...ONE, transforms: [{ op: 'transpose', by: 12 }] }], []);
+  is('NEGATIVE CONTROL: two links that differ only in a transform are both kept', twoWays.length === 2);
+  const thrown = await handle('/wish', { text: 'x', ports: PORTS }, async () => { throw new Error('5006 bad input'); });
+  is('a patch model that throws is a 502 in its own words', thrown.status === 502 && /5006/.test(thrown.body.error), JSON.stringify(thrown.body));
+}
+
+// ── /code: the examples in the prompt, and a revision ──
+{
+  const { GLSL_EXAMPLES } = await import('../../../demo/shell/glsl-examples.mjs');
+  const sent = [];
+  const stub = async (model, payload) => { sent.push(payload); return { response: { code: 'ok' } }; };
+  await handle('/code', { text: 'slow blue waves', contract: 'A PAGE CONTRACT' }, stub);
+  const sys = sent[0]?.messages?.[0]?.content || '';
+  is('/code puts every example after the contract, even when the page sends its own contract', sys.startsWith('A PAGE CONTRACT')
+    && GLSL_EXAMPLES.every((e) => sys.includes(e.body)) && /Answer as JSON/.test(sys.split('\n').at(-1)), sys.slice(0, 120));
+  sent.length = 0;
+  await handle('/code', { text: 'heavier rain', previous: 'void main(){ o = vec4(1.0); }' }, stub);
+  const rm = sent[0]?.messages || [];
+  is('previous with no error is a revision: one user message carrying the program and the change', rm.length === 2 && rm[1].role === 'user'
+    && rm[1].content.includes('o = vec4(1.0)') && /Change it: heavier rain/.test(rm[1].content) && !/refused/.test(rm[1].content), JSON.stringify(rm.slice(1)));
+  sent.length = 0;
+  await handle('/code', { text: 'heavier rain', previous: 'void main(){ o = x; }', error: 'ERROR: x' }, stub);
+  is('NEGATIVE CONTROL: previous with an error is still a retry, not a revision', sent[0]?.messages?.length === 4 && /refused: ERROR: x/.test(sent[0].messages[3].content));
+}
+
+// ── the per-visitor cap on the paid routes ──
+{
+  const { createLimiter, addressTag, BURST, PER_MINUTE, LIMITED } = await import('./limit.mjs');
+  let t = 0;
+  const lim = createLimiter({ now: () => t });
+  const takeN = (n, who, path = '/code') => Array.from({ length: n }, () => lim.take(who, path));
+  const first = takeN(BURST.n, 'a');
+  const over = lim.take('a', '/code');
+  is('a burst is let through and the next one is a 429 with a plain reason and a wait', first.every((x) => x === null) && over?.status === 429
+    && /too many requests from here: at most 6 in 10 s, try again in \d+ s/.test(over.error) && over.retryAfter >= 1, JSON.stringify(over));
+  is('/wish counts against the same visitor as /code', lim.take('a', '/wish')?.status === 429);
+  is('NEGATIVE CONTROL: another visitor is not refused for the first one\'s burst', lim.take('b', '/code') === null);
+  is('NEGATIVE CONTROL: /hear is not counted here', LIMITED.join() === '/code,/wish' && lim.take('a', '/hear') === null);
+  t += BURST.ms;
+  is('the burst frees itself once its window has passed', lim.take('a', '/code') === null);
+  // Spread under the burst until the minute fills: 30 in a minute, then a refusal naming the minute.
+  let lim2t = 0;
+  const lim2 = createLimiter({ now: () => lim2t });
+  let refused = null;
+  for (let i = 0; i < PER_MINUTE.n + 1; i++) { refused = lim2.take('c', '/code'); lim2t += 1900; }
+  is('past 30 in a minute the refusal names the minute', refused?.status === 429 && /at most 30 in 60 s/.test(refused.error), JSON.stringify(refused));
+  const tagA = await addressTag('203.0.113.5');
+  is('an address is kept as 8 hex of its hash, and two addresses differ', /^[0-9a-f]{8}$/.test(tagA) && tagA !== await addressTag('203.0.113.6') && !tagA.includes('203'));
 }
 
 for (const line of bad) console.log(`FAIL  ${line}`);

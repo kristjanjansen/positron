@@ -2,12 +2,14 @@
 // grains:audio-in is written round an eight second ring; grains leave on grains:audio-out.
 // why: lessons/kit-rt-grains.md#header
 
-import { createRingEngine, PATCHES } from '/granulator/grain-ring.mjs';
+import { createRingEngine, PATCHES, DEFAULTS } from '/granulator/grain-ring.mjs';
 import { createStepper } from './stepper.mjs';
 
 export function make({ log, reroute }) {
   const engine = createRingEngine({ log });
   let input = null, out = null, grains = 0, up = false, at = 0;
+  // Values that came in on value-in; held until the engine is up, and set again over its patch.
+  const held = {};
   // The face is the granulator's patch picker, the same patches /granulator/grains/ offers.
   const say = document.createElement('p');
   say.className = 'cn-face-say';
@@ -15,6 +17,8 @@ export function make({ log, reroute }) {
     at = (i + PATCHES.length) % PATCHES.length;
     step.show(PATCHES[at].name, at);
     say.textContent = PATCHES[at].says;
+    // A person's patch press wins over values that came in before it.
+    for (const k of Object.keys(held)) delete held[k];
     if (up) engine.fixed(PATCHES[at].set);
   };
   const step = createStepper({ what: 'patch', prev: () => choose(at - 1), next: () => choose(at + 1),
@@ -25,12 +29,21 @@ export function make({ log, reroute }) {
   say.textContent = PATCHES[0].says;
   return {
     engine, face, slot: 'panel', patch: () => PATCHES[at].name, choose,
+    deliver: {
+      'value-in': (e) => {
+        if (e?.of !== 'param') return;
+        if (!Object.hasOwn(DEFAULTS, e.name)) { log(`the grain ring has no ${e.name}, so it ignores it`); return; }
+        held[e.name] = e.v;
+        if (up) engine.knob(e.name, e.v);
+      },
+    },
+    param: (name) => held[name] ?? PATCHES[at].set[name] ?? DEFAULTS[name],
     start(ctx) {
       input = ctx.createGain();
       engine.boot({ ctx, input, log, grain: () => { grains++; } }).then((r) => {
         // The engine opens closed; its wire to the speakers is this page's router.
         out = r.out; out.gain.value = 1; up = true;
-        engine.fixed(PATCHES[at].set);
+        engine.fixed({ ...PATCHES[at].set, ...held });
         // A silent branch off the meter keeps the engine pulled when no link
         // takes its sound: Web Audio pulls, and an engine nobody pulls stops.
         const pull = ctx.createGain(); pull.gain.value = 0;
