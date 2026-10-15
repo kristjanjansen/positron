@@ -10,6 +10,11 @@
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
   .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  /* the simulated panel at a whole number scale, so a panel pixel stays square */
+  .ol-sim { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+  .ol-sim canvas { display: block; width: 384px; max-width: 100%; aspect-ratio: 2 / 1; image-rendering: pixelated;
+    border: var(--edge, 1px solid var(--line2)); border-radius: var(--r, 4px); background: #05070c; }
+  @media (min-width: 600px) { .ol-sim canvas { width: 512px; } }
 </style>
 <script type="module">
   // The 0.96" OLED and its four keys on the Pi's header (rig/board/panel.mjs), as two nodes of the
@@ -26,6 +31,7 @@
   import { createBay } from '/shell/bay.mjs';
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { paintFrame } from '/shell/panel-screen.mjs';
 
   const d = mount({ name: 'OLED on Pi', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('remote/oled');
@@ -33,6 +39,8 @@
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';
   const MAY_SEND = !SELFCHECK || q.get('board') === '1';
+  // ?live=1: the layout module is read again every second and the simulated screen redrawn on a change.
+  const LIVE = q.get('live') === '1';
 
   // ── the bay: a text box and a key table here, the screen and the keys on the Pi ──
   const TEXT_OUT = 'web:text:value-out', LOG_IN = 'web:keylog:value-in';
@@ -42,6 +50,14 @@
   bay.addNode({ id: 'web:keylog', kind: 'screen', label: 'key table', place: 'browser' });
   bay.addNode({ id: `${BOARD_SITE}:oled`, kind: 'device', label: 'OLED 128x64', place: ROOM });
   bay.addNode({ id: `${BOARD_SITE}:keys`, kind: 'device', label: 'four keys', place: ROOM });
+  // The simulated panel, drawn by demo/shell/panel-screen.mjs as the Pi draws it, and its four keys.
+  // Mirrored by name: web:oled and web:keys are this tab's copies of pi-1:oled and pi-1:keys.
+  bay.addNode({ id: 'web:oled', kind: 'screen', label: 'simulated OLED', place: 'browser' });
+  bay.addNode({ id: 'web:keys', kind: 'person', label: 'simulated keys', place: 'browser' });
+  const SIM_IN = 'web:oled:value-in', SIMKEYS_OUT = 'web:keys:value-out';
+  const sim = { text: 'waiting for a tab', held: new Set(), ui: null, frames: 0, version: '' };
+  const simCv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
+  function simDraw() { if (!sim.ui) return; paintFrame(simCv, sim.ui.frame({ text: sim.text, held: [...sim.held] })); sim.frames++; }
 
   let board = null, connected = false, sent = 0, shown = 0;
   const flash = new Map();                  // link id -> until (ms), lit for a moment per event
@@ -59,7 +75,14 @@
   bay.addPort({ id: KEYS_OUT, dir: 'out', medium: 'value', emits: ['key'], label: 'keys:value-out' });
   bay.addPort({ id: LOG_IN, dir: 'in', medium: 'value', accepts: ['key'], label: 'keylog:value-in',
     deliver: (ev) => keys.add({ key: `K${ev.k}`, sym: ev.sym, edge: ev.down ? 'press' : 'release', gpio: String(ev.gpio) }) });
-  for (const [from, to] of [[TEXT_OUT, OLED_IN], [KEYS_OUT, LOG_IN]]) {
+  bay.addPort({ id: SIMKEYS_OUT, dir: 'out', medium: 'value', emits: ['key'], label: 'keys:value-out' });
+  bay.addPort({ id: SIM_IN, dir: 'in', medium: 'value', accepts: ['text', 'key'], label: 'oled:value-in',
+    deliver: (ev) => {
+      if (ev.cls === 'text') sim.text = ev.text;
+      else if (ev.down) sim.held.add(ev.k); else sim.held.delete(ev.k);
+      simDraw();
+    } });
+  for (const [from, to] of [[TEXT_OUT, OLED_IN], [KEYS_OUT, LOG_IN], [TEXT_OUT, SIM_IN], [KEYS_OUT, SIM_IN], [SIMKEYS_OUT, SIM_IN]]) {
     const r = bay.link(from, to);
     if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
   }
@@ -79,6 +102,34 @@
     { id: 'send', label: 'Send', onPress: () => send() },
   ] });
   buttons.enable('send', false, 'connect first');
+  // The simulated keys: down on press, up on release, as the module's keys arrive from the Pi.
+  const SYMS = ['^', 'v', '#', '*'];
+  const simKeys = createButtonGroup({ buttons: SYMS.map((s, i) => ({ id: `k${i + 1}`, label: s })) });
+  SYMS.forEach((s, i) => {
+    const b = simKeys.button(`k${i + 1}`), k = i + 1;
+    const edge = (down) => { lit(SIMKEYS_OUT); bay.send(SIMKEYS_OUT, { of: 'key', cls: 'key', k, sym: s, gpio: 0, down }); };
+    b.addEventListener('pointerdown', () => edge(true));
+    for (const ev of ['pointerup', 'pointerleave']) b.addEventListener(ev, () => { if (sim.held.has(k)) edge(false); });
+  });
+  async function loadLayout(v = '') {
+    const [{ loadPanelUi }, wasm] = await Promise.all([import(`/shell/panel-screen.mjs${v ? `?v=${v}` : ''}`),
+      sim.wasm || fetch('/resources/pico/oled-ui.wasm').then((r) => r.arrayBuffer())]);
+    sim.wasm = wasm;
+    sim.ui = await loadPanelUi(wasm);
+    simDraw();
+  }
+  loadLayout().catch((e) => d.log(`the simulated screen did not load: ${e.message}`, 'bad'));
+  if (LIVE) {
+    setInterval(async () => {
+      try {
+        const src = await (await fetch('/shell/panel-screen.mjs', { cache: 'no-store' })).text();
+        let h = 0; for (let i = 0; i < src.length; i++) h = (h * 31 + src.charCodeAt(i)) | 0;
+        const v = (h >>> 0).toString(36);
+        if (sim.version && v !== sim.version) { await loadLayout(v); d.log('layout reloaded'); }
+        sim.version = v;
+      } catch (e) { d.log(`the new layout did not load, keeping the old one: ${e.message}`, 'warn'); }
+    }, 1000);
+  }
   const keys = createTable({ columns: [
     { key: 'key', label: 'key', width: 56 },
     { key: 'sym', label: 'sym', width: 48 },
@@ -114,12 +165,16 @@
 
   const top = el('div', 'cc-top');
   top.append(text.el, buttons.el);
-  d.stack.add(top, keys.el, pb.el);
+  const simBox = el('div', 'ol-sim');
+  simBox.append(simCv, simKeys.el);
+  d.stack.add(simBox, top, keys.el, pb.el);
   window.__demo.bay = bay;
-  window.__demo.probe = () => ({ connected, sent, shown });
+  window.__demo.probe = () => ({ connected, sent, shown, simFrames: sim.frames });
 
   if (SELFCHECK) {
-    d.assert('two links: the text to the screen, the keys to the table', bay.links().length === 2, bay.links().map((l) => `${l.from} -> ${l.to}`).join(', '));
+    d.assert('five links: text and keys to the Pi\'s screen, the table and the simulated screen', bay.links().length === 5, bay.links().map((l) => `${l.from} -> ${l.to}`).join(', '));
+    await new Promise((r) => setTimeout(r, 400));
+    d.assert('the simulated screen drew a frame', sim.frames > 0, `${sim.frames} frames`);
     d.assert('a visit reaches nothing until Connect', !board);
   }
   d.ready();
