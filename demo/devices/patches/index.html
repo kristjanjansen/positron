@@ -22,11 +22,12 @@
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createOledCard, createOledGrid } from '/shell/oled-card.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
   import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
-  import { layoutBayOled } from '/shell/bay-oled.mjs';
+  import { layoutBayOled, BEADS } from '/shell/bay-oled.mjs';
 
   const d = mount({ name: 'Patches on Pi screen', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('devices/patches');
@@ -124,15 +125,18 @@
   }
 
   // The wires run: beads move out to in, about 15 frames a second, as the Pi draws a patch it was sent.
+  // How a value's bead travels, while it is being chosen: a solid block as MIDI's, a hollow square or a diamond.
+  let valueBead = 'diamond';
+  const beadPick = createChoice({ label: 'value bead', options: BEADS.map((b) => [b, b]), at: BEADS.indexOf(valueBead), onPick: (v) => { valueBead = v; } });
   let last = 0;
   (function run(now) {
-    if (now - last > 66) { last = now; for (const [cv, patch, events] of screens) paintFrame(cv, ui.frame({ mode: 'patch', patch, t: now / 1000, events })); }
+    if (now - last > 66) { last = now; for (const [cv, patch, events] of screens) paintFrame(cv, ui.frame({ mode: 'patch', patch, t: now / 1000, events, valueBead })); }
     requestAnimationFrame(run);
   })(0);
 
   const pb = createPatchbay(bay, { room: ROOM, flowing: (l) => (flash.get(l.id) || 0) > performance.now() });
   setInterval(() => pb.refresh?.(), 200);
-  d.stack.add(...blocks, pb.el);
+  d.stack.add(beadPick.el, ...blocks, pb.el);
   window.__demo.bay = bay;
   window.__demo.probe = () => ({ connected, sent, landed, cuts });
 

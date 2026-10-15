@@ -115,15 +115,33 @@ function layoutColumns({ nodes, links }, { home = 'pi-1', adv = 6 } = {}) {
 /** A wire's texture by its medium, so one ink tells them apart: audio solid, midi dashed (3 on, 2 off),
  *  value dotted (1 on, 2 off), video a double line. A wire with no medium is solid. */
 const ON = { midi: (c) => c % 5 < 3, value: (c) => c % 3 === 0 };
+/** The wire's two rails for video: the line moved 1 px to each side, the corners mitred so the rails meet
+ *  there as a bent pair rather than crossing or leaving a gap. Wires are only ever level or upright. */
+function rails(pts) {
+  const dir = (a, b) => [Math.sign(b[0] - a[0]), Math.sign(b[1] - a[1])];
+  const nrm = ([dx, dy]) => [-dy, dx];
+  const side = (k) => pts.map((p, i) => {
+    const n0 = i > 0 ? nrm(dir(pts[i - 1], p)) : null, n1 = i < pts.length - 1 ? nrm(dir(p, pts[i + 1])) : null;
+    const n = !n0 ? n1 : !n1 ? n0 : n0[0] === n1[0] && n0[1] === n1[1] ? n0 : [n0[0] + n1[0], n0[1] + n1[1]];
+    return [p[0] + k * n[0], p[1] + k * n[1]];
+  });
+  return [side(1), side(-1)];
+}
+function solid(ui, pts) {
+  for (let i = 1; i < pts.length; i++) {
+    const [a, b] = [pts[i - 1], pts[i]];
+    ui.fill(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(b[0] - a[0]) + 1, Math.abs(b[1] - a[1]) + 1, 1);
+  }
+}
 function texture(ui, pts, medium) {
+  if (medium === 'video') { for (const r of rails(pts)) solid(ui, r); return; }
   let c = 0;
   for (let i = 1; i < pts.length; i++) {
     const [a, b] = [pts[i - 1], pts[i]], d = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]);
     const sx = Math.sign(b[0] - a[0]), sy = Math.sign(b[1] - a[1]);
     for (let j = i === 1 ? 0 : 1; j <= d; j++, c++) {
       const x = a[0] + sx * j, y = a[1] + sy * j;
-      if (medium === 'video') { if (sy) { ui.fill(x - 1, y, 1, 1, 1); ui.fill(x + 1, y, 1, 1, 1); } else { ui.fill(x, y - 1, 1, 1, 1); ui.fill(x, y + 1, 1, 1, 1); } }
-      else if (!ON[medium] || ON[medium](c)) ui.fill(x, y, 1, 1, 1);
+      if (!ON[medium] || ON[medium](c)) ui.fill(x, y, 1, 1, 1);
     }
   }
 }
@@ -143,12 +161,19 @@ const lengthOf = (pts) => pts.slice(1).reduce((n, b, i) => n + Math.abs(b[0] - p
  *  second while shown; an event medium (midi, value) sends one bead out to in over EVENT_S after each event
  *  in `events[i]`, the time of the wire's last event. */
 const BEAD = 10, SPEED = 20, EVENT_S = 0.6;
-const bead = (ui, [x, y]) => ui.fill(Math.round(x) - 1, Math.round(y) - 1, 3, 3, 1);
-function beads(ui, w, t, events) {
+/** A bead's shape: `solid` a 3x3 block, `hollow` a 5x5 outline around the wire, `diamond` a 5 px diamond. */
+export const BEADS = ['solid', 'hollow', 'diamond'];
+function bead(ui, [x, y], shape = 'solid') {
+  x = Math.round(x); y = Math.round(y);
+  if (shape === 'hollow') { ui.fill(x - 2, y - 2, 5, 1, 1); ui.fill(x - 2, y + 2, 5, 1, 1); ui.fill(x - 2, y - 1, 1, 3, 1); ui.fill(x + 2, y - 1, 1, 3, 1); }
+  else if (shape === 'diamond') { ui.fill(x, y - 2, 1, 5, 1); ui.fill(x - 1, y - 1, 3, 3, 1); ui.fill(x - 2, y, 5, 1, 1); }
+  else ui.fill(x - 1, y - 1, 3, 3, 1);
+}
+function beads(ui, w, t, events, valueBead) {
   const len = lengthOf(w.pts);
   if (w.medium === 'midi' || w.medium === 'value') {
     const t0 = events?.[w.i], u = Number.isFinite(t0) ? (t - t0) / EVENT_S : -1;
-    if (u >= 0 && u <= 1) bead(ui, along(w.pts, Math.max(2, Math.min(len - 2, u * len))));
+    if (u >= 0 && u <= 1) bead(ui, along(w.pts, Math.max(2, Math.min(len - 2, u * len))), w.medium === 'value' ? valueBead : 'solid');
     return;
   }
   for (let at = (t * SPEED) % BEAD + 2; at < len - 2; at += BEAD) bead(ui, along(w.pts, at));
@@ -160,7 +185,7 @@ function beads(ui, w, t, events) {
 export function drawBayOled(ui, patch, o = {}) {
   const L = layoutBayOled(patch, { ...o, adv: ui.adv });
   for (const w of L.wires) texture(ui, w.pts, w.medium);
-  if (Number.isFinite(o.t)) for (const w of L.wires) beads(ui, w, o.t, o.events);
+  if (Number.isFinite(o.t)) for (const w of L.wires) beads(ui, w, o.t, o.events, BEADS.includes(o.valueBead) ? o.valueBead : 'solid');
   for (const b of L.boxes) {
     // the firmware's box: an outline with its corners off. Never filled: a lit box drowns its thin letters.
     ui.fill(b.x + 1, b.y, b.w - 2, 1, 1); ui.fill(b.x + 1, b.y + b.h - 1, b.w - 2, 1, 1);
