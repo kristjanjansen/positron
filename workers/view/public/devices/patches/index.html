@@ -22,17 +22,20 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
-  /* One card a patch: its name, the screen as the Pi draws it at 2x, a cut note, and the send button. */
+  /* One card a patch: its name, the screen as the Pi draws it at 2x, and a footer like the video panel's with the send button. */
   .pt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 16px; }
-  .pt-card { display: flex; flex-direction: column; gap: 10px; padding: var(--inset, 12px); background: var(--card);
-    border: var(--edge, 1px solid var(--line)); border-radius: var(--r, 4px); min-width: 0; }
+  .pt-card { display: flex; flex-direction: column; background: var(--card); border: var(--edge, 1px solid var(--line));
+    border-radius: var(--r, 4px); overflow: hidden; min-width: 0; }
+  .pt-head { display: flex; flex-direction: column; gap: 6px; padding: 12px; }
   .pt-name { margin: 0; font: 600 14px/1.3 var(--mono); }
-  .pt-screen { display: flex; justify-content: center; padding: 12px; background: #07090d; border-radius: 2px; }
-  .pt-frame { padding: 8px; border: 1px solid var(--line); border-radius: 2px; line-height: 0; background: #000; }
+  .pt-say { margin: 0; font: 400 13px/1.45 var(--sans); color: var(--dim); text-wrap: balance; }
+  /* The well runs edge to edge; the screen sits in it with the same air above and below it as its own black border. */
+  .pt-screen { display: flex; justify-content: center; margin-top: auto; padding: 16px 0; background: #07090d; }
+  .pt-frame { padding: 8px; line-height: 0; background: #000; }
   .pt-frame canvas { display: block; width: 256px; height: 128px; image-rendering: pixelated; }
-  .pt-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; }
+  .pt-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px;
+    border-top: 1px solid var(--line); }
   .pt-cut { font-size: 12px; color: var(--dim2); }
-  .pt-say { margin: -4px 0 0; font: 400 13px/1.45 var(--sans); color: var(--dim); text-wrap: balance; }
   .pt-sec { display: flex; flex-direction: column; gap: 12px; }
 </style>
 <script type="module">
@@ -66,11 +69,11 @@
     ['Evolution to the Circuit', 'Play the Circuit from the keyboard on the Pi.', [[EVO, `${P}:circuit`]]],
     ['A split', 'Low keys play the Circuit, high keys play Plaits on the Pi.', [[EVO, `${P}:circuit`], [EVO, `${P}:plaits`]]],
     ['A layer', 'Every key plays the Circuit and the sampler\'s piano together.', [[EVO, `${P}:circuit`], [EVO, `${P}:sampler`]]],
-    ['The knobs to Plaits', 'The keyboard plays Plaits and its knobs turn Plaits\'s controls.', [[EVO, `${P}:plaits`], [`${P}:plaits`, `${P}:capture`]]],
+    ['Evolution to Plaits', 'The keys play Plaits on the Pi and the knobs turn its sound, heard in a tab.', [[EVO, `${P}:plaits`], [`${P}:plaits`, 'web:speaker']]],
     ['Evolution to Collide', 'Play the SuperCollider synth on the Pi, heard in a tab.', [[EVO, `${P}:collide`], [`${P}:collide`, 'web:speaker']]],
     ['Camera on the screen', 'The Pi\'s camera drawn in one bit on its own small screen.', [[`${P}:camera`, `${P}:screen`]]],
     ['Drums from the screen\'s keys', 'The four keys under the screen trigger the drum machine.', [[`${P}:keys`, `${P}:drums`], [`${P}:drums`, 'web:speaker']]],
-    ['Drums in time with the Circuit', 'The Circuit\'s clock drives the drum machine, both on the Pi.', [[`${P}:circuit`, `${P}:drums`], [`${P}:drums`, `${P}:capture`]]],
+    ['Drums in time with the Circuit', 'The Circuit\'s clock drives the drum machine on the Pi, heard in a tab.', [[`${P}:circuit`, `${P}:drums`], [`${P}:drums`, 'web:speaker']]],
     ['Record what you play', 'The Evolution plays the Circuit and every take goes to the bucket.', [[EVO, `${P}:circuit`], [`${P}:circuit`, 'cf-r2:takes']]],
   ];
   // name, then links as [from node, to node]; every node a box
@@ -140,7 +143,9 @@
     } }] });
     const foot = el('div', 'pt-foot');
     foot.append(el('span', 'pt-cut', L.cut.length ? `cut: ${L.cut.map((c) => c.split(' as ')[1] || c.split(':')[1]).join(', ')}` : ''), send.el);
-    card.append(el('h3', 'pt-name', x.name), ...(x.say ? [el('p', 'pt-say', x.say)] : []), screen, foot);
+    const head = el('div', 'pt-head');
+    head.append(el('h3', 'pt-name', x.name), ...(x.say ? [el('p', 'pt-say', x.say)] : []));
+    card.append(head, screen, foot);
     grid.append(card);
   }
   const block = el('section', 'pt-sec');
