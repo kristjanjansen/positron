@@ -10,10 +10,7 @@
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
   .cc-top { display: flex; }
-  /* The picture and the dial that drives it are one instrument, as on /radio/tuner/. */
-  .cc-tuner { display: flex; flex-direction: column; gap: 12px; }
   .cc-pic canvas { display: block; width: 100%; height: 100%; }
-  .cc-dial { display: flex; flex-direction: column; width: 100%; }
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
@@ -23,35 +20,50 @@
   import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createSlider } from '/shell/slider.mjs';
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createMp3Stream } from '/shell/mp3-stream.mjs';
   import { createMix, createTunerGraph, pinkNoise } from '/shell/tuner-mix.mjs';
   import { createEnvFollower } from '/shell/pappus-mod.mjs';
   import { LANES, LAYOUT_VERSION, MOD_FOLLOWERS, FOLLOWER_NAMES, createFeatures } from '/shell/radio-gran.mjs';
   import { createScanField, LOOKS, DEFAULT_LOOK, EXTRA, FIELD_W, FIELD_H, DATA_W, DATA_H, at, u8 } from '/shell/scan-field.mjs';
-  import { createSources, WINDOW_S } from '/granulator/grain-rig.mjs';
+  import { WINDOW_S } from '/granulator/grain-rig.mjs';
   import { PATCHES, valuesOf, createRingEngine } from '/granulator/grain-ring.mjs';
 
-  // /radio/tuner/'s dial over our three recordings, through the grain ring, into
-  // /shader/landscape/'s picture. Play fetches the recordings and boots the engine;
-  // nothing opens on a visit. Taken from /videoradio/: the picture tears when a station
-  // comes in, its trail lengthens while one arrives, and the blend is never all grains.
+  // Live stations through our relay, /radio/tuner/'s AM graph and the grain ring into /shader/landscape/.
+  // A drift node on a clock tunes from one station to the next; the waves follow the tuner's noise.
+  // Each ERR connection is a listener: at most two open, only after Play, all closed on Stop or leaving.
+  const params = new URLSearchParams(location.search);
+  const BASE = params.get('base') || 'https://shout.positron.studio';
+  const LOCAL = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(BASE);
   const S = 'web';
   const d = mount({ name: 'Radio landscape', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('radio/scenery');
 
-  // Where each recording sits on the dial, as on /social/radio/; `echo` is its skywave delay.
-  const DIAL = { raadio2: { short: 'R2', at: 0.2, echo: 0.09 }, raadio4: { short: 'R4', at: 0.5, echo: 0.11 },
-    ida: { short: 'Ida', at: 0.8, echo: 0.13 } };
-  const SOURCES = createSources({ log: (m) => d.log(m) });
-  const STATIONS = SOURCES.map((s) => ({ ...s, ...DIAL[s.id] }));
-  const mix = createMix(STATIONS);
-  // videoradio's WET_MIN..WET_MAX: at 1 the tuner's own noise and whistle are gone.
+  // /radio/tuner/'s four stations; Ida (320 kbit/s) stays at the back of the list.
+  const STATIONS = [
+    { key: 'viker', site: 'err', node: 'vikerraadio', mount: 'vikerraadio', label: 'Vikerraadio' },
+    { key: 'klassika', site: 'err', node: 'klassikaraadio', mount: 'klassikaraadio', label: 'Klassikaraadio' },
+    { key: 'r2', site: 'err', node: 'raadio2', mount: 'raadio2', label: 'Raadio 2' },
+    { key: 'ida', site: 'ida', node: 'tallinn', mount: 'ida-tallinn', label: 'Ida Radio Tallinn' },
+  ];
+
+  // ── the drift's clock ───────────────────────────────────────────────────
+  // Two slots 0.08 apart on the dial, so halfway each station is a quarter clear under noise and
+  // whistle: a blend, not a silence. The tuner rides between them; phases are read off the clock.
+  const SLOTS = [{ at: 0.46, echo: 0.09 }, { at: 0.54, echo: 0.13 }];
+  const num = (k, dflt) => { const v = Number(params.get(k)); return Number.isFinite(v) && v > 0 ? v : dflt; };
+  const DWELL_S = num('dwell', SELFCHECK ? 5 : 40);   // one station, clear
+  const BLEND_S = num('blend', SELFCHECK ? 6 : 16);   // leaving one, through noise, into the next
+  const PREROLL_S = Math.min(DWELL_S / 2, 4);            // the arriving mount opens this early
+  const CYCLE_S = DWELL_S + BLEND_S;
+  const mix = createMix(SLOTS);
+  // On a slot the tuner lets through 0.04 noise; halfway 0.04 + 0.26 * (1 - clear).
+  const MID = 1 - mix((SLOTS[0].at + SLOTS[1].at) / 2).st[0].clear;
   const WET = 0.7;
-  const TRAIL_S = 1.6, TRAIL_TUNED_S = 5.0;
+  const TRAIL_S = 1.6, TRAIL_STORM_S = 5.0;
 
   // landscape's six knobs, each a node whose turn is one event into the shader.
   const f2 = (v) => v.toFixed(2), f3 = (v) => v.toFixed(3);
@@ -65,11 +77,14 @@
   ];
   const LOOK = LOOKS[DEFAULT_LOOK];
   const OPEN = { ...LOOK, ...EXTRA };
+  // What the storm adds at its peak, on top of where the knobs stand.
+  const STORM = { ampM: (b) => Math.min(8, b * 1.5), swellY: (b) => Math.min(0.05, b + 0.03), heave: (b) => Math.min(1, b + 0.8) };
 
   // ── the bay ─────────────────────────────────────────────────────────────
-  const FILE_OUT = (s) => `${s.store}:${s.id}:file-out`;
-  const PLAYER_IN = `${S}:player:file-in`, PLAYER_OUT = `${S}:player:audio-out`;
-  const NOISE_OUT = `${S}:noise:audio-out`, DIAL_OUT = `${S}:dial:value-out`;
+  const outOf = (st) => `${st.site}:${st.node}:audio-out`;
+  const relayIn = (st) => `cf-shout:${st.mount}:audio-in`, relayOut = (st) => `cf-shout:${st.mount}:audio-out`;
+  const NOISE_OUT = `${S}:noise:audio-out`;
+  const DRIFT_TUNE = `${S}:drift:value-out`, DRIFT_STORM = `${S}:drift:value-out-2`;
   const TUNER_IN = `${S}:tuner:audio-in`, TUNER_OUT = `${S}:tuner:audio-out`;
   const TUNER_TUNE = `${S}:tuner:value-in`, TUNER_EV = `${S}:tuner:value-out`;
   const PATCH_OUT = `${S}:patch:value-out`;
@@ -81,15 +96,17 @@
   const KNOB_OUT = (c) => `${S}:knob-${c.label}:value-out`;
 
   const bay = createBay();
-  for (const s of STATIONS) {
-    addNodes(bay, S, [{ name: 'recording', site: s.store, as: s.id, label: s.label }],
-      { ports: { [`${s.id}:file-out`]: { label: 'recording', address: s.url } } });
+  for (const st of STATIONS) {
+    addNodes(bay, S, [{ name: 'station', site: st.site, as: st.node, label: st.label }],
+      { ports: { [outOf(st)]: { label: st.label } } });
+    addNodes(bay, S, [{ name: 'shout', as: st.mount }],
+      { ports: { [relayIn(st)]: { label: 'relay' }, [relayOut(st)]: { label: 'relay', address: `${BASE}/${st.mount}` } } });
   }
-  addNodes(bay, S, ['player', 'noise', 'dial', 'tuner', 'patch-values', { name: 'grains', label: 'granulator' }, 'speaker',
+  addNodes(bay, S, ['noise', 'drift', 'tuner', 'patch-values', { name: 'grains', label: 'granulator' }, 'speaker',
     'shader-landscape', 'screen', ...K.map((c) => ({ name: 'knob', as: `knob-${c.label}`, label: c.label }))], {
     ports: {
-      'player:file-in': { label: 'player' }, 'player:audio-out': { label: 'player' },
-      'noise:audio-out': { label: 'noise' }, 'dial:value-out': { label: 'dial' },
+      'noise:audio-out': { label: 'noise' },
+      'drift:value-out': { label: 'tune' }, 'drift:value-out-2': { label: 'storm' },
       'tuner:audio-in': { label: 'tuner' }, 'tuner:audio-out': { label: 'tuner' },
       'tuner:value-in': { label: 'tune' }, 'tuner:value-out': { label: 'station' },
       'patch:value-out': { label: 'patch' },
@@ -106,22 +123,27 @@
       'shader:value-in': (e) => valueIn(e),
     },
   });
-  function hold(a, b) {
-    const r = bay.link(a, b, [], { site: S });
+  function hold(a, b, opts) {
+    bay.seen(a); bay.seen(b);
+    const r = bay.link(a, b, [], { site: S, ...opts });
     if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
   }
   // The sound and the picture follow the links the bay holds, read every time.
   const holds = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
   const sentOn = (a, b) => bay.links().find((l) => l.from === a && l.to === b)?.sent ?? 0;
-  for (const s of STATIONS) hold(FILE_OUT(s), PLAYER_IN);
-  hold(PLAYER_OUT, TUNER_IN);
+  for (const st of STATIONS) {
+    // Holding a link opens nothing. A stream opens only after Play, where a person asks to
+    // listen, so the consent is named here.
+    hold(outOf(st), relayIn(st), { consent: true, via: 'https' });
+    hold(relayOut(st), TUNER_IN, { via: 'https' });
+  }
   hold(NOISE_OUT, TUNER_IN);
-  hold(DIAL_OUT, TUNER_TUNE);
+  hold(DRIFT_TUNE, TUNER_TUNE);
+  hold(DRIFT_STORM, SH_VAL);
   hold(TUNER_OUT, GRAINS_IN);
   hold(PATCH_OUT, GRAINS_VAL);
   hold(GRAINS_OUT, SPEAKER);
-  // The picture hears the grains rather than the tuner: its axes are the granulator's (across is
-  // where in the last eight seconds a grain read, up how long it was), as on /videoradio/.
+  // The picture hears the grains: across is where in the last eight seconds a grain read.
   hold(GRAINS_OUT, SH_AUDIO);
   hold(GRAINS_EV, SH_VAL);
   hold(TUNER_EV, SH_VAL);
@@ -132,30 +154,34 @@
   const canvas = el('canvas');
   canvas.width = FIELD_W; canvas.height = FIELD_H;
   const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: false });
-  const name = el('span', 'cc-say', '');
+  const onAir = el('span', 'cc-say', '');
   const count = el('span', 'cc-say', '');
-  const panel = createVideoPanel({ media: canvas, left: name });
+  const panel = createVideoPanel({ media: canvas, left: onAir });
   panel.el.classList.add('cc-pic');
   panel.el.querySelector('.pos-vp-r')?.prepend(count);
   let field = null, glErr = 0, frames = 0;
   if (gl) {
-    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-    const r = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
-    name.textContent = (r.match(/Renderer:\s*([^,)]+)/)?.[1] ?? r.replace(/^ANGLE \(|\)$/g, '')).trim().slice(0, 24);
     try { field = createScanField(gl, { look: LOOK, live: true, canvas }); }
     catch (e) { d.log(`the picture did not compile: ${e.message}`, 'bad'); }
   } else d.log('this browser has no WebGL2, so there is no picture', 'bad');
 
-  // ── what reaches the shader's value inlet: grains, the tuned station, knob turns ─
-  const seen = { grain: 0, tuned: 0, knob: 0 };
-  let jolt = 0, tunedAt = -1e9;
+  // ── what reaches the shader's value inlet: grains, the tuned station, the storm, knobs ─
+  const seen = { grain: 0, tuned: 0, storm: 0, knob: 0 };
+  const base = Object.fromEntries(K.map((c) => [c.name, OPEN[c.name]]));
+  let storm = 0, jolt = 0;
+  function shade(name) {
+    const b = base[name];
+    field?.set(name, STORM[name] ? b + (STORM[name](b) - b) * storm : b);
+  }
   function valueIn(ev) {
     if (ev?.of === 'grain') { seen.grain++; bucket(ev); return; }
-    // a station coming in or going out tears the picture, as a station change does on /videoradio/
-    if (ev?.of === 'tuned') { seen.tuned++; jolt = 1; tunedAt = performance.now(); return; }
+    // a station coming in tears the picture, as a station change does on /videoradio/
+    if (ev?.of === 'tuned') { seen.tuned++; if (ev.station) jolt = 1; return; }
+    if (ev?.of === 'storm' && Number.isFinite(ev.v)) { seen.storm++; storm = ev.v; for (const n of Object.keys(STORM)) shade(n); return; }
     if (ev?.of !== 'param' || !Number.isFinite(ev.v)) return;
     seen.knob++;
-    field?.set(ev.name, ev.v);
+    base[ev.name] = ev.v;
+    shade(ev.name);
   }
 
   // ── the data texture, filled every frame as /shader/landscape/ fills it ─
@@ -198,7 +224,8 @@
       windowRow();
       data[at(6, 3)] = u8(WET);
       data[at(7, 3)] = Math.min(255, got);
-      const tau = performance.now() - tunedAt < 4000 ? TRAIL_TUNED_S : TRAIL_S;
+      // The trail lengthens with the storm, so the picture smears while the stations cross.
+      const tau = TRAIL_S + (TRAIL_STORM_S - TRAIL_S) * storm;
       data[at(16, 3)] = u8(Math.exp(-dt / tau));
       pulse = (pulse + got * 0.045) % 1;
       data[at(19, 3)] = u8(0.5 - 0.5 * Math.cos(pulse * Math.PI * 2));
@@ -220,23 +247,77 @@
   }
   if (field) requestAnimationFrame(frame);
 
-  // ── the tuner: the dial's value arrives on tuner:value-in ──────────────
-  let tune = DIAL.raadio2.at, tuned = null;
-  const tunedOf = (m) => { const i = m.st.findIndex((s) => s.clear > 0.5); return i < 0 ? null : STATIONS[i].id; };
+  // ── the tuner: the drift's value arrives on tuner:value-in ──────────────
+  let tune = SLOTS[0].at, tuned = null;
+  const slotIn = [null, null];      // which station sits in each slot
+  const tunedOf = (m) => { const i = m.st.findIndex((s) => s.clear > 0.5); return i < 0 ? null : slotIn[i]?.key ?? null; };
   function applyTune() {
     const m = mix(tune);
-    if (graph) graph.apply(m, { whistle: holds(PLAYER_OUT, TUNER_IN) });
+    if (graph) graph.apply(m, { whistle: true });
     const now = tunedOf(m);
     if (now !== tuned) {
       tuned = now;
       bay.send(TUNER_EV, { of: 'tuned', station: now, clear: +Math.max(...m.st.map((s) => s.clear)).toFixed(3) });
     }
   }
-  tuned = tunedOf(mix(tune));
-  const dial = createSlider({ label: '', aria: 'tune', min: 0, max: 1, step: 0.001, value: tune,
-    onInput: (v) => bay.send(DIAL_OUT, { of: 'param', name: 'tune', v }) });
-  const dialRow = el('div', 'cc-dial');
-  dialRow.append(dial.el);
+
+  // ── the streams: one open while a station plays, two while one arrives ──
+  const legs = new Map();          // station key -> { stream, slot, live }
+  const conns = { opened: 0, closed: 0, maxOpen: 0 };
+  function openLeg(st, slot) {
+    const stream = createMp3Stream(ctx, { url: `${BASE}/${st.mount}`, log: (m) => d.log(`${st.label}: ${m}`) });
+    const leg = { st, stream, slot, live: false };
+    legs.set(st.key, leg);
+    conns.opened++; conns.maxOpen = Math.max(conns.maxOpen, legs.size);
+    slotIn[slot] = st;
+    stream.node.connect(graph.legs[slot].input);
+    stream.started.then(() => { if (legs.get(st.key) === leg) { leg.live = true; pb.refresh(); } }).catch(() => {});
+    pb.refresh();
+    return leg;
+  }
+  function closeLeg(key) {
+    const leg = legs.get(key);
+    if (!leg) return;
+    try { leg.stream.stop(); } catch { /* already stopped */ }
+    legs.delete(key);
+    conns.closed++;
+    if (slotIn[leg.slot] === leg.st) slotIn[leg.slot] = null;
+    pb.refresh();
+  }
+
+  // ── the drift: a clock moving the tuner, and the storm that follows the noise ─
+  let cycleFrom = 0, here = 0, from = 0, nextKey = null, phase = 'off', driftTimer = 0, k = 0;
+  const ease = (x) => x * x * (3 - 2 * x);
+  const stationAt = (i) => STATIONS[((i % STATIONS.length) + STATIONS.length) % STATIONS.length];
+  function driftTick() {
+    if (!playing) return;
+    const t = (performance.now() - cycleFrom) / 1000;
+    const to = 1 - from;
+    const next = stationAt(here + 1);
+    if (t >= DWELL_S - PREROLL_S && !legs.has(next.key)) {
+      openLeg(next, to);
+      d.log(`${next.label} opening, ${stationAt(here).label} still on air`);
+    }
+    if (t < DWELL_S) { phase = 'dwell'; k = 0; return; }
+    if (t < CYCLE_S) {
+      phase = 'blend';
+      k = (t - DWELL_S) / BLEND_S;
+      const v = SLOTS[from].at + (SLOTS[to].at - SLOTS[from].at) * ease(k);
+      bay.send(DRIFT_TUNE, { of: 'param', name: 'tune', v: +v.toFixed(5) });
+      const m = mix(v);
+      const s = Math.min(1, (1 - Math.max(...m.st.map((x) => x.clear))) / MID);
+      bay.send(DRIFT_STORM, { of: 'storm', v: +s.toFixed(4) });
+      return;
+    }
+    // landed: the leaving station closes, the arriving one plays, and the clock starts again
+    bay.send(DRIFT_TUNE, { of: 'param', name: 'tune', v: SLOTS[to].at });
+    bay.send(DRIFT_STORM, { of: 'storm', v: 0 });
+    const left = stationAt(here);
+    if (left.key !== next.key) closeLeg(left.key);
+    here += 1; from = to; cycleFrom = performance.now(); phase = 'dwell'; k = 0;
+    onAir.textContent = next.label;
+    d.log(`${next.label} on air, ${left.label} closed`);
+  }
 
   // ── the granulator's patch: one whole patch per event on patch -> grains ─
   let patchAt = Math.max(0, PATCHES.findIndex((p) => p.name === 'Cloud'));
@@ -265,17 +346,14 @@
   // ── the sound ───────────────────────────────────────────────────────────
   const engine = createRingEngine({ log: (m, k) => d.log(m, k) });
   let ctx = null, graph = null, toGrains = null, heard = null, heardBuf = null, noiseSrc = null;
-  let eng = null, booting = null, playing = false, opening = 0, fetchedAt = 0;
-  let pressedAt = 0, firstSoundMs = null;
-  const legs = new Map();          // source id -> { node, stop }
+  let eng = null, booting = null, playing = false;
+  let pressedAt = 0, firstSoundMs = null, openOnPlay = 0;
   function route() {
     if (!ctx) return;
-    STATIONS.forEach((s, i) => {
-      const g = legs.get(s.id);
-      if (!g) return;
-      try { g.node.disconnect(); } catch { /* not connected */ }
-      if (holds(FILE_OUT(s), PLAYER_IN) && holds(PLAYER_OUT, TUNER_IN)) g.node.connect(graph.legs[i].input);
-    });
+    for (const leg of legs.values()) {
+      try { leg.stream.node.disconnect(); } catch { /* not connected */ }
+      if (holds(outOf(leg.st), relayIn(leg.st)) && holds(relayOut(leg.st), TUNER_IN)) leg.stream.node.connect(graph.legs[leg.slot].input);
+    }
     try { noiseSrc?.disconnect(); } catch { /* not connected */ }
     if (noiseSrc && holds(NOISE_OUT, TUNER_IN)) noiseSrc.connect(graph.noiseIn);
     try { graph.out.disconnect(); } catch { /* not connected */ }
@@ -302,19 +380,6 @@
     booting.catch(() => { booting = null; eng = null; });
     return booting;
   }
-  /** Each recording into its leg of the tuner, fetched while the engine boots. */
-  async function plug(s) {
-    opening++; pb.refresh();
-    try {
-      const got = await s.open(ctx);
-      if (!playing) { got.stop(); return false; }
-      legs.get(s.id)?.stop();
-      legs.set(s.id, got);
-      route();
-      return true;
-    } catch (e) { d.log(`${s.label} did not open: ${e?.message || e}`, 'warn'); return false; }
-    finally { opening--; fetchedAt = performance.now(); pb.refresh(); }
-  }
   // When sound first reaches the speakers after a press, read off what the speakers get.
   function listen() {
     if (!playing || firstSoundMs !== null || !heard) return;
@@ -328,34 +393,45 @@
     ctx ??= new AudioContext({ sampleRate: 48000 });
     ctx.resume();
     if (!graph) {
-      graph = createTunerGraph(ctx, STATIONS);
+      graph = createTunerGraph(ctx, SLOTS);
       toGrains = ctx.createGain();
       heard = ctx.createAnalyser(); heard.fftSize = 2048; heardBuf = new Float32Array(heard.fftSize);
       const pull = ctx.createGain(); pull.gain.value = 0; heard.connect(pull).connect(ctx.destination);
     }
     playing = true; jolt = 1;
     noiseSrc = ctx.createBufferSource(); noiseSrc.buffer = pinkNoise(ctx); noiseSrc.loop = true; noiseSrc.start();
+    // A random first station, so no one mount is the one every visit opens.
+    here = Math.floor(Math.random() * STATIONS.length); from = 0;
+    tune = SLOTS[0].at; storm = 0;
+    openLeg(stationAt(here), 0);
+    openOnPlay = legs.size;
+    onAir.textContent = stationAt(here).label;
+    cycleFrom = performance.now(); phase = 'dwell';
+    driftTimer = setInterval(driftTick, 50);
     face(); route();
     requestAnimationFrame(listen);
     const wasUp = !!eng;
-    const opened = Promise.all(STATIONS.map(plug));
     try { await boot(); } catch (e) { d.log(`the granulator did not come up: ${e?.message || e}`, 'bad'); stop(); return; }
     if (!playing) return;
     if (wasUp) engine.run(true);
     route();
-    // once sound is in, the read head starts at the write head and no grain reaches back past it
-    if ((await opened).some(Boolean) && playing) { engine.fresh(); engine.land(); }
+    engine.fresh(); engine.land();
     pb.refresh();
   }
   function stop() {
     playing = false;
-    for (const g of legs.values()) g.stop();
-    legs.clear();
+    clearInterval(driftTimer);
+    for (const key of [...legs.keys()]) closeLeg(key);
     try { noiseSrc?.stop(); noiseSrc?.disconnect(); } catch { /* gone */ }
     noiseSrc = null;
+    storm = 0; phase = 'off'; k = 0;
+    for (const nm of Object.keys(STORM)) shade(nm);
+    onAir.textContent = '';
     if (eng) engine.run(false);
     route(); pb.refresh(); face();
   }
+  // Leaving the page closes every station connection.
+  addEventListener('pagehide', () => { if (playing) stop(); });
   const transport = createButtonGroup({ buttons: [
     { id: 'play', icon: 'play', label: 'play', onPress: () => (playing ? stop() : play()) },
   ] });
@@ -364,84 +440,100 @@
   const top = el('div', 'cc-top');
   top.append(transport.el);
 
-  // File wires are lit while a recording comes down, audio wires while it plays, the video wire
-  // while the shader draws; value wires pulse once per event.
+  // A station's wires are lit while its stream is open; the tuner's and grains' while playing.
   const pb = createPatchbay(bay, {
     flowing: (l, medium) => {
-      if (medium === 'file') return opening > 0 || (fetchedAt && performance.now() - fetchedAt < 600);
-      if (medium === 'audio') return playing && (l.from.startsWith(`${S}:grains:`) ? !!eng : l.from !== PLAYER_OUT || legs.size > 0);
+      if (medium === 'audio') {
+        const st = STATIONS.find((s) => outOf(s) === l.from || relayOut(s) === l.from);
+        if (st) return !!legs.get(st.key)?.live;
+        return playing && (l.from.startsWith(`${S}:grains:`) ? !!eng : true);
+      }
       if (medium === 'video') return !!field;
       return false;
     },
   });
 
-  const tunerBlock = el('div', 'cc-tuner');
-  tunerBlock.append(panel.el, dialRow);
-  d.stack.add(top, tunerBlock, patchPick.el, grid.el, pb.el);
+  d.stack.add(top, panel.el, patchPick.el, grid.el, pb.el);
 
   // ── read only, for a check over CDP ─────────────────────────────────────
   window.__demo.scenery = {
-    bay, dial, field: () => field, playing: () => playing, frames: () => frames, seen: () => ({ ...seen }),
-    firstSoundMs: () => firstSoundMs, legs: () => [...legs.keys()], patch: () => PATCHES[patchAt].name,
-    mix: () => mix(tune), tuned: () => tuned, jolt: () => jolt, fetched: () => SOURCES.fetched(), context: () => ctx,
+    bay, field: () => field, playing: () => playing, frames: () => frames, seen: () => ({ ...seen }),
+    firstSoundMs: () => firstSoundMs, open: () => [...legs.keys()], conns: () => ({ ...conns, open: legs.size }),
+    drift: () => ({ phase, k, tune, storm, onAir: stationAt(here).key, tuned }), patch: () => PATCHES[patchAt].name,
+    params: () => field?.params(), jolt: () => jolt, context: () => ctx, stop: () => stop(),
   };
 
-  // ── the self check, only under ?selfcheck=1 ─────────────────────────────
+  // ── the self check, only under ?selfcheck=1, and only against a stand-in ─
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const until = async (fn, ms) => { const t = performance.now(); while (!fn() && performance.now() - t < ms) await wait(50); return fn(); };
   const diff = (a, b) => { let s = 0; for (let i = 0; i < a.px.length; i += 4) s += Math.abs(a.px[i] - b.px[i]) + Math.abs(a.px[i + 1] - b.px[i + 1]) + Math.abs(a.px[i + 2] - b.px[i + 2]); return s / (a.px.length / 4) / 3; };
   async function check() {
-    d.assert('a visit opened no audio context and fetched nothing', ctx === null && SOURCES.fetched() === 0 && legs.size === 0);
-    const want = [...STATIONS.map((s) => [FILE_OUT(s), PLAYER_IN]), [PLAYER_OUT, TUNER_IN], [NOISE_OUT, TUNER_IN], [DIAL_OUT, TUNER_TUNE],
-      [TUNER_OUT, GRAINS_IN], [PATCH_OUT, GRAINS_VAL], [GRAINS_OUT, SPEAKER], [GRAINS_OUT, SH_AUDIO], [GRAINS_EV, SH_VAL],
-      [TUNER_EV, SH_VAL], ...K.map((c) => [KNOB_OUT(c), SH_VAL]), [SH_OUT, SCREEN]];
+    d.assert('a visit opened no audio context and no station', ctx === null && conns.opened === 0 && legs.size === 0);
+    const want = [...STATIONS.flatMap((s) => [[outOf(s), relayIn(s)], [relayOut(s), TUNER_IN]]), [NOISE_OUT, TUNER_IN],
+      [DRIFT_TUNE, TUNER_TUNE], [DRIFT_STORM, SH_VAL], [TUNER_OUT, GRAINS_IN], [PATCH_OUT, GRAINS_VAL], [GRAINS_OUT, SPEAKER],
+      [GRAINS_OUT, SH_AUDIO], [GRAINS_EV, SH_VAL], [TUNER_EV, SH_VAL], ...K.map((c) => [KNOB_OUT(c), SH_VAL]), [SH_OUT, SCREEN]];
     const missing = want.filter(([a, b]) => !holds(a, b));
-    d.assert('the patch holds every link: dial to tuner, tuner to granulator, granulator to speakers and picture',
+    d.assert('the patch holds every link: stations through the relay to the tuner, drift to tuner and shader',
       !missing.length, missing.length ? `missing ${missing.map((w) => w.join(' -> ')).join(', ')}` : `${want.length} links`);
     if (field) {
       await wait(400);
       d.assert('the standby picture draws before Play, with no GL error', frames > 10 && glErr === 0, `${frames} frames, gl.getError ${glErr}`);
     }
-    // midway is noise; just off a station its carrier whistles; on it, it is clear
-    const q = mix(0.35), off = mix(DIAL.raadio2.at + 0.03), on = mix(DIAL.raadio4.at);
-    d.assert('between stations is noise, just off one a whistle, on one it is clear',
-      q.st.every((s) => s.clear < 0.05) && q.noise > 0.25 && off.whistle > 0.03 && on.st[1].clear > 0.99,
-      `midway noise ${q.noise.toFixed(2)}; off R2 whistle ${off.whistle.toFixed(3)} at ${Math.round(off.pitch)} Hz; on R4 clear ${on.st[1].clear.toFixed(3)}`);
+    const mid = mix((SLOTS[0].at + SLOTS[1].at) / 2), on = mix(SLOTS[0].at);
+    d.assert('halfway is a blend under noise and whistle, on a slot it is clear',
+      mid.st.every((s) => s.clear > 0.15 && s.clear < 0.5) && mid.noise > 0.2 && mid.whistle > 0.02 && on.st[0].clear > 0.99 && on.noise < 0.05,
+      `halfway clear ${mid.st.map((s) => s.clear.toFixed(2)).join(' and ')}, noise ${mid.noise.toFixed(2)}, whistle ${mid.whistle.toFixed(3)}`);
+    if (!LOCAL) { d.log('the self check plays only against a stand-in: add ?base=http://127.0.0.1:8899 (node demo/fake-station.mjs)', 'warn'); return; }
 
     await play();
     await until(() => firstSoundMs !== null, 4000);
-    d.assert('sound reaches the speakers within 2 s of Play', firstSoundMs !== null && firstSoundMs <= 2000, `${firstSoundMs ?? 'none'} ms`);
-    await until(() => legs.size === STATIONS.length, 10000);
-    d.assert('all three recordings play into the tuner', legs.size === STATIONS.length, legs.size ? [...legs.keys()].join(', ') : 'none');
+    d.assert('sound reaches the speakers within 3 s of Play', firstSoundMs !== null && firstSoundMs <= 3000, `${firstSoundMs ?? 'none'} ms`);
+    d.assert('Play opened one station', openOnPlay === 1, `${stationAt(here).label}, ${openOnPlay} open`);
     if (!eng) return;
-    await wait(1500);
+    await wait(1200);
     const g0 = sentOn(GRAINS_EV, SH_VAL);
-    await wait(1000);
-    d.assert('the grains reach the shader over their wire', sentOn(GRAINS_EV, SH_VAL) - g0 > 5, `${sentOn(GRAINS_EV, SH_VAL) - g0} in a second`);
+    await wait(800);
+    d.assert('the grains reach the shader over their wire', sentOn(GRAINS_EV, SH_VAL) - g0 > 5, `${sentOn(GRAINS_EV, SH_VAL) - g0} in 0.8 s`);
 
-    // The dial moves the picture: R2 to R4 crosses noise, and the station coming in tears it.
-    const t0 = sentOn(TUNER_EV, SH_VAL), s0 = seen.tuned;
-    const was = tuned;
-    dial.set(DIAL.raadio4.at);
-    await wait(80);
-    const held = new Uint8Array(data), calm = new Uint8Array(data);
-    calm[at(20, 3)] = 0;
-    const m = mix(tune);
-    d.assert('the dial reaches the tuner over its wire and tunes it to Raadio 4', Math.abs(tune - DIAL.raadio4.at) < 1e-6 && m.st[1].clear > 0.99 && tuned === 'raadio4',
-      `tune ${tune.toFixed(3)}, ${was} to ${tuned}`);
-    d.assert('the tuner tells the shader a station came in, over its wire', sentOn(TUNER_EV, SH_VAL) > t0 && seen.tuned > s0,
-      `${sentOn(TUNER_EV, SH_VAL) - t0} sent, ${seen.tuned - s0} arrived`);
-    if (field) {
-      const a = field.testFinal(calm), b = field.testFinal(held);
-      d.assert('the picture tears when the station comes in', held[at(20, 3)] > 100 && diff(a, b) > 0.3,
-        `jolt ${held[at(20, 3)]} of 255, mean change ${diff(a, b).toFixed(2)} of 255`);
-      const f1 = field.readFinal(), fA = frames;
-      await wait(500);
-      const f2 = field.readFinal();
-      d.assert('frames keep being drawn and the picture moves with the sound', frames > fA + 10 && diff(f1, f2) > 0.2,
-        `${frames - fA} frames in 500 ms, mean change ${diff(f1, f2).toFixed(2)} of 255`);
+    // One whole cycle: the drift moves the tuner, the storm rises and falls, the station changes.
+    const first = stationAt(here).key, firstHere = here;
+    const t0 = sentOn(DRIFT_TUNE, TUNER_TUNE), s0 = sentOn(DRIFT_STORM, SH_VAL), j0 = seen.tuned;
+    const calmAmp = field?.params().ampM ?? 0;
+    let maxOpen = 0, peak = 0, peakAmp = 0, waves = null, tore = 0;
+    const end = performance.now() + (CYCLE_S + 2) * 1000;
+    while (performance.now() < end && here === firstHere) {
+      maxOpen = Math.max(maxOpen, legs.size);
+      if (peak > 0.5) tore = Math.max(tore, jolt);
+      if (storm > peak) { peak = storm; peakAmp = field?.params().ampM ?? 0; }
+      // The same grains drawn twice from black, once with the storm's values and once calm.
+      if (field && !waves && storm > 0.9) {
+        const held = new Uint8Array(data);
+        const a = field.testFinal(held);
+        for (const nm of Object.keys(STORM)) field.set(nm, base[nm]);
+        const b = field.testFinal(held);
+        for (const nm of Object.keys(STORM)) shade(nm);
+        waves = { change: diff(a, b), lit: [b, a].map((p) => { let n = 0; for (let i = 0; i < p.px.length; i += 4) if (p.px[i] + p.px[i + 1] + p.px[i + 2] > 60) n++; return n / (p.px.length / 4); }) };
+      }
+      await wait(50);
     }
-    // A patch is one event on patch -> grains, and the engine takes it.
+    await wait(150);
+    const now = stationAt(here).key;
+    d.assert('the drift tunes the tuner over its wire, and the next station comes in', sentOn(DRIFT_TUNE, TUNER_TUNE) - t0 > 20 && now !== first && tuned === now,
+      `${sentOn(DRIFT_TUNE, TUNER_TUNE) - t0} tune events, ${first} to ${now}, tuned ${tuned}`);
+    d.assert('at most two stations were open at once, and one is open after the blend',
+      maxOpen <= 2 && legs.size === 1 && conns.opened === 2 && conns.closed === 1, `max ${maxOpen}, now ${legs.size}, opened ${conns.opened}, closed ${conns.closed}`);
+    d.assert('the storm rises to its peak between stations and falls back on the next', peak > 0.9 && storm === 0 && sentOn(DRIFT_STORM, SH_VAL) > s0 + 20,
+      `peak ${peak.toFixed(2)}, now ${storm}, ${sentOn(DRIFT_STORM, SH_VAL) - s0} storm events`);
+    if (field) {
+      const nowAmp = field.params().ampM;
+      d.assert('the waves grow with the storm and settle after', peakAmp > calmAmp * 1.4 && Math.abs(nowAmp - calmAmp) < 1e-6,
+        `height ${calmAmp.toFixed(2)} calm, ${peakAmp.toFixed(2)} at the peak, ${nowAmp.toFixed(2)} after`);
+      d.assert('the storm draws a different picture from the same grains', !!waves && waves.change > 1,
+        waves ? `mean change ${waves.change.toFixed(2)} of 255, lit ${(waves.lit[0] * 100).toFixed(1)}% calm, ${(waves.lit[1] * 100).toFixed(1)}% in the storm` : 'never sampled');
+    }
+    d.assert('the tuner told the shader the station came in, and the picture tore', seen.tuned > j0 && tore > 0.8,
+      `${seen.tuned - j0} tuned events, jolt up to ${tore.toFixed(2)}`);
+
     const p0 = sentOn(PATCH_OUT, GRAINS_VAL);
     choosePatch(patchAt + 1);
     await wait(300);
@@ -449,6 +541,8 @@
     d.assert('the patch picker reaches the granulator over its wire', sentOn(PATCH_OUT, GRAINS_VAL) === p0 + 1 && Math.abs(size - wantSize) < 1e-3,
       `${PATCHES[patchAt].name}: size ${size} against ${wantSize}`);
     stop();
+    d.assert('Stop closed every station it opened', legs.size === 0 && conns.opened === conns.closed,
+      `opened ${conns.opened}, closed ${conns.closed}`);
   }
   if (SELFCHECK) { try { await check(); } catch (e) { d.assert('the self check ran to the end', false, String(e?.stack || e)); } }
   d.ready();

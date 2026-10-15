@@ -374,6 +374,8 @@
   };
   const rankOf = (p, text, hit) => {
     const n = nodeOf(p.id);
+    // A part drawn here but with no engine on this page is never offered: it would build silence.
+    if (!PRESS_ONLY[n] && !loaderOf(n, typeOf)) return 9;
     if (p.id.startsWith(`${BOARD_SITE}:`) && !NAMES_PI.test(text) && !hit.has(n)) return 9;
     return hit.has(n) ? 0 : ESSENTIAL.has(n) ? 1 : !hit.size && EXAMPLE_PORTS.has(p.id) ? 2 : 9;
   };
@@ -1246,6 +1248,10 @@
     await ask('keys play a sawtooth'); await runtime.idle(); await frame();
     A('a link choosing sawtooth sets the synth to the sawtooth wave', runtime.get('web:synth')?.param('wave') === 'sawtooth',
       `wave ${runtime.get('web:synth')?.param('wave')}`);
+    // Parts with no engine on this page (web:mix) are never offered to the model.
+    { const offered = new Set(portsForModel('drum machine plays drums and plaits through the mixer').map((p) => nodeOf(p.id)));
+      A('a part with no engine on this page is never offered to the model', !offered.has('web:mix') && offered.has('web:sequencer') && offered.has('web:drum'),
+        [...offered].join(' ')); }
     // An answer that reaches for the Pi when the sentence did not ask for it builds nothing; on an empty patch nothing at all.
     newPatch('the check');
     await ask('the keys play the piano'); await frame();

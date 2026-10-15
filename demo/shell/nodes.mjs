@@ -75,7 +75,7 @@ export const NODES = {
   dial: {
     kind: 'person', label: 'dial',
     ports: { 'value-out': P({ ...PARAM }) },
-    pages: ['radio/tuner', 'radio/scenery'],
+    pages: ['radio/tuner'],
   },
   patch: {
     kind: 'person', label: 'patch',
@@ -231,7 +231,7 @@ export const NODES = {
   player: {
     kind: 'engine', label: 'player',
     ports: { 'file-in': P(), 'audio-out': P() },
-    pages: ['radio/tempo', 'granulator/grains', 'granulator/beat', 'shader/landscape', 'radio/scenery'],
+    pages: ['radio/tempo', 'granulator/grains', 'granulator/beat', 'shader/landscape'],
     labels: { 'granulator/grains': 'radio', 'granulator/beat': 'radio', 'shader/landscape': 'radio' },
   },
   'player-video': {
@@ -337,6 +337,12 @@ export const NODES = {
     ports: { 'audio-in': P(), 'audio-out': P(), 'value-in': P({ shape: { of: 'param', names: ['tune'] } }),
       'value-out': P({ shape: { of: 'tuned' }, optional: true }) },
     pages: ['radio/tuner', 'radio/scenery'],
+  },
+  // A clock in place of a dial: value-out tunes the tuner, value-out-2 says how far between stations.
+  drift: {
+    kind: 'engine', label: 'drift', also: ['auto tuner', 'clock'],
+    ports: { 'value-out': P({ ...PARAM }), 'value-out-2': P({ shape: { of: 'storm' } }) },
+    pages: ['radio/scenery'],
   },
   sequencer: {
     kind: 'engine', label: 'sequencer', also: ['drum machine', 'drums'],
@@ -462,7 +468,7 @@ export const NODES = {
     site: 'cf-r2', place: 'cloudflare', net: 'cloudflare', kind: 'store', label: '<station> recording',
     instance: 'one per recording in the bucket: raadio2, raadio4, ida (Raadio 2 recording ...); the file-out carries its URL as address',
     ports: { 'file-out': P({ ...HTTPS }) },
-    pages: ['granulator/grains', 'granulator/beat', 'shader/landscape', 'radio/tempo', 'radio/scenery'],
+    pages: ['granulator/grains', 'granulator/beat', 'shader/landscape', 'radio/tempo'],
   },
   'piano-samples': {
     node: 'piano', site: 'cf-r2', place: 'cloudflare', net: 'cloudflare', kind: 'store', label: 'piano samples',
@@ -488,7 +494,7 @@ export const NODES = {
     place: 'site', net: 'site', kind: 'external', label: '<station>',
     instance: 'a live station on its broadcaster\'s site: err:vikerraadio, err:klassikaraadio, err:raadio2, err:raadio4, ida:tallinn',
     ports: { 'audio-out': P({ ...HTTPS }) },
-    pages: ['radio/blend', 'radio/tuner', 'radio/live', 'radio/key'],
+    pages: ['radio/blend', 'radio/tuner', 'radio/live', 'radio/key', 'radio/scenery'],
     labels: { 'radio/live': 'ERR Raadio 2 (with the broadcaster)', 'radio/key': 'ERR Raadio 2 (with the broadcaster)' },
   },
   newsreel: {
@@ -508,7 +514,7 @@ export const NODES = {
     // A page asks `{ name: 'shout', as: st.mount }` and passes the mount URL as the audio-out's address.
     instance: 'one per station mount, cf-shout:<mount>',
     ports: { 'audio-in': P({ ...HTTPS }), 'audio-out': P({ ...HTTPS }) },
-    pages: ['radio/blend', 'radio/tuner', 'radio/live', 'radio/key'],
+    pages: ['radio/blend', 'radio/tuner', 'radio/live', 'radio/key', 'radio/scenery'],
   },
   'stream-live': {
     node: 'live', site: 'cf-stream', place: 'cloudflare', net: 'cloudflare', kind: 'endpoint', label: 'Stream WebRTC input',
