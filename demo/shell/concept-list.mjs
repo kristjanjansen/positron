@@ -28,6 +28,7 @@ export const CONCEPTS = [
   { id: 'remote/circuit', title: 'Circuit on Pi', say: 'A Novation Circuit in another building, played from here through its Pi. Keys, MIDI and 8 macros.' },
   { id: 'remote/collide', title: 'Collide on Pi', say: 'SuperCollider here and on a Pi in another building at once. Crossfade between the two.' },
   { id: 'remote/piano', title: 'Piano and Rhodes on Pi', say: 'A piano and a Rhodes on a Pi in another building, played from here over the relay or direct.' },
+  { id: 'remote/plaits', title: 'Plaits on Pi', say: "Emilie Gillet's Plaits running on a Pi in another building. Play it and turn its knobs from here." },
   // why: lessons/kit-concept-list.md#draw
   { id: 'radio/blend', title: 'Blend', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
   { id: 'radio/tuner', title: 'Tuner', say: 'Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.' },

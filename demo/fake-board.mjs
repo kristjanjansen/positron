@@ -1,6 +1,6 @@
 // node demo/fake-board.mjs [--relay ws://...] [--listening] [--skew ms] [--hand] The board's own
-// beat.mjs, inputs.mjs and scollide.mjs on a loopback relay, with fake arecord, MIDI port and
-// scsynth and a 220/330 Hz pulsing tone. Page: ?relay=ws://127.0.0.1:8897&board=1.
+// beat.mjs, inputs.mjs, scollide.mjs and plaits.mjs on a loopback relay, with fake arecord, MIDI
+// port, scsynth and posplaits and a 220/330 Hz pulsing tone. Page: ?relay=ws://127.0.0.1:8897&board=1.
 // why: lessons/harness.md#fake-board
 
 import { fileURLToPath } from 'node:url';
@@ -12,6 +12,7 @@ import { createInputs, parseInputs } from '../rig/board/inputs.mjs';
 import { startRelay } from './fake-relay.mjs';
 import { createCollideService, ENGINES, PAGE_BUS } from '../rig/board/scollide.mjs';
 import { readOsc } from '../rig/board/pappus.mjs';
+import { createPlaitsService, PLAITS_PARAMS } from '../rig/board/plaits.mjs';
 
 export const RATE = 48000;
 export const FRAME = 960;                 // 20 ms, the board's relay frame
@@ -186,8 +187,8 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
   const graphFacts = {
     // `collide`: the collide verbs ARE answered here, by the board's own service
     // (above), so its two nodes (`collide`, `drums`) are announced as the Pi does.
-    room, instruments: { synth: true, collide: true }, inputs: INPUTS.inputs, ports: [],
-    frameMs: FRAME_MS, gpu: false, midiPresent: () => true,
+    room, instruments: { synth: true, collide: true, plaits: true }, inputs: INPUTS.inputs, ports: [],
+    frameMs: FRAME_MS, gpu: false, midiPresent: () => true, plaitsParams: PLAITS_PARAMS,
   };
 
   // ── the main room ─────────────────────────────────────────────────────────
@@ -231,15 +232,34 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     },
   });
 
+  // Plaits: the board's own service over a fake posplaits that keeps every command line it is
+  // handed (the far side's count) and plays the tone while it is up.
+  const plaitsLines = [];
+  const plaits = createPlaitsService({
+    log: (l) => say('plaits', l),
+    start: async ({ voices }) => {
+      startTone();
+      let quit = false;
+      return {
+        ok: true, ready: { standIn: true, voices }, send: (line) => { if (!quit) plaitsLines.push(line); },
+        onExit: () => {},
+        stats: async () => ({ standIn: true, cmds: plaitsLines.length, loadPct: 0, xruns: 0 }),
+        stop: () => { quit = true; if (!source) { stopTone?.(); stopTone = null; } return true; },
+        status: () => ({ standIn: true }),
+      };
+    },
+  });
+
   function handle(msg) {
     const reply = (type, body) => send({ type, re: msg.id, ...body });
     if (collide.handles(msg)) { collide.handle(msg, reply).catch((e) => say('collide threw', e.message)); return undefined; }
+    if (plaits.handles(msg)) { plaits.handle(msg, reply).catch((e) => say('plaits threw', e.message)); return undefined; }
     switch (msg.type) {
       case 'graph.ask': counts.asked++; send(alive()); return;
       case 'board.ping': counts.pings++; return reply('board.pong', { pongAt: Date.now() });
       case 'audio.status':
-        return reply('audio.started', source ? { ok: true, source, jack: false, fx: false, standIn: true, inputs: inputs.status() }
-          : { ok: false, reason: 'nothing playing', fx: false, standIn: true, inputs: inputs.status() });
+        return reply('audio.started', { ...(source ? { ok: true, source, jack: false, fx: false, standIn: true }
+          : { ok: false, reason: 'nothing playing', fx: false, standIn: true }), inputs: inputs.status(), plaits: plaits.status() });
       case 'audio.start': {
         // No source is refused in words; there is no default.
         // why: lessons/harness.md#no-source
@@ -379,10 +399,12 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     turnMacro,
     stats: () => ({ ...counts, midiWritten: written.length, midi: written.slice(-16),
       collide: { ...(collide.core()?.stats() ?? {}), scsynth: scsynth ? scsynth.counts() : null, skewMs },
+      plaits: { ...(plaits.core()?.stats() ?? {}), lines: plaitsLines.length, last: plaitsLines.slice(-8) },
       inputs: inputs ? inputs.status() : null, relay: ownRelay?.stats?.() ?? null }),
     close() {
       closed = true;
       collide.stop();
+      plaits.stop();
       clearInterval(beat); clearInterval(listener); clearInterval(handTimer);
       stopAudio();
       try { ws?.close(); } catch { /* gone */ }

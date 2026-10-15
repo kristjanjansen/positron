@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Plaits on Pi</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<style>
+  /* Play and the path choice on one row at the top left, as /remote/piano/. */
+  .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+</style>
+<script type="module">
+  // Plaits running natively on the Pi (rig/board/plaits.mjs, posplaits as a JACK client summed into
+  // the capture), played from here: /code/plaits/'s knobs and keys, wired to `pi-1:plaits` instead.
+  // The board is made on Play; a check never joins studio-1 on the real relay and sends nothing
+  // without ?board=1 (demo/fake-board.mjs answers the Plaits verbs on a loopback relay).
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createMidiDevices } from '/shell/midi-devices.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { announceOn } from '/shell/announce.mjs';
+  import { roomFor } from '/shell/bay-node.mjs';
+  import { RELAY_BASE } from '/shell/wire.mjs';
+  import { BOARD_SITE, boardGraph, addBoardNode } from '/shell/graph-registry.mjs';
+  import { KNOBS, PATCHES, PARAM_NAMES, patchKnobs } from '/shell/plaits-params.mjs';
+  import { createPathChoice, hintCell, PATH_HINT, NETWORK_HINT } from '/remote/path.mjs';
+
+  const d = mount({ name: 'Plaits on Pi', what: '', index: '/', indexLabel: 'positron',
+    // The cells under the title, the log alone at the foot, as /remote/piano/.
+    joined: false,
+    readout: { 'key to sound': 'ms', network: 'ms', cushion: 'ms', path: '', 'Pi load': '%', xruns: '' } });
+  hintCell(d, 'network', NETWORK_HINT);
+  hintCell(d, 'path', PATH_HINT);
+  conceptNav('remote/plaits');
+
+  const q = new URLSearchParams(location.search);
+  // A check reaches studio-1 only on a relay on this machine (the stand-in board); on the real
+  // relay it gets a private room of its own, whatever ?room= says, so the owner's desk never sees it.
+  const LOOPBACK = /^wss?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:|\/|$)/.test(RELAY_BASE);
+  const ROOM = SELFCHECK && !LOOPBACK ? roomFor({ slug: 'remote-plaits', search: '', selfcheck: true })
+    : (q.get('room') || 'studio-1');
+  const MAY_PLAY = !SELFCHECK || q.get('board') === '1';
+
+  // ── the bay: this page's nodes and the Pi's `pi-1:plaits` as the board announces it ─
+  const S = 'web';
+  const ID = (node, port) => `${S}:${node}:${port}`;
+  const PI = (port) => `${BOARD_SITE}:plaits:${port}`;
+  const bay = createBay();
+  let board = null, armed = false, kb = null;
+  let notesIn = 0, setsIn = 0, refusedNames = 0, notesSent = 0, setsSent = 0;
+  /** The last value each parameter was sent, so arming can say what the panel shows. */
+  const sent = new Map();
+
+  const knobNodes = KNOBS.map((k) => ({ name: 'knob', as: `knob-${k.id}`, label: k.name }));
+  addNodes(bay, S, ['keys', ...knobNodes], {
+    portLabel: 'node:port',
+    deliver: { 'keys:midi-in': (e) => kb?.lightNote(e.d1, !!e.d2) },
+  });
+  // What reaches pi-1:plaits leaves for the board, and only once armed.
+  addBoardNode(bay, boardGraph({ room: ROOM, instruments: { plaits: true }, plaitsParams: PARAM_NAMES }), 'plaits', {
+    label: 'Plaits on the Pi',
+    deliver: {
+      'midi-in': (e) => {
+        if (e?.cls !== 'note') return;
+        notesIn++;
+        if (e.d2 > 0) pressed(e.d1);
+        if (!armed || !board) return;
+        notesSent++;
+        board.send(e.d2 > 0 ? { type: 'note.on', node: 'plaits', note: e.d1, vel: e.d2 } : { type: 'note.off', node: 'plaits', note: e.d1 });
+      },
+      'value-in': (e) => {
+        if (e?.of !== 'param') return;
+        if (!PARAM_NAMES.includes(e.name)) { refusedNames++; return; }
+        setsIn++;
+        sent.set(e.name, e.v);
+        if (!armed || !board) return;
+        setsSent++;
+        board.send({ type: 'plaits.set', name: e.name, v: e.v });
+      },
+    },
+  });
+  addNodes(bay, S, ['scope', 'speaker'], { portLabel: 'node:port' });
+  const lay = (from, to, opts) => { const r = bay.link(from, to, [], opts); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); return r; };
+  lay(ID('keys', 'midi-out'), PI('midi-in'));
+  for (const k of KNOBS) lay(ID(`knob-${k.id}`, 'value-out'), PI('value-in'));
+  // Via the wire it rides: both listeners read one `board.playout()`. Without it the second
+  // listener makes the sound internet-many, where the bay asks for MoQ, which the board never opens.
+  lay(PI('audio-out'), ID('scope', 'audio-in'), { via: 'relay' });
+  lay(PI('audio-out'), ID('speaker', 'audio-in'), { via: 'relay' });
+
+  // Relay or direct, the remote pages' one choice. Every link touching the Pi says which wire it rides.
+  const path = createPathChoice({ log: d.log, onPick: () => switchPath() });
+  const isPi = (l) => l.from.startsWith(`${BOARD_SITE}:`) || l.to.startsWith(`${BOARD_SITE}:`);
+  path.rewire(bay, 'relay', isPi, d.log);
+
+  // ── the scope: an analyser on the board's playout, full width ────────────
+  const WINDOW = 512, FULL = 0.25;
+  const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
+  let analyser = null, buf = null, level = 0, looping = false;
+  function frame() {
+    if (analyser) {
+      analyser.getFloatTimeDomainData(buf);
+      let i0 = 0, hi = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      for (const v of buf) { const a = v < 0 ? -v : v; if (a > hi) hi = a; }
+      level = hi;
+      const win = buf.subarray(i0, i0 + WINDOW);
+      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    }
+    listen();
+    requestAnimationFrame(frame);
+  }
+
+  // Key to sound per press, as /remote/piano/: the first 1 ms block over ONSET and three times the
+  // 30 ms before it, on the speaker's clock, matched to the oldest press still waiting.
+  const KEEP_MS = 200, ONSET = 0.02, WAIT_MS = 1500;
+  const env = [], pending = [], lags = [];
+  let lastLag = null, readUpTo = 0;
+  function pressed(note) {
+    if (!armed) return;
+    pending.push({ note, at: performance.now() });
+    while (pending.length > 8) pending.shift();
+  }
+  function listen() {
+    if (!analyser || !buf || !board) return;
+    const ctx = board.ctx();
+    const ts = ctx?.getOutputTimestamp?.();
+    if (!ts || !ts.performanceTime) return;
+    const sr = ctx.sampleRate, N = buf.length, blk = Math.round(sr / 1000);
+    const tEnd = ts.performanceTime + (ctx.currentTime - ts.contextTime) * 1000;
+    const t0 = tEnd - (N / sr) * 1000;
+    for (let i = 0; i + blk <= N; i += blk) {
+      const at = t0 + (i / sr) * 1000;
+      if (at <= readUpTo) continue;
+      let pk = 0;
+      for (let j = i; j < i + blk; j++) { const a = buf[j] < 0 ? -buf[j] : buf[j]; if (a > pk) pk = a; }
+      env.push({ at, peak: pk });
+      readUpTo = at;
+      let before = 0;
+      for (let k = env.length - 31; k < env.length - 1; k++) if (k >= 0 && env[k].peak > before) before = env[k].peak;
+      if (pk > ONSET && pk > before * 3) {
+        const p = pending.find((x) => x.at < at);
+        if (p) {
+          pending.splice(pending.indexOf(p), 1);
+          lastLag = at - p.at;
+          lags.push(lastLag); if (lags.length > 20) lags.shift();
+        }
+      }
+    }
+    const now = performance.now();
+    while (env.length && env[0].at < now - KEEP_MS) env.shift();
+    for (let k = pending.length - 1; k >= 0; k--) if (now - pending[k].at > WAIT_MS) pending.splice(k, 1);
+  }
+
+  // ── the cells, and what the Pi says about its own Plaits ─────────────────
+  let piStats = null;
+  function cells() {
+    const st = board?.stats();
+    d.set('key to sound', lastLag == null ? '' : Math.round(lastLag));
+    d.set('network', st?.rttMs == null ? '' : Math.round(st.rttMs));
+    d.set('cushion', st?.bufferedMs == null ? '' : Math.round(st.bufferedMs));
+    d.set('path', st?.via ?? '');
+    const load = piStats?.engine?.loadPct;
+    d.set('Pi load', Number.isFinite(load) ? load.toFixed(1) : '');
+    d.set('xruns', Number.isFinite(piStats?.engine?.xruns) ? piStats.engine.xruns : '');
+  }
+  setInterval(() => { if (board) cells(); }, 250);
+  let statsTimer = 0;
+  async function askStats() {
+    if (!armed || !board) return;
+    const r = await board.ask({ type: 'plaits.stats' }, 'plaits.stats', 3000);
+    if (r) piStats = r;
+  }
+
+  // ── the knobs: one row, each its own node, each cabled into pi-1:plaits ──
+  const knobs = new Map(KNOBS.map((k) => {
+    const knob = createKnob({
+      label: k.short || k.name, title: k.name, min: k.min, max: k.max, step: k.step, value: k.value, home: k.value, hand: true,
+      format: k.format,
+      onInput: (v) => bay.send(ID(`knob-${k.id}`, 'value-out'), { of: 'param', name: k.name, v }),
+    });
+    return [k.name, knob];
+  }));
+  const grid = createKnobGrid(knobs, { row: true });
+  /** Every knob sends what it shows along its own cable, once: on arming, so the Pi plays the panel. */
+  function sendPanel() {
+    for (const k of KNOBS) bay.send(ID(`knob-${k.id}`, 'value-out'), { of: 'param', name: k.name, v: knobs.get(k.name).value() });
+  }
+
+  // ── the patch picker: it turns the knobs, and each turned knob sends on its cable ─
+  let at = 0;
+  function pick(i) {
+    at = i;
+    patchPick.show(PATCHES[i].name, i);
+    for (const [name, v] of Object.entries(patchKnobs(PATCHES[i]))) {
+      const got = knobs.get(name).receive(v, { from: 'patch', force: true });
+      const k = KNOBS.find((x) => x.name === name);
+      bay.send(ID(`knob-${k.id}`, 'value-out'), { of: 'param', name, v: got });
+    }
+  }
+  const stepPatch = (by) => pick((at + by + PATCHES.length) % PATCHES.length);
+  const patchPick = createPicker({ what: 'patch', cls: 'cc-patch', prev: () => stepPatch(-1), next: () => stepPatch(+1), onPick: (i) => pick(i) });
+  patchPick.options(PATCHES.map((p) => p.name), 0);
+  patchPick.show(PATCHES[0].name, 0);
+
+  // ── the keyboard: its notes leave on web:keys:midi-out and nowhere else ──
+  const host = el('div');
+  kb = createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => { if (how !== 'midi') bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 }); },
+    onUp: (note, how) => { if (how !== 'midi') bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 }); },
+  });
+  // Keyboards plugged into this machine, as /code/plaits/, asked for on Play rather than on a visit.
+  const { plugged, ask: askMidi } = createMidiDevices({ bay, site: S, to: [PI('midi-in'), ID('keys', 'midi-in')],
+    onChange: () => { path.reset(); path.rewire(bay, board?.stats().via ?? 'relay', isPi, d.log); pb.refresh(); },
+    log: (line, kind) => d.log(line, kind) });
+  const shown = (id) => !id.startsWith(`${S}:midi`) || plugged.has(id.split(':').slice(0, 2).join(':'));
+
+  // ── play: join the board and raise Plaits beside whatever is up ──────────
+  let said = '', starting = false, opened = null, lastStatus = null, midiAsked = false;
+  const say = (text, kind) => { said = text; d.log(text, kind); };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function makeBoard() {
+    let open;
+    opened = new Promise((r) => { open = r; });
+    const cushion = path.mode() === 'direct'
+      ? { cushionMs: 80, maxCushionMs: 250, direct: true, directCushionMs: 40 }
+      : { cushionMs: 160, maxCushionMs: 400 };
+    board = createBoard({ room: ROOM, of: 'Raspberry Pi', showName: false, ...cushion,
+      log: (line, kind) => d.log(line, kind), onOpen: () => open(true),
+      onMessage: (m) => { if (m?.type === 'note.ack' && m.node === 'plaits' && m.dropped && m.reason) d.log(`the Pi dropped a note: ${m.reason}`, 'warn'); } });
+    announceOn(board, bay, { label: 'Plaits on Pi' });
+  }
+
+  async function start() {
+    if (starting) return false;
+    starting = true;
+    try {
+      if (!board) makeBoard();
+      say(`Reaching ${ROOM}`);
+      const up = await Promise.race([opened, wait(8000).then(() => false)]);
+      if (!up) { say(`The relay did not open ${ROOM} within eight seconds, so nothing is playing`, 'warn'); return false; }
+      await board.startAudio();
+      const pl = board.playout();
+      if (pl && !analyser) {
+        analyser = board.ctx().createAnalyser();
+        analyser.fftSize = 2048;
+        buf = new Float32Array(analyser.fftSize);
+        pl.connect(analyser);
+        if (!looping) { looping = true; requestAnimationFrame(frame); }
+      }
+      if (!MAY_PLAY) { say('A check is running, so nothing was sent to the board. Add ?board=1 to let it through', 'warn'); return false; }
+      const st = await board.ask({ type: 'audio.status' }, 'audio.started', 6000);
+      lastStatus = st;
+      if (!st) { say(`The Raspberry Pi is not answering in ${ROOM}, so the keys go nowhere`, 'warn'); return false; }
+      if (!st.plaits) { say('The Pi runs board code from before Plaits, so there is nothing to play', 'warn'); return false; }
+      if (!st.plaits.up) {
+        say('Starting Plaits on the Pi');
+        const t0 = performance.now();
+        const r = await board.ask({ type: 'audio.start', source: 'plaits' }, 'audio.started', 20000);
+        if (!r?.ok) { say(`The Pi could not start Plaits${r?.reason ? `, it said ${r.reason}` : ''}`, 'bad'); return false; }
+        d.log(`Plaits up on the Pi in ${Math.round(performance.now() - t0)} ms`);
+      }
+      if (path.mode() === 'direct') {
+        // Before the first note, so a phrase never starts on the relay and switches. Falls back after 3 s.
+        say('Opening a direct path to the Pi');
+        path.connecting(true);
+        let via;
+        try { via = await board.goDirect(); } finally { path.connecting(false); }
+        if (via === 'relay' || via === 'refused') path.fellBack();
+      }
+      path.reset();
+      path.rewire(bay, board.stats().via ?? 'relay', isPi, d.log);
+      armed = true;
+      board.watchRtt(2000);
+      // Plaits on the Pi keeps its knobs between visitors, so the panel is sent as it stands.
+      sendPanel();
+      clearInterval(statsTimer); statsTimer = setInterval(askStats, 2000); askStats();
+      if (!midiAsked) { midiAsked = true; askMidi(); }
+      transport.setIcon('play', 'stop', 'stop');
+      say(`Plaits on the Raspberry Pi, ${PATCHES[at].name}, play the keys`);
+      pb.refresh();
+      return true;
+    } finally { starting = false; }
+  }
+  function stop() {
+    if (armed && board) board.send({ type: 'note.panic', node: 'plaits' });
+    armed = false;
+    clearInterval(statsTimer); statsTimer = 0;
+    board?.watchRtt(0);
+    kb.panic?.();
+    transport.setIcon('play', 'play', 'play');
+    say('Stopped, every note this page held on the Pi was released');
+    pb.refresh();
+  }
+  /** A new path while joined: leave the board and join again on the new one. */
+  async function switchPath() {
+    if (!board) return;
+    const was = armed;
+    if (armed) stop();
+    board.close(); board = null; analyser = null; buf = null;
+    path.reset();
+    if (was) await start();
+  }
+
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'play', onPress: () => (armed ? stop() : start()) },
+  ] });
+
+  // ── the patchbay ──────────────────────────────────────────────────────────
+  const pb = createPatchbay({
+    nodes: () => bay.nodes().filter((n) => shown(n.id)),
+    ports: () => bay.ports().filter((p) => shown(p.id)),
+    links: () => bay.links(),
+  }, { room: ROOM, flowing: (l) => (l.from === PI('audio-out') ? armed && level > 0.002 : armed) });
+  setInterval(() => {
+    if (board && armed) {
+      const via = board.stats().via;
+      path.rewire(bay, via, isPi, d.log);
+      if (path.mode() === 'direct' && via === 'relay') { d.log('the direct path dropped, the relay carries everything now', 'warn'); path.fellBack(); }
+    }
+    pb.refresh?.();
+  }, 500);
+
+  const top = el('div', 'cc-top');
+  top.append(transport.el, path.el);
+  d.stack.add(top, wave.el, patchPick.el, grid.el, host, pb.el);
+
+  window.__demo.keyboard = kb;
+  window.__demo.knobs = grid;
+  window.__demo.bay = bay;
+  window.__demo.plaits = {
+    bay, knobs, pick, room: ROOM, armed: () => armed, start, stop,
+    probe: () => ({ armed, level, said, status: lastStatus, piStats, stats: board ? board.stats() : null, lags: [...lags],
+      notesIn, setsIn, refusedNames, notesSent, setsSent }),
+  };
+
+  // ── the self-check: only under ?selfcheck=1, and driving only a stand-in board ─
+  if (SELFCHECK) {
+    const A = d.assert;
+    A('a check never joins studio-1 on the real relay', LOOPBACK || ROOM !== 'studio-1', `room ${ROOM}, relay ${RELAY_BASE}`);
+    A('a visit opens nothing: no board, no sound, no MIDI asked', board === null && analyser === null && !midiAsked);
+    const held = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
+    const knobLinks = KNOBS.filter((k) => held(ID(`knob-${k.id}`, 'value-out'), PI('value-in'))).length;
+    A('the keys, every knob and both listeners are linked to pi-1:plaits',
+      held(ID('keys', 'midi-out'), PI('midi-in')) && knobLinks === KNOBS.length
+      && held(PI('audio-out'), ID('scope', 'audio-in')) && held(PI('audio-out'), ID('speaker', 'audio-in')),
+      `${knobLinks} of ${KNOBS.length} knobs, ${bay.links().length} links`);
+    A('every link touching the Pi says which wire carries it', bay.links().filter(isPi).every((l) => l.via === 'relay' || l.via === 'datachannel'),
+      bay.links().filter(isPi).map((l) => l.via ?? 'none').join(' '));
+    {
+      // NEGATIVE CONTROL: the Pi's midi-in consents to notes only, so a program change is refused.
+      const b2 = createBay();
+      addNodes(b2, S, ['patch']);
+      addBoardNode(b2, boardGraph({ room: ROOM, instruments: { plaits: true }, plaitsParams: PARAM_NAMES }), 'plaits');
+      const r = b2.link(ID('patch', 'midi-out'), PI('midi-in'));
+      A('NEGATIVE CONTROL: a program change cannot be linked into pi-1:plaits:midi-in', !r.ok && /note/.test(r.fix || ''), r.why || 'linked');
+    }
+    const t0 = setsIn, s0 = setsSent;
+    bay.send(ID('knob-timbre', 'value-out'), { of: 'param', name: 'timbre', v: 0.5 });
+    A('a knob turn arrives at pi-1:plaits:value-in over its link, and nothing leaves before Play',
+      setsIn === t0 + 1 && setsSent === s0 && sent.get('timbre') === 0.5, `in ${setsIn - t0}, sent ${setsSent - s0}`);
+    const r0 = refusedNames;
+    bay.send(ID('knob-timbre', 'value-out'), { of: 'param', name: 'cutoff', v: 0.5 });
+    A('NEGATIVE CONTROL: a parameter Plaits does not have is dropped at the Pi\'s port', refusedNames === r0 + 1 && !sent.has('cutoff'));
+
+    // Driving: only a stand-in on this machine, asked for with board=1.
+    if (LOOPBACK && MAY_PLAY) {
+      (async () => {
+        const ok = await start();
+        A('Play reaches the stand-in board and Plaits is up there', ok && armed, said);
+        if (!ok) return;
+        await wait(400);
+        const before = board.stats().frames;
+        const n0 = notesSent;
+        bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: 57, d2: 100 });
+        const ack = await board.waitFor('note.ack', 3000);
+        A('a key leaves on keys:midi-out and the Pi answers note.ack for plaits', notesSent === n0 + 1 && ack?.node === 'plaits' && ack?.ok === true,
+          JSON.stringify(ack && { node: ack.node, ok: ack.ok, at: ack.at }));
+        const set = await board.ask({ type: 'plaits.set', name: 'morph', v: 0.25 }, 'plaits.set', 3000);
+        A('plaits.set is answered by the board\'s own service', set?.ok === true && set.name === 'morph', JSON.stringify(set));
+        pick(5);
+        await wait(600);
+        const stats = await board.ask({ type: 'plaits.stats' }, 'plaits.stats', 3000);
+        const want = patchKnobs(PATCHES[5]);
+        const far = stats?.values || {};
+        A('a patch pick reaches the far side as knob values, one cable each',
+          Object.entries(want).every(([name, v]) => Math.abs((far[name] ?? -9) - (name === 'model' ? Math.round(v) : v)) < 1e-6),
+          JSON.stringify(far));
+        A('the Pi holds the note the key started', stats?.held === 1, `held ${stats?.held}`);
+        bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: 57, d2: 0 });
+        await wait(400);
+        A('sound frames arrive from the board while Plaits is up', board.stats().frames > before, `${board.stats().frames - before} frames`);
+        stop();
+        await wait(300);
+        const after = await board.ask({ type: 'plaits.stats' }, 'plaits.stats', 3000);
+        A('Stop releases every note on the Pi', after?.held === 0 && after?.panics >= 1, `held ${after?.held}, panics ${after?.panics}`);
+      })().catch((e) => A('the driven check ran', false, e.message));
+    } else d.log('left out of this check: driving the board, which needs a stand-in on a loopback relay and board=1');
+  }
+  d.ready();
+</script>

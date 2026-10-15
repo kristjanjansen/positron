@@ -1,5 +1,9 @@
 ## Open
 
+- ~~**/remote/plaits/: play the Pi's Plaits from a page**~~ (2026-10-15, DONE: self-check 7/7 on the relay, 14/14 on the stand-in board; not heard yet; a patch's level trim does not reach the Pi, because the picker sends knob values and only plaits.patch sets the trim). Asked: *"Do eemote plaits page"*. In the shape of /remote/collide/, a card in the remote group, the pi-1:plaits node /connect/ can link.
+
+- **posplaits: text notes land on the next JACK period** (2026-10-15). Asked: *"What to do with text notes?"*. Up to 10.7 ms of jitter, no timestamped scheduling like collide's; options answered in chat, the owner picks.
+
 - **Plaits on the Pi, route A: the native JACK client, board service and pi-1:plaits node** (2026-10-14). Asked: *"Move on"* after step 1 of plans/plan-plaits-on-pi.md. Code only on this machine; installing libjack-jackd2-dev and pushing to the Pi wait for the owner. Code written and committed (posplaits.cc, plaits/build.sh, plaits.mjs, the pi-1:plaits branch); tests 54/54, 525/525, run-tests 57 pass. Built and running on the board 2026-10-15 (load 1.87 %, 0 xruns), wired into the capture; not heard yet.
 
 - **/connect/: the drum machine is sometimes silent** (2026-10-14). Found by the harness: red in 3 of 6 runs, engine up, context running, 11 hits heard, 0 at the speakers. A visitor can hit it. Ruled out on 2026-10-14 by reading: a closed context (audio.mjs suspends, never closes), definitions not loaded (`eng` is set only after every /d_recv), the machine's internal links (laid once, never removed), late bundles (scsynth.mjs: a past time plays late, not dropped). NOT a finding: "inside the machine 0", because routeAudio (audio-router.mjs) disconnects every out before routing, which also cuts the drum machine's own meter (junction to `an`); that field was removed from the assert. Next: log routeAudio's edges at the moment of the red, and whether the drum runtime's start() ran its reroute.
