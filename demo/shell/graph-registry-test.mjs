@@ -508,5 +508,19 @@ console.log('\n== Plaits on the Pi, route A of plans/plan-plaits-on-pi.md ==');
   ok('NEGATIVE CONTROL: a board told no patches lists none', !bare.ports.some((p) => 'patches' in p));
 }
 
+// The jackd card's outputs, and the MIDI devices that are known by a name the patches use.
+{
+  const g = boardGraph({ room: 'studio-1', jack: true, gpu: false, outputs: [{ device: 'hw:CARD=Pro,DEV=0' }],
+    alsa: [{ client: 'FastTrack Pro' }, { client: 'MK-425C USB MIDI Keyboard' }] });
+  ok('the Fast Track Pro is one node, pi-1:ftpro', g.nodes.filter((n) => n.id === 'pi-1:ftpro').length === 1);
+  ok('its outputs are an audio-in on JACK playback', JSON.stringify(port(g, 'pi-1:ftpro:audio-in')?.jack) === '["system:playback_1","system:playback_2"]');
+  ok('its MIDI joins the same node', !!port(g, 'pi-1:ftpro:midi-in') && !!port(g, 'pi-1:ftpro:midi-out') && !node(g, 'pi-1:midi-fasttrack-pro'));
+  ok('the MK-425C is pi-1:evo', !!port(g, 'pi-1:evo:midi-out') && node(g, 'pi-1:evo')?.label === 'Evolution MK-425C');
+  const noJack = boardGraph({ room: 'studio-1', jack: false, gpu: false, outputs: [{ device: 'hw:CARD=Pro,DEV=0' }], alsa: [{ client: 'FastTrack Pro' }] });
+  ok('NEGATIVE CONTROL: no JACK, no playback port, the MIDI still announced', !port(noJack, 'pi-1:ftpro:audio-in') && !!port(noJack, 'pi-1:ftpro:midi-in'));
+  const bare = boardGraph({ room: 'studio-1', jack: true, gpu: false });
+  ok('NEGATIVE CONTROL: a card with capture only announces no output', !bare.ports.some((p) => p.jack?.includes('system:playback_1')));
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

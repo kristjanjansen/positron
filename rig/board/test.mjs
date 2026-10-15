@@ -505,6 +505,15 @@ console.log('jackd on the card: the Circuit IS the clock, nothing resamples');
   const a = jackdArgs(card);
   is('NEGATIVE CONTROL: no playback device, so nothing new can come out of the Fast Track Pro',
     [a.includes('-P'), a.includes('-D'), a.includes('-d') && a[a.indexOf('-d') + 1] === 'alsa' && !a.includes('-o')], [false, false, true]);
+  const duplex = { ...card, playback: true };
+  is('with playback the same card is opened for its outputs too',
+    jackdArgs(duplex), ['-r', '-d', 'alsa', '-C', 'hw:CARD=Pro,DEV=0', '-P', 'hw:CARD=Pro,DEV=0', '-r', '48000', '-p', '256', '-n', '3']);
+  is('a capture only server is not the one a playback card asks for, so it is raised again',
+    [jackdOwns('1234 jackd -r -d alsa -C hw:CARD=Pro,DEV=0 -r 48000 -p 512 -n 3', duplex),
+     jackdOwns('1234 jackd -r -d alsa -C hw:CARD=Pro,DEV=0 -P hw:CARD=Pro,DEV=0 -r 48000 -p 512 -n 3', duplex)], [false, true]);
+  is('playback is parsed from BOARD_INPUTS, and a wrong type is refused',
+    [parseInputs('{"c":{"device":"hw:0","via":"jack","jackd":{"playback":true}}}').inputs.get('c').jackd.playback,
+     /playback/.test(parseInputs('{"c":{"device":"hw:0","via":"jack","jackd":{"playback":"yes"}}}').problems[0] ?? '')], [true, true]);
   is('jackd skips the D-Bus card reservation a service has no session bus for', JACKD_ENV.JACK_NO_AUDIO_RESERVATION, '1');
   is('with no card it is the dummy clock it always was', jackdArgs(null), ['-r', '-d', 'dummy', '-r', '48000', '-p', '1024']);
   is('the card ports are shown by the input name', cardPortNames(card),

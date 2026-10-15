@@ -25,6 +25,8 @@ export function graphOf(f) {
       midi: i.midi && present(f, i.midi.port) ? i.midi : null,
       // An input on JACK announces its JACK port (graph-registry `inputJack`).
       ...(i.via === 'jack' ? { jack: true, take: i.take ?? 1 } : {}) })),
+    // The jackd card's outputs, when its jackd opens playback (inputs.mjs `playback`).
+    outputs: inputs.filter((i) => i.via === 'jack' && i.jackd?.playback).map((i) => ({ device: i.device })),
     alsa: f.ports || [], frameMs: f.frameMs, gpu: f.gpu !== false, camera: f.camera === true, jack: f.jack === true,
     ...(Array.isArray(f.plaitsParams) ? { plaitsParams: f.plaitsParams } : {}),
     ...(f.patches && typeof f.patches === 'object' ? { patches: f.patches } : {}),

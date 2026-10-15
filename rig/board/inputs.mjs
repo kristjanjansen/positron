@@ -177,7 +177,9 @@ export function parseInputs(text) {
       const period = Number(o?.period ?? 512), periods = Number(o?.periods ?? 3);
       if (!Number.isInteger(period) || period < 32 || period > 4096 || (period & (period - 1))) { problems.push(`${name}: jackd period is a power of two, 32 to 4096`); continue; }
       if (!Number.isInteger(periods) || periods < 2 || periods > 8) { problems.push(`${name}: jackd periods is 2 to 8`); continue; }
-      jackd = { period, periods };
+      // `playback: true` opens the card's outputs too, as `system:playback_N`; capture only otherwise.
+      if (o?.playback != null && typeof o.playback !== 'boolean') { problems.push(`${name}: jackd playback is true or false`); continue; }
+      jackd = { period, periods, ...(o?.playback ? { playback: true } : {}) };
     }
     inputs.set(name, { name, device, channels, take, midi, via, ...(jackd ? { jackd } : {}) });
   }

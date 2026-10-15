@@ -56,11 +56,11 @@
     ['Evolution to the Circuit', 'Play the Circuit from the keyboard on the Pi.', [[EVO, `${P}:circuit`]]],
     ['A split', 'Low keys play the Circuit, high keys play Plaits on the Pi.', [[EVO, `${P}:circuit`], [EVO, `${P}:plaits`]]],
     ['A layer', 'Every key plays the Circuit and the sampler\'s piano together.', [[EVO, `${P}:circuit`], [EVO, `${P}:sampler`]]],
-    ['Evolution to Plaits', 'The keys play Plaits on the Pi and the knobs turn its sound, heard in a tab.', [[EVO, `${P}:plaits`], [`${P}:plaits`, 'web:speaker']]],
-    ['Evolution to Collide', 'Play the SuperCollider synth on the Pi, heard in a tab.', [[EVO, `${P}:collide`], [`${P}:collide`, 'web:speaker']]],
+    ['Evolution to Plaits', 'The keys play Plaits on the Pi and the knobs turn its sound.', [[EVO, `${P}:plaits`], [`${P}:plaits`, `${P}:ftpro`]]],
+    ['Evolution to Collide', 'Play the SuperCollider synth on the Pi out of the Fast Track Pro.', [[EVO, `${P}:collide`], [`${P}:collide`, `${P}:ftpro`]]],
     ['Camera on the screen', 'The Pi\'s camera drawn in one bit on its own small screen.', [[`${P}:camera`, `${P}:screen`]]],
-    ['Drums from the screen\'s keys', 'The four keys under the screen trigger the drum machine.', [[`${P}:keys`, `${P}:drums`], [`${P}:drums`, 'web:speaker']]],
-    ['Drums in time with the Circuit', 'The Circuit\'s clock drives the drum machine on the Pi, heard in a tab.', [[`${P}:circuit`, `${P}:drums`], [`${P}:drums`, 'web:speaker']]],
+    ['Drums from the screen\'s keys', 'The four keys under the screen trigger the drum machine.', [[`${P}:keys`, `${P}:drums`], [`${P}:drums`, `${P}:ftpro`]]],
+    ['Drums in time with the Circuit', 'The Circuit\'s clock drives the drum machine on the Pi.', [[`${P}:circuit`, `${P}:drums`], [`${P}:drums`, `${P}:ftpro`]]],
     ['Record what you play', 'The Evolution plays the Circuit and every take goes to the bucket.', [[EVO, `${P}:circuit`], [`${P}:circuit`, 'cf-r2:takes']]],
   ];
   // name, then links as [from node, to node]; every node a box

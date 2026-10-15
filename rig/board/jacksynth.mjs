@@ -130,14 +130,14 @@ function withBay(doc, rows) {
 }
 
 // jackd on the card: one clock, no resampler (alsa_in resampling read up to -18.8 dBFS of noise).
-// `card` comes from BOARD_INPUTS; capture only (-C). `-r` before -d is no-realtime, after it the
-// rate.
+// `card` comes from BOARD_INPUTS; capture (-C), and playback (-P) when its jackd says `playback`.
+// `-r` before -d is no-realtime, after it the rate.
 // why: lessons/rig-board-synth.md#card
 let CARD = null;
 export function setJackCard(card) { CARD = card ?? null; }
 export function jackdArgs(card) {
   if (!card) return ['-r', '-d', 'dummy', '-r', String(RATE), '-p', '1024'];
-  return ['-r', '-d', 'alsa', '-C', card.device, '-r', String(RATE), '-p', String(card.period), '-n', String(card.periods)];
+  return ['-r', '-d', 'alsa', '-C', card.device, ...(card.playback ? ['-P', card.device] : []), '-r', String(RATE), '-p', String(card.period), '-n', String(card.periods)];
 }
 // JACK_NO_AUDIO_RESERVATION: a service has no D-Bus session bus, so jackd could not reserve the
 // card.
@@ -151,7 +151,9 @@ export function cardPortNames(card) {
 /** Whether a running jackd, by its `pgrep -a` line, is the one on this card. */
 export function jackdOwns(cmdline, card) {
   if (!card || !cmdline) return false;
-  return /\s-d\s+alsa\b/.test(cmdline) && cmdline.split(/\s+/).includes(card.device);
+  const words = cmdline.split(/\s+/);
+  // A capture only server is not the one a playback card asks for, nor the other way round.
+  return /\s-d\s+alsa\b/.test(cmdline) && words.includes(card.device) && words.includes('-P') === !!card.playback;
 }
 /** jackd's own xrun lines, counted. The memory-lock complaint is not one. */
 export function countXruns(text) {

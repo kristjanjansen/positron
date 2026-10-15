@@ -39,7 +39,13 @@ export function withBoardTransports(g) {
 }
 
 /** MIDI devices on this desk by the name ALSA gives them, announced under the name the patches use. */
-const KNOWN_MIDI = { 'MK-425C USB MIDI Keyboard': { name: 'evo', label: 'Evolution MK-425C' } };
+const KNOWN_MIDI = {
+  'MK-425C USB MIDI Keyboard': { name: 'evo', label: 'Evolution MK-425C' },
+  'FastTrack Pro': { name: 'ftpro', label: 'Fast Track Pro' },
+};
+/** Audio interfaces by ALSA card id, announced under the name the patches use. */
+const KNOWN_CARDS = { Pro: { name: 'ftpro', label: 'Fast Track Pro' } };
+const cardOf = (device) => KNOWN_CARDS[/CARD=([^,]+)/.exec(String(device))?.[1]] ?? { name: 'out', label: 'audio out' };
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 
 /**
@@ -92,6 +98,7 @@ export function jackRows(from, to) {
  * @param {string} [o.net]       the network it is on, if known
  * @param {object} [o.instruments]  `board.hello`'s own map: name -> available
  * @param {Array}  [o.inputs]    `[{ name, channels, midi: { port, channels } | null }]`
+ * @param {Array}  [o.outputs]   `[{ device }]`, the jackd card when its jackd opens playback
  * @param {Array}  [o.alsa]      `alsa.mjs` `addressable()` rows
  * @param {number} [o.frameMs]
  * @param {boolean} [o.gpu]      whether the GPU video path exists; announces the `shader` node
@@ -102,7 +109,7 @@ export function jackRows(from, to) {
  * @param {object} [o.patches]  patch names by instrument (`{ sampler: [...], plaits: [...] }`), put on its midi-in for a `patch` transform; passed in for the same reason
  * why: lessons/kit-graph-registry.md#boardgraph
  */
-export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false, plaitsParams = null, patches = {} }) {
+export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], outputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false, plaitsParams = null, patches = {} }) {
   const place = room;
   // Port names are `<medium>-<dir>` (plans/plan-site-names.md §4c), so the id
   // says what a port carries and which way. `graphProblem` holds a board to it.
@@ -206,6 +213,13 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
         shape: { channels: i.midi.channels }, address: `${room}-${i.name}` });
     }
   }
+  // The jackd card's outputs: a link to its audio-in is a JACK connection to `system:playback_N`.
+  for (const o of jack ? outputs : []) {
+    const c = cardOf(o.device);
+    node(c.name, 'device', c.label);
+    port(c.name, 'audio-in', { label: c.label, dir: 'in', medium: 'audio', shape: { rate: 48000, channels: 2 },
+      transports: ['jack'], jack: ['system:playback_1', 'system:playback_2'] });
+  }
   // Every other MIDI device the board sees. A device already described as an
   // input above is not described twice.
   for (const a of alsa) {
@@ -214,8 +228,11 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     const known = KNOWN_MIDI[a.client];
     const n = known?.name ?? `midi-${slug(a.client)}`;
     const label = known?.label ?? a.client;
-    if (nodes.some((x) => x.id === `${site}:${n}`)) continue;
-    node(n, 'device', label);
+    const has = nodes.some((x) => x.id === `${site}:${n}`);
+    // A known device's MIDI joins its audio node (the Fast Track Pro); any other repeat is skipped.
+    if (has && !known) continue;
+    if (has && ports.some((x) => x.id === `${site}:${n}:midi-in`)) continue;
+    if (!has) node(n, 'device', label);
     port(n, 'midi-out', { label, dir: 'out', medium: 'midi', emits: ['note', 'cc', 'bend', 'clock'] });
     port(n, 'midi-in', { label, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend'], never: [] });
   }
