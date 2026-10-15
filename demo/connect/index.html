@@ -67,6 +67,8 @@
   .cn-pic.cn-pic-empty { display: grid; place-items: center; }
   .cn-pic.cn-pic-empty > :not(.cn-empty) { display: none; }
   .cn-pic:not(.cn-pic-empty) > .cn-empty { display: none; }
+  /* A refused request over a standing patch says why under the drawing; the patch stays. */
+  .cn-pic[data-why]:not(.cn-pic-empty) > .cn-empty { display: block; margin: 0 auto 12px; color: var(--dim); }
   .cn-empty { margin: 0; max-width: 46ch; padding: 0 16px; text-align: center; text-wrap: balance; overflow-wrap: anywhere; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
   .cn-ex > button.cn-pill[aria-pressed="true"] { border-color: var(--voice); }
   /* An example whose patch does not run yet is dimmed, never disabled: it still
@@ -502,7 +504,7 @@
         await buildAsked(text, out.links || [], out, { prev, tag });
       } catch (e) {
         d.log(e.message, 'warn');
-        unbuild(`nothing answered: ${e.message}`);
+        refuse(`nothing answered: ${e.message}`);
         logAsk(`[${via}]${tag ? ` ${tag}` : ''} asked "${text}" -> failed: ${e.message}`);
       } finally {
         inFlight = false;
@@ -552,7 +554,14 @@
     for (const l of [...bay.links()]) bay.unlink(l.id);
     for (const b of exRow.children) b.setAttribute('aria-pressed', 'false');
     empty.textContent = msg;
+    delete pic.dataset.why;
     redraw();
+  }
+  /** A request that failed or was refused builds nothing new: the patch and the conversation stand, and the reason is said over it. */
+  function refuse(msg) {
+    if (!bay.links().length) { unbuild(msg); return; }
+    empty.textContent = msg;
+    pic.dataset.why = '1';
   }
   /** An answer's settings checked against the nodes its patch links: `{ set, why }`, set by node. */
   function settingsWhy(settings, links) {
@@ -581,7 +590,7 @@
   async function buildAsked(text, links, out, { prev = [], tag = '' } = {}) {
     const who = `[${via}]${tag ? ` ${tag}` : ''}`;
     if (!links.length) {
-      unbuild('nothing here matches that');
+      refuse('nothing here matches that');
       logAsk(`${who} asked "${text}" -> nothing proposed in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
       return;
     }
@@ -592,7 +601,7 @@
     const away = full.flatMap((l) => [l.from, l.to]).filter((p) => p.startsWith(`${BOARD_SITE}:`) && !piBefore.has(nodeOf(p)));
     if (away.length && !NAMES_PI.test(text)) {
       const msg = `not built: the answer reached for the Pi (${[...new Set(away.map(nodeOf))].join(', ')}), and the sentence did not ask for it`;
-      unbuild(msg);
+      refuse(msg);
       d.log(msg, 'warn');
       logAsk(`${who} asked "${text}" -> NOT BUILT, Pi unasked in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`);
       return;
@@ -601,7 +610,7 @@
     const st = settingsWhy(out.settings, full);
     const why = [...linkWhy, ...st.why];
     if (why.length) {
-      unbuild(`could not be made: ${why.join('; ')}`);
+      refuse(`could not be made: ${why.join('; ')}`);
       d.log(`could not be made: ${why.join('; ')}`, 'warn');
       logAsk(`${who} asked "${text}" -> NOT BUILT in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`
         + `${Object.keys(out.settings || {}).length ? ` settings ${JSON.stringify(out.settings)}` : ''} | ${why.join('; ')}`);
@@ -655,6 +664,7 @@
   // model is asked. It replaces whatever was linked, because an example is a whole patch.
   function build(ex, person) {
     empty.textContent = EMPTY;
+    delete pic.dataset.why;
     for (const l of [...bay.links()]) bay.unlink(l.id);
     let made = 0;
     for (const l of ex.links) made += connect(l.from, l.to, l.transforms || [], person, l.param) ? 1 : 0;
@@ -1196,12 +1206,15 @@
         && inPicture('web:plaits') && !inGrid('web:plaits') && reached === reached0,
       `${bay.links().length} links`);
 
-    // A sentence nobody listed gets the stand-in with a broken transform: nothing is built, and the reason is said.
+    // A sentence nobody listed gets the stand-in with a broken transform: nothing new is built, the patch stands, and the reason is said over it.
+    const linkIds = () => bay.links().map((l) => l.id).join(' ');
+    const whyShown = () => pic.dataset.why === '1' && !pic.classList.contains('cn-pic-empty') && getComputedStyle(empty).display !== 'none';
+    const standing = linkIds(), turnsAt = turns.length;
     const askedBusy = ask('something else');
     const shimmered = askBtn.el.dataset.busy === '1';
     await askedBusy; await frame();
-    A('a request whose answer cannot be made builds nothing and says why where the patch goes, with the send button busy while asking',
-      shimmered && !askBtn.el.dataset.busy && bay.links().length === 0 && pic.classList.contains('cn-pic-empty')
+    A('a request whose answer cannot be made builds nothing new, keeps the standing patch and the conversation, and says why under the drawing, with the send button busy while asking',
+      shimmered && !askBtn.el.dataset.busy && !!standing && linkIds() === standing && turns.length === turnsAt && whyShown()
         && /could not be made/.test(empty.textContent) && /transpose/.test(empty.textContent), empty.textContent);
     // A request that names an instrument but not the speakers is still heard.
     await ask('keys play the synth, nothing else'); await frame();
@@ -1219,9 +1232,10 @@
       patchOf(rhodesLink?.transforms) === 'Rhodes' && rhodesRt?.chosen?.() === 'Rhodes' && rhodesRt.sampler.stat().files === 0
         && /patches: Piano, Rhodes/.test(portsForModel().find((p) => p.id === W('sampler', 'midi-in'))?.label || ''),
       `${bay.links().map(printLink).join('; ')}; runtime chose ${rhodesRt?.chosen?.()}`);
+    const rhodesIds = linkIds();
     await ask('keys play the harpsichord'); await frame();
-    A('NEGATIVE CONTROL: an answer naming a patch the sampler does not have builds nothing and says which it has',
-      bay.links().length === 0 && /no patch called "Harpsichord"/.test(empty.textContent), empty.textContent);
+    A('NEGATIVE CONTROL: an answer naming a patch the sampler does not have builds nothing, the Rhodes patch stands, and it says which it has',
+      linkIds() === rhodesIds && runtime.get('web:sampler')?.chosen?.() === 'Rhodes' && whyShown() && /no patch called "Harpsichord"/.test(empty.textContent), empty.textContent);
     // A split by note ranges shows on the keys: two named zones with a gap track between them.
     [...exRow.children].find((b) => b.textContent === 'bass synth on my left hand, plaits on my right').click();
     await runtimes(); await frame();
@@ -1232,10 +1246,12 @@
     await ask('keys play a sawtooth'); await runtime.idle(); await frame();
     A('a link choosing sawtooth sets the synth to the sawtooth wave', runtime.get('web:synth')?.param('wave') === 'sawtooth',
       `wave ${runtime.get('web:synth')?.param('wave')}`);
-    // An answer that reaches for the Pi when the sentence did not ask for it builds nothing.
+    // An answer that reaches for the Pi when the sentence did not ask for it builds nothing; on an empty patch nothing at all.
+    newPatch('the check');
     await ask('the keys play the piano'); await frame();
-    A('an answer that reaches for the Pi unasked builds nothing and says so',
-      bay.links().length === 0 && /did not ask for it/.test(empty.textContent) && /pi-1:sampler/.test(empty.textContent), empty.textContent);
+    A('NEGATIVE CONTROL: a refused first request on an empty patch builds nothing, and says why where the patch goes',
+      bay.links().length === 0 && pic.classList.contains('cn-pic-empty') && !pic.dataset.why && turns.length === 0
+        && /did not ask for it/.test(empty.textContent) && /pi-1:sampler/.test(empty.textContent), empty.textContent);
     // ── what a sentence finds, and what speech is told to hear ──
     const drumPorts = portsForModel('the drum machine plays the piano');
     const seqPort = drumPorts.find((p) => p.id === W('sequencer', 'midi-out'));
@@ -1271,14 +1287,16 @@
         && !has(KEYS, W('synth', 'midi-in')) && !settingsNow['web:synth'], lastLine);
     await ask('keys play the synth, nothing else'); await runtimes();
     const turnsBefore = turns.length;
+    const synthIds = linkIds();
     await ask('make it very bright'); await frame();
-    A('NEGATIVE CONTROL: a setting out of its range builds nothing and says why where the patch goes, and the conversation keeps its turns',
-      bay.links().length === 0 && pic.classList.contains('cn-pic-empty') && /web:synth cutoff runs 80\.\.8000, and the answer asked 40000/.test(empty.textContent)
+    A('NEGATIVE CONTROL: a setting out of its range sets nothing, the patch and the conversation stand, and it says why',
+      linkIds() === synthIds && whyShown() && /web:synth cutoff runs 80\.\.8000, and the answer asked 40000/.test(empty.textContent)
         && turns.length === turnsBefore && runtime.get('web:synth')?.param?.('cutoff') !== 40000, empty.textContent);
     await ask('keys play the synth, nothing else'); await runtimes();
+    const wobbleIds = linkIds();
     await ask('more wobble'); await frame();
-    A('NEGATIVE CONTROL: a setting the synth does not have builds nothing and names the ones it has',
-      bay.links().length === 0 && /no setting called "wobble"; it has cutoff, q, attack, release/.test(empty.textContent), empty.textContent);
+    A('NEGATIVE CONTROL: a setting the synth does not have sets nothing, the patch stands, and it names the ones it has',
+      linkIds() === wobbleIds && whyShown() && /no setting called "wobble"; it has cutoff, q, attack, release/.test(empty.textContent), empty.textContent);
     await ask('keys play the synth, nothing else'); await runtimes();
     const had = turns.length;
     [...exRow.children].find((b) => b.textContent === EXAMPLES[0].say).click();

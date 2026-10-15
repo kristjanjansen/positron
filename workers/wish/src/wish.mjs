@@ -189,7 +189,45 @@ const SYNONYM = {
   patch: { to: 'name' },
 };
 
-export function relabel(links) {
+// A port's patch list reaches the worker in its label, `... midi-in (patches: Piano, Rhodes)`
+// (demo/shell/patch-names.mjs withPatches), or as a `patches` array.
+const PATCHES_RE = /\(patches: ([^)]*)\)/;
+const MIDI_IN = /:midi-in(?:-\d+)?$/;
+const patchesOf = (p) => (Array.isArray(p?.patches) ? p.patches
+  : (PATCHES_RE.exec(String(p?.label || ''))?.[1] || '').split(',')).map((x) => String(x).trim()).filter(Boolean);
+const nodeOfPort = (id) => String(id).replace(/:[^:]+$/, '');
+
+/**
+ * A patch transform on a link that is not into a midi-in (kimi wrote `plaits:audio-out -> mix:audio-in
+ * { patch "Soft FM" }`) moves to the MIDI link into the node whose patch list has that name, or is dropped.
+ */
+export function movePatches(links, ports = [], fixed = []) {
+  // With no ports there is nothing to read a patch list from, so nothing moves.
+  if (!Array.isArray(ports) || !ports.length) return links;
+  const lists = ports.filter((p) => p?.dir === 'in' && MIDI_IN.test(String(p.id)))
+    .map((p) => ({ id: p.id, names: patchesOf(p) })).filter((p) => p.names.length);
+  for (const l of links) {
+    if (MIDI_IN.test(String(l.to))) continue;
+    const stray = l.transforms.filter((t) => t?.op === 'patch');
+    if (!stray.length) continue;
+    l.transforms = l.transforms.filter((t) => t?.op !== 'patch');
+    for (const t of stray) {
+      const want = String(t.name ?? '').trim().toLowerCase();
+      const hits = lists.filter((p) => p.names.some((n) => n.toLowerCase() === want));
+      // The node the stray link leaves from first: plaits:audio-out names Plaits.
+      const ports_ = [...hits.filter((p) => nodeOfPort(p.id) === nodeOfPort(l.from)), ...hits];
+      const into = ports_.map((p) => ({ p, link: links.find((x) => x.to === p.id) })).find((x) => x.link);
+      const said = `patch "${t.name}" on ${l.from} -> ${l.to}`;
+      if (!into) { fixed.push({ op: 'patch', said, read: 'dropped: no MIDI link into an instrument with that patch', value: t.name }); continue; }
+      const name = into.p.names.find((n) => n.toLowerCase() === want);
+      if (!into.link.transforms.some((x) => x?.op === 'patch')) into.link.transforms.push({ op: 'patch', name });
+      fixed.push({ op: 'patch', said, read: `on ${into.link.from} -> ${into.link.to}`, value: name });
+    }
+  }
+  return links;
+}
+
+export function relabel(links, ports = []) {
   const fixed = [];
   const out = (Array.isArray(links) ? links : []).map((l) => {
     const transforms = (Array.isArray(l?.transforms) ? l.transforms : []).map((t) => {
@@ -207,6 +245,7 @@ export function relabel(links) {
     });
     return { ...l, transforms };
   });
+  movePatches(out, ports, fixed);
   return { links: out, fixed };
 }
 
@@ -478,7 +517,7 @@ export async function handle(path, body, run) {
     // why: lessons/workers-wish.md#shape
     const said = textOf(r);
     const out = r?.response && typeof r.response === 'object' ? r.response : jsonIn(said);
-    const { links: told, fixed } = relabel(out?.links ?? []);
+    const { links: told, fixed } = relabel(out?.links ?? [], ports);
     const links = dedupe(told, fixed);
     const settings = settingsFrom(out, fixed, links);
     return { status: 200, body: {

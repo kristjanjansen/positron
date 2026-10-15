@@ -4160,3 +4160,24 @@ Above `else if (s.exp && s.exp <= Date.now()) console.log('  credential   the wr
 // how a boot line reports the exact fault it is there to catch as if it were
 // health.
 ~~~
+
+## `demo/connect-e2e.mjs`
+
+### connect-e2e
+
+Written 2026-10-15 from a scratch script that found three /connect/ defects in one run
+(device 1291ae in pub's log): a failed or refused request wiped the standing patch, a
+`patch` transform on an audio link refused the whole answer, and the grain ring booted into
+a suspended context. It drives the real page against the real model through
+`demo/wish-local.mjs`, so it costs money (kimi-k2.6, about $1.06 per 1000 asks, under a cent
+a run) and is never in a suite: no harness may import or start it.
+
+- **Unbuffered.** Every line is a `writeSync(1, ...)`, so a run piped to a file or `tail`
+  shows each step as it happens rather than all of them at exit.
+- **A step has 90 s.** A step that times out stops its run (it may still be pressing keys)
+  and the rest read `skipped`.
+- **INFRA is not FAIL.** A step whose page log says the worker, the network or a timeout was
+  the cause (`nothing answered`, `Failed to fetch`, a 5xx, the model not answering) is INFRA.
+  A refusal of the model's answer (`could not be made`) is a FAIL: the model or the page.
+- **Chrome is closed on every path**: `launchChrome` kills it on exit and on a signal, and the
+  script's own `finally` closes it.

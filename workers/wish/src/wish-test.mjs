@@ -168,6 +168,40 @@ is('the two older ones are handed bytes and no options',
     r.links[0].transforms[0].name === 'Rhodes' && r.fixed[0]?.read === 'name', JSON.stringify(r));
 }
 
+// A patch on the wrong link (kimi, 2026-10-15) moves to the MIDI link into the node whose patch list has it.
+{
+  const P = [
+    { id: 'web:sequencer:midi-out', dir: 'out', label: 'drum machine midi-out' },
+    { id: 'web:plaits:midi-in', dir: 'in', label: 'Plaits midi-in (patches: Soft FM, Bell)' },
+    { id: 'web:sampler:midi-in', dir: 'in', label: 'sampler midi-in', patches: ['Piano', 'Rhodes'] },
+    { id: 'web:mix:audio-in', dir: 'in', label: 'mix audio-in' },
+  ];
+  const SEQ = { from: 'web:sequencer:midi-out', to: 'web:plaits:midi-in', transforms: [] };
+  const WRONG = { from: 'web:plaits:audio-out', to: 'web:mix:audio-in', transforms: [{ op: 'patch', name: 'soft fm' }] };
+  const m = relabel([SEQ, WRONG], P);
+  is('a patch on an audio link moves to the MIDI link into the node that has it, spelled as its list spells it, and is reported',
+    m.links[0].transforms[0]?.name === 'Soft FM' && m.links[1].transforms.length === 0
+      && m.fixed.some((f) => f.op === 'patch' && /plaits:audio-out -> web:mix:audio-in/.test(f.said) && /sequencer:midi-out -> web:plaits:midi-in/.test(f.read)),
+    JSON.stringify(m));
+  const via = await handle('/wish', { text: 'x', ports: P }, async () => ({ response: { links: [SEQ, WRONG] } }));
+  is('the /wish answer carries the moved patch', via.body.links[0].transforms[0]?.name === 'Soft FM' && via.body.links[1].transforms.length === 0,
+    JSON.stringify(via.body.links));
+  const array = relabel([{ from: 'web:keys:midi-out', to: 'web:sampler:midi-in', transforms: [] },
+    { from: 'web:sampler:audio-out', to: 'web:mix:audio-in', transforms: [{ op: 'patch', name: 'Rhodes' }] }], P);
+  is('a patch list sent as a `patches` array counts too', array.links[0].transforms[0]?.name === 'Rhodes', JSON.stringify(array.links));
+  const lone = relabel([WRONG], P);
+  is('NEGATIVE CONTROL: with no MIDI link into Plaits the patch is dropped, and the drop is said',
+    lone.links[0].transforms.length === 0 && lone.fixed.some((f) => f.op === 'patch' && /dropped/.test(f.read)), JSON.stringify(lone));
+  const keep = relabel([{ ...SEQ, transforms: [{ op: 'patch', name: 'Bell' }] }, WRONG], P);
+  is('NEGATIVE CONTROL: a MIDI link that already has a patch keeps it', keep.links[0].transforms.length === 1 && keep.links[0].transforms[0].name === 'Bell',
+    JSON.stringify(keep.links));
+  const unknown = relabel([SEQ, { ...WRONG, transforms: [{ op: 'patch', name: 'Harpsichord' }] }], P);
+  is('NEGATIVE CONTROL: a name no instrument lists is dropped, never put on a link', unknown.links.every((l) => l.transforms.length === 0)
+    && unknown.fixed.some((f) => /dropped/.test(f.read)), JSON.stringify(unknown));
+  const right = relabel([{ ...SEQ, transforms: [{ op: 'patch', name: 'Bell' }] }], P);
+  is('NEGATIVE CONTROL: a patch already on a midi-in link is left alone and nothing is reported', right.links[0].transforms[0].name === 'Bell' && right.fixed.length === 0);
+}
+
 /* A model nobody allowed must not be run, because the name arrives from a
    browser and somebody's account is being spent. */
 const refused = await handle('/wish', { model: '@cf/somebody/else', ports: DESK }, () => {
