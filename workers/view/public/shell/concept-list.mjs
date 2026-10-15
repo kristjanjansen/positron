@@ -13,6 +13,7 @@ export const CONCEPTS = [
   // why: lessons/kit-concept-list.md#envelope-lfo
   { id: 'code/faust', title: 'Faust synth', say: 'A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.' },
   { id: 'code/collide', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
+  { id: 'code/write', title: 'Written synth', say: 'Type or say a sound and a model writes it in SuperCollider. Play it from the keys or edit the code.' },
   // why: lessons/kit-concept-list.md#plaits
   { id: 'code/plaits', title: 'Plaits', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
   // A row's `group` sets the heading it shows under; its folder and URL stay where they are.

@@ -13,7 +13,7 @@ export const MIC_LABEL = 'Speak: hold Option or Caps Lock, or the sustain pedal,
 /**
  * @param {object} o
  * @param {(text: string, how: { how: 'typed'|'voice'|'pill', by: HTMLElement }) => Promise<any>} o.onAsk
- * @param {{ say: string, title?: string }[]} [o.pills]
+ * @param {{ say: string, title?: string, onPress?: () => void }[]} [o.pills]  a pill with onPress runs it and asks nothing
  * @param {string} [o.placeholder]
  * @param {string} [o.api]  the wish worker, for /hear
  * @param {() => string[]} [o.vocabulary]  names Whisper should hear as written
@@ -51,7 +51,11 @@ export function createAskBar({ onAsk, pills = [], placeholder = '', api = 'https
 
   const pillButtons = pills.map((p) => {
     const b = el('button', 'pos-pill', p.say, { type: 'button', ...(p.title ? { title: p.title } : {}) });
-    b.addEventListener('click', () => { if (inFlight) return; field.set(p.say); showBtn(); ask(p.say, 'pill', b); });
+    b.addEventListener('click', () => {
+      if (inFlight) return;
+      if (p.onPress) { p.onPress(); return; }
+      field.set(p.say); showBtn(); ask(p.say, 'pill', b);
+    });
     pillRow.append(b);
     return b;
   });
