@@ -65,7 +65,7 @@
   bay.addNode({ id: 'web:screen', kind: 'screen', label: 'simulated OLED', place: 'browser' });
   bay.addNode({ id: 'web:keys', kind: 'person', label: 'simulated keys', place: 'browser' });
   const SIM_IN = 'web:screen:value-in', SIMKEYS_OUT = 'web:keys:value-out';
-  const sim = { text: 'waiting for a tab', held: new Set(), ui: null, frames: 0, version: '' };
+  const sim = { text: '', held: new Set(), ui: null, frames: 0, version: '' };
   const simCv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
   function simDraw() { if (!sim.ui) return; paintFrame(simCv, sim.ui.frame({ text: sim.text, held: [...sim.held] })); sim.frames++; }
 

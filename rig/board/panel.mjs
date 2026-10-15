@@ -44,7 +44,7 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
 
   const { createRings } = await import(RINGS.href);
   const rings = createRings();
-  const state = { text: 'waiting for a tab', held: new Set(), shown: 0, layoutAt: 0, mode: 'text', frameMs: 0 };
+  const state = { text: '', held: new Set(), shown: 0, layoutAt: 0, mode: 'text', frameMs: 0 };
   // One draw at a time; a change during a draw is drawn once it ends.
   let busy = false, again = false;
   async function draw() {
