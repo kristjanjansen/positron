@@ -40,7 +40,7 @@ export function withBoardTransports(g) {
 
 /** MIDI devices on this desk by the name ALSA gives them, announced under the name the patches use. */
 const KNOWN_MIDI = {
-  'MK-425C USB MIDI Keyboard': { name: 'evo', label: 'Evolution MK-425C' },
+  'MK-425C USB MIDI Keyboard': { name: 'mk-425c', label: 'Evolution MK-425C' },
   'FastTrack Pro': { name: 'ftpro', label: 'Fast Track Pro' },
 };
 /** Audio interfaces by ALSA card id, announced under the name the patches use. */

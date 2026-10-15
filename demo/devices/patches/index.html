@@ -50,8 +50,8 @@
   const P = BOARD_SITE;
 
   // [name, what it is for, links as [from node, to node]]; every node a box. The Evolution keyboard
-  // plugs into the Pi, so it is a Pi node, drawn filled; `evo`, since a box holds eight letters.
-  const EVO = `${P}:evo`;
+  // plugs into the Pi, so it is a Pi node, drawn filled, by its model name.
+  const EVO = `${P}:mk-425c`;
   const USES = [
     ['Evolution to the Circuit', 'Play the Circuit from the keyboard on the Pi.', [[EVO, `${P}:circuit`]]],
     ['A split', 'Low keys play the Circuit, high keys play Plaits on the Pi.', [[EVO, `${P}:circuit`], [EVO, `${P}:plaits`]]],
@@ -59,22 +59,16 @@
     ['Evolution to Plaits', 'The keys play Plaits on the Pi and the knobs turn its sound.', [[EVO, `${P}:plaits`], [`${P}:plaits`, `${P}:ftpro`]]],
     ['Evolution to Collide', 'Play the SuperCollider synth on the Pi out of the Fast Track Pro.', [[EVO, `${P}:collide`], [`${P}:collide`, `${P}:ftpro`]]],
     ['Camera on the screen', 'The Pi\'s camera drawn in one bit on its own small screen.', [[`${P}:camera`, `${P}:screen`]]],
-    ['Drums from the screen\'s keys', 'The four keys under the screen trigger the drum machine.', [[`${P}:keys`, `${P}:drums`], [`${P}:drums`, `${P}:ftpro`]]],
-    ['Drums in time with the Circuit', 'The Circuit\'s clock drives the drum machine on the Pi.', [[`${P}:circuit`, `${P}:drums`], [`${P}:drums`, `${P}:ftpro`]]],
-    ['Record what you play', 'The Evolution plays the Circuit and every take goes to the bucket.', [[EVO, `${P}:circuit`], [`${P}:circuit`, 'cf-r2:takes']]],
   ];
   // name, then links as [from node, to node]; every node a box
   const PATCHES = [
     ['Keys to the Circuit', [['web:keys', `${P}:circuit`]]],
     ['The Circuit out loud', [[`${P}:circuit`, 'web:speaker']]],
     ['Play the Circuit', [['web:keys', `${P}:circuit`], [`${P}:circuit`, 'web:speaker']]],
-    ['Record a take', [['web:keys', `${P}:circuit`], [`${P}:circuit`, 'web:speaker'], [`${P}:circuit`, 'cf-r2:takes']]],
     ['Piano on the sampler', [['web:keys', `${P}:sampler`], [`${P}:sampler`, 'web:speaker']]],
     ['Plaits and a knob', [['web:keys', `${P}:plaits`], ['web:knob', `${P}:plaits`], [`${P}:plaits`, 'web:speaker']]],
     ['Drums from pads', [['web:pads', `${P}:drums`], [`${P}:drums`, 'web:speaker']]],
-    ['A shader on the GPU', [['web:editor', `${P}:gpu`], [`${P}:gpu`, 'web:screen']]],
-    ['The Pi\'s camera live', [[`${P}:camera`, 'cf-stream:live'], ['cf-stream:live', 'web:screen']]],
-    ['The screen\'s own keys', [[`${P}:keys`, `${P}:screen`]]],
+    ['A shader on the GPU', [['web:editor', `${P}:shader`], [`${P}:shader`, 'web:screen']]],
   ].map(([name, pairs]) => [name, '', pairs]);
   const asPatch = ([name, say, pairs]) => {
     const nodes = [...new Set(pairs.flat())].map((id) => ({ id }));
