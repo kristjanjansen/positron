@@ -45,7 +45,7 @@ export const GROUPS = [
   ]],
   ['moving around', [
     ['plus', 'plus'], ['minus', 'minus'], ['arrow-left', 'arrow-left'], ['arrow-right', 'arrow-right'],
-    ['chevron-left', 'chevron-left'], ['chevron-right', 'chevron-right'], ['chevron-down', 'chevron-down'],
+    ['chevron-left', 'chevron-left'], ['chevron-right', 'chevron-right'], ['chevron-down', 'chevron-down'], ['chevron-up', 'chevron-up'], ['hash', 'hash'], ['zoom-in', 'zoom-in'], ['zoom-out', 'zoom-out'],
     ['menu', 'menu'], ['more', 'more-horizontal'], ['search', 'search'], ['refresh', 'refresh-cw'],
     ['external', 'external-link'], ['home', 'home'], ['grid', 'grid'], ['list', 'list'], ['clock', 'clock'],
   ]],
