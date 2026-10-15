@@ -1,5 +1,5 @@
 // demo/shell/panel-screen.mjs: what the Pi's 0.96" OLED shows, drawn by the firmware's UI kit compiled
-// to WebAssembly (oled-ui.wasm), so rig/board/panel.mjs and /devices/screen/'s simulated screen make the
+// to WebAssembly (oled-ui.wasm), so rig/board/panel.mjs and /devices/text/'s simulated screen make the
 // same 1024 bytes. Change `drawPanel` here: the page shows it on reload, the Pi after push.sh.
 // No DOM and no Pico emulator, so node imports it too (oled-view.mjs would load pico.mjs, 216 KB).
 // why: lessons/kit-panel-screen.md#header
@@ -13,9 +13,12 @@ const LIT = [0x40, 0xdc, 0xfa], DARK = [0, 0, 0];
 
 /**
  * The layout, in the firmware kit's calls. `state` is what the board knows:
- * `{ text, held }`, `held` the keys down as numbers 1 to 4.
+ * `{ text, held }`, `held` the keys down as numbers 1 to 4; or `{ mode: 'rings', rings, t }`, a
+ * `createRings()` from rings.mjs and its clock.
  */
 export function drawPanel(ui, state) {
+  // The dot piano: the rings alone, the whole panel, as the Pico draws them (rings.mjs).
+  if (state.mode === 'rings' && state.rings) { state.rings.draw((x, y) => ui.fill(x, y, 1, 1, 1), state.t); return; }
   // The keys down the right edge, ^ at the top, level with the module's buttons: no rules, a 14 px square
   // per key that fills while it is held. No header: at 0.96" its line is too small to read.
   const held = new Set(state.held || []), SQ = 14, sx = W - SQ, cell = H / 4;
@@ -34,8 +37,6 @@ export function drawPanel(ui, state) {
     if (next.length > per && lines.at(-1)) lines.push(w.slice(0, per)); else lines[lines.length - 1] = next.slice(0, per);
   }
   lines.slice(0, Math.floor((H - 2) / step)).forEach((ln, i) => ui.text(1, 2 + i * step, ln));
-  // For testing: * held lights every pixel, to see the panel's whole extent and any dead pixel.
-  if (held.has(4)) ui.fill(0, 0, W, H, 1);
 }
 
 // A 7 by 4 chevron two pixels thick, centred on (cx, cy).

@@ -970,13 +970,15 @@ async function handle(msg, replyVia = null) {
     // why: lessons/rig-board.md#board-ping
     case 'board.ping':    return reply('board.pong', { pongAt: Date.now() });
 
-    // The OLED and its keys (panel.mjs), for /devices/screen/: a tab's text drawn on the screen, and
+    // The OLED and its keys (panel.mjs), for /devices/text/: a tab's text drawn on the screen, and
     // a press or release sent to the room as `panel.key`. No screen answers `ok: false`.
     case 'oled.text': {
       if (!panel) return reply('oled.shown', { ok: false, why: 'no screen answered at 0x3c on this board' });
       panel.text(msg.text);
       return reply('oled.shown', { ok: true, text: panel.status().text });
     }
+    // The dot piano on the same screen (/devices/dots/): a note on or off, sent and not asked, as keys are.
+    case 'screen.note': { if (panel) { if (msg.panic) panel.panic(); else panel.note(Number(msg.n), !!msg.on); } return; }
     case 'panel.status': return reply('panel.status', panel ? { ok: true, ...panel.status() } : { ok: false, why: 'no screen on this board' });
 
     // jack.graph reads and writes nothing; jack.rebuild returns the graph before and after, so it

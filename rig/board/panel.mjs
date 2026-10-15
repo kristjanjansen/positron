@@ -1,5 +1,5 @@
 // rig/board/panel.mjs: the 0.96" OLED and its four keys on the header (plans/plan-pi-oled.md), for
-// /devices/screen/. The layout is demo/shell/panel-screen.mjs, shared with the page's simulated screen and
+// /devices/text/. The layout is demo/shell/panel-screen.mjs, shared with the page's simulated screen and
 // reloaded here whenever that file changes (rig/board/panel-sync.mjs copies it over on every save).
 // Nothing runs unless the screen answers at 0x3c, so a board without one is unchanged.
 // why: lessons/rig-board-panel.md#header
@@ -13,6 +13,8 @@ const BUS = '1', ADDR = '0x3c', T = '/usr/sbin/i2ctransfer';
 export const KEYS = { 5: { k: 1, sym: '^' }, 6: { k: 2, sym: 'v' }, 13: { k: 3, sym: '#' }, 26: { k: 4, sym: '*' } };
 const WASM = new URL('../../demo/resources/pico/oled-ui.wasm', import.meta.url);
 const LAYOUT = new URL('../../demo/shell/panel-screen.mjs', import.meta.url);
+const RINGS = new URL('../../demo/shell/rings.mjs', import.meta.url);
+const FRAME_MS = 66;                // the rings' animation, about 15 a second over i2ctransfer
 // rig/pico/firmware/ssd1306.c's init, so the panel is lit as the Pico lights it.
 const INIT = [0xAE, 0x20, 0x00, 0x40, 0xA1, 0xA8, 63, 0xC8, 0xD3, 0x00, 0xDA, 0x12, 0xD5, 0x80,
   0xD9, 0xF1, 0xDB, 0x30, 0x81, 0xFF, 0xA4, 0xA6, 0x8D, 0x14, 0xAF];
@@ -40,17 +42,22 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
   await layout();
   for (let i = 0; i < INIT.length; i += 16) await write([0x00, ...INIT.slice(i, i + 16)]);
 
-  const state = { text: 'waiting for a tab', held: new Set(), shown: 0, layoutAt: 0 };
+  const { createRings } = await import(RINGS.href);
+  const rings = createRings();
+  const state = { text: 'waiting for a tab', held: new Set(), shown: 0, layoutAt: 0, mode: 'text', frameMs: 0 };
   // One draw at a time; a change during a draw is drawn once it ends.
   let busy = false, again = false;
   async function draw() {
     if (busy) { again = true; return; }
     busy = true;
     try {
-      const fb = ui.frame({ text: state.text, held: [...state.held] });
+      const t0 = Date.now();
+      const fb = ui.frame(state.mode === 'rings' ? { mode: 'rings', rings, t: t0 } : { text: state.text, held: [...state.held] });
+      // the whole frame in one transfer: the window, then 1024 bytes
       await write([0x00, 0x21, 0, 127, 0x22, 0, 7]);
-      for (let p = 0; p < 8; p++) await write([0x40, ...fb.subarray(p * 128, p * 128 + 128)]);
+      await write([0x40, ...fb]);
       state.shown++;
+      state.frameMs = Date.now() - t0;
     } catch (e) {
       log(`panel: draw failed: ${e.message}`);
     } finally {
@@ -58,6 +65,16 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
       if (again) { again = false; draw(); }
     }
   }
+  // The rings turn, so they redraw on a clock while anything is left to draw, and stop when nothing is.
+  let ticking = null;
+  function animate() {
+    if (ticking) return;
+    ticking = setInterval(() => {
+      if (state.mode !== 'rings' || !rings.alive(Date.now())) { clearInterval(ticking); ticking = null; draw(); return; }
+      draw();
+    }, FRAME_MS);
+  }
+
   // A saved layout redraws within a second; a broken one is logged and the old one kept.
   setInterval(() => {
     layout().then((changed) => { if (changed) { state.layoutAt = Date.now(); log('panel: layout reloaded'); draw(); } })
@@ -91,8 +108,11 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
   draw();
   log(`panel: the screen answers at ${ADDR}, keys on GPIO ${Object.keys(KEYS).join(', ')}`);
   return {
-    text(s) { state.text = String(s ?? '').slice(0, 120) || ' '; draw(); return state.shown; },
-    status: () => ({ text: state.text, held: [...state.held], shown: state.shown, layoutAt: state.layoutAt }),
+    text(s) { state.mode = 'text'; state.text = String(s ?? '').slice(0, 120) || ' '; draw(); return state.shown; },
+    /** A note on or off for the dot piano: the screen turns to the rings and animates. */
+    note(n, on) { state.mode = 'rings'; if (on) rings.noteOn(n, Date.now()); else rings.noteOff(n, Date.now()); animate(); },
+    panic() { rings.panic(Date.now()); animate(); },
+    status: () => ({ mode: state.mode, text: state.text, held: [...state.held], shown: state.shown, layoutAt: state.layoutAt, frameMs: state.frameMs }),
     close() { mon?.kill(); write([0x00, 0xAE]).catch(() => {}); },
   };
 }
