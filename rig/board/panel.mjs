@@ -121,12 +121,13 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
       const links = (p?.links || []).slice(0, 24).map((l) => ({ from: String(l.from), to: String(l.to) }));
       state.mode = 'patch'; state.patch = { nodes, links }; draw();
     },
-    /** A drum pattern, `{ voices, pattern, step, voice, playing }`, drawn by steps-oled.mjs; a step change is one frame. */
+    /** A drum pattern, `{ voices, pattern, step, voice, playing, look }`, drawn by steps-oled.mjs; a step change is one frame. */
     steps(p) {
-      const voices = (p?.voices || []).slice(0, 6).map((v) => String(v).slice(0, 2));
-      const pattern = (p?.pattern || []).slice(0, 6).map((r) => (Array.isArray(r) ? r.map((x) => (x ? '1' : '0')).join('') : String(r)).slice(0, 16));
+      const voices = (p?.voices || []).slice(0, 8).map((v) => String(v).slice(0, 2));
+      const pattern = (p?.pattern || []).slice(0, 8).map((r) => (Array.isArray(r) ? r.map((x) => (x ? '1' : '0')).join('') : String(r)).slice(0, 16));
       const int = (x) => (Number.isInteger(x) ? x : -1);
-      state.mode = 'steps'; state.steps = { voices, pattern, step: int(p?.step), voice: int(p?.voice), playing: !!p?.playing }; draw();
+      const look = { empty: String(p?.look?.empty ?? ''), head: String(p?.look?.head ?? '') };
+      state.mode = 'steps'; state.steps = { voices, pattern, step: int(p?.step), voice: int(p?.voice), playing: !!p?.playing, look }; draw();
       return state.shown;
     },
     /** A finished 1024 byte page major frame, drawn as it is; frames arriving mid draw collapse to the newest. */

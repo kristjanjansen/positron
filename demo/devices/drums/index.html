@@ -17,6 +17,12 @@
   .ol-media .pos-bgroup { flex: none; margin-left: auto; align-self: center; }
   .ol-screen { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-width: 0; }
   .ol-say { font-size: 12px; color: var(--dim); }
+  /* Ways to draw the grid, side by side at 2x; pressing one puts it on both screens. */
+  .dr-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 12px; }
+  .dr-opt { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; height: auto; background: #07090d; border: 1px solid var(--line); border-radius: var(--r, 4px); }
+  .dr-opt[aria-pressed="true"] { border-color: var(--hi); }
+  .dr-opt canvas { display: block; width: 256px; height: 128px; image-rendering: pixelated; }
+  .dr-opt span { font: 400 12px/1.3 var(--mono); color: var(--dim); }
 </style>
 <script type="module">
   // The kit's drum machine in this tab, its pattern and playing step along links to pi-1:screen and
@@ -30,7 +36,7 @@
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
   import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
-  import { stepCell } from '/shell/steps-oled.mjs';
+  import { stepCell, EMPTIES, HEADS, MAX_ROWS } from '/shell/steps-oled.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDrumMachine } from '/drums/drum-machine.mjs';
   import { VOICES } from '/drums/voices.mjs';
@@ -106,13 +112,31 @@
     return {
       voices: a.VOICES.map((v) => SHORT[v.key] ?? v.label.slice(0, 2)),
       pattern: g.pattern().map((row) => Array.from(row, (x) => (x ? '1' : '0')).join('')),
-      step: a.playing() ? g.step() : cursor, voice, playing: a.playing(),
+      step: a.playing() ? g.step() : cursor, voice, playing: a.playing(), look,
     };
   }
+  // ── the ways to draw it: every empty style with each cursor, and the grid at its most rows ──
+  let look = { empty: 'dot', head: 'frame' };
+  const SAMPLE8 = ['1000100010001000', '0000100000001000', '0010001000100010', '1011101110111011',
+    '0000000100000001', '0100000001000000', '0001000000010000', '1000000010000010'];
+  const OPTS = [...EMPTIES.flatMap((empty) => HEADS.map((head) => ({ empty, head }))), { empty: 'dot', head: 'frame', rows: MAX_ROWS }];
+  const opts = el('div', 'dr-opts');
+  const tiles = OPTS.map((o) => {
+    const b = el('button', 'dr-opt'), cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
+    b.append(cv, el('span', '', o.rows ? `${o.rows} rows, a sample` : `${o.empty}, ${o.head}`));
+    b.addEventListener('click', () => { look = { empty: o.empty, head: o.head }; for (const t of tiles) t.b.setAttribute('aria-pressed', String(t.o === o)); });
+    b.setAttribute('aria-pressed', String(!o.rows && o.empty === look.empty && o.head === look.head));
+    opts.append(b);
+    return { o, b, cv };
+  });
+  const paintOpts = (st) => {
+    if (!ui) return;
+    for (const t of tiles) paintFrame(t.cv, ui.frame({ mode: 'steps', steps: { ...st, ...(t.o.rows ? { pattern: SAMPLE8 } : {}), look: { empty: t.o.empty, head: t.o.head } } }));
+  };
   let said = '';
   (function tick() {
     const s = steps(), sig = JSON.stringify(s);
-    if (ui && sig !== said) { said = sig; sent++; lit(SEQ_OUT); bay.send(SEQ_OUT, { of: 'steps', cls: 'steps', steps: s }); }
+    if (ui && sig !== said) { said = sig; sent++; lit(SEQ_OUT); bay.send(SEQ_OUT, { of: 'steps', cls: 'steps', steps: s }); paintOpts(s); }
     requestAnimationFrame(tick);
   })();
   loadPanelUi(await (await fetch('/resources/pico/oled-ui.wasm')).arrayBuffer()).then((u) => { ui = u; });
@@ -164,7 +188,7 @@
   }
   setZoom(zi);
   const simPanel = createVideoPanel({ media, left: scale, right: zoomBtns.el, aspect: 'auto' });
-  d.stack.add(simPanel.el, m.surface, m.patchbay);
+  d.stack.add(simPanel.el, opts, m.surface, m.patchbay);
   setInterval(() => { if (m.api.playing() || flash.size) m.api.refresh(); }, 200);
   window.__demo.bay = bay;
   window.__demo.probe = () => ({ connected, sent, frames, edits, voice, cursor });
