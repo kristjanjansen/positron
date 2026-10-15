@@ -1,18 +1,18 @@
 ## Open
 
-- **/connect/: the example pills in one row that scrolls sideways, edges faded** (2026-10-15). Asked: *"make suggestions pills one row and overflow-x scrollable. add gradient to cover edges ub a bit"*.
+- ~~**/connect/: the example pills in one row that scrolls sideways, edges faded**~~ (2026-10-15, DONE). Asked: *"make suggestions pills one row and overflow-x scrollable. add gradient to cover edges ub a bit"*.
 
-- **/connect/: a microphone button beside send, the standard dictation shortcut, and the sustain pedal starts it, as the old wish demo did** (2026-10-15). Asked: *"can we have mike input button next to send button. what is standard dictate button shortcut in claude/chatgpt, use it. also activate on sustain button. see old wish demo"*.
+- ~~**/connect/: a microphone button beside send, the standard dictation shortcut, and the sustain pedal starts it, as the old wish demo did**~~ (2026-10-15, DONE: no official in-page shortcut exists in ChatGPT or Claude; Claude's desktop app uses Caps Lock, so Caps Lock toggles; the sustain pedal (CC 64) holds, once MIDI is on; heard by the wish worker's /hear). Asked: *"can we have mike input button next to send button. what is standard dictate button shortcut in claude/chatgpt, use it. also activate on sustain button. see old wish demo"*.
 
-- **/connect/: "split onscreen keyboard to play rhodes on top and synth bass on bottom - there is no way to listen"** (2026-10-15). From the owner's own asks on /connect/ (device log). Find why nothing could be heard and what a keyboard split needs.
+- ~~**/connect/: "split onscreen keyboard to play rhodes on top and synth bass on bottom - there is no way to listen"**~~ (2026-10-15, DONE: the log showed the model proposing keys-to-instrument links only; a request's patch now gets every audio out it leaves dangling wired to the speakers). From the owner's own asks on /connect/ (device log). Find why nothing could be heard and what a keyboard split needs.
 
 - **Grains: a default that is heard at once, on every page that has the granulator** (2026-10-15). Asked: *"set grains default to something that is immediately listenambe (in others demos too), currently the sound takes forever to appear"*.
 
-- **/connect/: a Pi node's Join and LEAVE become the standard play and stop icon buttons** (2026-10-15). Asked: *"use standard play / stop iconbuttons"*, on a crop of `pi-1:shader`'s face.
+- ~~**/connect/: a Pi node's Join and LEAVE become the standard play and stop icon buttons**~~ (2026-10-15, DONE, rt-pi.mjs). Asked: *"use standard play / stop iconbuttons"*, on a crop of `pi-1:shader`'s face.
 
-- **/connect/: each request replaces the patch; no connect or dismiss rows** (2026-10-15). Asked: *"on each input rm previpus patch. rm these. just build patch or not. when can not be made say it in centred text (parch placeholder aread). rm dotted line around."*
+- ~~**/connect/: each request replaces the patch; no connect or dismiss rows**~~ (2026-10-15, DONE: built whole or not at all, the reason centred where the patch goes, no dashed line). Asked: *"on each input rm previpus patch. rm these. just build patch or not. when can not be made say it in centred text (parch placeholder aread). rm dotted line around."*
 
-- **/connect/: a shimmer on the pill or the send button while asking; the send button is an arrow up inside the field, as the chat components do** (2026-10-15). Asked: *"on submit show shimmer on pill or on send. use arrow up as send button, inside-field (see chat components)"*.
+- ~~**/connect/: a shimmer on the pill or the send button while asking; the send button is an arrow up inside the field, as the chat components do**~~ (2026-10-15, DONE; one request at a time, which also stops the doubled asks the log showed). Asked: *"on submit show shimmer on pill or on send. use arrow up as send button, inside-field (see chat components)"*.
 
 - ~~**/connect/: a text field for my own requests, and a log of them**~~ (2026-10-15, DONE: field + send button in --voice; each ask, the model's links with refusals, and every connect/dismiss go to pub.positron.studio/logs as `connect ...` lines; never from a check; verify 98/98). Asked: *"in connect lets have regular input field (just accect in pill one). log my requests, i am trying to input differrent patcbays and lets see what works"*. A field in the pills' --voice colour; every request, the model's answer and what got built, logged where the session can read it.
 
