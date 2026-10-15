@@ -35,6 +35,7 @@ export const CONCEPTS = [
   { id: 'devices/patches', title: 'Patches on Pi screen', say: 'Small patches drawn as the Pi\'s screen shows them. Send one to the Pi to check it.' },
   { id: 'devices/drums', title: 'Drums on Pi screen', say: 'A drum machine plays here and its steps show on the Pi\'s small screen. Its keys edit them.' },
   { id: 'devices/camera', title: 'Camera on Pi screen', say: 'The Pi\'s camera plays in one bit dots on its small screen and here. It needs the camera key.' },
+  { id: 'devices/keys', title: 'Keyboard to Circuit on Pi', say: 'The keyboard on the Pi plays the Circuit\'s synth 1 or 2. The Pi keeps the link when the tab closes.' },
   // why: lessons/kit-concept-list.md#draw
   { id: 'radio/blend', title: 'Blend', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
   { id: 'radio/tuner', title: 'Tuner', say: 'Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.' },
