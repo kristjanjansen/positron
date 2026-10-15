@@ -117,7 +117,7 @@ function layoutColumns({ nodes, links }, { home = 'pi-1', adv = 6 } = {}) {
 const ON = { midi: (c) => c % 5 < 3, value: (c) => c % 3 === 0 };
 /** The wire's two rails for video: the line moved 1 px to each side, the corners mitred so the rails meet
  *  there as a bent pair rather than crossing or leaving a gap. Wires are only ever level or upright. */
-function rails(pts, ks = [1, -1]) {
+function rails(pts) {
   const dir = (a, b) => [Math.sign(b[0] - a[0]), Math.sign(b[1] - a[1])];
   const nrm = ([dx, dy]) => [-dy, dx];
   const side = (k) => pts.map((p, i) => {
@@ -125,7 +125,7 @@ function rails(pts, ks = [1, -1]) {
     const n = !n0 ? n1 : !n1 ? n0 : n0[0] === n1[0] && n0[1] === n1[1] ? n0 : [n0[0] + n1[0], n0[1] + n1[1]];
     return [p[0] + k * n[0], p[1] + k * n[1]];
   });
-  return ks.map(side);
+  return [side(1), side(-1)];
 }
 function solid(ui, pts) {
   for (let i = 1; i < pts.length; i++) {
@@ -135,8 +135,13 @@ function solid(ui, pts) {
 }
 function texture(ui, pts, medium) {
   if (medium === 'video') {
-    // a 2 px line: the wire and its neighbour 1 px to one side
-    for (const r of rails(pts, VIDEO)) solid(ui, r);
+    for (const r of rails(pts)) solid(ui, r);
+    // the outer rail's corner pixel off at each bend, as a box's corners are, so the turn reads round
+    for (let i = 1; i < pts.length - 1; i++) {
+      const p = pts[i], d0 = [Math.sign(p[0] - pts[i - 1][0]), Math.sign(p[1] - pts[i - 1][1])], d1 = [Math.sign(pts[i + 1][0] - p[0]), Math.sign(pts[i + 1][1] - p[1])];
+      const ix = d1[0] - d0[0], iy = d1[1] - d0[1];            // towards the inside of the turn
+      if (ix && iy) ui.fill(p[0] - ix, p[1] - iy, 1, 1, 0);
+    }
     return;
   }
   let c = 0;
@@ -165,8 +170,6 @@ const lengthOf = (pts) => pts.slice(1).reduce((n, b, i) => n + Math.abs(b[0] - p
  *  second, on both rails for video. An event medium (MIDI, value) sends one 2x2 dot out to in over EVENT_S
  *  after each event in `events[i]`, the time of the wire's last event. */
 const SPEED = 20, EVENT_S = 0.6, MARCH = 9;
-/** Video's two lines: 0 and 1 px off the wire, a 2 px line. */
-const VIDEO = [0, 1];
 function beads(ui, w, t, events) {
   const len = lengthOf(w.pts);
   if (w.medium === 'midi' || w.medium === 'value') {
@@ -179,7 +182,7 @@ function beads(ui, w, t, events) {
     return;
   }
   // audio: the line itself marches, a 1 px gap every MARCH px moving out to in; video: both rails march so
-  const lines = w.medium === 'video' ? rails(w.pts, VIDEO) : [w.pts];
+  const lines = w.medium === 'video' ? rails(w.pts) : [w.pts];
   for (const pts of lines) {
     const n = lengthOf(pts);
     for (let at = Math.floor(t * SPEED) % MARCH; at <= n; at += MARCH) { const [x, y] = along(pts, at); ui.fill(Math.round(x), Math.round(y), 1, 1, 0); }
