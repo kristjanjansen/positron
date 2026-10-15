@@ -1,8 +1,14 @@
 ## Open
 
-- **/connect/: "sawtooth" chooses the synth's wave** (2026-10-15). Asked: *"read logs. i asked for sawtooth"*. Whisper heard "sort of" and "soft"; the synth's waves were not patches. Fix: the synth's WAVES are its patch names (the model sees them, Whisper's vocabulary gets them), rt-synth's patch() sets the wave.
+- **Text to code, slice 1: a sentence writes a shader, on its own page** (2026-10-15; changed by the owner: *"make separate page with text input and sample pills for shaders. can reuse connect ui"*; the ask field and pills lifted into a shared kit module). Asked: *"where is textinput to sc code etc?"*, then *"do it, and explain how it works too"*. plans/plan-text-to-code.md §6: a /code route on the wish worker, a writer node, program-in on web:shader, compile, check, retry. Shader first; SuperCollider next with a limiter and .range.
 
-- **/connect/: the in-browser SuperCollider runs out of sample memory** (2026-10-15). From the log: "Buffer pool allocation failed: requested 0.73MB, available 0.34MB of 70.00MB", then "Buffer 361 allocation timeout (30000ms)", after piano and Rhodes were switched in one session. Free a sampler's buffers when it closes or changes patch, or raise the pool.
+- **A demo: the radio tuner through the granulator into the landscape** (2026-10-15). Asked: *"make a demo with landscapes and granulator and radio tuner connected"*. A concept page built from /radio/tuner/, the granulator and /shader/landscape/, with /videoradio/ as prior art (owner: *"se also videoradio as prior art"*); background agent.
+
+- **Speech and patch models: find keys, verify Nova-3 on Cloudflare, test performance** (2026-10-15). Asked: *"ok but test performance. also vertify deepgram nova misbehaviour on cf. look for antr keys in ~/personal projects .env files"*, then *"put it to bg"*. Background agent; results to research/stt-and-patch-models-2026-10-15.md.
+
+- ~~**/connect/: "sawtooth" chooses the synth's wave**~~ (2026-10-15, DONE: the synth's WAVES are its patch names; rt-synth.patch sets the wave). Asked: *"read logs. i asked for sawtooth"*. Whisper heard "sort of" and "soft"; the synth's waves were not patches. Fix: the synth's WAVES are its patch names (the model sees them, Whisper's vocabulary gets them), rt-synth's patch() sets the wave.
+
+- ~~**/connect/: the in-browser SuperCollider runs out of sample memory**~~ (2026-10-15, DONE: loads into the engine one at a time (the pool's grow race), a 128 MB budget freeing the least recently played samples, close() destroys the engine and keeps the shared context; 0 recordings lost where 2 to 3 were; lessons/page-code.md#sc-sampler-pool). From the log: "Buffer pool allocation failed: requested 0.73MB, available 0.34MB of 70.00MB", then "Buffer 361 allocation timeout (30000ms)", after piano and Rhodes were switched in one session. Free a sampler's buffers when it closes or changes patch, or raise the pool.
 
 - ~~**/connect/: a long port list makes the model answer nothing**~~ (2026-10-15, DONE: ports of the parts the sentence names, then the essentials, at most 40). From the log: "play Rhodes on the left hand and Piano on the right" heard right, then nothing proposed in 11 s; the same sentence with six ports gave the right split with patches in 5 s. Fix: send only the ports of the parts the sentence names, plus the essentials.
 

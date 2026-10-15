@@ -3,6 +3,7 @@
 // set by synth:value-in, heard on synth:audio-out. No face of its own.
 
 import { createVoice } from './synth-voice.mjs';
+import { WAVES } from './synth-params.mjs';
 
 export function make({ log }) {
   const v = createVoice();
@@ -25,6 +26,8 @@ export function make({ log }) {
     start: (ctx) => v.start(ctx),
     audio: { out: () => v.out() },
     param: (name) => v.get(name),
+    /** A patch link names a wave; the wave param takes its index. */
+    patch(name) { const i = WAVES.indexOf(String(name).toLowerCase()); if (i >= 0) v.set('wave', i); },
     heard: () => notes,
     stop: () => v.panic(),
     close: () => v.close(),
