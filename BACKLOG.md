@@ -1,10 +1,12 @@
 ## Open
 
+- **/connect/: "sawtooth" chooses the synth's wave** (2026-10-15). Asked: *"read logs. i asked for sawtooth"*. Whisper heard "sort of" and "soft"; the synth's waves were not patches. Fix: the synth's WAVES are its patch names (the model sees them, Whisper's vocabulary gets them), rt-synth's patch() sets the wave.
+
 - **/connect/: the in-browser SuperCollider runs out of sample memory** (2026-10-15). From the log: "Buffer pool allocation failed: requested 0.73MB, available 0.34MB of 70.00MB", then "Buffer 361 allocation timeout (30000ms)", after piano and Rhodes were switched in one session. Free a sampler's buffers when it closes or changes patch, or raise the pool.
 
 - ~~**/connect/: a long port list makes the model answer nothing**~~ (2026-10-15, DONE: ports of the parts the sentence names, then the essentials, at most 40). From the log: "play Rhodes on the left hand and Piano on the right" heard right, then nothing proposed in 11 s; the same sentence with six ports gave the right split with patches in 5 s. Fix: send only the ports of the parts the sentence names, plus the essentials.
 
-- **Research: text that writes code, shaders, Faust or SuperCollider** (2026-10-15). Asked: *"do resraech of text input generatinv visual shaders, faust or supercollider code"*. A plan in plans/, from a background agent.
+- **Research: text that writes code, shaders, Faust or SuperCollider** (2026-10-15; plan written: plans/plan-text-to-code.md, GLSL first, the measurement designed and not run). Asked: *"do resraech of text input generatinv visual shaders, faust or supercollider code"*. A plan in plans/, from a background agent.
 
 - ~~**/connect/: the grains box has at least a patch picker**~~ (2026-10-15, DONE: rt-grains face, the granulator's PATCHES). The owner's feedback note: *"grains should have patch selector minimum in ui"*. rt-grains' face; the granulator's PATCHES (grain-rig.mjs).
 
