@@ -9,17 +9,17 @@ import { fileURLToPath } from 'node:url';
 const C = { v3: '#d63b3b', v5: '#ff1a1a', gnd: '#222', sda: '#2f7bd6', scl: '#f08a24', key: '#9b5cf0' };
 // module pin, left to right as printed -> Pi physical pin, wire colour
 const WIRES = [
-  { mod: 'GND', pin: 6, c: C.gnd, what: 'ground, the return for power and signals' },
-  { mod: 'VCC', pin: 1, c: C.v3, what: 'power in, 3.3 V from the Pi' },
-  { mod: 'SCL', pin: 5, c: C.scl, what: 'I2C clock (GPIO3), the Pi sets the pace' },
-  { mod: 'SDA', pin: 3, c: C.sda, what: 'I2C data (GPIO2), pictures to the screen' },
-  { mod: 'K4', pin: 37, c: C.key, what: 'button 4 (GPIO26)' },
-  { mod: 'K3', pin: 33, c: C.key, what: 'button 3 (GPIO13)' },
-  { mod: 'K2', pin: 31, c: C.key, what: 'button 2 (GPIO6)' },
-  { mod: 'K1', pin: 29, c: C.key, what: 'button 1 (GPIO5)' },
+  { mod: 'GND', pin: 6, c: C.gnd, what: 'ground, the return for power and signals', long: 'Ground' },
+  { mod: 'VCC', pin: 1, c: C.v3, what: 'power in, 3.3 V from the Pi', long: 'power supply Voltage' },
+  { mod: 'SCL', pin: 5, c: C.scl, what: 'I2C clock (GPIO3), the Pi sets the pace', long: 'Serial CLock' },
+  { mod: 'SDA', pin: 3, c: C.sda, what: 'I2C data (GPIO2), pictures to the screen', long: 'Serial DAta' },
+  { mod: 'K4', pin: 37, c: C.key, what: 'button 4 (GPIO26)', long: 'Key 4, a button' },
+  { mod: 'K3', pin: 33, c: C.key, what: 'button 3 (GPIO13)', long: 'Key 3, a button' },
+  { mod: 'K2', pin: 31, c: C.key, what: 'button 2 (GPIO6)', long: 'Key 2, a button' },
+  { mod: 'K1', pin: 29, c: C.key, what: 'button 1 (GPIO5)', long: 'Key 1, a button' },
 ];
 
-const W = 1200, H = 1130;
+const W = 1200, H = 1150;
 const P = 32;                                  // header pitch in px
 const HX = 480, TOP = 190, BOT = TOP + P;      // pin 1's column; top row (even pins), bottom row (odd)
 // Pin n: column (n+1)>>1 from the left; odd pins on the bottom row, toward the middle of the board.
@@ -91,19 +91,20 @@ WIRES.forEach((w, i) => {
 
 // the table, counted the way the photo is read
 const ord = (k) => `${k}${k === 1 ? 'st' : k === 2 ? 'nd' : k === 3 ? 'rd' : 'th'}`;
-const rows = [['module', 'Pi pin', 'row', 'where', 'what it is'], ...WIRES.map((w) => {
+const rows = [['module', 'stands for', 'Pi pin', 'row', 'where', 'what it does'], ...WIRES.map((w) => {
   const col = (w.pin + 1) >> 1;
-  return [w.mod, String(w.pin), w.pin % 2 ? 'bottom' : 'top', w.pin < 10 ? `${ord(col)} from the left` : `${ord(21 - col)} from the right`, w.what];
+  return [w.mod, w.long, String(w.pin), w.pin % 2 ? 'bottom' : 'top', w.pin < 10 ? `${ord(col)} from the left` : `${ord(21 - col)} from the right`, w.what];
 })];
 const TX = 40, TY = 790;
 rows.forEach((r, i) => {
   const y = TY + i * 26, w = WIRES[i - 1];
   if (w) o.push(`<rect x="${TX}" y="${y - 13}" width="14" height="14" fill="${w.c}"/>`);
-  [0, 90, 170, 260, 430].forEach((dx, j) => t(TX + 24 + dx, y, r[j], { size: 15, weight: i ? 400 : 700 }));
+  [0, 70, 250, 320, 400, 560].forEach((dx, j) => t(TX + 24 + dx, y, r[j], { size: 15, weight: i ? 400 : 700 }));
 });
-t(TX, TY + 9 * 26 + 10, 'Nothing on the top row but GND. Pin 35, 3rd from the right on the bottom row, stays empty.', { size: 13, fill: '#555' });
-t(TX, TY + 9 * 26 + 30, 'Which K is which of the ^ v # * buttons is not printed on the module: pressing each one and reading the pins tells. A press should read low; not measured yet.', { size: 13, fill: '#555' });
-t(TX, TY + 9 * 26 + 50, 'The two top-left pins are 5 V and would put 5 V on the screen and the Pi\'s I2C pins.', { size: 13, fill: C.v5 });
+t(TX, TY + 9 * 26 + 10, 'I2C (Inter-Integrated Circuit) is the two wire bus the screen talks on. GPIO (General Purpose Input/Output) is a Pi pin a program reads or sets.', { size: 13, fill: '#555' });
+t(TX, TY + 9 * 26 + 30, 'Nothing on the top row but GND. Pin 35, 3rd from the right on the bottom row, stays empty.', { size: 13, fill: '#555' });
+t(TX, TY + 9 * 26 + 50, 'Which K is which of the ^ v # * buttons is not printed on the module: pressing each one and reading the pins tells. A press should read low; not measured yet.', { size: 13, fill: '#555' });
+t(TX, TY + 9 * 26 + 70, 'The two top-left pins are 5 V and would put 5 V on the screen and the Pi\'s I2C pins.', { size: 13, fill: C.v5 });
 o.push('</svg>');
 
 const out = fileURLToPath(new URL('./panel-wiring.svg', import.meta.url));
