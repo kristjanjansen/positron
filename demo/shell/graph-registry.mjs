@@ -38,6 +38,8 @@ export function withBoardTransports(g) {
   return changed ? { ...g, ports } : g;
 }
 
+/** MIDI devices on this desk by the name ALSA gives them, announced under the name the patches use. */
+const KNOWN_MIDI = { 'MK-425C USB MIDI Keyboard': { name: 'evo', label: 'Evolution MK-425C' } };
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 
 /**
@@ -209,11 +211,13 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
   for (const a of alsa) {
     if (a.virtual) continue;
     if (inputPorts.has(String(a.client).toLowerCase())) continue;
-    const n = `midi-${slug(a.client)}`;
+    const known = KNOWN_MIDI[a.client];
+    const n = known?.name ?? `midi-${slug(a.client)}`;
+    const label = known?.label ?? a.client;
     if (nodes.some((x) => x.id === `${site}:${n}`)) continue;
-    node(n, 'device', a.client);
-    port(n, 'midi-out', { label: a.client, dir: 'out', medium: 'midi', emits: ['note', 'cc', 'bend', 'clock'] });
-    port(n, 'midi-in', { label: a.client, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend'], never: [] });
+    node(n, 'device', label);
+    port(n, 'midi-out', { label, dir: 'out', medium: 'midi', emits: ['note', 'cc', 'bend', 'clock'] });
+    port(n, 'midi-in', { label, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend'], never: [] });
   }
   return { v: GRAPH_V, site, place, ...(net ? { net } : {}), kind: 'board', label, nodes, ports };
 }
