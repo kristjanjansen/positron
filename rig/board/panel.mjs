@@ -54,7 +54,7 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
       const t0 = Date.now();
       // `raw` is a finished frame (screen-camera.mjs), drawn as it is.
       const fb = state.mode === 'raw' ? state.raw : ui.frame(state.mode === 'rings' ? { mode: 'rings', rings, t: t0 }
-        : state.mode === 'patch' ? { mode: 'patch', patch: state.patch, t: t0 / 1000 }
+        : state.mode === 'patch' ? { mode: 'patch', patch: state.patch, t: t0 / 1000, events: state.events }
           : state.mode === 'steps' ? { mode: 'steps', steps: state.steps } : { text: state.text, held: [...state.held] });
       // the whole frame in one transfer: the window, then 1024 bytes
       await write([0x00, 0x21, 0, 127, 0x22, 0, 7]);
@@ -117,11 +117,19 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
     /** A note on or off for the dot piano: the screen turns to the rings and animates. */
     note(n, on) { state.mode = 'rings'; if (on) rings.noteOn(n, Date.now()); else rings.noteOff(n, Date.now()); animate(); },
     panic() { rings.panic(Date.now()); animate(); },
-    /** A small patch, `{ nodes: [{ id }], links: [{ from, to }] }`, drawn as bay-oled.mjs lays it out. */
+    /** A small patch, `{ nodes: [{ id }], links: [{ from, to, medium }] }`, drawn as bay-oled.mjs lays it out. */
     patch(p) {
       const nodes = (p?.nodes || []).slice(0, 16).map((n) => ({ id: String(n.id) }));
-      const links = (p?.links || []).slice(0, 24).map((l) => ({ from: String(l.from), to: String(l.to) }));
-      state.mode = 'patch'; state.patch = { nodes, links }; draw(); animate();
+      const MEDIA = ['midi', 'audio', 'video', 'value', 'clock', 'file', 'state'];
+      const links = (p?.links || []).slice(0, 24).map((l) => ({ from: String(l.from), to: String(l.to), ...(MEDIA.includes(l.medium) ? { medium: l.medium } : {}) }));
+      state.mode = 'patch'; state.patch = { nodes, links }; state.events = {}; draw(); animate();
+    },
+    /** Events on the shown patch's links, by link index: each sends one bead along its wire. */
+    patchEvent(links) {
+      if (state.mode !== 'patch') return state.shown;
+      const now = Date.now() / 1000;
+      for (const i of [].concat(links)) if (Number.isInteger(i) && i >= 0 && i < 24) state.events[i] = now;
+      return state.shown;
     },
     /** A drum pattern, `{ voices, pattern, step, voice, playing, look }`, drawn by steps-oled.mjs; a step change is one frame. */
     steps(p) {

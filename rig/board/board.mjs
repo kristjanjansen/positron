@@ -981,6 +981,11 @@ async function handle(msg, replyVia = null) {
     // The dot piano on the same screen (/devices/dots/): a note on or off, sent and not asked, as keys are.
     case 'screen.note': { if (panel) { if (msg.panic) panel.panic(); else panel.note(Number(msg.n), !!msg.on); } return; }
     // A small patch for the screen (/devices/patches/), asked so the page can say it landed.
+    case 'screen.patch.event': {
+      if (!panel) return reply('screen.patched', { ok: false, why: 'no screen answered at 0x3c on this board' });
+      panel.patchEvent(msg.links);
+      return;
+    }
     case 'screen.patch': {
       if (!panel) return reply('screen.patched', { ok: false, why: 'no screen answered at 0x3c on this board' });
       panel.patch(msg.patch);

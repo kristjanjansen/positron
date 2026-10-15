@@ -61,11 +61,16 @@
     ['Evolution to Collide', 'Play the SuperCollider synth on the Pi out of the Fast Track Pro.', [[EVO, `${P}:collide`], [`${P}:collide`, `${P}:ftpro`]]],
     ['The Circuit plays the drums', 'The Circuit\'s MIDI plays the drum machine on the Pi, out of the Fast Track Pro.', [[`${P}:circuit`, `${P}:drums`], [`${P}:drums`, `${P}:ftpro`]]],
     ['Circuit drums, Evolution synth', 'The Circuit plays the Pi\'s drums and the Evolution plays its synth, both out of the Fast Track.', [[`${P}:circuit`, `${P}:drums`], [EVO, `${P}:synth`], [`${P}:drums`, `${P}:ftpro`], [`${P}:synth`, `${P}:ftpro`]]],
+    ['Drums on the screen', 'The drum machine\'s steps drawn on the Pi\'s screen, and its keys edit them.', [[`${P}:keys`, 'web:drums'], ['web:drums', `${P}:screen`]]],
     ['Camera on the screen', 'The Pi\'s camera drawn in one bit on its own small screen.', [[`${P}:camera`, `${P}:dither`], [`${P}:dither`, `${P}:screen`]]],
   ];
+  // What a wire carries, by its ends: the camera's wires are video, a wire into the Fast Track is audio,
+  // the drum steps and the screen's keys are values, the rest is MIDI from a keyboard or the Circuit.
+  const mediumOf = (a, b) => (/:(camera|dither)$/.test(a) ? 'video' : /:ftpro$/.test(b) ? 'audio'
+    : /:keys$/.test(a) || /:screen$/.test(b) ? 'value' : 'midi');
   const asPatch = ([name, say, pairs]) => {
     const nodes = [...new Set(pairs.flat())].map((id) => ({ id }));
-    return { name, say, patch: { nodes, links: pairs.map(([a, b]) => ({ from: `${a}:out`, to: `${b}:in` })) } };
+    return { name, say, patch: { nodes, links: pairs.map(([a, b]) => ({ from: `${a}:out`, to: `${b}:in`, medium: mediumOf(a, b) })) } };
   };
   const SECTIONS = [['use cases', USES.map(asPatch)]];
 
@@ -83,12 +88,12 @@
       if (!board) connect();
       await opened;
       const r = await board.ask({ type: 'screen.patch', patch: ev.patch }, 'screen.patched', 3000);
-      if (r?.ok) { landed++; d.log(`on the Pi's screen: ${ev.name}`, 'ok'); } else d.log(`the Pi did not draw it: ${r?.why || 'no answer in 3 s'}`, 'warn');
+      if (r?.ok) { landed++; onPi = ev.name; d.log(`on the Pi's screen: ${ev.name}`, 'ok'); } else d.log(`the Pi did not draw it: ${r?.why || 'no answer in 3 s'}`, 'warn');
     } });
   const r = bay.link(LIST_OUT, PI_IN);
   if (!r.ok) d.log(`${LIST_OUT} -> ${PI_IN} refused: ${r.why}`, 'warn');
 
-  let opened = null;
+  let opened = null, onPi = '', fired = 0;
   function connect() {
     let ready;
     opened = new Promise((res) => { ready = res; });
@@ -106,16 +111,26 @@
     const card = el('div', 'pt-card');
     const cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
     paintFrame(cv, ui.frame({ mode: 'patch', patch: x.patch }));
-    screens.push([cv, x.patch]);
+    const events = {};
+    screens.push([cv, x.patch, events]);
+    // the wires that carry events: a press sends one along each, here and on the Pi when it shows this patch
+    const evLinks = x.patch.links.map((l, i) => (l.medium === 'midi' || l.medium === 'value' ? i : -1)).filter((i) => i >= 0);
     const L = layoutBayOled(x.patch);
     cuts.push(L.cut.length);
     const frame = el('div', 'pt-frame'); frame.append(cv);
     const screen = el('div', 'pt-screen'); screen.append(frame);
-    const send = createButtonGroup({ buttons: [{ id: 'send', icon: 'send', label: `send ${x.name} to the Pi's screen`, onPress: () => {
-      sent++;
-      flash.set([...bay.links()][0]?.id, performance.now() + 400);
-      bay.send(LIST_OUT, { of: 'patch', cls: 'patch', name: x.name, patch: x.patch });
-    } }] });
+    const send = createButtonGroup({ buttons: [
+      ...(evLinks.length ? [{ id: 'event', icon: 'music', label: `send a MIDI event along ${x.name}'s wires`, onPress: () => {
+        const now = performance.now() / 1000;
+        for (const i of evLinks) events[i] = now;
+        fired++;
+        if (onPi === x.name && board && connected && MAY_SEND) board.send({ type: 'screen.patch.event', links: evLinks });
+      } }] : []),
+      { id: 'send', icon: 'send', label: `send ${x.name} to the Pi's screen`, onPress: () => {
+        sent++;
+        flash.set([...bay.links()][0]?.id, performance.now() + 400);
+        bay.send(LIST_OUT, { of: 'patch', cls: 'patch', name: x.name, patch: x.patch });
+      } }] });
     const foot = el('div', 'pt-foot');
     foot.append(el('span', 'pt-cut', L.cut.length ? `cut: ${L.cut.map((c) => c.split(' as ')[1] || c.split(':')[1]).join(', ')}` : ''), send.el);
     const head = el('div', 'pt-head');
@@ -131,7 +146,7 @@
   // The wires run: beads move out to in, about 15 frames a second, as the Pi draws a patch it was sent.
   let last = 0;
   (function run(now) {
-    if (now - last > 66) { last = now; for (const [cv, patch] of screens) paintFrame(cv, ui.frame({ mode: 'patch', patch, t: now / 1000 })); }
+    if (now - last > 66) { last = now; for (const [cv, patch, events] of screens) paintFrame(cv, ui.frame({ mode: 'patch', patch, t: now / 1000, events })); }
     requestAnimationFrame(run);
   })(0);
 

@@ -1,5 +1,6 @@
 ## Open
 
+- ~~**Pi screen patches: tell MIDI, audio, video and values apart; a button to fire MIDI events**~~ (2026-10-15, DONE: by line texture, audio solid, MIDI dashed, value dotted, video double; streams run beads, an event sends one bead; a note button per card, also on the Pi when it shows that patch; a Drums on the screen card). Asked: *"how we distinguist midi and audio and video etc"*, *"yea try. add an icon to launch midi events for testings"*, *"no marks no letters"*, *"where is drums on screen?"*.
 - ~~**/devices/patches/: scale buttons**~~ (2026-10-15, DONE: 1x, 2x, 3x for every screen, the cards one column at 3x). Asked: *"add scale buttons to http://127.0.0.1:8890/devices/patches/"*.
 - ~~**Pi screen patches: back to beads**~~ (2026-10-15, DONE). Asked: *"revert to original design. ants are undredable"*.
 - **Web patchbay wires: beads or marching ants as on the Pi's screen, to compare** (2026-10-15; built behind `?wires=beads` and `?wires=ants` on any page, the glow stays the default until the owner picks). Asked: *"show beads in web too"*, *"try also marchin ants?"*.
