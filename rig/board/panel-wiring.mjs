@@ -6,7 +6,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const C = { v3: '#d63b3b', v5: '#ff1a1a', gnd: '#222', sda: '#2f7bd6', scl: '#f08a24', key: '#8a4fd1' };
+const C = { v3: '#d63b3b', v5: '#ff1a1a', gnd: '#222', sda: '#2f7bd6', scl: '#f08a24', key: '#9b5cf0' };
 // module pin, left to right as printed -> Pi physical pin, wire colour
 const WIRES = [
   { mod: 'GND', pin: 6, c: C.gnd, what: 'ground, the return for power and signals' },
@@ -28,8 +28,8 @@ const MX = 70, MY = 450, MP = 40;              // module's first pin x, its top 
 const modX = (i) => MX + i * MP;
 
 const o = [];
-const t = (x, y, s, { size = 14, fill = '#222', weight = 400, anchor = 'start', rot = 0 } = {}) =>
-  o.push(`<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" font-weight="${weight}" text-anchor="${anchor}"${rot ? ` transform="rotate(${rot} ${x} ${y})"` : ''}>${s}</text>`);
+const t = (x, y, s, { size = 14, fill = '#222', weight = 400, anchor = 'start', rot = 0, halo = '' } = {}) =>
+  o.push(`<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" font-weight="${weight}" text-anchor="${anchor}"${halo ? ` stroke="${halo}" stroke-width="4" paint-order="stroke"` : ''}${rot ? ` transform="rotate(${rot} ${x} ${y})"` : ''}>${s}</text>`);
 o.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Helvetica, Arial, sans-serif">`);
 o.push(`<rect width="100%" height="100%" fill="#f4f1ea"/>`);
 t(40, 48, '0.96" OLED with 4 keys on the Raspberry Pi 4', { size: 24, weight: 700 });
@@ -51,9 +51,12 @@ for (let n = 1; n <= 40; n++) {
   // the signal's name beside its pin, on the side its wire arrives from
   const name = w ? w.mod : bad ? '5V' : '';
   if (name) {
-    const fill = w ? (w.c === C.gnd ? '#fff' : w.c) : C.v5;
-    if (n % 2) t(x + 13, y + 20, name, { size: 13, fill, weight: 700, rot: 90 });
-    else t(x, y - 16, name, { size: 11, fill, weight: 700, anchor: 'middle' });
+    // white on a dark halo: a wire's own colour on the green board does not read
+    const fill = w ? '#fff' : C.v5, halo = w ? '#000' : '#fff';
+    if (n % 2) t(x + 13, y + 20, name, { size: 14, fill, weight: 700, rot: 90, halo });
+    // a used top-row pin's wire comes down through the spot above it, so its name sits to the right
+    else if (w) t(x + 14, y - 13, name, { size: 12, fill, weight: 700, halo });
+    else t(x, y - 16, name, { size: 12, fill, weight: 700, anchor: 'middle', halo });
   }
 }
 t(HX - 26, BOT + 5, 'pin 1', { size: 13, fill: '#fff', weight: 700, anchor: 'end' });
@@ -80,6 +83,8 @@ WIRES.forEach((w, i) => {
   // GND is on the top row, so it comes over the header's top edge
   const lane = w.pin % 2 ? BOT + 80 + i * 10 : TOP - 90;
   const d = `M${mx} ${my} L${mx} ${lane} L${x} ${lane} L${x} ${w.pin % 2 ? y + 12 : y - 12}`;
+  // a white casing under every wire, so purple and black read on the green board
+  o.push(`<path d="${d}" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>`);
   o.push(`<path d="${d}" fill="none" stroke="${w.c}" stroke-width="4" stroke-linejoin="round"/>`);
   o.push(`<rect x="${mx - 7}" y="${my - 20}" width="14" height="20" rx="2" fill="#333"/>`);
 });

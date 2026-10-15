@@ -9,22 +9,22 @@
 <text x="416" y="452" font-size="13" fill="#dfe" font-weight="400" text-anchor="start">USB-C power</text>
 <rect x="470" y="212" width="20" height="20" rx="3" fill="#d63b3b" stroke="#000" stroke-width="1"/>
 <text x="480" y="227" font-size="12" fill="#fff" font-weight="700" text-anchor="middle">1</text>
-<text x="493" y="242" font-size="13" fill="#d63b3b" font-weight="700" text-anchor="start" transform="rotate(90 493 242)">VCC</text>
+<text x="493" y="242" font-size="14" fill="#fff" font-weight="700" text-anchor="start" stroke="#000" stroke-width="4" paint-order="stroke" transform="rotate(90 493 242)">VCC</text>
 <rect x="470" y="180" width="20" height="20" rx="3" fill="#fff" stroke="#ff1a1a" stroke-width="3"/>
 <g stroke="#ff1a1a" stroke-width="3"><line x1="473" y1="183" x2="487" y2="197"/><line x1="487" y1="183" x2="473" y2="197"/></g>
-<text x="480" y="174" font-size="11" fill="#ff1a1a" font-weight="700" text-anchor="middle">5V</text>
+<text x="480" y="174" font-size="12" fill="#ff1a1a" font-weight="700" text-anchor="middle" stroke="#fff" stroke-width="4" paint-order="stroke">5V</text>
 <rect x="502" y="212" width="20" height="20" rx="3" fill="#2f7bd6" stroke="#000" stroke-width="1"/>
 <text x="512" y="227" font-size="12" fill="#fff" font-weight="700" text-anchor="middle">3</text>
-<text x="525" y="242" font-size="13" fill="#2f7bd6" font-weight="700" text-anchor="start" transform="rotate(90 525 242)">SDA</text>
+<text x="525" y="242" font-size="14" fill="#fff" font-weight="700" text-anchor="start" stroke="#000" stroke-width="4" paint-order="stroke" transform="rotate(90 525 242)">SDA</text>
 <rect x="502" y="180" width="20" height="20" rx="3" fill="#fff" stroke="#ff1a1a" stroke-width="3"/>
 <g stroke="#ff1a1a" stroke-width="3"><line x1="505" y1="183" x2="519" y2="197"/><line x1="519" y1="183" x2="505" y2="197"/></g>
-<text x="512" y="174" font-size="11" fill="#ff1a1a" font-weight="700" text-anchor="middle">5V</text>
+<text x="512" y="174" font-size="12" fill="#ff1a1a" font-weight="700" text-anchor="middle" stroke="#fff" stroke-width="4" paint-order="stroke">5V</text>
 <rect x="534" y="212" width="20" height="20" rx="3" fill="#f08a24" stroke="#000" stroke-width="1"/>
 <text x="544" y="227" font-size="12" fill="#fff" font-weight="700" text-anchor="middle">5</text>
-<text x="557" y="242" font-size="13" fill="#f08a24" font-weight="700" text-anchor="start" transform="rotate(90 557 242)">SCL</text>
+<text x="557" y="242" font-size="14" fill="#fff" font-weight="700" text-anchor="start" stroke="#000" stroke-width="4" paint-order="stroke" transform="rotate(90 557 242)">SCL</text>
 <rect x="534" y="180" width="20" height="20" rx="3" fill="#222" stroke="#000" stroke-width="1"/>
 <text x="544" y="195" font-size="12" fill="#fff" font-weight="700" text-anchor="middle">6</text>
-<text x="544" y="174" font-size="11" fill="#fff" font-weight="700" text-anchor="middle">GND</text>
+<text x="558" y="177" font-size="12" fill="#fff" font-weight="700" text-anchor="start" stroke="#000" stroke-width="4" paint-order="stroke">GND</text>
 <rect x="566" y="212" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
 <rect x="566" y="180" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
 <rect x="598" y="212" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
@@ -47,23 +47,23 @@
 <rect x="854" y="180" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
 <rect x="886" y="212" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
 <rect x="886" y="180" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
-<rect x="918" y="212" width="20" height="20" rx="3" fill="#8a4fd1" stroke="#000" stroke-width="1"/>
+<rect x="918" y="212" width="20" height="20" rx="3" fill="#9b5cf0" stroke="#000" stroke-width="1"/>
 <text x="928" y="227" font-size="10" fill="#fff" font-weight="700" text-anchor="middle">29</text>
-<text x="941" y="242" font-size="13" fill="#8a4fd1" font-weight="700" text-anchor="start" transform="rotate(90 941 242)">K1</text>
+<text x="941" y="242" font-size="14" fill="#fff" font-weight="700" text-anchor="start" stroke="#000" stroke-width="4" paint-order="stroke" transform="rotate(90 941 242)">K1</text>
 <rect x="918" y="180" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
-<rect x="950" y="212" width="20" height="20" rx="3" fill="#8a4fd1" stroke="#000" stroke-width="1"/>
+<rect x="950" y="212" width="20" height="20" rx="3" fill="#9b5cf0" stroke="#000" stroke-width="1"/>
 <text x="960" y="227" font-size="10" fill="#fff" font-weight="700" text-anchor="middle">31</text>
-<text x="973" y="242" font-size="13" fill="#8a4fd1" font-weight="700" text-anchor="start" transform="rotate(90 973 242)">K2</text>
+<text x="973" y="242" font-size="14" fill="#fff" font-weight="700" text-anchor="start" stroke="#000" stroke-width="4" paint-order="stroke" transform="rotate(90 973 242)">K2</text>
 <rect x="950" y="180" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
-<rect x="982" y="212" width="20" height="20" rx="3" fill="#8a4fd1" stroke="#000" stroke-width="1"/>
+<rect x="982" y="212" width="20" height="20" rx="3" fill="#9b5cf0" stroke="#000" stroke-width="1"/>
 <text x="992" y="227" font-size="10" fill="#fff" font-weight="700" text-anchor="middle">33</text>
-<text x="1005" y="242" font-size="13" fill="#8a4fd1" font-weight="700" text-anchor="start" transform="rotate(90 1005 242)">K3</text>
+<text x="1005" y="242" font-size="14" fill="#fff" font-weight="700" text-anchor="start" stroke="#000" stroke-width="4" paint-order="stroke" transform="rotate(90 1005 242)">K3</text>
 <rect x="982" y="180" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
 <rect x="1014" y="212" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
 <rect x="1014" y="180" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
-<rect x="1046" y="212" width="20" height="20" rx="3" fill="#8a4fd1" stroke="#000" stroke-width="1"/>
+<rect x="1046" y="212" width="20" height="20" rx="3" fill="#9b5cf0" stroke="#000" stroke-width="1"/>
 <text x="1056" y="227" font-size="10" fill="#fff" font-weight="700" text-anchor="middle">37</text>
-<text x="1069" y="242" font-size="13" fill="#8a4fd1" font-weight="700" text-anchor="start" transform="rotate(90 1069 242)">K4</text>
+<text x="1069" y="242" font-size="14" fill="#fff" font-weight="700" text-anchor="start" stroke="#000" stroke-width="4" paint-order="stroke" transform="rotate(90 1069 242)">K4</text>
 <rect x="1046" y="180" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
 <rect x="1078" y="212" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
 <rect x="1078" y="180" width="20" height="20" rx="3" fill="#bdb6a3" stroke="#000" stroke-width="1"/>
@@ -98,21 +98,29 @@
 <rect x="347" y="416" width="6" height="40" fill="#c8a24a"/>
 <text x="350" y="474" font-size="12" fill="#fff" font-weight="700" text-anchor="middle">K1</text>
 <text x="36" y="730" font-size="13" fill="#555" font-weight="400" text-anchor="start">module pins, left to right as printed on it</text>
+<path d="M70 410 L70 100 L544 100 L544 178" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
 <path d="M70 410 L70 100 L544 100 L544 178" fill="none" stroke="#222" stroke-width="4" stroke-linejoin="round"/>
 <rect x="63" y="390" width="14" height="20" rx="2" fill="#333"/>
+<path d="M110 410 L110 312 L480 312 L480 234" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
 <path d="M110 410 L110 312 L480 312 L480 234" fill="none" stroke="#d63b3b" stroke-width="4" stroke-linejoin="round"/>
 <rect x="103" y="390" width="14" height="20" rx="2" fill="#333"/>
+<path d="M150 410 L150 322 L544 322 L544 234" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
 <path d="M150 410 L150 322 L544 322 L544 234" fill="none" stroke="#f08a24" stroke-width="4" stroke-linejoin="round"/>
 <rect x="143" y="390" width="14" height="20" rx="2" fill="#333"/>
+<path d="M190 410 L190 332 L512 332 L512 234" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
 <path d="M190 410 L190 332 L512 332 L512 234" fill="none" stroke="#2f7bd6" stroke-width="4" stroke-linejoin="round"/>
 <rect x="183" y="390" width="14" height="20" rx="2" fill="#333"/>
-<path d="M230 410 L230 342 L1056 342 L1056 234" fill="none" stroke="#8a4fd1" stroke-width="4" stroke-linejoin="round"/>
+<path d="M230 410 L230 342 L1056 342 L1056 234" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
+<path d="M230 410 L230 342 L1056 342 L1056 234" fill="none" stroke="#9b5cf0" stroke-width="4" stroke-linejoin="round"/>
 <rect x="223" y="390" width="14" height="20" rx="2" fill="#333"/>
-<path d="M270 410 L270 352 L992 352 L992 234" fill="none" stroke="#8a4fd1" stroke-width="4" stroke-linejoin="round"/>
+<path d="M270 410 L270 352 L992 352 L992 234" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
+<path d="M270 410 L270 352 L992 352 L992 234" fill="none" stroke="#9b5cf0" stroke-width="4" stroke-linejoin="round"/>
 <rect x="263" y="390" width="14" height="20" rx="2" fill="#333"/>
-<path d="M310 410 L310 362 L960 362 L960 234" fill="none" stroke="#8a4fd1" stroke-width="4" stroke-linejoin="round"/>
+<path d="M310 410 L310 362 L960 362 L960 234" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
+<path d="M310 410 L310 362 L960 362 L960 234" fill="none" stroke="#9b5cf0" stroke-width="4" stroke-linejoin="round"/>
 <rect x="303" y="390" width="14" height="20" rx="2" fill="#333"/>
-<path d="M350 410 L350 372 L928 372 L928 234" fill="none" stroke="#8a4fd1" stroke-width="4" stroke-linejoin="round"/>
+<path d="M350 410 L350 372 L928 372 L928 234" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
+<path d="M350 410 L350 372 L928 372 L928 234" fill="none" stroke="#9b5cf0" stroke-width="4" stroke-linejoin="round"/>
 <rect x="343" y="390" width="14" height="20" rx="2" fill="#333"/>
 <text x="64" y="790" font-size="15" fill="#222" font-weight="700" text-anchor="start">module</text>
 <text x="154" y="790" font-size="15" fill="#222" font-weight="700" text-anchor="start">Pi pin</text>
@@ -143,25 +151,25 @@
 <text x="234" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
 <text x="324" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">2nd from the left</text>
 <text x="494" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">I2C data (GPIO2), pictures to the screen</text>
-<rect x="40" y="907" width="14" height="14" fill="#8a4fd1"/>
+<rect x="40" y="907" width="14" height="14" fill="#9b5cf0"/>
 <text x="64" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">K4</text>
 <text x="154" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">37</text>
 <text x="234" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
 <text x="324" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">2nd from the right</text>
 <text x="494" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">button 4 (GPIO26)</text>
-<rect x="40" y="933" width="14" height="14" fill="#8a4fd1"/>
+<rect x="40" y="933" width="14" height="14" fill="#9b5cf0"/>
 <text x="64" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">K3</text>
 <text x="154" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">33</text>
 <text x="234" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
 <text x="324" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">4th from the right</text>
 <text x="494" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">button 3 (GPIO13)</text>
-<rect x="40" y="959" width="14" height="14" fill="#8a4fd1"/>
+<rect x="40" y="959" width="14" height="14" fill="#9b5cf0"/>
 <text x="64" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">K2</text>
 <text x="154" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">31</text>
 <text x="234" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
 <text x="324" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">5th from the right</text>
 <text x="494" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">button 2 (GPIO6)</text>
-<rect x="40" y="985" width="14" height="14" fill="#8a4fd1"/>
+<rect x="40" y="985" width="14" height="14" fill="#9b5cf0"/>
 <text x="64" y="998" font-size="15" fill="#222" font-weight="400" text-anchor="start">K1</text>
 <text x="154" y="998" font-size="15" fill="#222" font-weight="400" text-anchor="start">29</text>
 <text x="234" y="998" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
