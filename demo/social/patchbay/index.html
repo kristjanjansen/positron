@@ -55,7 +55,7 @@
   // Each slide is a board of two columns of boxes, drawn at READ so port names read on a phone. The boxes go in rank
   // order, sources first, in as few columns as the height allows; after two columns the next board.
   const K = READ, FONT = Math.round(11 * K), TITLE = Math.round(13 * K), ROW = Math.round(20 * K), PAD = Math.round(10 * K);
-  const HEAD = PAD + TITLE + Math.round(6 * K), FIELD = 140, COL_W = (PW - 2 * X - FIELD) / 2, VGAP = 28;
+  const HEAD = PAD + TITLE + Math.round(6 * K), FIELD = 140, COL_W = (PW - 2 * X - FIELD) / 2, VGAP = 60;
   const colX = (c) => Math.floor(c / 2) * PW + X + (c % 2) * (COL_W + FIELD);
   function plan(b) {
     const bay = asBay(b), { rank } = ranks(bay.nodes, bay.links);
@@ -113,6 +113,15 @@
     ctx.textAlign = 'left';
     // wires under the boxes, in the out port's medium colour
     ctx.lineWidth = 3;
+    // wires inside one column, laned so none crosses another: on the right, a higher port takes an outer lane; on the
+    // left, a lower target takes an outer lane; each its own height in the gap
+    const inner = p.links.map((l) => [l, p.at.get(l.from), p.at.get(l.to)]).filter(([, a, z]) => a && z && z.x <= a.x);
+    const lane = new Map();
+    for (const col of new Set(inner.map(([, a]) => a.x))) {
+      const here = inner.filter(([, a]) => a.x === col);
+      [...here].sort((u, v) => u[1].y - v[1].y).forEach(([l], i, all) => lane.set(l, { r: all.length - 1 - i, n: all.length }));
+      [...here].sort((u, v) => u[2].y - v[2].y).forEach(([l], i) => Object.assign(lane.get(l), { l: i }));
+    }
     for (const l of p.links) {
       const a = p.at.get(l.from), z = p.at.get(l.to);
       if (!a || !z) continue;
@@ -124,8 +133,9 @@
       } else {
         // a box below in the same column: out to the right, back through the gap above the target, in from the left
         // each corner an arc, as the patchbay's own wires bend
-        const gy = z.top - VGAP / 2, r = 32, rr = 12;
-        const pts = [[a.x, a.y], [a.x + r, a.y], [a.x + r, gy], [z.x - r, gy], [z.x - r, z.y], [z.x, z.y]];
+        const L = lane.get(l), xr = a.x + 24 + 12 * L.r, xl = z.x - 24 - 12 * L.l;
+        const gy = z.top - VGAP / 2 + (L.l - (L.n - 1) / 2) * Math.min(12, (VGAP - 16) / Math.max(1, L.n - 1)), rr = 10;
+        const pts = [[a.x, a.y], [xr, a.y], [xr, gy], [xl, gy], [xl, z.y], [z.x, z.y]];
         ctx.moveTo(...pts[0]);
         for (let i = 1; i < pts.length - 1; i++) ctx.arcTo(...pts[i], ...pts[i + 1], rr);
         ctx.lineTo(...pts.at(-1));
