@@ -10,8 +10,8 @@ import { ditherFrame, W, H } from '../../demo/shell/dither-oled.mjs';
 
 /** No `screen.camera` renewal from anybody for this long, and the camera stops. */
 export const LEASE_MS = 15_000;
-/** Frames a second asked of ffmpeg; the panel takes about 35 ms a frame. */
-export const SCREEN_FPS = 12;
+/** Frames a second asked of ffmpeg: a native C925e rate (no 25), and 41.7 ms against the panel's 35 ms a frame. */
+export const SCREEN_FPS = 24;
 const GRAY_BYTES = W * H;
 
 /** ffmpeg arguments: the camera at 320x240, a centred 2:1 crop, area scaled to 128x64, grey bytes on stdout. */
