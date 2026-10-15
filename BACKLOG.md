@@ -1,5 +1,11 @@
 ## Open
 
+- ~~**/connect/: Feedback carries the last request, how it came in and the patch**~~ (2026-10-15, DONE: mount's `feedback.context` and `onSent`, shown read-only in the panel, appended to the note, and the note echoed to the device log as [feedback]). Asked: *"can we use feedback field where you tie the current input, method and patchbay so i can comment on it?"*.
+
+- ~~**/connect/: more realistic example pills**~~ (2026-10-15, DONE: eight, all local and running, verify 98/98). Asked: *"add more realistic pills"*. Sentences a player says, local, each a patch no page makes, including a split and an octave double.
+
+- **The patch transform and Whisper hearing the site's names** (2026-10-15). Asked: *"fix. keep loggin, i will input more"*, on "the patch transform (piano or Rhodes chosen by name) and the roads to Rhodes name correction". Go given; to a background agent; the wish worker redeploy is the session's.
+
 - ~~**/connect/: example pills on two lines**~~ (2026-10-15, DONE). Asked: *"make it 2 lines pills"*. Two rows that flow sideways and scroll, edges still faded.
 
 - ~~**/connect/: only local example pills**~~ (2026-10-15, DONE; typed and spoken requests still reach the Pi when they name it). Asked: *"suggestions pill only locals, no remote ones"*. The Pi examples leave the pills; the model gets the Pi's ports only when the sentence names the Pi.

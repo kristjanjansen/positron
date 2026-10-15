@@ -39,6 +39,7 @@ export function mount({
   // the default is for the archived demos, which every page that is not passes its own
   index = '/archive/',
   indexLabel = 'archive',  // the word after the arrow; a concept page passes `positron`, the front page
+  feedback = null,       // { context: () => string, onSent: (text) => void }: what a note carries from this page
 } = {}) {
   document.title = `POSITRON ${name}`;
   favicon();
@@ -68,7 +69,7 @@ export function mount({
       // Imported on the press, so a panel nobody opens costs no page anything on load.
       // why: lessons/kit-shell.md#feedback-lazy
       const fb = await import('./feedback.mjs');
-      fb.openFeedback({ log }, { slug: name });
+      fb.openFeedback({ log }, { slug: name, ...(feedback || {}) });
     } catch (err) {
       fbBtn.setAttribute('aria-expanded', 'false');
       log(`the feedback box did not load (${err?.message || err})`, 'bad');

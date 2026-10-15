@@ -262,7 +262,12 @@
     ['the drum machine plays plaits', [[W('sequencer', 'midi-out'), W('plaits', 'midi-in')], [W('plaits', 'audio-out'), SPK]]],
     ['granulate plaits as i play', [[KEYS, W('plaits', 'midi-in')], [W('plaits', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
     ['granulate the piano as i play it', [[KEYS, W('sampler', 'midi-in')], ['cf-r2:piano-samples:file-out', W('sampler', 'file-in')], [W('sampler', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
-  ].map(([say, links]) => ({ say, links: links.map(([from, to, param]) => ({ from, to, transforms: [], ...(param ? { param } : {}) })) }));
+    ['bass synth on my left hand, plaits on my right', [[KEYS, W('synth', 'midi-in'), [{ op: 'range', lo: 0, hi: 59 }]], [KEYS, W('plaits', 'midi-in'), [{ op: 'range', lo: 60, hi: 127 }]], [W('synth', 'audio-out'), SPK], [W('plaits', 'audio-out'), SPK]]],
+    ['plaits doubles the synth an octave up', [[KEYS, W('synth', 'midi-in')], [KEYS, W('plaits', 'midi-in'), [{ op: 'transpose', by: 12 }]], [W('synth', 'audio-out'), SPK], [W('plaits', 'audio-out'), SPK]]],
+    ['the drum machine plays the piano', [[W('sequencer', 'midi-out'), W('sampler', 'midi-in')], ['cf-r2:piano-samples:file-out', W('sampler', 'file-in')], [W('sampler', 'audio-out'), SPK]]],
+    ['granulate the drum machine', [[W('sequencer', 'midi-out'), W('drum', 'midi-in')], [W('drum', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
+    ['play the piano and watch its waveform', [[KEYS, W('sampler', 'midi-in')], ['cf-r2:piano-samples:file-out', W('sampler', 'file-in')], [W('sampler', 'audio-out'), SPK], [W('sampler', 'audio-out'), W('scope', 'audio-in')]]],
+  ].map(([say, links]) => ({ say, links: links.map(([from, to, x]) => ({ from, to, transforms: Array.isArray(x) ? x : [], ...(typeof x === 'string' ? { param: x } : {}) })) }));
   // The patches the concept pages make, one per page: never shown, built only by the
   // self-check to grade each runtime, and the record an example must not copy.
   const RIGS = [
@@ -297,6 +302,11 @@
   const rigOf = (say) => EXAMPLES.find((e) => e.say === say) || RIGS.find((e) => e.say === say);
 
   const d = mount({ name: 'connect',
+    // A note from Feedback carries the last request, how it came in, what it built, and the patch now.
+    feedback: {
+      context: () => `last: ${lastLine || 'nothing asked yet'}\npatch now: ${bay.links().map(printLink).join('; ') || 'nothing linked'}`,
+      onSent: (note) => logAsk(`[feedback] "${note}"`),
+    },
     what: 'Say what should play what, press an example, or press an out port and then an in port. Pressing a wire takes it away.',
     readout: null, index: '/', indexLabel: 'positron' });
   useMediumColours();
@@ -387,7 +397,8 @@
 
   // A person's own requests go to the device log (pub.positron.studio/logs), never a check's.
   const ship = SELFCHECK ? () => {} : createShipper();
-  const logAsk = (line) => ship(`connect ${line}`);
+  let lastLine = '';
+  const logAsk = (line) => { if (!line.startsWith('[feedback]') && !line.startsWith('[page')) lastLine = line; ship(`connect ${line}`); };
   if (!SELFCHECK) { const say = d.log.bind(d); d.log = (m, lv) => { say(m, lv); if (lv === 'warn' || lv === 'bad') logAsk(`[page ${lv}] ${m}`); }; }
   let asking = Promise.resolve(), inFlight = false;
   /** A sentence asks the model; its answer replaces the patch, or nothing is built and the reason is said. */
