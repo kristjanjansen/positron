@@ -15,15 +15,17 @@ const LIT = [0x4f, 0xc3, 0xff], DARK = [0x05, 0x07, 0x0c];
  * `{ text, held }`, `held` the keys down as numbers 1 to 4.
  */
 export function drawPanel(ui, state) {
-  // The keys down the right edge, ^ at the top, level with the module's buttons; a held key lit.
-  // No header: at 0.96" its line is too small to read.
-  let hot = 0;
-  for (const k of state.held || []) hot |= 1 << (k - 1);
-  // ^ and v are drawn as chevrons rather than typed: in the 5x7 font they are a caret and a letter.
-  const right = ui.keysRight(['', '', KEY_SYMBOLS[2], KEY_SYMBOLS[3]], hot, 0);
-  const cell = H / 4, cx = Math.round((right + W) / 2);
-  chevron(ui, cx, Math.round(cell / 2), 'up');
-  chevron(ui, cx, Math.round(cell * 1.5), 'down');
+  // The keys down the right edge, ^ at the top, level with the module's buttons: no rules, a 14 px square
+  // per key that fills while it is held. No header: at 0.96" its line is too small to read.
+  const held = new Set(state.held || []), SQ = 14, sx = W - SQ, cell = H / 4;
+  for (let i = 0; i < 4; i++) {
+    const cy = Math.round(cell * (i + 0.5)), cx = sx + SQ / 2;
+    if (i < 2) chevron(ui, cx, cy, i ? 'down' : 'up');
+    else { const w = ui.textW(KEY_SYMBOLS[i]); ui.text(Math.round(cx - w / 2), Math.round(cy - ui.cap / 2), KEY_SYMBOLS[i]); }
+    // held: the square flipped, a lit square with the glyph cut out of it
+    if (held.has(i + 1)) ui.fill(sx, cy - SQ / 2, SQ, SQ, 2);
+  }
+  const right = sx - 2;
   // the message in what is left, word wrapped, as many lines as fit
   const per = Math.max(1, Math.floor((right - 3) / ui.adv)), step = ui.cap + 4, lines = [''];
   for (const w of String(state.text || '').split(/\s+/)) {
@@ -33,13 +35,12 @@ export function drawPanel(ui, state) {
   lines.slice(0, Math.floor((H - 2) / step)).forEach((ln, i) => ui.text(1, 2 + i * step, ln));
 }
 
-// A 7 by 4 chevron two pixels thick, centred on (cx, cy). Drawn by flipping pixels, so it reads on a
-// dark cell and on a lit (held) one alike.
+// A 7 by 4 chevron two pixels thick, centred on (cx, cy).
 const CHEVRON = [[3, 3], [2, 4], [1, 2, 4, 5], [0, 1, 5, 6]];
 function chevron(ui, cx, cy, dir) {
   CHEVRON.forEach((runs, r) => {
     const y = cy - 2 + (dir === 'up' ? r : 3 - r);
-    for (let i = 0; i < runs.length; i += 2) ui.fill(cx - 3 + runs[i], y, runs[i + 1] - runs[i] + 1, 1, 2);
+    for (let i = 0; i < runs.length; i += 2) ui.fill(cx - 3 + runs[i], y, runs[i + 1] - runs[i] + 1, 1, 1);
   });
 }
 
