@@ -399,6 +399,28 @@ is('a page this account deployed is allowed',
   is('NEGATIVE CONTROL: previous with an error is still a retry, not a revision', sent[0]?.messages?.length === 4 && /refused: ERROR: x/.test(sent[0].messages[3].content));
 }
 
+// ── /code in SuperCollider: the contract is sclang-lite's own whitelist ──
+{
+  const { UGENS, compile } = await import('../../../demo/shell/sclang-lite.mjs');
+  const { NOT_FOR_KEYS, SCLANG_EXAMPLES } = await import('../../../demo/shell/sclang-writer.mjs');
+  const sent = [];
+  const stub = async (model, payload) => { sent.push({ model, payload }); return { response: { code: '{ SinOsc.ar * 0.1 }' } }; };
+  const out = await handle('/code', { text: 'a warm pad', lang: 'sclang' }, stub);
+  const sys = sent[0]?.payload?.messages?.[0]?.content || '';
+  is('SuperCollider defaults to gpt-oss-120b at low effort, the measured best', sent[0]?.model === '@cf/openai/gpt-oss-120b' && sent[0]?.payload?.reasoning_effort === 'low', sent[0]?.model);
+  is('/code writes SuperCollider under a contract that offers every UGen the subset has for keys', out.status === 200 && out.body.code === '{ SinOsc.ar * 0.1 }'
+    && Object.keys(UGENS).filter((n) => !NOT_FOR_KEYS.includes(n)).every((n) => sys.includes(`${n}.`)), sys.slice(0, 120));
+  is('NEGATIVE CONTROL: the buffer and bus UGens a key cannot use are not offered', NOT_FOR_KEYS.every((n) => !new RegExp(`\\b${n}\\.`).test(sys)));
+  is('the SuperCollider contract names .range, the no precedence rule and full scale', /\.range\(lo: 0, hi: 1\)/.test(sys) && /NO PRECEDENCE/.test(sys) && /between -1 and 1/.test(sys));
+  is('a first SuperCollider try carries no examples, as GLSL\'s does not', !SCLANG_EXAMPLES.some((e) => sys.includes(e.body)));
+  sent.length = 0;
+  await handle('/code', { text: 'darker', lang: 'sclang', previous: SCLANG_EXAMPLES[0].body }, stub);
+  is('a SuperCollider revision carries both examples, and each compiles', SCLANG_EXAMPLES.every((e) => sent[0]?.payload?.messages?.[0]?.content.includes(e.body) && compile(e.body).ok));
+  sent.length = 0;
+  await handle('/code', { text: 'a bell', lang: 'sclang', model: '@cf/moonshotai/kimi-k2.6' }, stub);
+  is('kimi-k2.6 writes with its thinking off', sent[0]?.model === '@cf/moonshotai/kimi-k2.6' && sent[0]?.payload?.chat_template_kwargs?.thinking === false);
+}
+
 // ── the per-visitor cap on the paid routes ──
 {
   const { createLimiter, addressTag, BURST, PER_MINUTE, LIMITED } = await import('./limit.mjs');

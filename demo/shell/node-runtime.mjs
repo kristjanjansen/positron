@@ -60,6 +60,7 @@ export const NOT_YET = {
     'mix', 'rec-video', 'looper', 'store']),
   ...why('somebody else\'s server, opened only by a person\'s own press and never by a check, a later slice',
     ['station', 'newsreel', 'err-radio']),
+  ...why('a page\'s own clock drives it (/radio/scenery/), with nothing to link it to here', ['drift']),
   ...why('a hop between sites, carried by a transport rather than run in this tab', ['shout', 'stream-live', 'stream-hls', 'moq-relay']),
 };
 

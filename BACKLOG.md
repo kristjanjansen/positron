@@ -2,7 +2,7 @@
 
 - ~~**/connect/: the model is offered only parts that run here**~~ (2026-10-15, DONE). The owner's feedback: *"hear plaits only. should we have separate drumpad/seq and drum synth?"*: the drums went through web:mix, which has no engine on /connect/. The sequencer and the drum voices were already separate parts.
 
-- **Text to code, slice 2: a sentence writes a SuperCollider synth** (2026-10-15). Asked: *"Voice or text to SuperCollider doesn't exist yet. - do it"*. A page like /shader/write/ at /code/write/: the /code route with lang sclang and a contract from sclang-lite's whitelist, `.range` added to the subset, an offline render check (NaN, peak, silence) and a limiter before the speakers, the keys play it; plans/plan-text-to-code.md.
+- ~~**Text to code, slice 2: a sentence writes a SuperCollider synth**~~ (2026-10-15, DONE as /code/write/: gpt-oss-120b default, 20 of 20 ran across two runs, about 9 s; a sound check before the speakers and a -1 dBFS limiter; .range and .exprange in sclang-lite, the Pi needs a push for them). Asked: *"Voice or text to SuperCollider doesn't exist yet. - do it"*. A page like /shader/write/ at /code/write/: the /code route with lang sclang and a contract from sclang-lite's whitelist, `.range` added to the subset, an offline render check (NaN, peak, silence) and a limiter before the speakers, the keys play it; plans/plan-text-to-code.md.
 
 - **/shader/write/: slow, and no change when it timed out** (2026-10-15). Asked: *"shaders super slow and no change"*. The example shaders now join the /code prompt only on a retry or a revision; a first try is the plain contract again (5 to 10 s this morning).
 

@@ -28,7 +28,7 @@ export const NODES = {
     variantPages: { cc: ['code/piano', 'remote/piano'] },
     pages: ['synth/keyboard', 'synth/recorder', 'synth/timeline', 'synth/dots', 'synth/sound', 'code/faust',
       'code/collide', 'code/plaits', 'code/piano', 'remote/circuit', 'remote/collide', 'remote/piano',
-      'remote/plaits', 'radio/key', 'room/words'],
+      'remote/plaits', 'radio/key', 'room/words', 'code/write'],
   },
   typing: {
     node: 'keys', kind: 'person', label: 'keyboard',
@@ -102,7 +102,9 @@ export const NODES = {
   writer: {
     kind: 'person', label: 'writer',
     ports: { 'program-out': P({ shape: { of: 'glsl' } }) },
-    pages: ['shader/write'],
+    variants: { sclang: { 'program-out': { shape: { of: 'sclang' } } } },
+    variantPages: { sclang: ['code/write'] },
+    pages: ['shader/write', 'code/write'],
   },
   invert: {
     kind: 'person', label: 'invert',
@@ -170,8 +172,9 @@ export const NODES = {
   },
   collide: {
     kind: 'engine', label: 'SuperCollider',
-    ports: { 'midi-in': P({ ...TAKES_NOTE }), 'value-in': P({ ...PARAM }), 'audio-out': P() },
-    pages: ['code/collide', 'remote/collide'],
+    ports: { 'midi-in': P({ ...TAKES_NOTE }), 'value-in': P({ ...PARAM }),
+      'program-in': P({ shape: { of: 'sclang' }, optional: true }), 'audio-out': P() },
+    pages: ['code/collide', 'remote/collide', 'code/write'],
     labels: { 'remote/collide': 'SuperCollider here' },
   },
   plaits: {
@@ -401,7 +404,7 @@ export const NODES = {
       'code/collide', 'code/plaits', 'code/piano', 'granulator/grains', 'granulator/beat', 'remote/circuit',
       'remote/collide', 'remote/piano', 'remote/plaits', 'radio/blend', 'radio/tuner', 'radio/tempo', 'radio/live', 'radio/key',
       'shader/landscape', 'radio/scenery', 'room/words', 'typist/typewriter', 'typist/machines', 'typist/playback', 'typist/score',
-      'drums/machine', 'drums/knobs', 'drums/samples', 'drums/camera', 'drums/remote', 'history/newsreels'],
+      'drums/machine', 'drums/knobs', 'drums/samples', 'drums/camera', 'drums/remote', 'history/newsreels', 'code/write'],
   },
   scope: {
     kind: 'screen', label: 'waveform', match: ['scope-<name>'],

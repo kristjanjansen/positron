@@ -35,8 +35,8 @@ export const UGENS = {
   // `inline` an array spliced into the inputs, `order` the server's input order where it differs.
   // `outputs: 0` answers 0.0 as sclang does; `noAlias` changes the wire count (wirePeak).
   // why: lessons/kit-sclang-lite.md#ugens-grain-ring
-  Impulse:    { file: 'Osc.sc',     args: [['freq', 440], ['phase', 0]], madd: true },
-  Dust:       { file: 'Noise.sc',   args: [['density', 0]], madd: true },
+  Impulse:    { file: 'Osc.sc',     args: [['freq', 440], ['phase', 0]], madd: true, unipolar: true },
+  Dust:       { file: 'Noise.sc',   args: [['density', 0]], madd: true, unipolar: true },
   TRand:      { file: 'Noise.sc',   args: [['lo', 0], ['hi', 1], ['trig', 0]] },
   Phasor:     { file: 'Trig.sc',    args: [['trig', 0], ['rate', 1], ['start', 0], ['end', 1], ['resetPos', 0]] },
   BufFrames:  { file: 'InfoUGens.sc', args: [['bufnum', REQUIRED]], rates: ['kr'] },
@@ -122,6 +122,10 @@ const FOLD1 = {
   sqrt: (x) => (x < 0 ? -Math.sqrt(-x) : Math.sqrt(x)),
   midicps: (x) => 440 * 2 ** ((x - 69) / 12), sin: Math.sin, cos: Math.cos, tanh: Math.tanh,
 };
+/** UGen.sc's `range` and `exprange`, arguments and defaults verbatim. */
+export const RANGES = { range: [['lo', 0], ['hi', 1]], exprange: [['lo', 0.01], ['hi', 1]] };
+/** Every method this subset takes on a value, in the order a refusal names them. */
+export const METHODS = [...Object.keys(UNARY), 'dup', ...Object.keys(RANGES)];
 /** `sc_mod` in `SC_InlineBinaryOp.h`: the result is always on the divisor's side of zero, so -0.25 % 1 is 0.75. */
 const scMod = (a, b) => (b === 0 ? 0 : a - b * Math.floor(a / b));
 
@@ -506,7 +510,8 @@ function compileOrThrow(src, name, bus = 0) {
     const ref = add(cls, rate, refs, outs, 0, meta);
     // SendReply answers 0.0, sclang's own `^0.0`: it has no output to read.
     if (outs === 0) return num(0);
-    if (outs === 1) return { k: 'sig', rate, ref };
+    // `signalRange { ^\unipolar }` in the class file; .range reads it (UGen.sc). Arithmetic makes it bipolar again.
+    if (outs === 1) return { k: 'sig', rate, ref, ...(spec.unipolar ? { uni: true } : {}) };
     return { k: 'arr', items: Array.from({ length: outs }, (_, i) => ({ k: 'sig', rate, ref: { from: ref.from, out: i } })) };
   }
 
@@ -788,6 +793,29 @@ function compileOrThrow(src, name, bus = 0) {
     throw new SclError(t.t === 'eof' ? 'the text ends in the middle of something' : `${JSON.stringify(t.v)} was not expected here`, t);
   }
 
+  /**
+   * UGen.sc's `range` (a MulAdd onto lo..hi) and `exprange` (LinExp with no clip), read off the
+   * source's own `signalRange`: -1..1 unless the class says unipolar. An array does each item.
+   * why: lessons/kit-sclang-lite.md#range
+   */
+  function ranged(kind, v, got, at) {
+    const [lo, hi] = bind(RANGES[kind], got, `.${kind}`, at);
+    for (const x of [lo, hi]) {
+      if (x.k !== 'num' && x.k !== 'sig') throw new SclError(`.${kind} takes a number or a signal for lo and hi, not ${describe(x)}`, at);
+    }
+    if (v.k === 'arr') return { k: 'arr', items: v.items.map((x) => ranged1(kind, x, lo, hi, at)) };
+    return ranged1(kind, v, lo, hi, at);
+  }
+  function ranged1(kind, v, lo, hi, at) {
+    if (v.k !== 'sig') throw new SclError(`.${kind} maps a signal, and ${describe(v)} is not one`, at);
+    if (kind === 'range') {
+      const mul = v.uni ? binop('-', hi, lo, at) : binop('*', binop('-', hi, lo, at), num(0.5), at);
+      return madd(v, mul, v.uni ? lo : binop('+', mul, lo, at), at);
+    }
+    const [inMin, inMax] = v.uni ? [0, 1] : [-1, 1];
+    return { k: 'sig', rate: v.rate, ref: add('LinExp', v.rate, [v.ref, g.value(inMin), g.value(inMax), input(lo, at), input(hi, at)]) };
+  }
+
   function postfix() {
     let v = primary();
     while (is('punc', '.')) {
@@ -801,8 +829,9 @@ function compileOrThrow(src, name, bus = 0) {
         v = dup(v, got[0]?.val ?? num(2), m);
         continue;
       }
+      if (m.v in RANGES) { v = ranged(m.v, v, callArgs(), m); continue; }
       if (m.v === 'play') throw new SclError('leave off .play, this page plays the function itself', m);
-      throw new SclError(`.${m.v} is not in this subset; it knows .${[...Object.keys(UNARY), 'dup'].join(' .')}`, m);
+      throw new SclError(`.${m.v} is not in this subset; it knows .${METHODS.join(' .')}`, m);
     }
     return v;
   }

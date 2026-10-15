@@ -58,6 +58,47 @@ for (const p of PRESETS) {
 
 // ── the language, against numbers read off SuperCollider's class files ────────
 
+// .range and .exprange, against UGen.sc: bipolar by default, unipolar where the class says so.
+// why: lessons/kit-sclang-lite.md#range
+{
+  const r = compile('{ SinOsc.ar(SinOsc.kr(2).range(200, 800)) }');
+  const m = compile('{ SinOsc.ar(SinOsc.kr(2, mul: 300, add: 500)) }');
+  ok('.range on a bipolar UGen is the MulAdd UGen.sc writes, mul (hi - lo) / 2 and add mul + lo, byte for byte',
+    r.ok && m.ok && sameBytes(r.bytes, m.bytes), `${r.bytes?.length} B and ${m.bytes?.length} B`);
+  const u = compile('{ SinOsc.ar(Impulse.kr(2).range(200, 800)) }');
+  const um = compile('{ SinOsc.ar(Impulse.kr(2, mul: 600, add: 200)) }');
+  ok('.range on Impulse, whose signalRange is unipolar, is mul hi - lo and add lo',
+    u.ok && um.ok && sameBytes(u.bytes, um.bytes), u.ok ? `${u.bytes.length} B` : u.message);
+  const du = compile('{ SinOsc.ar(Dust.kr(5).range(1, 3)) * 0.1 }');
+  const dm = compile('{ SinOsc.ar(Dust.kr(5, mul: 2, add: 1)) * 0.1 }');
+  ok('and on Dust, the other unipolar class in the subset', du.ok && dm.ok && sameBytes(du.bytes, dm.bytes));
+  const a = compile('{ SinOsc.ar((Impulse.kr(2) * 2).range(200, 800)) }');
+  const am = compile('{ SinOsc.ar((Impulse.kr(2) * 2) * 300 + 500) }');
+  ok('NEGATIVE CONTROL: after arithmetic the signal is bipolar again, as a BinaryOpUGen is in sclang',
+    a.ok && am.ok && sameBytes(a.bytes, am.bytes), a.ok ? '' : a.message);
+  const d0 = compile('{ SinOsc.ar(SinOsc.kr(2).range * 100) }');
+  const d0m = compile('{ SinOsc.ar(SinOsc.kr(2, mul: 0.5, add: 0.5) * 100) }');
+  ok('.range with no arguments is 0 to 1, the defaults in UGen.sc', d0.ok && d0m.ok && sameBytes(d0.bytes, d0m.bytes));
+}
+{
+  const { r, d } = def('{ SinOsc.ar(LFNoise1.kr(1).exprange(100, 1000)) * 0.1 }');
+  const le = d ? byName(d, 'LinExp')[0] : null;
+  ok('.exprange on a bipolar UGen is one LinExp from -1..1 to lo..hi, at the rate of what it maps',
+    r.ok && le && ins(d, le).join(' ') === 'LFNoise1:0 -1 1 100 1000' && le.rate === 1, le ? `${ins(d, le).join(' ')} rate ${le.rate}` : r.message);
+  const u = def('{ SinOsc.ar(Impulse.kr(1).exprange(100, 1000)) * 0.1 }');
+  const ue = u.d ? byName(u.d, 'LinExp')[0] : null;
+  ok('NEGATIVE CONTROL: on a unipolar UGen the LinExp reads 0..1', ue && ins(u.d, ue).join(' ') === 'Impulse:0 0 1 100 1000', ue ? ins(u.d, ue).join(' ') : u.r.message);
+  const dflt = def('{ SinOsc.ar(LFTri.kr(1).exprange * 1000) * 0.1 }');
+  const de = dflt.d ? byName(dflt.d, 'LinExp')[0] : null;
+  ok('.exprange with no arguments is 0.01 to 1', de && close(inp(dflt.d, de.inputs[3]), 0.01) && inp(dflt.d, de.inputs[4]) === 1);
+  const arr = def('{ SinOsc.ar(SinOsc.kr([1, 2]).range(1, 3) * 100) * 0.1 }');
+  ok('an array is ranged item by item, as SequenceableCollection does', arr.r.ok && arr.r.channels === 2 && byName(arr.d, 'SinOsc').length === 4,
+    arr.r.ok ? `${byName(arr.d, 'SinOsc').length} SinOsc` : arr.r.message);
+  const sig = compile('{ |freq = 220| SinOsc.ar(SinOsc.kr(1).range(freq, freq * 2)) * 0.1 }');
+  ok('lo and hi may be signals', sig.ok, sig.ok ? '' : sig.message);
+}
+
+
 {
   const { d } = def('{ SinOsc.ar(1 + 2 * 3) }');
   const s = byName(d, 'SinOsc')[0];
@@ -431,7 +472,10 @@ const REFUSE = [
   ['a default that is not a number', '{ |freq = x| SinOsc.ar(freq) }', 1, 11, /has to be a number/],
   ['a brace that never closes', '{ SinOsc.ar(300)\n', 1, 1, /never closed/],
   ['an Env shape that does not exist', '{ SinOsc.ar * EnvGen.kr(Env([0, 1, 0], [1, 1], \\wobble)) }', 1, 48, /wobble is not one of Env's shapes/],
-  ['a method outside the subset', '{ SinOsc.ar(300).range(1, 2) }', 1, 18, /\.range is not in this subset/],
+  ['a method outside the subset', '{ SinOsc.ar(300).clip(1, 2) }', 1, 18, /\.clip is not in this subset; it knows .*\.range \.exprange/],
+  ['NEGATIVE CONTROL: .range on a number, which has no signalRange', '{ 3.range(1, 2) }', 1, 5, /\.range maps a signal, and the number 3 is not one/],
+  ['.exprange with an argument UGen.sc does not name', '{ SinOsc.ar(LFNoise1.kr(1).exprange(lo: 100, high: 900)) }', 1, 46, /\.exprange has no argument called high; it takes lo, hi/],
+  ['.range with an array for lo', '{ SinOsc.ar(LFNoise1.kr(1).range([1, 2], 3)) }', 1, 28, /takes a number or a signal for lo and hi, not an array/],
   // Named controls. The values under `String.raw` are what a person types.
   ['NEGATIVE CONTROL: an audio rate named control', String.raw`{ SinOsc.ar(\x.ar(300)) }`, 1, 16, /\\x\.ar is an audio rate control/],
   ['a named control read once at the start', String.raw`{ SinOsc.ar(\x.ir(300)) }`, 1, 16, /\\x\.ir is a control read once/],

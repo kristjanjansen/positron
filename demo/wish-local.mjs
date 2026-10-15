@@ -255,5 +255,5 @@ http.createServer((req, res) => {
   else console.log(`  credential   the wrangler session, good to ${s.at || 'an unrecorded time'}`);
   console.log('  POST /hear  { audio: base64, model? }');
   console.log('  POST /wish  { text, ports: [...], model?, facts?, history?: [{ said, links, settings? }], current?: [links], currentSettings? }');
-  console.log('  POST /code  { text, lang: glsl, contract?, error?, previous? (alone: a revision of it), model? }');
+  console.log('  POST /code  { text, lang: glsl or sclang, contract?, error?, previous? (alone: a revision of it), model? }');
 });

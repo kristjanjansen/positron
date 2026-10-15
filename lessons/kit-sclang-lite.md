@@ -409,3 +409,30 @@ The ring's echo, 2026-10-13: Delay.sc and InOut.sc at develop 1995490.
 LocalIn.ar(2) is one block, two outputs, and `argDefault.wrapExtend(2)`
 as its inputs, so two zeros; LocalOut is one block with no output whose
 inputs are the channels; DelayC is in, maxdelaytime, delaytime.
+
+<a id="range"></a>
+
+## sclang-lite.mjs, ranged (`.range` and `.exprange`)
+
+Added 2026-10-15 for slice 2 of `plans/plan-text-to-code.md`, where `.range` and
+`.exprange` were the commonest gap (3 of 8 ordinary programs). Read off
+`SCClassLibrary/Common/Audio/UGen.sc` on supercollider develop `d877096`:
+
+    range { arg lo = 0.0, hi = 1.0;
+        if (this.signalRange == \bipolar) { mul = (hi - lo) * 0.5; add = mul + lo }
+        { mul = (hi - lo); add = lo };
+        ^MulAdd(this, mul, add) }
+    exprange { arg lo = 0.01, hi = 1.0;
+        ^if (this.signalRange == \bipolar) { this.linexp(-1, 1, lo, hi, nil) }
+        { this.linexp(0, 1, lo, hi, nil) } }
+
+`signalRange` is `\bipolar` on `UGen` and overridden to `\unipolar` by, among
+the subset's classes, only `Impulse` (Osc.sc) and `Dust` (Noise.sc).
+`BinaryOpUGen` and `MulAdd` do not override it, so `(Impulse.kr(2) * 2).range`
+maps from -1..1 in real SuperCollider too, and so it does here. `Phasor` and
+`EnvGen` run 0..1 and still say bipolar; that is sclang's answer and this file
+keeps it. `linexp` with `clip: nil` is a bare `LinExp` UGen (`prune` returns the
+receiver), which both the vendored wasm scsynth and the Pi's scsynth carry
+(`strings scsynth-nrt.wasm | grep LinExp`). The MulAdd is written as two
+BinaryOpUGens, as `madd` already is in this file, so `.range(200, 800)` on a
+SinOsc is the same bytes as `mul: 300, add: 500`, which the test asserts.

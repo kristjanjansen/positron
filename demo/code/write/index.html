@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Written synth</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<script type="module">
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el, createShipper } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createAskBar } from '/shell/ask-bar.mjs';
+  import { make as makeCollide } from '/shell/rt-collide.mjs';
+  import { make as makeWriter, WISH_API } from '/shell/rt-writer.mjs';
+  import { createSclangTrial } from '/shell/sclang-trial.mjs';
+  import { SCLANG_EXAMPLES, checkSound } from '/shell/sclang-writer.mjs';
+  import { hashOf } from '/shell/code-writer.mjs';
+  import { compile } from '/shell/sclang-lite.mjs';
+
+  // A sentence becomes a SuperCollider synth: the writer asks the wish worker's /code, compiles each
+  // answer and plays one held note of it where nobody hears it, and only a program that compiled and
+  // stayed inside full scale leaves on program-out. The keys play the last good synth throughout.
+  const S = 'web';
+  const WR_OUT = `${S}:writer:program-out`, SC_PROG = `${S}:collide:program-in`;
+  const KEYS_OUT = `${S}:keys:midi-out`, SC_MIDI = `${S}:collide:midi-in`;
+  const SC_OUT = `${S}:collide:audio-out`, SPEAKER = `${S}:speaker:audio-in`;
+  const q = new URLSearchParams(location.search);
+  const API = q.get('api') || WISH_API;
+  /** The limiter's ceiling: -1 dBFS, so nothing written can reach the speakers above it. */
+  const CEILING = 10 ** (-1 / 20);
+
+  const d = mount({ name: 'Written synth', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  conceptNav('code/write');
+  const log = (m, lv) => d.log(m, lv);
+
+  // A person's own requests go to the device log (pub.positron.studio/logs), never a check's.
+  const ship = SELFCHECK ? () => {} : createShipper();
+  let lastLine = '';
+  const logAsk = (line) => { lastLine = line; ship(`code/write ${line}`); };
+
+  // ── the self-check's model: canned programs, so a check asks the worker nothing ──
+  const GOOD = SCLANG_EXAMPLES[0].body;
+  const LOUD = `{ |freq = 220, amp = 0.2, gate = 1|
+    var env = EnvGen.kr(Env.adsr(0.01, 0.2, 0.8, 0.3), gate, doneAction: 2);
+    Saw.ar(freq) * env * 8
+}`;
+  const BROKEN = '{ |freq = 220, amp = 0.2, gate = 1| Pluck.ar(WhiteNoise.ar, gate, 0.02, 1 / freq, 2) * amp }';
+  const asks = [];
+  const canned = async (a) => {
+    asks.push(a);
+    if (/busy/.test(a.text)) throw Object.assign(new Error('too many requests from here: at most 6 in 10 s, try again in 4 s'), { plain: true });
+    return { code: /broken/.test(a.text) ? BROKEN : /loud/.test(a.text) ? LOUD : GOOD, ms: 0, model: 'canned', usage: { total_tokens: 0 } };
+  };
+
+  // ── the sound: one context, made on a press, and a limiter before the speakers ──
+  let ctx = null, master = null, outAn = null, on = false;
+  function context() {
+    if (ctx) return ctx;
+    ctx = new AudioContext();
+    master = ctx.createGain(); master.gain.value = 0.8;
+    // A fast compressor catches the rise, then a hard clip at -1 dBFS holds whatever got past it.
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -6; comp.knee.value = 0; comp.ratio.value = 20; comp.attack.value = 0.001; comp.release.value = 0.1;
+    const clip = ctx.createWaveShaper();
+    clip.curve = Float32Array.from({ length: 2049 }, (_, i) => Math.max(-CEILING, Math.min(CEILING, i / 1024 - 1)));
+    outAn = ctx.createAnalyser(); outAn.fftSize = 32768;
+    master.connect(comp); comp.connect(clip); clip.connect(outAn); outAn.connect(ctx.destination);
+    return ctx;
+  }
+  /** The engine's sound goes where the bay's audio links say. */
+  function route() {
+    const out = collide.audio.out();
+    if (!out) return;
+    try { out.disconnect(); } catch { /* not connected */ }
+    for (const l of bay.links()) if (l.from === SC_OUT && l.to === SPEAKER) out.connect(master);
+  }
+  async function start() {
+    context().resume();
+    if (on) return true;
+    try { await collide.voice.wake(ctx); } catch { return false; }
+    route();
+    on = true;
+    pb.refresh();
+    return true;
+  }
+
+  // ── the runtimes: collide is /connect/'s, the writer is /shader/write/'s in SuperCollider ──
+  const bay = createBay();
+  const collide = makeCollide({ log, wake: () => start(), reroute: route });
+  const check = createSclangTrial({ context, log });
+  const writer = makeWriter({ log, api: API, lang: 'sclang', model: q.get('model') || '', ask: SELFCHECK ? canned : null,
+    trial: (src) => check.trial(src), send: (port, ev) => bay.send(`${S}:writer:${port}`, ev) });
+  addNodes(bay, S, [{ name: 'writer', variant: 'sclang' }, 'keys', 'collide', 'speaker'], {
+    deliver: {
+      'collide:program-in': collide.deliver['program-in'], 'collide:midi-in': collide.deliver['midi-in'],
+    },
+    portLabel: 'node:port',
+  });
+  for (const [a, b] of [[WR_OUT, SC_PROG], [KEYS_OUT, SC_MIDI], [SC_OUT, SPEAKER]]) {
+    bay.seen(a); bay.seen(b);
+    const r = bay.link(a, b, [], { site: S });
+    if (!r.ok) log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+  const sentOn = (from, to) => bay.links().find((l) => l.from === from && l.to === to)?.sent ?? 0;
+
+  // ── the keys: notes leave on keys:midi-out and nowhere else ──
+  const host = el('div');
+  const kb = createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => {
+      if (how === 'midi') return;
+      bay.send(KEYS_OUT, { cls: 'note', ch: 1, d1: note, d2: 100 });
+      if (!on) start();
+    },
+    onUp: (note, how) => { if (how === 'midi') return; bay.send(KEYS_OUT, { cls: 'note', ch: 1, d1: note, d2: 0 }); },
+  });
+  for (const ev of ['pointerenter', 'focusin', 'touchstart']) host.addEventListener(ev, () => collide.voice.warm(), { once: true, passive: true });
+
+  // ── the ask: a sentence or a pill, then the writer's loop ──
+  const PILLS = ['a warm pad', 'a plucky bass', 'a bell', 'wind', 'a detuned saw lead', 'a kick drum', 'a soft organ', 'a wobbly bass'];
+  const said = (r) => {
+    if (r.verdict === 'ran') return '';
+    if (r.verdict === 'failed') return `Nothing was written: ${r.error}. The old synth keeps playing.`;
+    return `The synth did not change: ${r.error}. The old synth keeps playing.`;
+  };
+  // A conversation: once a written synth runs (or a hand edit to the code box), the next sentence
+  // revises the program in the code box. A pill or start new begins again from nothing.
+  let live = false, follow = 0, handEdited = false;
+  collide.code.input.addEventListener('input', () => { handEdited = true; showTurn(); });
+  const followsNow = () => live || handEdited;
+  function startFresh() { live = false; follow = 0; handEdited = false; showTurn(); }
+  async function write(text, { how = 'typed', fresh = how === 'pill' } = {}) {
+    // Made inside the press, so the sound check and the keys have a running context.
+    context().resume();
+    if (fresh) startFresh();
+    const isFollow = followsNow();
+    if (isFollow) follow++;
+    const base = isFollow ? collide.code.input.value : null;
+    bar.say('');
+    log(isFollow ? `changing the synth in the code box (follow-up ${follow}): ${text}` : `writing: ${text}`);
+    const r = await writer.write(text, { base, onTry: (t) => {
+      for (const f of t.fixed || []) log(`try ${t.attempt}: ${f}`);
+      const loud = t.peak != null ? `, peak ${t.peak.toFixed(2)}` : '';
+      log(`try ${t.attempt}: ${t.ok && !t.error ? `compiled and sounded${loud}` : t.error || 'refused'}${t.ms != null ? `, the answer took ${t.ms} ms` : ''}`, t.ok && !t.error ? '' : 'warn');
+    } });
+    if (!r) return null;
+    if (r.source) { live = true; handEdited = false; }
+    showTurn();
+    bar.say(said(r), r.verdict === 'ran' ? '' : 'bad');
+    if (r.source) log(`playing the written synth from the next note: ${r.tries.length} ${r.tries.length === 1 ? 'try' : 'tries'}, ${r.ms} ms, ${r.tokens} tokens, by ${r.model}`);
+    const verdict = r.verdict === 'ran' ? `ran, peak ${r.tries.at(-1).peak?.toFixed(2)}` : `${r.verdict}: ${String(r.error).split('\n')[0]}`;
+    logAsk(`[code] lang sclang "${text}" via ${how}, ${isFollow ? `follow-up ${follow}` : 'new'}, model ${r.model || '?'}, ${r.tries.length} attempt(s), ${r.ms} ms, ${r.tokens} tokens, ${verdict}`
+      + `${r.source ? `, ${r.source.length} chars, hash ${hashOf(r.source)}` : ''}`);
+    return r;
+  }
+  const bar = createAskBar({ placeholder: 'say a sound, and a model writes its synth', api: API, log, ship: logAsk,
+    selfcheck: SELFCHECK,
+    pills: [{ say: 'start new', title: 'the next sentence writes a new synth instead of changing this one', onPress: () => {
+      startFresh(); log('a new synth: the next sentence starts from nothing'); logAsk('[new] pressed start new');
+    } }, ...PILLS.map((say) => ({ say }))],
+    vocabulary: () => ['SuperCollider', 'synth', 'pad', 'bass', 'organ'],
+    onAsk: (text, { how }) => write(text, { how }) });
+  const startPill = bar.pills[0];
+  // start new is shown only while there is a conversation to forget.
+  function showTurn() { startPill.hidden = !followsNow(); }
+  showTurn();
+
+  const pb = createPatchbay(bay, {
+    flowing: (l) => (l.from === SC_OUT ? on : l.from === KEYS_OUT ? on && collide.voice.held().length > 0 : false),
+  });
+  d.stack.add(bar.el, host, collide.code.el, pb.el);
+
+  window.__demo.write = write;
+  window.__demo.writer = writer;
+  window.__demo.collide = collide;
+  window.__demo.trial = check;
+  window.__demo.keyboard = kb;
+  window.__demo.bar = bar;
+  window.__demo.bay = bay;
+  window.__demo.out = () => { if (!outAn) return null; const b = new Float32Array(outAn.fftSize); outAn.getFloatTimeDomainData(b); return checkSound(b); };
+
+  if (SELFCHECK) await selfcheck();
+  d.ready();
+
+  async function selfcheck() {
+    const A = d.assert;
+    const fetches = [], sockets = [];
+    const f0 = window.fetch;
+    window.fetch = (u, o) => { fetches.push(String(u)); return f0(u, o); };
+    const W0 = window.WebSocket;
+    window.WebSocket = function (...a) { sockets.push(a[0]); return new W0(...a); };
+    const gum = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
+    let micAsked = 0;
+    if (gum) navigator.mediaDevices.getUserMedia = (o) => { micAsked++; return gum(o); };
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const toWorker = () => fetches.filter((u) => u.startsWith(API)).length;
+    /** Hold a key for `ms`, let go, and read what reached the speakers' side of the limiter. */
+    async function playNote(ms = 500) {
+      bay.send(KEYS_OUT, { cls: 'note', ch: 1, d1: 60, d2: 100 });
+      await sleep(ms);
+      const heard = window.__demo.out();
+      bay.send(KEYS_OUT, { cls: 'note', ch: 1, d1: 60, d2: 0 });
+      await sleep(400);
+      return heard;
+    }
+
+    const first = collide.code.input.value;
+    A('nothing is written or opened on a visit: no context, no engine, nothing asked, and start new is not drawn',
+      ctx === null && writer.asked() === 0 && collide.programs().ran === 0 && startPill.hidden && getComputedStyle(startPill).display === 'none',
+      `${collide.programs().ran} programs, start new ${getComputedStyle(startPill).display}`);
+
+    // Positive control: a good synth passes the sound check, arrives on program-in along the link, and plays.
+    const r1 = await write('canned bell');
+    await collide.programs().last?.loaded;
+    const t1 = r1?.tries[0] || {};
+    A('a good synth runs in one try: it compiled, its held note sounded inside full scale, and it reached collide along the link into the code box',
+      r1?.verdict === 'ran' && r1.tries.length === 1 && t1.peak > 0.01 && t1.peak <= 1 && !t1.nan && collide.programs().ran === 1
+        && sentOn(WR_OUT, SC_PROG) === 1 && collide.code.input.value === `${GOOD}\n` && check.renders() === 1,
+      `${r1?.verdict}, peak ${t1.peak?.toFixed(3)}, rms ${t1.rms?.toFixed(3)}, render ${t1.renderMs} ms, sent ${sentOn(WR_OUT, SC_PROG)}`);
+    await start();
+    const heard = await playNote();
+    A('a key plays the written synth through the speakers\' chain', heard && heard.peak > 0.01 && heard.peak <= CEILING + 1e-4 && sentOn(KEYS_OUT, SC_MIDI) >= 2,
+      heard ? `peak ${heard.peak.toFixed(3)} after the limiter` : 'no context');
+    A('start new is drawn once there is a synth to forget', !startPill.hidden && getComputedStyle(startPill).display !== 'none');
+    const good = collide.code.input.value;
+
+    // Negative control: a synth that clips is refused by the sound check, three times, before the speakers.
+    const r2 = await write('canned loud');
+    A('a clipping synth is refused before the speakers: three tries, each peaked above full scale, none sent, the old synth stays',
+      r2?.verdict === 'refused' && r2.tries.length === 3 && r2.tries.every((t) => t.peak > 1) && sentOn(WR_OUT, SC_PROG) === 1
+        && collide.programs().ran === 1 && collide.code.input.value === good,
+      `${r2?.verdict}, peaks ${r2?.tries.map((t) => t.peak?.toFixed(2)).join(' ')}`);
+    A('the refusal is said with the peak, and the retry told the model the number', /times full scale/.test(bar.said()) && /old synth keeps playing/.test(bar.said())
+      && /Keep the last line between -1 and 1/.test(asks.at(-1)?.error || ''), bar.said());
+    A('a sentence after a written synth was follow-up 1: its first ask carried the code box\'s program and no error',
+      asks.at(-3)?.previous === good && asks.at(-3)?.error === null && /, follow-up 1, /.test(lastLine), lastLine.slice(0, 90));
+
+    // Negative control: a program outside the subset is retried with the compiler's list, and the old synth stays.
+    const r3 = await write('canned broken');
+    A('a program outside the subset is tried three times with the compiler\'s list of what it knows, and the old synth keeps playing',
+      r3?.verdict === 'refused' && r3.tries.length === 3 && /Pluck is not in this subset, which knows SinOsc/.test(asks.at(-1)?.error || '')
+        && collide.programs().ran === 1 && collide.code.input.value === good && collide.voice.compiled.bytes.length === compile(good, { name: 'collide' }).bytes.length,
+      `${r3?.verdict}, ${(asks.at(-1)?.error || '').slice(0, 70)}`);
+    const door = collide.deliver['program-in']({ of: 'program', source: BROKEN });
+    A('NEGATIVE CONTROL: program-in refuses a program that does not compile and keeps the running one', !door.ok && /Pluck/.test(door.error)
+      && collide.code.input.value === good && collide.programs().refused === 1, door.error);
+
+    // The limiter: a loud program handed straight to program-in, as typing could, still leaves at -1 dBFS.
+    const loudIn = collide.deliver['program-in']({ of: 'program', source: LOUD });
+    await loudIn.loaded;
+    const loudHeard = await playNote(400);
+    A('the limiter holds a program that clips at 8 times full scale to -1 dBFS at the speakers', loudIn.ok && loudHeard && loudHeard.peak <= CEILING + 1e-4 && loudHeard.peak > 0.5,
+      loudHeard ? `peak ${loudHeard.peak.toFixed(4)}, ceiling ${CEILING.toFixed(4)}` : 'nothing');
+    await collide.deliver['program-in']({ of: 'program', source: good }).loaded;
+
+    // A pill starts fresh; start new forgets the conversation and hides itself.
+    const pill = bar.pills[1];
+    pill.click();
+    const busyWhile = pill.dataset.busy === '1';
+    while (bar.busy()) await sleep(20);
+    A('a pill asks its sentence, shimmers while the writer works, and starts fresh', busyWhile && !pill.dataset.busy && asks.at(-1)?.previous === null
+      && /via pill, new, /.test(lastLine) && collide.programs().ran === 4, `busy ${busyWhile}, ${lastLine.slice(0, 60)}`);
+    startPill.click();
+    A('start new forgets the conversation, asks nothing, and is hidden again', startPill.hidden && !followsNow() && /\[new\] pressed start new/.test(lastLine));
+
+    const ran0 = collide.programs().ran;
+    const busy = await write('canned busy');
+    A('a refusal for asking too often is said plainly and the old synth keeps playing', busy?.verdict === 'failed'
+      && /^Nothing was written: too many requests from here/.test(bar.said()) && collide.programs().ran === ran0, bar.said());
+
+    // The worker's examples pass this page's own sound check.
+    const ex = [];
+    for (const e of SCLANG_EXAMPLES) ex.push({ name: e.name, ...(await check.trial(e.body)) });
+    A('the examples in the prompt compile and sound inside full scale here', ex.every((e) => e.ok && !e.unchecked && !e.nan && !e.silent && e.peak <= 1),
+      ex.map((e) => `${e.name} ${e.ok ? `peak ${e.peak?.toFixed(2)}` : e.error}`).join(', '));
+
+    A('nothing reaches pi-1: no node or link names it, no relay socket was opened, and the check asked the worker nothing',
+      !bay.nodes().some((x) => x.id.startsWith('pi-1:')) && !bay.links().some((l) => /pi-1:/.test(l.from + l.to))
+        && sockets.length === 0 && toWorker() === 0 && writer.asked() === 0 && micAsked === 0 && first !== good,
+      `${sockets.length} sockets, ${toWorker()} worker calls, ${micAsked} microphone asks`);
+    window.fetch = f0; window.WebSocket = W0;
+    if (gum) navigator.mediaDevices.getUserMedia = gum;
+  }
+</script>

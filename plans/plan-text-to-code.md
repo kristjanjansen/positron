@@ -543,3 +543,40 @@ handlers, the relay header, the wish worker, /connect/'s ask path. Measuring:
 one sclang-lite test run, 24 programs written and compiled (8 per language),
 8 Faust renders, one headless Chrome run, all local, zero external API spend.
 Searches: Cloudflare's documentation, and the web for §4.
+
+## 10. Slice 2, built 2026-10-15: a sentence writes a SuperCollider synth (/code/write/)
+
+Built locally, not committed, not deployed. Page: `demo/code/write/index.html`.
+
+- **One loop for both languages.** `demo/shell/code-writer.mjs` (`writeLoop`) asks, adapts, tries and
+  judges; `glsl-writer.mjs` and the new `sclang-writer.mjs` hand it an adapter, a trial and a judge.
+  /shader/write/'s self-check is 15/15 on the shared loop, `glsl-writer-test.mjs` 36/36 unchanged.
+- **The contract is sclang-lite's own tables** (`sclangContract()`: every UGen with its arguments and
+  defaults, the Env methods, the methods, minus `NOT_FOR_KEYS`, the eight buffer and bus UGens a key
+  cannot use). Examples only on a retry or a revision, as GLSL.
+- **`.range` and `.exprange` are in sclang-lite**, read off UGen.sc: bipolar unless the class says
+  unipolar (Impulse and Dust in the subset); `.range` is the MulAdd, `.exprange` a bare `LinExp`.
+  The Pi compiles the same file and needs a push to have them.
+- **Safety before sound.** Every answer that compiles plays one held note (middle C, velocity 100,
+  0.5 s) on a second scsynth in the page's context wired to no speaker (`sclang-trial.mjs`); NaN, a
+  peak above 1 and a peak under 0.001 are refused and never sent on program-out. The page's output
+  runs through a compressor and a hard clip at -1 dBFS (0.891). MEASURED: a program peaking at 5.09
+  was refused three times; the same program handed straight to program-in left the limiter at 0.8913.
+- **A copy of the contract's shape is refused** before any render: qwen3-30b answered the shape
+  unchanged for 9 of 10 sentences in the first run, and every compile and sound number called it a
+  success.
+
+**MEASURED, ten sentences per model through the real page against `node demo/wish-local.mjs`**, second
+run (after the copy refusal and a `60.midicps` fold in the adapter), first run in brackets:
+
+| model | first-shot compiled | compiled within 3 | sound check passed | mean attempts | ms median | ms max | tokens median | distinct programs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| gpt-oss-120b (low effort) | 8/10 (8) | 10/10 (10) | **10/10 (10)** | 1.2 | 9408 | 17434 | 1787 | 10 of 10 |
+| qwen2.5-coder-32b | 7/10 (9) | 10/10 (9) | 9/10 (9) | 1.4 | 6299 | 18013 | 1342 | 9 of 9 |
+| kimi-k2.6 (thinking off) | 7/10 (6) | 9/10 (9) | 8/10 (9) | 1.4 | 8300 | 18620 | 1397 | 8 of 8 |
+| qwen3-30b-a3b-fp8 | 10/10 (10) | 10/10 (10) | 10/10 (10) | 1.3 | 2648 | 4024 | 1309 | 9 of 10 (2 of 10) |
+
+Default for `lang: 'sclang'` is gpt-oss-120b (`CODE_DEFAULT` in wish.mjs): 20 of 20 ran, distinct,
+and the most worked programs read (a kick with a pitch envelope and a noise click). qwen3-30b is
+fastest but, even after the copy refusal, mostly swaps one oscillator in the shape. Not settled: how
+any of it sounds, which needs an ear (section 6.5). Both runs cost about $0.10 in total.

@@ -379,6 +379,7 @@ export function settingsFrom(out, fixed = [], links = []) {
 // The contract is generated from the module whose program runs it, never typed here.
 import { glslContract } from '../../../demo/shell/mirror-shader.mjs';
 import { glslExamples } from '../../../demo/shell/glsl-examples.mjs';
+import { sclangContract, sclangExamples } from '../../../demo/shell/sclang-writer.mjs';
 
 /** The models that write a program; the first is the default. MEASURED 2026-10-15 on /shader/write/, ten
  *  sentences each: qwen2.5-coder compiled 20 of 20 first shot at 6.3 to 6.8 s median, qwen3-30b 18 of 20
@@ -387,20 +388,26 @@ export const CODE = [
   '@cf/qwen/qwen2.5-coder-32b-instruct',
   '@cf/qwen/qwen3-30b-a3b-fp8',
   '@cf/moonshotai/kimi-k2.7-code',
+  '@cf/moonshotai/kimi-k2.6',
   '@cf/qwen/qwen3.8-27b',
   '@cf/openai/gpt-oss-120b',
   '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
 ];
+/** The model a language gets when a page names none. SuperCollider, MEASURED 2026-10-15 on /code/write/, ten
+ *  sentences twice: gpt-oss-120b ran 20 of 20 (9.4 s median, distinct programs), qwen2.5-coder 18 of 20 at 6.3 s,
+ *  kimi-k2.6 17 of 20 at 8.3 s, qwen3-30b 20 of 20 at 2.6 s but by changing one oscillator in the contract's shape. */
+export const CODE_DEFAULT = { glsl: CODE[0], sclang: '@cf/openai/gpt-oss-120b' };
 /** The languages /code writes, each with the contract its runtime keeps. */
-export const CODE_LANGS = { glsl: glslContract };
+export const CODE_LANGS = { glsl: glslContract, sclang: sclangContract };
 /** Short good programs per language, said after the contract; a page's own contract does not replace them. */
-export const CODE_EXAMPLES = { glsl: glslExamples };
+export const CODE_EXAMPLES = { glsl: glslExamples, sclang: sclangExamples };
 export const CODE_MAX_TOKENS = 1000;
 /** A page may send its own contract, a previous program and a compiler error, each capped. */
 export const CODE_TEXT_MAX = 12000;
 // Per model: a thinking model spends max_tokens on thought unless told not to.
 const CODE_EXTRA = {
   '@cf/moonshotai/kimi-k2.7-code': { chat_template_kwargs: { thinking: false } },
+  '@cf/moonshotai/kimi-k2.6': { chat_template_kwargs: { thinking: false } },
   '@cf/openai/gpt-oss-120b': { reasoning_effort: 'low' },
   '@cf/qwen/qwen3.8-27b': { chat_template_kwargs: { enable_thinking: false } },
   '@cf/qwen/qwen3-30b-a3b-fp8': { chat_template_kwargs: { enable_thinking: false } },
@@ -531,10 +538,10 @@ export async function handle(path, body, run) {
   }
 
   if (path === '/code') {
-    const model = body.model || CODE[0];
-    if (!CODE.includes(model)) return bad(`not a writing model: ${model}`);
     const lang = body.lang || 'glsl';
     if (!Object.hasOwn(CODE_LANGS, lang)) return bad(`no contract for ${lang}`);
+    const model = body.model || CODE_DEFAULT[lang];
+    if (!CODE.includes(model)) return bad(`not a writing model: ${model}`);
     const text = String(body.text || '').trim();
     if (!text) return bad('say what to write');
     const contract = cap(body.contract) || CODE_LANGS[lang]();

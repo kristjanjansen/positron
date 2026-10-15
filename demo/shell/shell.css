@@ -4169,6 +4169,8 @@ a.pos-hero-secret, a.pos-hero-secret:hover, a.pos-hero-secret:visited { color: i
   padding: 0 var(--pad-seg); color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
   background-color: transparent; }
 .pos-pills > button.pos-pill:hover { border-color: var(--voice); background-color: transparent; }
+/* A pill with nothing to do yet (start new before there is anything) is not drawn and keeps no gap. */
+.pos-pills > button.pos-pill[hidden] { display: none; }
 /* Focus colours the pill's own edge, lighter; no second ring outside it. */
 .pos-pills > button.pos-pill:focus-visible { outline: none; border-color: color-mix(in oklab, var(--voice) 60%, #fff); }
 /* What came of an ask, centred and balanced like /connect/'s empty picture; hidden until something is said. */

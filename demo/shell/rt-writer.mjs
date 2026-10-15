@@ -1,9 +1,17 @@
 // demo/shell/rt-writer.mjs: runtime of a `writer` node, a sentence that comes out of program-out as a
-// fragment shader. The model is the wish worker's /code; each answer is compiled and looked at in a
-// sandbox GL of its own, so the picture on screen changes only when a program has passed.
+// program. The model is the wish worker's /code; each answer is tried off the running program (a GLSL
+// shader in a sandbox GL of its own, a SuperCollider synth by the trial a page hands in), so what runs
+// changes only when a program has passed.
 
 import { createMirrorShader, glslContract } from './mirror-shader.mjs';
 import { writeProgram, checkPicture, TRIAL_TIMES, VERSION, bodyError } from './glsl-writer.mjs';
+import { writeSclang, sclangContract } from './sclang-writer.mjs';
+
+/** Per language: the contract the page sends and the loop. A trial for `sclang` comes from the page. */
+const LANGS = {
+  glsl: { contract: glslContract, loop: writeProgram },
+  sclang: { contract: sclangContract, loop: writeSclang },
+};
 
 export const WISH_API = 'https://wish.positron.studio';
 /** One model call may take this long before it counts as not answering. */
@@ -16,8 +24,12 @@ export const ASK_TIMEOUT_MS = 30000;
  * @param {string} [o.api]  the wish worker
  * @param {string} [o.model]  one of the worker's CODE models, or its default
  * @param {Function} [o.ask]  stands in for the worker (the self-check's canned programs)
+ * @param {'glsl'|'sclang'} [o.lang]
+ * @param {(source: string) => Promise<object>} [o.trial]  the language's own trial, where it is not GLSL's sandbox
  */
-export function make({ log, send, api = WISH_API, model = '', ask = null }) {
+export function make({ log, send, api = WISH_API, model = '', ask = null, lang = 'glsl', trial: given = null }) {
+  if (!LANGS[lang]) throw new Error(`rt-writer: no language ${lang}`);
+  if (lang !== 'glsl' && !given) throw new Error(`rt-writer: ${lang} needs a trial from the page`);
   let sandbox = null, writes = 0, asked = 0, busy = false, last = null;
   function trial(body) {
     sandbox ??= createMirrorShader({ w: 160, h: 90 });
@@ -35,7 +47,7 @@ export function make({ log, send, api = WISH_API, model = '', ask = null }) {
     try {
       r = await fetch(`${api}/code`, { method: 'POST', headers: { 'content-type': 'application/json' },
         signal: AbortSignal.timeout(ASK_TIMEOUT_MS),
-        body: JSON.stringify({ text, lang: 'glsl', contract: glslContract(), previous, error, ...(model ? { model } : {}) }) });
+        body: JSON.stringify({ text, lang, contract: LANGS[lang].contract(), previous, error, ...(model ? { model } : {}) }) });
     } catch (e) {
       throw new Error(e?.name === 'TimeoutError' ? `no answer in ${ASK_TIMEOUT_MS / 1000} s` : `nothing answered at ${api}`);
     }
@@ -51,14 +63,15 @@ export function make({ log, send, api = WISH_API, model = '', ask = null }) {
     if (busy) return null;
     busy = true; writes++;
     try {
-      last = await writeProgram({ text, base, ask: ask || askWorker, trial, onTry });
+      last = await LANGS[lang].loop({ text, base, ask: ask || askWorker, trial: given || trial, onTry });
       if (last.source) send('program-out', { of: 'program', source: last.source, at: Date.now() });
       return last;
     } finally { busy = false; }
   }
   return {
     write,
-    trial,
+    lang,
+    trial: given || trial,
     busy: () => busy,
     last: () => last,
     heard: () => writes,
