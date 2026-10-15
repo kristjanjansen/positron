@@ -166,10 +166,10 @@ function along(pts, at) {
 }
 const lengthOf = (pts) => pts.slice(1).reduce((n, b, i) => n + Math.abs(b[0] - pts[i][0]) + Math.abs(b[1] - pts[i][1]), 0);
 
-/** Beads, `t` in seconds. A stream (audio, video, or no medium) runs a bead every BEAD px at SPEED px a
- *  second while shown; an event medium (midi, value) sends one bead out to in over EVENT_S after each event
- *  in `events[i]`, the time of the wire's last event. */
-const BEAD = 10, SPEED = 20, EVENT_S = 0.6, MARCH = 9;
+/** Motion, `t` in seconds. A stream (audio, video, or no medium) marches: a 1 px gap every MARCH px at SPEED px a
+ *  second, on both rails for video. An event medium sends one dot (MIDI) or bead (value) out to in over EVENT_S
+ *  after each event in `events[i]`, the time of the wire's last event. */
+const SPEED = 20, EVENT_S = 0.6, MARCH = 9;
 /** A bead's shape: `solid` a 3x3 block, `hollow` a 5x5 outline around the wire, `diamond` a 5 px diamond. */
 export const BEADS = ['solid', 'hollow', 'diamond'];
 function bead(ui, [x, y], shape = 'solid') {
@@ -182,15 +182,20 @@ function beads(ui, w, t, events, valueBead) {
   const len = lengthOf(w.pts);
   if (w.medium === 'midi' || w.medium === 'value') {
     const t0 = events?.[w.i], u = Number.isFinite(t0) ? (t - t0) / EVENT_S : -1;
-    if (u >= 0 && u <= 1) bead(ui, along(w.pts, Math.max(2, Math.min(len - 2, u * len))), w.medium === 'value' ? valueBead : 'solid');
+    if (u >= 0 && u <= 1) {
+      const p = along(w.pts, Math.max(2, Math.min(len - 2, u * len)));
+      // MIDI: a 2x2 dot runs the dashed line; a value: its chosen bead
+      if (w.medium === 'midi') ui.fill(Math.round(p[0]), Math.round(p[1]) - 1, 2, 2, 1);
+      else bead(ui, p, valueBead);
+    }
     return;
   }
-  // audio: the line itself marches, a 1 px gap every MARCH px moving out to in; video runs beads
-  if (w.medium === 'audio') {
-    for (let at = Math.floor(t * SPEED) % MARCH; at <= len; at += MARCH) { const [x, y] = along(w.pts, at); ui.fill(Math.round(x), Math.round(y), 1, 1, 0); }
-    return;
+  // audio: the line itself marches, a 1 px gap every MARCH px moving out to in; video: both rails march so
+  const lines = w.medium === 'video' ? rails(w.pts) : [w.pts];
+  for (const pts of lines) {
+    const n = lengthOf(pts);
+    for (let at = Math.floor(t * SPEED) % MARCH; at <= n; at += MARCH) { const [x, y] = along(pts, at); ui.fill(Math.round(x), Math.round(y), 1, 1, 0); }
   }
-  for (let at = (t * SPEED) % BEAD + 2; at < len - 2; at += BEAD) bead(ui, along(w.pts, at));
 }
 
 /** The patch drawn with the UI kit's calls, each wire textured by its `medium`; `o.t` (seconds) runs beads along
