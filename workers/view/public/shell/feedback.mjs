@@ -146,9 +146,11 @@ export async function sendNote({ slug = '', text = '', name = '', tries = 8 } = 
  * nothing on the page and takes no `.pos-stack` gap.
  * why: lessons/kit-feedback.md#openfeedback
  */
-export function openFeedback(d, { slug = '' } = {}) {
+export function openFeedback(d, { slug = '', context = null, onSent = null } = {}) {
   let ui = document.querySelector('.pos-fb');
-  if (ui) { show(ui); return ui; }
+  // The page's context is read on every opening, so a note carries the state it was written about.
+  const ctx = () => { try { return String(context?.() ?? '').trim(); } catch { return ''; } };
+  if (ui) { ui.fbCtx?.(ctx()); show(ui); return ui; }
 
 
   ui = el('div', 'pos-fb');
@@ -172,6 +174,10 @@ export function openFeedback(d, { slug = '' } = {}) {
     placeholder: 'what worked, what did not, what is missing',
   });
   box.append(msg.el);
+  const ctxEl = el('pre', 'pos-fb-ctx', '');
+  box.append(ctxEl);
+  ui.fbCtx = (t) => { ctxEl.textContent = t ? `sent with it:\n${t}` : ''; ctxEl.hidden = !t; };
+  ui.fbCtx(ctx());
 
   const row = el('div', 'pos-fb-row');
   const who = createField({ label: 'name', placeholder: 'optional' });
@@ -207,7 +213,10 @@ export function openFeedback(d, { slug = '' } = {}) {
     send.disabled = true;
     say('sending');
     try {
-      const out = await sendNote({ slug, text: msg.value(), name: who.value() });
+      const extra = ctx();
+      const note = msg.value().trim();
+      const out = await sendNote({ slug, text: note && extra ? `${note}\n\n--- context ---\n${extra}`.slice(0, MAX_CHARS) : note, name: who.value() });
+      if (out.ok) { try { onSent?.(note, extra); } catch { /* the page's echo is never load-bearing */ } }
       say(out.said, out.ok ? 'ok' : 'bad');
       d?.log(out.ok ? `feedback sent · ${out.id}` : `feedback not sent: ${out.said}`,
         out.ok ? 'hi' : 'bad');
@@ -217,6 +226,7 @@ export function openFeedback(d, { slug = '' } = {}) {
         // what was written, which is the failure people do not forgive.
         msg.set('');
         lastAt = Date.now();
+        hide(ui);   // a sent note closes the panel; the page's log says it went
       }
     } finally {
       busy = false;

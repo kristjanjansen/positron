@@ -941,6 +941,10 @@ video[hidden] { display: none; }
         overflow-x: auto; overscroll-behavior-x: contain; scroll-behavior: auto;
         scrollbar-width: none; }
 .keys::-webkit-scrollbar { display: none; }
+/* A split keyboard: the zone names ride a row above the keys, and a narrow track separates zones. */
+.keys.kbd-zoned { grid-template-rows: auto 1fr; }
+.kbd-zone { align-self: end; padding: 0 2px 6px; font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--dim2); white-space: nowrap; overflow: hidden; text-overflow: clip; border-bottom: 1px solid var(--line2); margin-bottom: 6px; }
 .k { grid-row: 1; min-width: 0; height: var(--k-h, var(--k-white)); border-radius: 4px; background: var(--card2);
      border: 1px solid var(--line2); display: grid; grid-template-rows: auto 1fr auto;
      justify-items: center; padding: var(--k-pad, 6px) 0;
@@ -1789,6 +1793,9 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .pos-fb-send { margin-left: auto; }
 /* Two lines reserved so the send status can rewrite itself without the panel
    changing height. */
+/* The page state a note carries, shown read-only above Send. */
+.pos-fb-ctx { margin: 0; max-height: 9em; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 11.5px/1.45 var(--mono); color: var(--dim); }
+.pos-fb-ctx[hidden] { display: none; }
 /* why: lessons/css-shell.md#pos-fb-said */
 .pos-fb-said {
   min-height: 2.8em; margin: 0; font: 400 12px/1.4 var(--mono); color: var(--dim);

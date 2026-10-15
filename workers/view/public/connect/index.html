@@ -45,11 +45,7 @@
   .cn-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
 
   .cn-say { display: flex; flex-direction: column; gap: 12px; }
-  .cn-ex { --fade: 16px; display: grid; grid-template-rows: auto auto; grid-auto-flow: column; grid-auto-columns: max-content;
-    justify-items: start; gap: var(--ctl-gap); overflow-x: auto; scrollbar-width: none;
-    margin-inline: calc(-1 * var(--fade)); padding: 2px var(--fade);
-    mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); }
-  .cn-ex::-webkit-scrollbar { display: none; }
+  .cn-ex { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); }
   .cn-ex > button.cn-pill { flex: none; }
 
   /* What a person says, in --voice (shell.css). Round, lowercase and in
@@ -128,11 +124,12 @@
   import { mount, el, createShipper } from '/shell/shell.mjs';
   import { createIconButton } from '/shell/icon-button.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { createBay, checkTransforms, printLink, parseLink } from '/shell/bay.mjs';
+  import { createBay, checkTransforms, printLink, parseLink, patchOf } from '/shell/bay.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
   import { NODES as CATALOGUE, addNodes } from '/shell/nodes.mjs';
   import { boardGraph, BOARD_SITE } from '/shell/graph-registry.mjs';
   import { CONCEPTS } from '/shell/concept-list.mjs';
+  import { PATCH_NAMES, withPatches } from '/shell/patch-names.mjs';
   import { createRuntimes, EXTRA_PORTS, knobChoices, knobFor, loaderOf, FACED } from '/shell/node-runtime.mjs';
   import { sharedAudio, claim, release, contexts } from '/shell/audio.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
@@ -161,7 +158,7 @@
   // nodes.mjs NODES (concept pages), boardGraph() for the Pi nodes a page plays
   // (PI_PAGES says which), and the catalogue's endpoint hops between sites.
   // See lessons/page-connect.md#connect-1
-  const PI = boardGraph({ room: 'studio-1', instruments: { synth: true, pappusFx: true, sampler: true, collide: true }, jack: true, gpu: true,
+  const PI = boardGraph({ room: 'studio-1', instruments: { synth: true, pappusFx: true, sampler: true, collide: true }, jack: true, gpu: true, patches: PATCH_NAMES,
     camera: true, inputs: [{ name: 'circuit', channels: 2, jack: true, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
   const PI_PAGES = { circuit: ['remote/circuit'], sampler: ['remote/piano'], collide: ['remote/collide'], drums: ['drums/remote'],
     shader: ['shader/remote'], camera: ['remote/circuit'] };
@@ -197,8 +194,10 @@
       const e = CATALOGUE[name], site = siteOf(name, e), label = LABELS[name] ?? e.label, as = AS[name] ?? name;
       // Every port, the optional ones too: some page builds each of them.
       // A port has no label in the catalogue, and a refusal reads it.
-      const ports = Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${p}`,
-        ...(p === 'value-in' && PARAM_NAMES[name] ? { shape: { of: 'param', names: PARAM_NAMES[name] } } : {}) }]));
+      // An instrument's midi-in carries its patch names, in its label too, so the model reads them.
+      const named = (p) => (p === 'midi-in' && PATCH_NAMES[name] ? { patches: PATCH_NAMES[name] } : {});
+      const ports = Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: withPatches(`${label} ${p}`, named(p).patches),
+        ...named(p), ...(p === 'value-in' && PARAM_NAMES[name] ? { shape: { of: 'param', names: PARAM_NAMES[name] } } : {}) }]));
       try {
         addNodes(b, site, [{ name, as, site, label }], { ports });
         for (const [p, f] of Object.entries(EXTRA_PORTS[name] || {})) b.addPort({ id: `${site}:${as}:${p}`, ...f, label: `${label} ${p}` });
@@ -213,7 +212,7 @@
       if (!pages) continue;
       try {
         b.addNode(n);
-        for (const p of PI.ports.filter((q) => nodeOf(q.id) === n.id)) b.addPort({ ...p, label: `${n.label} ${p.id.split(':')[2]}` });
+        for (const p of PI.ports.filter((q) => nodeOf(q.id) === n.id)) b.addPort({ ...p, label: withPatches(`${n.label} ${p.id.split(':')[2]}`, p.patches) });
         PAGES.set(n.id, pages);
       } catch (x) { failed.push(`${n.id}: ${x.message}`); }
     }
@@ -234,7 +233,8 @@
     let k = 2;
     while (on.node(`web:${type}-${k}`)) k++;
     const as = `${type}-${k}`;
-    addNodes(on, 'web', [{ name: type, as, label }], { ports: Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${k} ${p}` }])) });
+    addNodes(on, 'web', [{ name: type, as, label }], { ports: Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`,
+      p === 'midi-in' && PATCH_NAMES[type] ? { label: withPatches(`${label} ${k} ${p}`, PATCH_NAMES[type]), patches: PATCH_NAMES[type] } : { label: `${label} ${k} ${p}` }])) });
     if (on !== bay) return `web:${as}`;
     TYPE.set(`web:${as}`, type);
     PAGES.set(`web:${as}`, e.pages);
@@ -275,7 +275,12 @@
     ['the drum machine plays plaits', [[W('sequencer', 'midi-out'), W('plaits', 'midi-in')], [W('plaits', 'audio-out'), SPK]]],
     ['granulate plaits as i play', [[KEYS, W('plaits', 'midi-in')], [W('plaits', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
     ['granulate the piano as i play it', [[KEYS, W('sampler', 'midi-in')], ['cf-r2:piano-samples:file-out', W('sampler', 'file-in')], [W('sampler', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
-  ].map(([say, links]) => ({ say, links: links.map(([from, to, param]) => ({ from, to, transforms: [], ...(param ? { param } : {}) })) }));
+    ['bass synth on my left hand, plaits on my right', [[KEYS, W('synth', 'midi-in'), [{ op: 'range', lo: 0, hi: 59 }]], [KEYS, W('plaits', 'midi-in'), [{ op: 'range', lo: 60, hi: 127 }]], [W('synth', 'audio-out'), SPK], [W('plaits', 'audio-out'), SPK]]],
+    ['plaits doubles the synth an octave up', [[KEYS, W('synth', 'midi-in')], [KEYS, W('plaits', 'midi-in'), [{ op: 'transpose', by: 12 }]], [W('synth', 'audio-out'), SPK], [W('plaits', 'audio-out'), SPK]]],
+    ['the drum machine plays the piano', [[W('sequencer', 'midi-out'), W('sampler', 'midi-in')], ['cf-r2:piano-samples:file-out', W('sampler', 'file-in')], [W('sampler', 'audio-out'), SPK]]],
+    ['granulate the drum machine', [[W('sequencer', 'midi-out'), W('drum', 'midi-in')], [W('drum', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
+    ['play the piano and watch its waveform', [[KEYS, W('sampler', 'midi-in')], ['cf-r2:piano-samples:file-out', W('sampler', 'file-in')], [W('sampler', 'audio-out'), SPK], [W('sampler', 'audio-out'), W('scope', 'audio-in')]]],
+  ].map(([say, links]) => ({ say, links: links.map(([from, to, x]) => ({ from, to, transforms: Array.isArray(x) ? x : [], ...(typeof x === 'string' ? { param: x } : {}) })) }));
   // The patches the concept pages make, one per page: never shown, built only by the
   // self-check to grade each runtime, and the record an example must not copy.
   const RIGS = [
@@ -310,6 +315,11 @@
   const rigOf = (say) => EXAMPLES.find((e) => e.say === say) || RIGS.find((e) => e.say === say);
 
   const d = mount({ name: 'connect',
+    // A note from Feedback carries the last request, how it came in, what it built, and the patch now.
+    feedback: {
+      context: () => `last: ${lastLine || 'nothing asked yet'}\npatch now: ${bay.links().map(printLink).join('; ') || 'nothing linked'}`,
+      onSent: (note) => logAsk(`[feedback] "${note}"`),
+    },
     what: 'Say what should play what, press an example, or press an out port and then an in port. Pressing a wire takes it away.',
     readout: null, index: '/', indexLabel: 'positron' });
   useMediumColours();
@@ -325,7 +335,9 @@
     + 'Ids starting web: are in this browser tab, pi-1: is a Raspberry Pi in the studio, cf- ids are Cloudflare, '
     + 'cf-r2:recording is a radio programme we recorded, and err:station is a live station on its broadcaster\'s server, '
     + 'which reaches this tab through cf-shout:relay. Use web: nodes; use pi-1: only when the sentence names the Pi, '
-    + 'the studio, the Circuit or remote.';
+    + 'the studio, the Circuit or remote. '
+    + 'An instrument whose midi in lists patches plays one of them, chosen by a patch transform on the MIDI link into it; '
+    + 'two patches at once need two instruments of that kind, the second one\'s id ending in -2.';
   /** A sentence that names somewhere else may reach it; any other stays in this tab. */
   const NAMES_PI = /\b(pi|raspberry|studio|circuit|remote|board|there)\b/i;
   // The self-check's stand-in for a sentence nobody listed, with one transform
@@ -344,16 +356,25 @@
   const rankOf = (p, text) => (EXAMPLE_PORTS.has(p.id) ? 0
     : p.id.startsWith(`${BOARD_SITE}:`) ? (NAMES_PI.test(text) ? 1 : 9)
       : EXAMPLE_NODES.has(nodeOf(p.id)) ? 2 : p.id.startsWith('web:') || p.id.startsWith('cf-r2:') ? 3 : 9);
+  // A type with patches is offered a second instance's midi-in before it exists, so two patches at once
+  // can be two instruments; ensureNamed makes it when an answer names it.
+  const secondOf = (p) => {
+    const m = /^web:([a-z]+):midi-in$/.exec(p.id);
+    if (!m || !MULTI.includes(m[1]) || !PATCH_NAMES[m[1]] || bay.port(`web:${m[1]}-2:midi-in`)) return [];
+    return [{ id: `web:${m[1]}-2:midi-in`, dir: 'in', label: withPatches(`${LABELS[m[1]] ?? CATALOGUE[m[1]].label} 2 midi-in`, PATCH_NAMES[m[1]]) }];
+  };
   const portsForModel = (text = '') => bay.ports()
     .map((p, i) => ({ p, i, r: rankOf(p, text) })).filter((x) => x.r < 9)
-    .sort((a, b) => a.r - b.r || a.i - b.i).slice(0, MAX_PORTS)
-    .map(({ p }) => ({ id: p.id, dir: p.dir, label: p.label }));
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .flatMap(({ p }) => [{ id: p.id, dir: p.dir, label: p.label }, ...secondOf(p)]).slice(0, MAX_PORTS);
   let reached = 0;
   async function post(text) {
     if (SELFCHECK) {
       const ex = EXAMPLES.find((e) => e.say === text);
       if (text === 'the keys play the piano') return { links: [{ from: KEYS, to: `${BOARD_SITE}:sampler:midi-in`, transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       if (text === 'keys play the sampler, nothing else') return { links: [{ from: KEYS, to: W('sampler', 'midi-in'), transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
+      if (text === 'keys play the rhodes') return { links: [{ from: KEYS, to: W('sampler', 'midi-in'), transforms: [{ op: 'patch', name: 'Rhodes' }] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
+      if (text === 'keys play the harpsichord') return { links: [{ from: KEYS, to: W('sampler', 'midi-in'), transforms: [{ op: 'patch', name: 'Harpsichord' }] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       if (text === 'keys play the synth, nothing else') return { links: [{ from: KEYS, to: W('synth', 'midi-in'), transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       return { links: ex ? ex.links : CANNED, fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
     }
@@ -400,7 +421,8 @@
 
   // A person's own requests go to the device log (pub.positron.studio/logs), never a check's.
   const ship = SELFCHECK ? () => {} : createShipper();
-  const logAsk = (line) => ship(`connect ${line}`);
+  let lastLine = '';
+  const logAsk = (line) => { if (!line.startsWith('[feedback]') && !line.startsWith('[page')) lastLine = line; ship(`connect ${line}`); };
   if (!SELFCHECK) { const say = d.log.bind(d); d.log = (m, lv) => { say(m, lv); if (lv === 'warn' || lv === 'bad') logAsk(`[page ${lv}] ${m}`); }; }
   let asking = Promise.resolve(), inFlight = false;
   /** A sentence asks the model; its answer replaces the patch, or nothing is built and the reason is said. */
@@ -828,7 +850,17 @@
     }
   }
 
+  // A keyboard split by note ranges shows its zones on the keys, each named for what it plays.
+  function showZones() {
+    const kb = runtime.get(nodeOf(KEYS))?.kb;
+    if (!kb?.zones) return;
+    const z = bay.links().filter((l) => l.from === KEYS).map((l) => ({ l, r: (l.transforms || []).find((t) => t.op === 'range') }))
+      .filter((x) => x.r).map((x) => ({ lo: x.r.lo, hi: x.r.hi, label: bay.node(nodeOf(x.l.to))?.label || nodeOf(x.l.to) }))
+      .sort((a, b) => (a.lo ?? 0) - (b.lo ?? 0));
+    kb.zones(z);
+  }
   function redraw() {
+    showZones();
     if (armed && !bay.port(armed)) armed = null;
     spares();
     pic.classList.toggle('cn-pic-empty', bay.links().length === 0);
@@ -864,6 +896,7 @@
     parts.push(...all.filter((x) => x.rt.slot === 'keys').map((x) => part(x.id, x.rt.face)));
     faces.replaceChildren(...parts);
     faces.hidden = !parts.length;
+    showZones();
   }
   const runtime = createRuntimes({ bay, typeOf, log: (m, lv) => d.log(m, lv), onChange: drawFaces, audio: { sharedAudio, claim, release } });
   window.__demo.runtime = runtime;
@@ -904,6 +937,10 @@
     micOn = false; micBtn.el.setAttribute('aria-pressed', 'false');
     if (rec && rec.state !== 'inactive') rec.stop(); else { micStream?.getTracks().forEach((t) => t.stop()); }
   }
+  // Names Whisper should hear as written ("Rhodes", not "roads"): sent as its initial prompt, which the
+  // worker caps and gives to turbo only. The site's own names first, so the cap cuts generic labels.
+  const vocabulary = () => [...new Set(['Plaits', 'Circuit', 'Rhodes', 'SuperCollider', ...Object.values(PATCH_NAMES).flat(),
+    ...bay.nodes().map((n) => n.label).filter((l) => typeof l === 'string' && !l.includes('<'))])];
   async function heard() {
     micStream?.getTracks().forEach((t) => t.stop()); micStream = null;
     const blob = new Blob(chunks, { type: rec?.mimeType || 'audio/webm' }); rec = null;
@@ -914,7 +951,7 @@
       const buf = new Uint8Array(await blob.arrayBuffer());
       let b = '';
       for (let i = 0; i < buf.length; i += 0x8000) b += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-      const r = await fetch(`${API}/hear`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ audio: btoa(b) }) });
+      const r = await fetch(`${API}/hear`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ audio: btoa(b), vocabulary: vocabulary() }) });
       const out = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
       const text = (out.text || '').trim();
@@ -1061,6 +1098,22 @@
     A('a request that leaves a sampler without samples gets the piano samples on its file-in and its sound at the speakers',
       bay.links().length === 3 && has(KEYS, W('sampler', 'midi-in')) && has('cf-r2:piano-samples:file-out', W('sampler', 'file-in'))
         && has(W('sampler', 'audio-out'), SPK), bay.links().map(printLink).join('; '));
+    // A patch in an answer: the link keeps it and the sampler's runtime is told it, fetching nothing yet.
+    await ask('keys play the rhodes'); await runtimes();
+    const rhodesLink = bay.links().find((l) => l.to === W('sampler', 'midi-in')), rhodesRt = runtime.get('web:sampler');
+    A('an answer choosing Rhodes on the sampler builds, its link keeps the patch, and the sampler is told it before any fetch',
+      patchOf(rhodesLink?.transforms) === 'Rhodes' && rhodesRt?.chosen?.() === 'Rhodes' && rhodesRt.sampler.stat().files === 0
+        && /patches: Piano, Rhodes/.test(portsForModel().find((p) => p.id === W('sampler', 'midi-in'))?.label || ''),
+      `${bay.links().map(printLink).join('; ')}; runtime chose ${rhodesRt?.chosen?.()}`);
+    await ask('keys play the harpsichord'); await frame();
+    A('NEGATIVE CONTROL: an answer naming a patch the sampler does not have builds nothing and says which it has',
+      bay.links().length === 0 && /no patch called "Harpsichord"/.test(empty.textContent), empty.textContent);
+    // A split by note ranges shows on the keys: two named zones with a gap track between them.
+    [...exRow.children].find((b) => b.textContent === 'bass synth on my left hand, plaits on my right').click();
+    await runtimes(); await frame();
+    const kz = runtime.get('web:keys')?.kb, zl = [...(kz?.keysEl.querySelectorAll('.kbd-zone') || [])].map((e) => e.textContent);
+    A('a keyboard split shows its zones on the keys, named for what each plays, with a gap between them',
+      zl.length === 2 && /sine|synth/i.test(zl[0]) && /plaits/i.test(zl[1]) && /14px/.test(kz.keysEl.style.gridTemplateColumns), zl.join(' | '));
     // An answer that reaches for the Pi when the sentence did not ask for it builds nothing.
     await ask('the keys play the piano'); await frame();
     A('an answer that reaches for the Pi unasked builds nothing and says so',
@@ -1524,6 +1577,13 @@
     A('with the piano samples linked, a key (its on and its off) fetches its recording from our bucket and the sampler reaches the speakers',
       smp.sampler.ready() && smp.heard() === 2 && piano?.heard() === 1 && pianoLoud > 0.005,
       `engine ${smp.sampler.ready()}, heard ${smp.heard()}, store reads ${piano?.heard()}, speakers ${pianoLoud.toFixed(4)}`);
+    // The same sampler, engine up and samples linked: a link choosing Rhodes switches its program at once.
+    const rhodes = bay.link(KEYS, W('sampler', 'midi-in'), [{ op: 'patch', name: 'rhodes' }]);
+    redraw(); await runtimes();
+    A('a link choosing rhodes into the running sampler switches its program to the Rhodes, spelled as the sampler spells it',
+      rhodes.ok && smp.chosen() === 'Rhodes' && smp.sampler.stat().inst === 'rhodes' && smp.sampler.stat().programs.at(-1) === 1,
+      `${rhodes.why || printLink(bay.links().find((l) => l.id === rhodes.id))}; inst ${smp.sampler.stat().inst}, programs ${smp.sampler.stat().programs.join(',')}`);
+    if (rhodes.ok) { bay.unlink(rhodes.id); redraw(); await runtimes(); }
 
     // ── a patch change for the Circuit, held off before Join ──
     await pressEx('change the circuit\'s patch');

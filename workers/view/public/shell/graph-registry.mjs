@@ -97,15 +97,17 @@ export function jackRows(from, to) {
  * @param {string} [o.label]     'Raspberry Pi', since every fresh Pi's hostname is `raspberrypi`
  * @param {boolean} [o.jack]     announce JACK ends and the granulator and capture nodes. Off by default.
  * @param {string[]} [o.plaitsParams]  the names `pi-1:plaits:value-in` takes; passed in, so this file stays import free
+ * @param {object} [o.patches]  patch names by instrument (`{ sampler: [...], plaits: [...] }`), put on its midi-in for a `patch` transform; passed in for the same reason
  * why: lessons/kit-graph-registry.md#boardgraph
  */
-export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false, plaitsParams = null }) {
+export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false, plaitsParams = null, patches = {} }) {
   const place = room;
   // Port names are `<medium>-<dir>` (plans/plan-site-names.md §4c), so the id
   // says what a port carries and which way. `graphProblem` holds a board to it.
   const nodes = [], ports = [];
   const node = (n, kind, label) => { nodes.push({ id: `${site}:${n}`, kind, label, place, ...(net ? { net } : {}) }); };
   const port = (n, p, o) => { ports.push({ id: `${site}:${n}:${p}`, ...o }); };
+  const named = (k) => (Array.isArray(patches?.[k]) && patches[k].length ? { patches: [...patches[k]] } : {});
 
   // The synths the board can start. `pappusFx` is an insert on another sound,
   // not a sound of its own, so it is not a node here.
@@ -115,7 +117,7 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     node(n, 'engine', k);
     // A synth lives in the board's MAIN room: `audio.start` and `note.on` go
     // there, and its sound comes back down the same socket.
-    port(n, 'midi-in', { label: k, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend', 'program'], never: [], address: room });
+    port(n, 'midi-in', { label: k, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend', 'program'], never: [], address: room, ...named(k) });
     const j = jack && JACK_ENDS[k] ? JACK_ENDS[k] : null;
     port(n, 'audio-out', { label: k, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs }, address: room,
       transports: [...BOARD_TRANSPORTS.audio, ...(j ? ['jack'] : [])], ...(j ? { jack: [...j] } : {}) });
@@ -159,7 +161,7 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
   if (instruments.plaits) {
     const j = jack ? JACK_ENDS.plaits : null;
     node('plaits', 'engine', 'Plaits');
-    port('plaits', 'midi-in', { label: 'Plaits', dir: 'in', medium: 'midi', accepts: ['note'], never: [], address: room });
+    port('plaits', 'midi-in', { label: 'Plaits', dir: 'in', medium: 'midi', accepts: ['note'], never: [], address: room, ...named('plaits') });
     port('plaits', 'value-in', { label: 'Plaits', dir: 'in', medium: 'value',
       shape: { of: 'param', ...(Array.isArray(plaitsParams) && plaitsParams.length ? { names: [...plaitsParams] } : {}) }, address: room });
     port('plaits', 'audio-out', { label: 'Plaits', dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs },

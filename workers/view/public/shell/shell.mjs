@@ -1,7 +1,7 @@
 // Which build is this? workers/view/build.mjs replaces it in the deployed copy only,
 // so a fix that did not work can be told from a fix that was never loaded.
 // why: lessons/kit-shell.md#build-stamp
-export const BUILD = '56bfaf1c-071832-6521';
+export const BUILD = '8073d556-073816-9f8e';
 // demo/shell/shell.mjs: the page frame and the __demo contract. mount() builds the chrome
 // and publishes on window.__demo everything it shows a human, for a CDP script.
 //   const d = mount({ name:'transport', what:'...', readout:{drift:'ms'} }); d.set('drift', 0.4);
@@ -39,6 +39,7 @@ export function mount({
   // the default is for the archived demos, which every page that is not passes its own
   index = '/archive/',
   indexLabel = 'archive',  // the word after the arrow; a concept page passes `positron`, the front page
+  feedback = null,       // { context: () => string, onSent: (text) => void }: what a note carries from this page
 } = {}) {
   document.title = `POSITRON ${name}`;
   favicon();
@@ -68,7 +69,7 @@ export function mount({
       // Imported on the press, so a panel nobody opens costs no page anything on load.
       // why: lessons/kit-shell.md#feedback-lazy
       const fb = await import('./feedback.mjs');
-      fb.openFeedback({ log }, { slug: name });
+      fb.openFeedback({ log }, { slug: name, ...(feedback || {}) });
     } catch (err) {
       fbBtn.setAttribute('aria-expanded', 'false');
       log(`the feedback box did not load (${err?.message || err})`, 'bad');

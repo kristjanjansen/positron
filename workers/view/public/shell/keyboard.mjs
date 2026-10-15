@@ -198,6 +198,7 @@ export function createKeyboard(host, {
   const keysEl = make('div', 'keys');
   const els = new Map();
   const letterOf = new Map();         // element -> letter, for the hit test
+  const colOf = new Map();            // letter -> white column it was placed at
 
   // One grid column per white key; a black takes the column starting at its join and `shell.css`
   // pulls it back by half its width plus half a gap. `--k-cols` is the white count, 8 an octave.
@@ -227,6 +228,7 @@ export function createKeyboard(host, {
       if (right && !left) b.style.setProperty('--kn-x', `${-NUDGE_PX}px`);
       else if (left && !right) b.style.setProperty('--kn-x', `${NUDGE_PX}px`);
     }
+    colOf.set(k, whites);
     whites = placeKey(b, { sharp, whites, pitchClass: ((map[k] % 12) + 12) % 12 });
     els.set(k, b);
     letterOf.set(b, k);
@@ -883,8 +885,46 @@ export function createKeyboard(host, {
     addEventListener('blur', onBlur);
   }
 
+  /** Split zones: `[{ lo, hi, label }]` by note. A narrow track at each split point and each
+   *  zone named above its keys; `[]` puts the plain keyboard back. Kept across octave shifts. */
+  let zoneList = [], zoneEls = [];
+  function zones(list = zoneList) {
+    zoneList = list || [];
+    zoneEls.forEach((e) => e.remove()); zoneEls = [];
+    const whiteKeys = keys.filter((k) => !sharps.has(k));
+    if (!zoneList.length) {
+      keysEl.style.removeProperty('grid-template-columns');
+      keysEl.classList.remove('kbd-zoned');
+      for (const [k, b] of els) { b.style.gridColumn = String(colOf.get(k) + 1); b.style.gridRow = ''; }
+      return;
+    }
+    const zoneOf = (n) => zoneList.findIndex((z) => n >= (z.lo ?? 0) && n <= (z.hi ?? 127));
+    const tracks = [], trackOf = [], runs = [];
+    whiteKeys.forEach((k, i) => {
+      const z = zoneOf(noteOf(k));
+      if (i > 0 && z !== runs[runs.length - 1].z) { tracks.push('var(--k-split, 14px)'); runs.push({ z, from: tracks.length }); }
+      else if (i === 0) runs.push({ z, from: 0 });
+      trackOf[i] = tracks.length;
+      tracks.push('minmax(var(--k-min, 49px), var(--k-max, 62px))');
+      runs[runs.length - 1].to = tracks.length;
+    });
+    keysEl.style.gridTemplateColumns = tracks.join(' ');
+    keysEl.classList.add('kbd-zoned');
+    for (const [k, b] of els) {
+      const c = colOf.get(k);
+      b.style.gridColumn = String((trackOf[c] ?? tracks.length) + 1);
+      b.style.gridRow = '2';
+    }
+    for (const r of runs) {
+      const lab = make('div', 'kbd-zone', r.z >= 0 ? zoneList[r.z].label || '' : '');
+      lab.style.gridColumn = `${r.from + 1} / ${r.to + 1}`;
+      lab.style.gridRow = '1';
+      keysEl.append(lab);
+      zoneEls.push(lab);
+    }
+  }
   const api = {
-    el, keysEl, pad,
+    el, keysEl, pad, zones,
     // The page's own row inside the keyboard's box, or `null` without `foot: true`.
     // why: lessons/kit-keyboard.md#api-foot
     foot: footEl,
@@ -953,6 +993,7 @@ export function createKeyboard(host, {
       const was = base;
       base = Math.max(min, Math.min(max, base + steps));
       for (const k of keys) label(els.get(k), k);      // every note name moved
+      if (zoneList.length) zones();
       paintPad();
       // Only on a real move: at the end of the range the press did nothing,
       // and a log line saying the octave changed when it did not is worse

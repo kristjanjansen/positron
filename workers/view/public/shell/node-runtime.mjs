@@ -7,6 +7,7 @@
 
 import { addNodes } from './nodes.mjs';
 import { routeAudio } from './audio-router.mjs';
+import { patchOf } from './bay.mjs';
 
 export const RUNTIMES = {
   keys: () => import('./rt-keys.mjs'),
@@ -249,6 +250,24 @@ export function createRuntimes({ bay, typeOf, log = () => {}, onChange = () => {
     live.delete(id);
   }
 
+  // A `patch` transform (bay.mjs) is told to the runtime its link reaches, once per link and runtime,
+  // so a runtime made after the link still switches.
+  const patched = new Map();          // linkId -> the runtime it was told to
+  function choosePatches() {
+    const now = new Set();
+    for (const l of bay.links()) {
+      const name = patchOf(l.transforms);
+      if (!name) continue;
+      now.add(l.id);
+      const rt = live.get(nodeOf(l.to))?.rt;
+      if (!rt || patched.get(l.id) === rt) continue;
+      patched.set(l.id, rt);
+      if (rt.patch) rt.patch(name, l.to.split(':')[2]);
+      else log(`${nodeOf(l.to)} runs here and cannot switch to ${name} yet`, 'warn');
+    }
+    for (const id of [...patched.keys()]) if (!now.has(id)) patched.delete(id);
+  }
+
   async function step() {
     const p = plan(bay.links(), [...live.keys()], runs);
     for (const id of p.close) close(id);
@@ -264,6 +283,7 @@ export function createRuntimes({ bay, typeOf, log = () => {}, onChange = () => {
       if (still.has(id) && !live.has(id)) await make(id, m);
     }
     route();
+    choosePatches();
     if (p.close.length || p.create.length) onChange();
     if (!live.size && ctx) audio.release(owner);
   }
