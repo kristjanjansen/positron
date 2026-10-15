@@ -58,7 +58,8 @@ function layoutPairOled({ nodes, links }, { home = 'pi-1', adv = 6 } = {}) {
     else {
       // a bracket in the column's outer lane, each a second pixel further out so two do not overlap
       const k = bracket[a.side]++, oa = a.side ? a.x + a.w : a.x - 1, ob = b.side ? b.x + b.w : b.x - 1;
-      const x = a.side ? Math.min(W - 1, a.x + a.w + 1 + 2 * k) : Math.max(0, a.x - 2 - 2 * k);
+      // 3 px clear of the boxes, so the bracket reads as a wire and not as a box's second edge
+      const x = a.side ? Math.min(W - 1, a.x + a.w + 3 + 2 * k) : Math.max(0, a.x - 4 - 2 * k);
       wires.push({ from: l.from, to: l.to, pts: [[oa, ya], [x, ya], [x, yb], [ob, yb]] });
     }
   }
