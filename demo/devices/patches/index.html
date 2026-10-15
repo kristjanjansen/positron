@@ -58,23 +58,13 @@
     ['A layer', 'Every key plays the Circuit and the sampler\'s piano together.', [[EVO, `${P}:circuit`], [EVO, `${P}:sampler`]]],
     ['Evolution to Plaits', 'The keys play Plaits on the Pi and the knobs turn its sound.', [[EVO, `${P}:plaits`], [`${P}:plaits`, `${P}:ftpro`]]],
     ['Evolution to Collide', 'Play the SuperCollider synth on the Pi out of the Fast Track Pro.', [[EVO, `${P}:collide`], [`${P}:collide`, `${P}:ftpro`]]],
-    ['Camera on the screen', 'The Pi\'s camera drawn in one bit on its own small screen.', [[`${P}:camera`, `${P}:screen`]]],
+    ['Camera on the screen', 'The Pi\'s camera drawn in one bit on its own small screen.', [[`${P}:camera`, `${P}:dither`], [`${P}:dither`, `${P}:screen`]]],
   ];
-  // name, then links as [from node, to node]; every node a box
-  const PATCHES = [
-    ['Keys to the Circuit', [['web:keys', `${P}:circuit`]]],
-    ['The Circuit out loud', [[`${P}:circuit`, 'web:speaker']]],
-    ['Play the Circuit', [['web:keys', `${P}:circuit`], [`${P}:circuit`, 'web:speaker']]],
-    ['Piano on the sampler', [['web:keys', `${P}:sampler`], [`${P}:sampler`, 'web:speaker']]],
-    ['Plaits and a knob', [['web:keys', `${P}:plaits`], ['web:knob', `${P}:plaits`], [`${P}:plaits`, 'web:speaker']]],
-    ['Drums from pads', [['web:pads', `${P}:drums`], [`${P}:drums`, 'web:speaker']]],
-    ['A shader on the GPU', [['web:editor', `${P}:shader`], [`${P}:shader`, 'web:screen']]],
-  ].map(([name, pairs]) => [name, '', pairs]);
   const asPatch = ([name, say, pairs]) => {
     const nodes = [...new Set(pairs.flat())].map((id) => ({ id }));
     return { name, say, patch: { nodes, links: pairs.map(([a, b]) => ({ from: `${a}:out`, to: `${b}:in` })) } };
   };
-  const SECTIONS = [['use cases', USES.map(asPatch)], ['simple patches', PATCHES.map(asPatch)]];
+  const SECTIONS = [['use cases', USES.map(asPatch)]];
 
   // ── the bay: this list sends a patch along one link to the Pi's screen ──
   const LIST_OUT = 'web:list:value-out', PI_IN = `${P}:screen:value-in`;
@@ -141,7 +131,7 @@
   window.__demo.probe = () => ({ connected, sent, landed, cuts });
 
   if (SELFCHECK) {
-    const cards = document.querySelectorAll('.pt-card').length, all = USES.length + PATCHES.length;
+    const cards = document.querySelectorAll('.pt-card').length, all = USES.length;
     d.assert('every patch drawn as a card', cards === all, `${cards} of ${all} cards`);
     d.assert('no name is cut on these patches', cuts.every((c) => c === 0), cuts.join(' '));
     d.assert('a visit reaches nothing until a send', !board);
