@@ -542,7 +542,9 @@ export async function handle(path, body, run) {
     let r;
     try {
       r = await run(model, {
-        messages: codeMessages({ text, contract, examples: CODE_EXAMPLES[lang]?.() || '', error: body.error, previous: body.previous }),
+        // The examples only on a retry or a revision: on a first try they doubled the time (7.5 to 10.8 s median)
+        // and timed the 15 s loop out with no picture (2026-10-15).
+        messages: codeMessages({ text, contract, examples: body.previous ? (CODE_EXAMPLES[lang]?.() || '') : '', error: body.error, previous: body.previous }),
         response_format: { type: 'json_schema', json_schema: CODE_SCHEMA },
         max_tokens: CODE_MAX_TOKENS,
         ...(CODE_EXTRA[model] || {}),

@@ -386,11 +386,12 @@ is('a page this account deployed is allowed',
   const stub = async (model, payload) => { sent.push(payload); return { response: { code: 'ok' } }; };
   await handle('/code', { text: 'slow blue waves', contract: 'A PAGE CONTRACT' }, stub);
   const sys = sent[0]?.messages?.[0]?.content || '';
-  is('/code puts every example after the contract, even when the page sends its own contract', sys.startsWith('A PAGE CONTRACT')
-    && GLSL_EXAMPLES.every((e) => sys.includes(e.body)) && /Answer as JSON/.test(sys.split('\n').at(-1)), sys.slice(0, 120));
+  is('a first /code try carries the page contract and no examples (they doubled its time)', sys.startsWith('A PAGE CONTRACT')
+    && !GLSL_EXAMPLES.some((e) => sys.includes(e.body)) && /Answer as JSON/.test(sys.split('\n').at(-1)), sys.slice(0, 120));
   sent.length = 0;
   await handle('/code', { text: 'heavier rain', previous: 'void main(){ o = vec4(1.0); }' }, stub);
   const rm = sent[0]?.messages || [];
+  is('a revision carries every example after the contract', GLSL_EXAMPLES.every((e) => (rm[0]?.content || '').includes(e.body)));
   is('previous with no error is a revision: one user message carrying the program and the change', rm.length === 2 && rm[1].role === 'user'
     && rm[1].content.includes('o = vec4(1.0)') && /Change it: heavier rain/.test(rm[1].content) && !/refused/.test(rm[1].content), JSON.stringify(rm.slice(1)));
   sent.length = 0;
