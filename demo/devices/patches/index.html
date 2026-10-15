@@ -58,6 +58,8 @@
     ['A layer', 'Every key plays the Circuit and the sampler\'s piano together.', [[EVO, `${P}:circuit`], [EVO, `${P}:sampler`]]],
     ['Evolution to Plaits', 'The keys play Plaits on the Pi and the knobs turn its sound.', [[EVO, `${P}:plaits`], [`${P}:plaits`, `${P}:ftpro`]]],
     ['Evolution to Collide', 'Play the SuperCollider synth on the Pi out of the Fast Track Pro.', [[EVO, `${P}:collide`], [`${P}:collide`, `${P}:ftpro`]]],
+    ['The Circuit plays the drums', 'The Circuit\'s MIDI plays the drum machine on the Pi, out of the Fast Track Pro.', [[`${P}:circuit`, `${P}:drums`], [`${P}:drums`, `${P}:ftpro`]]],
+    ['Circuit drums, Evolution synth', 'The Circuit plays the Pi\'s drums and the Evolution plays its synth, both out of the Fast Track.', [[`${P}:circuit`, `${P}:drums`], [EVO, `${P}:synth`], [`${P}:drums`, `${P}:ftpro`], [`${P}:synth`, `${P}:ftpro`]]],
     ['Camera on the screen', 'The Pi\'s camera drawn in one bit on its own small screen.', [[`${P}:camera`, `${P}:dither`], [`${P}:dither`, `${P}:screen`]]],
   ];
   const asPatch = ([name, say, pairs]) => {
