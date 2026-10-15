@@ -32,6 +32,7 @@ export const CONCEPTS = [
   { id: 'remote/plaits', title: 'Plaits on Pi', say: "Emilie Gillet's Plaits running on a Pi in another building. Play it and turn its knobs from here." },
   { id: 'devices/text', title: 'Text on Pi screen', say: 'Type a line and it shows on a small screen on the Pi. Its four keys show up here.' },
   { id: 'devices/dots', title: 'Dots on Pi screen', say: 'A short score plays as rings of dots on the Pi\'s small screen, the dot piano of the Pico.' },
+  { id: 'devices/patches', title: 'Patches on Pi screen', say: 'Small patches drawn as the Pi\'s screen shows them. Send one to the Pi to check it.' },
   // why: lessons/kit-concept-list.md#draw
   { id: 'radio/blend', title: 'Blend', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
   { id: 'radio/tuner', title: 'Tuner', say: 'Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.' },
