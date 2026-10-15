@@ -40,6 +40,12 @@
     padding: 0 var(--pad-seg); color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
     background: transparent; }
   .cn-ex > button.cn-pill:hover { border-color: var(--voice); background: transparent; }
+  /* The ask field in the pills' voice: a sentence a person says. */
+  .cn-ask { display: flex; gap: var(--ctl-gap); align-items: flex-end; }
+  .cn-ask > .pos-field { flex: 1 1 auto; min-width: 0; }
+  .cn-ask .pos-field input { font-family: var(--sans); color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
+  .cn-ask .pos-field input:focus { border-color: var(--voice); }
+  .cn-ask > button { color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
 
   .cn-props { display: flex; flex-direction: column; gap: 12px; }
   .cn-props[hidden] { display: none; }
@@ -104,7 +110,8 @@
   .cn-livemark { fill: var(--ok); }
 </style>
 <script type="module">
-  import { mount, el } from '/shell/shell.mjs';
+  import { mount, el, createShipper } from '/shell/shell.mjs';
+  import { createIconButton } from '/shell/icon-button.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay, checkTransforms, printLink, parseLink } from '/shell/bay.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
@@ -287,7 +294,7 @@
   const rigOf = (say) => EXAMPLES.find((e) => e.say === say) || RIGS.find((e) => e.say === say);
 
   const d = mount({ name: 'connect',
-    what: 'Press an example to build its patch, or an out port and then an in port. Pressing a wire takes it away.',
+    what: 'Say what should play what, press an example, or press an out port and then an in port. Pressing a wire takes it away.',
     readout: null, index: '/', indexLabel: 'positron' });
   useMediumColours();
 
@@ -364,6 +371,9 @@
 
   const props = el('div', 'cn-props');
   props.hidden = true;
+  // A person's own requests go to the device log (pub.positron.studio/logs), never a check's.
+  const ship = SELFCHECK ? () => {} : createShipper();
+  const logAsk = (line) => ship(`connect ${line}`);
   let asking = Promise.resolve();
   async function ask(text) {
     text = String(text || '').trim();
@@ -375,8 +385,11 @@
         for (const f of out.fixed || []) d.log(`the model wrote "${f.said}" on ${f.op}, read as ${f.read}`);
         d.log(`the answer came back in ${out.ms ?? '?'} ms with ${out.links?.length ?? 0} link(s), ${out.usage?.total_tokens ?? '?'} tokens`);
         showProposals(out.links || []);
+        const why = (l) => { const bad = checkTransforms(l.transforms || []); const v = bad ? null : bay.validate(l.from, l.to, l.transforms || []); return bad ? ` (cannot: ${bad.why})` : v.ok ? '' : ` (refused: ${v.why})`; };
+        logAsk(`asked "${text}" -> ${out.links?.length ?? 0} link(s) in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${(out.links || []).map((l) => printLink(l) + why(l)).join('; ') || 'nothing'}`);
       } catch (e) {
         d.log(e.message, 'warn');
+        logAsk(`asked "${text}" -> failed: ${e.message}`);
       }
     })();
     asking = run;
@@ -397,10 +410,10 @@
       const no = el('button', 'pos-sm', 'dismiss', { type: 'button' });
       yes.disabled = !!bad;
       yes.addEventListener('click', (e) => {
-        if (connect(l.from, l.to, l.transforms || [], e.isTrusted === true)) dropRow(row);
-        else row.querySelector('.cn-prop-n')?.replaceChildren(document.createTextNode(`refused: ${last.why}`));
+        if (connect(l.from, l.to, l.transforms || [], e.isTrusted === true)) { logAsk(`connected ${printLink(l)}`); dropRow(row); }
+        else { logAsk(`connect refused ${printLink(l)}: ${last.why}`); row.querySelector('.cn-prop-n')?.replaceChildren(document.createTextNode(`refused: ${last.why}`)); }
       });
-      no.addEventListener('click', () => { d.log(`dismissed ${printLink(l)}`); dropRow(row); });
+      no.addEventListener('click', () => { d.log(`dismissed ${printLink(l)}`); logAsk(`dismissed ${printLink(l)}`); dropRow(row); });
       buttons.append(yes, no);
       row.append(el('span', 'cn-prop-t', printLink(l)), buttons, el('span', 'cn-prop-n', note));
       props.append(row);
@@ -776,8 +789,15 @@
   const runtime = createRuntimes({ bay, typeOf, log: (m, lv) => d.log(m, lv), onChange: drawFaces, audio: { sharedAudio, claim, release } });
   window.__demo.runtime = runtime;
 
+  // Your own sentence, asked of the model like an example pill's.
+  const askRow = el('form', 'cn-ask');
+  const askField = createField({ placeholder: 'say which part should play which' });
+  const askBtn = createIconButton({ icon: 'send', label: 'Ask', onPress: () => askRow.requestSubmit() });
+  askBtn.el.type = 'submit';
+  askRow.append(askField.el, askBtn.el);
+  askRow.addEventListener('submit', (e) => { e.preventDefault(); const t = askField.value().trim(); if (t) ask(t); });
   const say = el('div', 'cn-say');
-  say.append(exRow, props);
+  say.append(askRow, exRow, props);
   d.stack.add(say, faces, pic, chooser, groups);
   redraw();
   for (const f of failed) d.log(f, 'bad');
