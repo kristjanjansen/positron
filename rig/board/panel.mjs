@@ -1,5 +1,5 @@
 // rig/board/panel.mjs: the 0.96" OLED and its four keys on the header (plans/plan-pi-oled.md), for
-// /devices/text/. The layout is demo/shell/panel-screen.mjs, shared with the page's simulated screen and
+// /devices/text/ and the other /devices/ pages. The layout is demo/shell/panel-screen.mjs, shared with the page's simulated screen and
 // reloaded here whenever that file changes (rig/board/panel-sync.mjs copies it over on every save).
 // Nothing runs unless the screen answers at 0x3c, so a board without one is unchanged.
 // why: lessons/rig-board-panel.md#header
@@ -52,8 +52,10 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
     busy = true;
     try {
       const t0 = Date.now();
-      const fb = ui.frame(state.mode === 'rings' ? { mode: 'rings', rings, t: t0 }
-        : state.mode === 'patch' ? { mode: 'patch', patch: state.patch } : { text: state.text, held: [...state.held] });
+      // `raw` is a finished frame (screen-camera.mjs), drawn as it is.
+      const fb = state.mode === 'raw' ? state.raw : ui.frame(state.mode === 'rings' ? { mode: 'rings', rings, t: t0 }
+        : state.mode === 'patch' ? { mode: 'patch', patch: state.patch }
+          : state.mode === 'steps' ? { mode: 'steps', steps: state.steps } : { text: state.text, held: [...state.held] });
       // the whole frame in one transfer: the window, then 1024 bytes
       await write([0x00, 0x21, 0, 127, 0x22, 0, 7]);
       await write([0x40, ...fb]);
@@ -118,6 +120,20 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
       const nodes = (p?.nodes || []).slice(0, 16).map((n) => ({ id: String(n.id) }));
       const links = (p?.links || []).slice(0, 24).map((l) => ({ from: String(l.from), to: String(l.to) }));
       state.mode = 'patch'; state.patch = { nodes, links }; draw();
+    },
+    /** A drum pattern, `{ voices, pattern, step, voice, playing }`, drawn by steps-oled.mjs; a step change is one frame. */
+    steps(p) {
+      const voices = (p?.voices || []).slice(0, 6).map((v) => String(v).slice(0, 2));
+      const pattern = (p?.pattern || []).slice(0, 6).map((r) => (Array.isArray(r) ? r.map((x) => (x ? '1' : '0')).join('') : String(r)).slice(0, 16));
+      const int = (x) => (Number.isInteger(x) ? x : -1);
+      state.mode = 'steps'; state.steps = { voices, pattern, step: int(p?.step), voice: int(p?.voice), playing: !!p?.playing }; draw();
+      return state.shown;
+    },
+    /** A finished 1024 byte page major frame, drawn as it is; frames arriving mid draw collapse to the newest. */
+    frame(bytes) {
+      if (!bytes || bytes.length !== 1024) return state.shown;
+      state.mode = 'raw'; state.raw = bytes; draw();
+      return state.shown;
     },
     status: () => ({ mode: state.mode, text: state.text, held: [...state.held], shown: state.shown, layoutAt: state.layoutAt, frameMs: state.frameMs }),
     close() { mon?.kill(); write([0x00, 0xAE]).catch(() => {}); },

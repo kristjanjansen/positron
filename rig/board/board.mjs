@@ -24,6 +24,7 @@ import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
 import { jackRows } from '../../demo/shell/graph-registry.mjs';
 import { listJack, plan as jackPlan, apply as jackApply, canonical as jackCanonical, diff as jackDiff } from './jack.mjs';
 import { openPanel } from './panel.mjs';
+import { createScreenCamera } from './screen-camera.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import * as fsMod from 'node:fs';
 
@@ -985,6 +986,12 @@ async function handle(msg, replyVia = null) {
       panel.patch(msg.patch);
       return reply('screen.patched', { ok: true, nodes: msg.patch?.nodes?.length || 0 });
     }
+    // A drum pattern and its playhead (/devices/drums/), sent per step and not asked; ask.mjs's reply is for a terminal.
+    case 'screen.steps': {
+      if (!panel) return reply('screen.stepped', { ok: false, why: 'no screen answered at 0x3c on this board' });
+      panel.steps(msg.steps);
+      return msg.ask ? reply('screen.stepped', { ok: true, shown: panel.status().shown }) : undefined;
+    }
     case 'panel.status': return reply('panel.status', panel ? { ok: true, ...panel.status() } : { ok: false, why: 'no screen on this board' });
 
     // jack.graph reads and writes nothing; jack.rebuild returns the graph before and after, so it
@@ -1298,6 +1305,12 @@ const camera = (DRY || ONCE) ? null : createCameraRoom({
     bitrate: Math.min(Number(process.env.BOARD_CAM_BITRATE) || 1_500_000, 4_000_000),
   },
 });
+// The camera on the OLED (/devices/camera/), keyed in the same `<room>-cam` and never while the H.264 picture runs.
+// why: lessons/rig-board-panel.md#screen-camera
+const screenCam = (DRY || ONCE) ? null : createScreenCamera({
+  relay: RELAY, room: `${ROOM}-cam`, key: process.env.BOARD_CAM_KEY || '',
+  log: (l) => log(l), panel: () => panel, cameraBusy: () => !!camera?.running(),
+});
 
 // Announce `pi-1:camera` only with a key and a camera found, asked once (findCamera spawns
 // synchronously).
@@ -1354,5 +1367,5 @@ const hwInputs = createInputs({
 });
 if (!DRY && !ONCE) hwInputs.start();
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { camera?.stop(); stopAudio(); collide.stop(); plaits.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { camera?.stop(); screenCam?.stop(); stopAudio(); collide.stop(); plaits.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
 connect();

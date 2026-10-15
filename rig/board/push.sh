@@ -39,7 +39,7 @@ echo "== shipping to $IP:$DEST"
 # why: lessons/rig-board-io.md#push-tar
 ( cd "$SRC/../.." && COPYFILE_DISABLE=1 tar cf - --no-xattrs --exclude=node_modules --exclude='._*' \
     rig/board rig/vis demo/muta/build/plaits_shim.cc demo/muta/vendor/PROVENANCE-plaits.json \
-    demo/resources/pico/oled-ui.wasm demo/shell/panel-screen.mjs demo/shell/rings.mjs demo/shell/bay-oled.mjs demo/shell/bay-layout.mjs \
+    demo/resources/pico/oled-ui.wasm demo/shell/panel-screen.mjs demo/shell/rings.mjs demo/shell/bay-oled.mjs demo/shell/dither-oled.mjs demo/shell/steps-oled.mjs demo/shell/bay-layout.mjs \
     $(cd rig/board && grep -ho "from '\.\./\.\./[^']*'" ./*.mjs | sed "s|from '\.\./\.\./||; s|'$||" | sort -u) \
 ) | ssh "$USER_@$IP" "sudo tar xf - -C $DEST && sudo chown -R $USER_ $DEST && echo '   unpacked'"
 

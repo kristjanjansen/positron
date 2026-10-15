@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Camera on Pi screen</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<style>
+  .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  /* the simulated panel as on /devices/text/: whole number scale, one height at every zoom */
+  .ol-media { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 24px 16px; height: calc(64px * 4 + 48px); background: #07090d; overflow-x: auto; }
+  .ol-media canvas { display: block; flex: none; width: calc(128px * var(--ol-k, 2)); height: calc(64px * var(--ol-k, 2)); image-rendering: pixelated; }
+  .ol-frame { padding: 8px; border: 1px solid var(--line); border-radius: 2px; line-height: 0; background: #000; }
+  .ol-screen { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-width: 0; }
+  .ol-say { font-size: 12px; color: var(--dim); }
+</style>
+<script type="module">
+  // The Pi's USB camera on its own 128x64 OLED: camera, a one bit dither and the screen are nodes of
+  // pi-1, and the frames the board draws come back over the keyed camera room to a simulated screen here.
+  // Needs the camera key in the address (?cam=), as /remote/circuit/ does; reached on play, never on load.
+  // why: lessons/page-devices.md#camera
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { paintFrame } from '/shell/panel-screen.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { RELAY_BASE, HTTP_BASE, randomId } from '/shell/wire.mjs';
+
+  const d = mount({ name: 'Camera on Pi screen', what: '', index: '/', indexLabel: 'positron',
+    // Readouts on top, the log at the foot (positron-concepts).
+    joined: false,
+    readout: { 'fps here': '', 'fps on Pi': '' } });
+  conceptNav('devices/camera');
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  const CAM_ROOM = `${ROOM}-cam`;
+  const CAM_KEY = q.get('cam') || '';
+  const ME = `web-screen-${randomId(6)}`;
+  const RENEW_MS = 5000;               // the board's lease is 15 s (screen-camera.mjs LEASE_MS)
+
+  // ── the bay: camera, dither and screen on the Pi, the simulated screen here ──
+  // One frame is 1024 bytes, 128x64 at one bit, page major as the SSD1306 takes it.
+  const FRAME = { w: 128, h: 64, bits: 1, layout: 'ssd1306-pages' };
+  const CAM_OUT = `${BOARD_SITE}:camera:video-out`, DITHER_IN = `${BOARD_SITE}:dither:video-in`,
+    DITHER_OUT = `${BOARD_SITE}:dither:video-out`, PI_IN = `${BOARD_SITE}:screen:video-in`, SIM_IN = 'web:screen:video-in';
+  const bay = createBay();
+  bay.addNode({ id: `${BOARD_SITE}:camera`, kind: 'device', label: 'USB camera', place: ROOM });
+  bay.addNode({ id: `${BOARD_SITE}:dither`, kind: 'engine', label: 'one bit 128x64', place: ROOM });
+  bay.addNode({ id: `${BOARD_SITE}:screen`, kind: 'device', label: 'OLED 128x64', place: ROOM });
+  // Mirrored by name: web:screen is this tab's copy of pi-1:screen.
+  bay.addNode({ id: 'web:screen', kind: 'screen', label: 'simulated OLED', place: 'browser' });
+  bay.addPort({ id: CAM_OUT, dir: 'out', medium: 'video', label: 'camera:video-out', shape: { format: 'gray' } });
+  bay.addPort({ id: DITHER_IN, dir: 'in', medium: 'video', label: 'dither:video-in', shape: { format: 'gray' } });
+  // The frames leave the Pi only in the keyed room, as `screen.frame` text, so that is the address.
+  bay.addPort({ id: DITHER_OUT, dir: 'out', medium: 'video', label: 'dither:video-out', shape: FRAME,
+    address: CAM_ROOM, transports: ['page', 'relay'] });
+  bay.addPort({ id: PI_IN, dir: 'in', medium: 'video', label: 'screen:video-in', shape: FRAME });
+  const simCv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
+  let painted = 0;
+  bay.addPort({ id: SIM_IN, dir: 'in', medium: 'video', label: 'screen:video-in', shape: FRAME, transports: ['relay'],
+    deliver: (ev) => { paintFrame(simCv, ev.frame); painted++; } });
+  // why: lessons/page-devices.md#camera-relay
+  for (const [from, to, opts] of [[CAM_OUT, DITHER_IN], [DITHER_OUT, PI_IN], [DITHER_OUT, SIM_IN, { via: 'relay' }]]) {
+    const r = bay.link(from, to, [], opts);
+    if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
+  }
+  const session = () => bay.links().find((l) => l.from === DITHER_OUT && l.to === SIM_IN)?.session || null;
+
+  // ── the keyed room: a renewal every 5 s while visible, the frames back ──
+  let ws = null, on = false, keyed = false, beat = null, lastAt = 0, frames = 0, piFps = null;
+  const arrivals = [];
+  const fpsHere = () => { const cut = performance.now() - 1000; while (arrivals.length && arrivals[0] < cut) arrivals.shift(); return arrivals.length; };
+  const say = (m) => { if (ws?.readyState === 1) ws.send(JSON.stringify({ ...m, from: ME })); };
+  const renew = () => { if (keyed && !document.hidden) say({ type: 'screen.camera', on: true }); };
+
+  async function start() {
+    if (on) return;
+    if (!CAM_KEY) { d.log('This page needs the camera key in its address, as ?cam=, so no camera is asked for', 'warn'); return; }
+    on = true;
+    transport.setIcon('play', 'stop', 'stop the camera');
+    let r = null;
+    try { r = await fetch(`${HTTP_BASE}/room/${CAM_ROOM}/key`, { method: 'POST', body: CAM_KEY }); } catch { /* stays null */ }
+    if (!on) return;
+    if (!r || r.status !== 204) {
+      d.log(r?.status === 403 ? 'The relay refused the camera key in this address' : 'The relay did not answer the key check', 'warn');
+      return stop(false);
+    }
+    const addr = session()?.address || CAM_ROOM;
+    ws = new WebSocket(`${RELAY_BASE}/room/${addr}/ws`);
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'cam.key', key: CAM_KEY, from: ME }));
+    ws.onmessage = (e) => {
+      if (typeof e.data !== 'string') return;
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.type === 'cam.key.ok') { keyed = true; renew(); clearInterval(beat); beat = setInterval(renew, RENEW_MS); d.log(`Asking the Pi for its camera on the screen in ${addr}`); }
+      else if (m.type === 'screen.camera.started') d.log(`The Pi's camera is on its screen, ${m.source}, ${m.w}x${m.h} at ${m.fps} fps${m.screen ? '' : ', but no screen answered on the Pi'}`, 'ok');
+      else if (m.type === 'screen.camera.refused') d.log(`The Pi did not start the camera: ${m.why}`, 'warn');
+      else if (m.type === 'screen.camera.stopped') { if (on) d.log(`The Pi's camera stopped: ${m.why}`, 'warn'); }
+      else if (m.type === 'screen.frame' && typeof m.b64 === 'string') {
+        const bin = atob(m.b64);
+        if (bin.length !== 1024) return;
+        const frame = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+        frames++; lastAt = performance.now(); arrivals.push(lastAt); piFps = m.fps;
+        bay.send(DITHER_OUT, { frame, n: m.n });
+      }
+    };
+    ws.onclose = (e) => {
+      if (!on) return;
+      d.log(e?.code === 4003 ? 'The relay closed the camera room: it did not take the key' : `The camera room closed (${e?.code ?? '?'})`, 'warn');
+      stop(false);
+    };
+  }
+  function stop(tell = true) {
+    if (tell && keyed) say({ type: 'screen.camera', on: false });
+    clearInterval(beat); beat = null;
+    try { ws?.close(); } catch { /* gone */ }
+    ws = null; on = false; keyed = false;
+    transport.setIcon('play', 'play', 'start the camera');
+    if (tell) d.log('Stopped');
+  }
+  addEventListener('visibilitychange', renew);
+  addEventListener('pagehide', () => { if (on) stop(); });
+
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'start the camera', onPress: () => (on ? stop() : start()) },
+  ] });
+  setInterval(() => { d.set('fps here', on ? fpsHere() : ''); d.set('fps on Pi', on && piFps != null ? piFps : ''); }, 500);
+
+  // ── the patchbay: video wires lit while frames arrive ──
+  const pb = createPatchbay(bay, { room: CAM_ROOM, flowing: () => performance.now() - lastAt < 500 });
+  setInterval(() => pb.refresh?.(), 200);
+
+  const top = el('div', 'cc-top');
+  top.append(transport.el);
+  const media = el('div', 'ol-media');
+  const screenBox = el('div', 'ol-screen');
+  const frameBox = el('div', 'ol-frame');
+  frameBox.append(simCv);
+  screenBox.append(frameBox);
+  media.append(screenBox);
+  const ZOOMS = [1, 2, 4];
+  let zi = 2;
+  const scale = el('span', 'ol-say', '');
+  const zoomBtns = createButtonGroup({ buttons: [
+    { id: 'out', icon: 'zoom-out', label: 'zoom out', onPress: () => setZoom(zi - 1) },
+    { id: 'in', icon: 'zoom-in', label: 'zoom in', onPress: () => setZoom(zi + 1) },
+  ] });
+  function setZoom(i) {
+    zi = Math.max(0, Math.min(ZOOMS.length - 1, i));
+    media.style.setProperty('--ol-k', String(ZOOMS[zi]));
+    scale.textContent = `128×64 at ${ZOOMS[zi]}x`;
+    zoomBtns.enable('out', zi > 0, 'smallest');
+    zoomBtns.enable('in', zi < ZOOMS.length - 1, 'largest');
+  }
+  setZoom(zi);
+  paintFrame(simCv, new Uint8Array(1024));
+  const simPanel = createVideoPanel({ media, left: scale, right: zoomBtns.el, aspect: 'auto' });
+  d.stack.add(top, simPanel.el, pb.el);
+  window.__demo.bay = bay;
+  window.__demo.probe = () => ({ on, keyed, frames, painted, fpsHere: fpsHere(), piFps });
+
+  if (SELFCHECK) {
+    d.assert('three links: camera to dither, dither to the Pi\'s screen and to the simulated one', bay.links().length === 3, bay.links().map((l) => `${l.from} -> ${l.to}`).join(', '));
+    const s = session();
+    d.assert('the frames to this tab ride the keyed camera room', s?.transport === 'relay' && s?.address === CAM_ROOM, JSON.stringify(s));
+    d.assert('a visit opens nothing until play', !ws && !on);
+    // A frame through the bay paints the simulated screen: a lit left half.
+    const half = new Uint8Array(1024); for (let p = 0; p < 8; p++) half.fill(0xff, p * 128, p * 128 + 64);
+    bay.send(DITHER_OUT, { frame: half, n: 0 });
+    const px = (x, y) => simCv.getContext('2d').getImageData(x, y, 1, 1).data[1];
+    d.assert('a frame on dither:video-out paints the simulated screen', painted === 1 && px(10, 10) > 100 && px(100, 10) === 0, `painted ${painted}`);
+    paintFrame(simCv, new Uint8Array(1024)); painted = 0;
+  }
+  d.ready();
+</script>
