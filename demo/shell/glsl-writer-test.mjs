@@ -97,6 +97,50 @@ check('NEGATIVE CONTROL: a model that does not answer runs nothing and is asked 
 
 check('a hash is 8 hex and tells two programs apart', /^[0-9a-f]{8}$/.test(hashOf(GOOD)) && hashOf(GOOD) !== hashOf(BROKEN));
 
+// ── a revision: the first ask carries the program running now and no error ──
+s = scripted([GOOD]);
+r = await writeProgram({ text: 'slower', base: BROKEN.replace('nope', 'uT'), ask: s.ask, trial });
+check('a revision\'s first ask carries the program running now as previous, and no error', r.verdict === 'ran' && s.asked[0].previous?.includes('vec4(uT)')
+  && s.asked[0].error === null, JSON.stringify(s.asked[0]));
+s = scripted([BROKEN, GOOD]);
+r = await writeProgram({ text: 'slower', base: GOOD, ask: s.ask, trial });
+check('a revision that fails is retried with the failed program and a reason, so the worker reads it as a fix', s.asked[1]?.previous?.includes('nope') && !!s.asked[1]?.error,
+  JSON.stringify(s.asked[1]));
+s = scripted([GOOD]);
+await writeProgram({ text: 'slower', ask: s.ask, trial });
+check('NEGATIVE CONTROL: with no base the first ask carries no previous', s.asked[0].previous === null);
+r = await writeProgram({ text: 'x', ask: async () => { throw Object.assign(new Error('too many requests from here: at most 6 in 10 s, try again in 4 s'), { plain: true }); }, trial });
+check('a refusal for asking too often is said in its own words', r.verdict === 'failed' && /^too many requests/.test(r.error), r.error);
+
+// ── the examples the worker puts in its prompt keep to the contract ──
+const { GLSL_EXAMPLES, glslExamples } = await import('./glsl-examples.mjs');
+/** What a body must be (glslContract), as a list of what it breaks. */
+function breaks(body) {
+  const out = [];
+  if (!/^precision highp float;/.test(body)) out.push('does not start with precision highp float');
+  if (/#version/.test(body)) out.push('carries #version');
+  for (const u of UNIFORMS) if (!new RegExp(`\\buniform\\s+${u.type}\\s+${u.name}\\s*;`).test(body)) out.push(`does not declare ${u.name}`);
+  if (!/\bout\s+vec4\s+o\s*;/.test(body)) out.push('no out vec4 o');
+  if (!/\bvoid\s+main\s*\(\s*\)/.test(body)) out.push('no main');
+  if (/\b(iTime|iResolution|mainImage|fragColor)\b/.test(body)) out.push('Shadertoy names');
+  for (const m of body.matchAll(/<\s*(\d+)\s*;/g)) if (Number(m[1]) > 64) out.push(`a loop of ${m[1]}`);
+  if (body.length >= 3000) out.push(`${body.length} chars`);
+  if (!/\buT\b/.test(body.replace(/uniform float uT;/, ''))) out.push('never reads uT');
+  if (adaptGlsl(body).fixed.length) out.push(`needed fixing: ${adaptGlsl(body).fixed.join(', ')}`);
+  return out;
+}
+check('two examples, each named and saying what it teaches', GLSL_EXAMPLES.length === 2 && GLSL_EXAMPLES.every((e) => e.name && e.teaches && e.body));
+for (const e of GLSL_EXAMPLES) check(`the example "${e.name}" keeps to the contract`, breaks(e.body).length === 0, breaks(e.body).join('; '));
+check('one example feeds back through uPrev, one layers noise with a palette, and both draw soft edges with smoothstep',
+  GLSL_EXAMPLES.some((e) => /texture\(uPrev/.test(e.body)) && GLSL_EXAMPLES.some((e) => /fbm/.test(e.body) && /cos\(6\.2831/.test(e.body))
+    && GLSL_EXAMPLES.every((e) => /smoothstep/.test(e.body)));
+check('one hash signature across the examples, since two made the model mix their arguments',
+  new Set(GLSL_EXAMPLES.flatMap((e) => [...e.body.matchAll(/float hash\(([^)]*)\)/g)].map((m) => m[1]))).size === 1);
+check('NEGATIVE CONTROL: the contract check refuses a body with #version and one missing uPrev',
+  breaks(`#version 300 es\n${GLSL_EXAMPLES[0].body}`).length > 0 && breaks(GLSL_EXAMPLES[0].body.replace(' uniform sampler2D uPrev;', '')).some((b) => /uPrev/.test(b)));
+check('NEGATIVE CONTROL: none of the examples is rain, so a measurement on rain grades no copy', !GLSL_EXAMPLES.some((e) => /rain|drop/i.test(e.name + e.body)));
+check('the prompt block carries every example whole', GLSL_EXAMPLES.every((e) => glslExamples().includes(e.body)));
+
 for (const b of bad) console.log(`FAIL  ${b}`);
 console.log(`${ok} ok, ${bad.length} failed`);
 process.exit(bad.length ? 1 : 0);

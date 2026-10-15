@@ -90,14 +90,15 @@ export function hashOf(text) {
  * Ask, adapt, compile and look, at most `attempts` times or until `budgetMs` has gone.
  * @param {object} o
  * @param {string} o.text  the sentence
+ * @param {string} [o.base]  the program running now: the first ask revises it as `text` says
  * @param {(q: { text: string, previous: string|null, error: string|null }) => Promise<{ code: string, ms?: number, model?: string, usage?: object }>} o.ask
  * @param {(body: string) => { ok: boolean, error?: string, flat?: boolean, still?: boolean }} o.trial  compiles in a sandbox
  * @returns {Promise<{ verdict: 'ran'|'ran still'|'refused'|'failed', source: string|null, error: string, tries: object[], ms: number, tokens: number, model: string }>}
  */
-export async function writeProgram({ text, ask, trial, attempts = ATTEMPTS, budgetMs = BUDGET_MS, now = () => Date.now(), onTry = () => {} }) {
+export async function writeProgram({ text, base = null, ask, trial, attempts = ATTEMPTS, budgetMs = BUDGET_MS, now = () => Date.now(), onTry = () => {} }) {
   const t0 = now();
   const tries = [];
-  let previous = null, error = null, still = null, model = '', tokens = 0;
+  let previous = base || null, error = null, still = null, model = '', tokens = 0;
   const done = (verdict, source, why) => ({ verdict, source, error: why, tries, ms: now() - t0, tokens, model });
   for (let i = 0; i < attempts; i++) {
     if (i > 0 && now() - t0 >= budgetMs) break;
@@ -105,7 +106,7 @@ export async function writeProgram({ text, ask, trial, attempts = ATTEMPTS, budg
     try { out = await ask({ text, previous, error }); } catch (e) {
       tries.push({ attempt: i + 1, stage: 'ask', error: e.message });
       onTry(tries.at(-1));
-      return done('failed', still, `nothing answered: ${e.message}`);
+      return done('failed', still, e.plain ? e.message : `nothing answered: ${e.message}`);
     }
     model = out.model || model;
     tokens += out.usage?.total_tokens ?? 0;
@@ -119,9 +120,9 @@ export async function writeProgram({ text, ask, trial, attempts = ATTEMPTS, budg
       if (r.ok && !r.flat && !r.still) { tries.push(t); onTry(t); return done('ran', source, ''); }
       if (r.ok && r.still) { still = source; t.error = 'it compiled and the picture did not change between two moments'; }
       if (r.ok && r.flat) t.error = 'it compiled and drew one flat colour';
-      error = r.ok ? `${t.error}. Make it vary across the screen and move with uT.` : String(r.error || '');
+      error = r.ok ? `${t.error}. Make it vary across the screen and move with uT.` : String(r.error || 'it did not compile');
     }
-    if (!t.ok) error = error || t.error;
+    if (!t.ok) error = error || t.error || 'it did not work';
     tries.push(t); onTry(t);
     previous = source;
   }

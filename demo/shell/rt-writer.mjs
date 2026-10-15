@@ -40,15 +40,18 @@ export function make({ log, send, api = WISH_API, model = '', ask = null }) {
       throw new Error(e?.name === 'TimeoutError' ? `no answer in ${ASK_TIMEOUT_MS / 1000} s` : `nothing answered at ${api}`);
     }
     const out = await r.json().catch(() => ({}));
+    // A refusal for asking too often is said as the worker wrote it, so the page can show it plainly.
+    if (r.status === 429) throw Object.assign(new Error(out.error || 'too many requests from here, wait a minute'), { plain: true });
     if (!r.ok) throw new Error(`the agent said: ${out.error || `HTTP ${r.status}`}`);
     return out;
   }
-  /** Write a program for `text`; a program that passed leaves on program-out, anything else leaves nothing. */
-  async function write(text, { onTry } = {}) {
+  /** Write a program for `text` (with `base`, a revision of that program); a program that passed
+   *  leaves on program-out, anything else leaves nothing. */
+  async function write(text, { onTry, base = null } = {}) {
     if (busy) return null;
     busy = true; writes++;
     try {
-      last = await writeProgram({ text, ask: ask || askWorker, trial, onTry });
+      last = await writeProgram({ text, base, ask: ask || askWorker, trial, onTry });
       if (last.source) send('program-out', { of: 'program', source: last.source, at: Date.now() });
       return last;
     } finally { busy = false; }
