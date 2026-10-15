@@ -123,8 +123,12 @@
         ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(a.x + dx, a.y, z.x - dx, z.y, z.x, z.y);
       } else {
         // a box below in the same column: out to the right, back through the gap above the target, in from the left
-        const gy = z.top - VGAP / 2, r = 32;
-        ctx.moveTo(a.x, a.y); ctx.lineTo(a.x + r, a.y); ctx.lineTo(a.x + r, gy); ctx.lineTo(z.x - r, gy); ctx.lineTo(z.x - r, z.y); ctx.lineTo(z.x, z.y);
+        // each corner an arc, as the patchbay's own wires bend
+        const gy = z.top - VGAP / 2, r = 32, rr = 12;
+        const pts = [[a.x, a.y], [a.x + r, a.y], [a.x + r, gy], [z.x - r, gy], [z.x - r, z.y], [z.x, z.y]];
+        ctx.moveTo(...pts[0]);
+        for (let i = 1; i < pts.length - 1; i++) ctx.arcTo(...pts[i], ...pts[i + 1], rr);
+        ctx.lineTo(...pts.at(-1));
       }
       ctx.stroke();
     }
