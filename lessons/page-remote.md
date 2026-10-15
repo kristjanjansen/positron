@@ -665,6 +665,3 @@ The full comments cut from the code under demo/ for remote, verbatim. Each headi
         // until it is up, light relay if it falls back.
 ````
 
-## oled
-
-`/remote/oled/` (2026-10-15): the Pi's OLED and keys as `pi-1:oled:value-in` and `pi-1:keys:value-out` in the page's own bay, the way `/remote/circuit/` draws the Circuit. Delivery into `oled:value-in` is a `board.ask({ type: 'oled.text' })`; a key on the Pi is a `panel.key` sent to the whole room, which the page puts on `keys:value-out`. Not in `boardGraph` yet, so another page does not see the panel; that and `bay.event` on the board are steps 5 and 6 of `plans/plan-pi-oled.md`.

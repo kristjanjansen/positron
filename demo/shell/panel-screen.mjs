@@ -1,5 +1,5 @@
 // demo/shell/panel-screen.mjs: what the Pi's 0.96" OLED shows, drawn by the firmware's UI kit compiled
-// to WebAssembly (oled-ui.wasm), so rig/board/panel.mjs and /remote/oled/'s simulated screen make the
+// to WebAssembly (oled-ui.wasm), so rig/board/panel.mjs and /devices/screen/'s simulated screen make the
 // same 1024 bytes. Change `drawPanel` here: the page shows it on reload, the Pi after push.sh.
 // No DOM and no Pico emulator, so node imports it too (oled-view.mjs would load pico.mjs, 216 KB).
 // why: lessons/kit-panel-screen.md#header

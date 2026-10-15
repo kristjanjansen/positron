@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>OLED on Pi</title>
+<title>Screen on Pi</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
@@ -31,7 +31,7 @@
   // The 0.96" OLED and its four keys on the Pi's header (rig/board/panel.mjs), as two nodes of the
   // Pi in this page's bay: text from a tab along a link to the screen, the keys along a link to a
   // table here. The board is reached on Connect, never on load.
-  // why: lessons/page-remote.md#oled
+  // why: lessons/page-devices.md#screen
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -44,8 +44,8 @@
   import { paintFrame } from '/shell/panel-screen.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
 
-  const d = mount({ name: 'OLED on Pi', what: '', readout: null, index: '/', indexLabel: 'positron' });
-  conceptNav('remote/oled');
+  const d = mount({ name: 'Screen on Pi', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  conceptNav('devices/screen');
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';
@@ -55,16 +55,16 @@
 
   // ── the bay: a text box and a key table here, the screen and the keys on the Pi ──
   const TEXT_OUT = 'web:text:value-out';
-  const OLED_IN = `${BOARD_SITE}:oled:value-in`, KEYS_OUT = `${BOARD_SITE}:keys:value-out`;
+  const OLED_IN = `${BOARD_SITE}:screen:value-in`, KEYS_OUT = `${BOARD_SITE}:keys:value-out`;
   const bay = createBay();
   bay.addNode({ id: 'web:text', kind: 'person', label: 'text box', place: 'browser' });
-  bay.addNode({ id: `${BOARD_SITE}:oled`, kind: 'device', label: 'OLED 128x64', place: ROOM });
+  bay.addNode({ id: `${BOARD_SITE}:screen`, kind: 'device', label: 'OLED 128x64', place: ROOM });
   bay.addNode({ id: `${BOARD_SITE}:keys`, kind: 'device', label: 'four keys', place: ROOM });
   // The simulated panel, drawn by demo/shell/panel-screen.mjs as the Pi draws it, and its four keys.
-  // Mirrored by name: web:oled and web:keys are this tab's copies of pi-1:oled and pi-1:keys.
-  bay.addNode({ id: 'web:oled', kind: 'screen', label: 'simulated OLED', place: 'browser' });
+  // Mirrored by name: web:screen and web:keys are this tab's copies of pi-1:screen and pi-1:keys.
+  bay.addNode({ id: 'web:screen', kind: 'screen', label: 'simulated OLED', place: 'browser' });
   bay.addNode({ id: 'web:keys', kind: 'person', label: 'simulated keys', place: 'browser' });
-  const SIM_IN = 'web:oled:value-in', SIMKEYS_OUT = 'web:keys:value-out';
+  const SIM_IN = 'web:screen:value-in', SIMKEYS_OUT = 'web:keys:value-out';
   const sim = { text: 'waiting for a tab', held: new Set(), ui: null, frames: 0, version: '' };
   const simCv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
   function simDraw() { if (!sim.ui) return; paintFrame(simCv, sim.ui.frame({ text: sim.text, held: [...sim.held] })); sim.frames++; }
@@ -75,7 +75,7 @@
 
   bay.addPort({ id: TEXT_OUT, dir: 'out', medium: 'value', emits: ['text'], label: 'text:value-out' });
   // What reaches the screen's in-port leaves for the board, and only once connected.
-  bay.addPort({ id: OLED_IN, dir: 'in', medium: 'value', accepts: ['text'], label: 'oled:value-in',
+  bay.addPort({ id: OLED_IN, dir: 'in', medium: 'value', accepts: ['text'], label: 'screen:value-in',
     deliver: (ev) => {
       if (!board || !connected || !MAY_SEND) return;
       board.ask({ type: 'oled.text', text: ev.text }, 'oled.shown', 3000).then((r) => {
@@ -84,7 +84,7 @@
     } });
   bay.addPort({ id: KEYS_OUT, dir: 'out', medium: 'value', emits: ['key'], label: 'keys:value-out' });
   bay.addPort({ id: SIMKEYS_OUT, dir: 'out', medium: 'value', emits: ['key'], label: 'keys:value-out' });
-  bay.addPort({ id: SIM_IN, dir: 'in', medium: 'value', accepts: ['text', 'key'], label: 'oled:value-in',
+  bay.addPort({ id: SIM_IN, dir: 'in', medium: 'value', accepts: ['text', 'key'], label: 'screen:value-in',
     deliver: (ev) => {
       if (ev.cls === 'text') sim.text = ev.text;
       else if (ev.down) sim.held.add(ev.k); else sim.held.delete(ev.k);

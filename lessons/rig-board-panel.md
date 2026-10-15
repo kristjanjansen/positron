@@ -2,7 +2,7 @@
 
 ## header
 
-Asked 2026-10-15, after the screen and keys were wired: *"lets not do its ui yet, just a testing demo for patchbay"*. So the board draws only a message and the key labels, and the patchbay test page `/remote/oled/` is the subject; the status screen in `plans/plan-pi-oled.md` §3.2 waits.
+Asked 2026-10-15, after the screen and keys were wired: *"lets not do its ui yet, just a testing demo for patchbay"*. So the board draws only a message and the key labels, and the patchbay test page `/devices/screen/` is the subject; the status screen in `plans/plan-pi-oled.md` §3.2 waits.
 
 - Frames go out through `i2ctransfer` (i2c-tools), nine writes a frame (the address window, then one per page), async, because the same process streams audio. The plan's `oledpush` C helper (§2.1) is not built; this is enough for a message at human pace.
 - The drawing is `oled-ui.wasm`, the firmware's `ui.c` compiled with no imports, the bytes the kit pages draw. `push.sh` ships it, since nothing imports it.
@@ -12,5 +12,5 @@ Asked 2026-10-15, after the screen and keys were wired: *"lets not do its ui yet
 
 ## live layout
 
-Asked 2026-10-15: *"can we run simulator screen also in https://positron.studio/remote/oled/ do develop it live? run local dev"*, then *"pushing to pi: find a way to keep it in sync perhaps?"*. The layout is `demo/shell/panel-screen.mjs` alone; the page's `web:oled` and the Pi's `pi-1:oled` both call its `drawPanel` through the same `oled-ui.wasm`. `panel.mjs` re-imports it under `?v=<mtime>` when the file changes, and `rig/board/panel-sync.mjs` copies it over on every save. MEASURED: save to `layout reloaded` on the Pi in about a second, the copy 270 to 310 ms. `push.sh` names the module and the wasm explicitly, because its import scan only finds a static `from '../../...'`: the first push without them left the board saying `no screen`.
+Asked 2026-10-15: *"can we run simulator screen also in https://positron.studio/devices/screen/ do develop it live? run local dev"*, then *"pushing to pi: find a way to keep it in sync perhaps?"*. The layout is `demo/shell/panel-screen.mjs` alone; the page's `web:oled` and the Pi's `pi-1:oled` both call its `drawPanel` through the same `oled-ui.wasm`. `panel.mjs` re-imports it under `?v=<mtime>` when the file changes, and `rig/board/panel-sync.mjs` copies it over on every save. MEASURED: save to `layout reloaded` on the Pi in about a second, the copy 270 to 310 ms. `push.sh` names the module and the wasm explicitly, because its import scan only finds a static `from '../../...'`: the first push without them left the board saying `no screen`.
 The tab's copies are named as mirrors, `web:oled` and `web:keys` (asked: *"why can it not be a mirror of web:<name> pi:<name> ?"*), as `/synth/dots/` names its emulated Pico's screen `web:oled`.

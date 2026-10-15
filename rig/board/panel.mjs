@@ -1,5 +1,5 @@
 // rig/board/panel.mjs: the 0.96" OLED and its four keys on the header (plans/plan-pi-oled.md), for
-// /remote/oled/. The layout is demo/shell/panel-screen.mjs, shared with the page's simulated screen and
+// /devices/screen/. The layout is demo/shell/panel-screen.mjs, shared with the page's simulated screen and
 // reloaded here whenever that file changes (rig/board/panel-sync.mjs copies it over on every save).
 // Nothing runs unless the screen answers at 0x3c, so a board without one is unchanged.
 // why: lessons/rig-board-panel.md#header

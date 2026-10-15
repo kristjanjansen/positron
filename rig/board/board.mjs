@@ -970,7 +970,7 @@ async function handle(msg, replyVia = null) {
     // why: lessons/rig-board.md#board-ping
     case 'board.ping':    return reply('board.pong', { pongAt: Date.now() });
 
-    // The OLED and its keys (panel.mjs), for /remote/oled/: a tab's text drawn on the screen, and
+    // The OLED and its keys (panel.mjs), for /devices/screen/: a tab's text drawn on the screen, and
     // a press or release sent to the room as `panel.key`. No screen answers `ok: false`.
     case 'oled.text': {
       if (!panel) return reply('oled.shown', { ok: false, why: 'no screen answered at 0x3c on this board' });

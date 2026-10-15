@@ -30,7 +30,7 @@ export const CONCEPTS = [
   { id: 'remote/collide', title: 'Collide on Pi', say: 'SuperCollider here and on a Pi in another building at once. Crossfade between the two.' },
   { id: 'remote/piano', title: 'Piano and Rhodes on Pi', say: 'A piano and a Rhodes on a Pi in another building, played from here over the relay or direct.' },
   { id: 'remote/plaits', title: 'Plaits on Pi', say: "Emilie Gillet's Plaits running on a Pi in another building. Play it and turn its knobs from here." },
-  { id: 'remote/oled', title: 'OLED on Pi', say: 'Type a line and it shows on a small screen on the Pi. Its four keys show up here.' },
+  { id: 'devices/screen', title: 'Screen on Pi', say: 'Type a line and it shows on a small screen on the Pi. Its four keys show up here.' },
   // why: lessons/kit-concept-list.md#draw
   { id: 'radio/blend', title: 'Blend', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
   { id: 'radio/tuner', title: 'Tuner', say: 'Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.' },
@@ -83,13 +83,13 @@ export const CONCEPTS = [
 // The folders under demo/ that hold concept pages, the first URL segment. workers/view/build.mjs
 // refuses a build where one is also a demo slug or a listed file, or a row names a folder not here.
 // why: lessons/kit-concept-list.md#concept-dirs
-export const CONCEPT_DIRS = ['synth', 'code', 'granulator', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'drums', 'history'];
+export const CONCEPT_DIRS = ['synth', 'code', 'granulator', 'remote', 'devices', 'radio', 'video', 'shader', 'room', 'typist', 'drums', 'history'];
 
 // The demos on the front page: every listed, built manifest row once, under a group. A concept group
 // draws it as a demo card, CASE_GROUPS as a use case card. Kept out of CONCEPTS so the pager skips it.
 // `supersededBy: '<group>/<slug>'` labels its card `not needed`, naming that page.
 // why: lessons/kit-concept-list.md#concept-groups
-export const CONCEPT_GROUPS = ['wish', 'synth', 'code', 'granulator', 'remote', 'drums', 'radio', 'video', 'shader', 'typist', 'sampler', 'archives', 'room'];
+export const CONCEPT_GROUPS = ['wish', 'synth', 'code', 'granulator', 'remote', 'devices', 'drums', 'radio', 'video', 'shader', 'typist', 'sampler', 'archives', 'room'];
 // A group's heading on the front page is its key unless it is named here.
 // why: lessons/kit-concept-list.md#group-titles
 export const GROUP_TITLES = { archives: 'history', synth: 'building instruments', code: 'instruments in code', remote: 'remote instruments', performances: 'timelines' };
