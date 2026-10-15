@@ -98,13 +98,14 @@
 
   // ── the cards ──
   const ui = await loadPanelUi(await (await fetch('/resources/pico/oled-ui.wasm')).arrayBuffer());
-  const blocks = [], cuts = [];
+  const blocks = [], cuts = [], screens = [];
   for (const [title, list] of SECTIONS) {
   const grid = el('div', 'pt-grid');
   for (const x of list) {
     const card = el('div', 'pt-card');
     const cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
     paintFrame(cv, ui.frame({ mode: 'patch', patch: x.patch }));
+    screens.push([cv, x.patch]);
     const L = layoutBayOled(x.patch);
     cuts.push(L.cut.length);
     const frame = el('div', 'pt-frame'); frame.append(cv);
@@ -125,6 +126,13 @@
   block.append(el('h3', 'pos-sec-h', title), grid);
   blocks.push(block);
   }
+
+  // The wires run: beads move out to in, about 15 frames a second, as the Pi draws a patch it was sent.
+  let last = 0;
+  (function run(now) {
+    if (now - last > 66) { last = now; for (const [cv, patch] of screens) paintFrame(cv, ui.frame({ mode: 'patch', patch, t: now / 1000 })); }
+    requestAnimationFrame(run);
+  })(0);
 
   const pb = createPatchbay(bay, { room: ROOM, flowing: (l) => (flash.get(l.id) || 0) > performance.now() });
   setInterval(() => pb.refresh?.(), 200);

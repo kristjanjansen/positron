@@ -54,7 +54,7 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
       const t0 = Date.now();
       // `raw` is a finished frame (screen-camera.mjs), drawn as it is.
       const fb = state.mode === 'raw' ? state.raw : ui.frame(state.mode === 'rings' ? { mode: 'rings', rings, t: t0 }
-        : state.mode === 'patch' ? { mode: 'patch', patch: state.patch }
+        : state.mode === 'patch' ? { mode: 'patch', patch: state.patch, t: t0 / 1000 }
           : state.mode === 'steps' ? { mode: 'steps', steps: state.steps } : { text: state.text, held: [...state.held] });
       // the whole frame in one transfer: the window, then 1024 bytes
       await write([0x00, 0x21, 0, 127, 0x22, 0, 7]);
@@ -68,12 +68,14 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
       if (again) { again = false; draw(); }
     }
   }
-  // The rings turn, so they redraw on a clock while anything is left to draw, and stop when nothing is.
+  // The rings turn and a patch's wires run, so both redraw on a clock: the rings while anything is left to
+  // draw, a patch while it is on the screen.
   let ticking = null;
+  const moving = () => (state.mode === 'rings' && rings.alive(Date.now())) || state.mode === 'patch';
   function animate() {
     if (ticking) return;
     ticking = setInterval(() => {
-      if (state.mode !== 'rings' || !rings.alive(Date.now())) { clearInterval(ticking); ticking = null; draw(); return; }
+      if (!moving()) { clearInterval(ticking); ticking = null; draw(); return; }
       draw();
     }, FRAME_MS);
   }
@@ -119,7 +121,7 @@ export async function openPanel({ log = () => {}, onKey = () => {} } = {}) {
     patch(p) {
       const nodes = (p?.nodes || []).slice(0, 16).map((n) => ({ id: String(n.id) }));
       const links = (p?.links || []).slice(0, 24).map((l) => ({ from: String(l.from), to: String(l.to) }));
-      state.mode = 'patch'; state.patch = { nodes, links }; draw();
+      state.mode = 'patch'; state.patch = { nodes, links }; draw(); animate();
     },
     /** A drum pattern, `{ voices, pattern, step, voice, playing, look }`, drawn by steps-oled.mjs; a step change is one frame. */
     steps(p) {
