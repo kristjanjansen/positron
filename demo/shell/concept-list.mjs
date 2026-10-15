@@ -35,6 +35,7 @@ export const CONCEPTS = [
   { id: 'radio/tempo', title: 'Tempo', say: 'Find the tempo of recordings of Raadio 2, Raadio 4 and Ida, with the beats it hears on the wave.' },
   { id: 'radio/live', title: 'Live tempo', say: 'The same tempo detector on Raadio 2, Raadio 4 or Ida live, one station at a time through our relay.' },
   { id: 'radio/key', title: 'Live key', say: 'Hear a live station, see the key a detector finds in it lit on a keyboard, and play along in it.' },
+  { id: 'radio/scenery', title: 'Radio landscape', say: 'Tune a dial across three of our radio recordings into a granulator. The landscape moves with it.' },
   // why: lessons/kit-concept-list.md#clock
   { id: 'video/camera', title: 'Camera', say: 'Turn on your camera and see it on the page while the patchbay holds the link from camera to screen.' },
   { id: 'video/shader', title: 'Camera shader', say: 'Your camera beside itself through a two tone dither shader, with one knob for how coarse it is.' },
