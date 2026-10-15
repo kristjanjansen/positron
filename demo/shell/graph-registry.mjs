@@ -107,9 +107,11 @@ export function jackRows(from, to) {
  * @param {boolean} [o.jack]     announce JACK ends and the granulator and capture nodes. Off by default.
  * @param {string[]} [o.plaitsParams]  the names `pi-1:plaits:value-in` takes; passed in, so this file stays import free
  * @param {object} [o.patches]  patch names by instrument (`{ sampler: [...], plaits: [...] }`), put on its midi-in for a `patch` transform; passed in for the same reason
+ * @param {object} [o.drums]    drum maps by node (`{ circuit: DRUM_MAPS.circuit }`, demo/shell/drum-maps.mjs), put on its midi-in as `drums` for a `drummap` transform
+ * @param {boolean} [o.sequencer]  announce `pi-1:sequencer`, the board's own step sequencer (rig/board/sequencer.mjs)
  * why: lessons/kit-graph-registry.md#boardgraph
  */
-export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], outputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false, plaitsParams = null, patches = {} }) {
+export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], outputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false, plaitsParams = null, patches = {}, drums = {}, sequencer = false }) {
   const place = room;
   // Port names are `<medium>-<dir>` (plans/plan-site-names.md §4c), so the id
   // says what a port carries and which way. `graphProblem` holds a board to it.
@@ -117,6 +119,8 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
   const node = (n, kind, label) => { nodes.push({ id: `${site}:${n}`, kind, label, place, ...(net ? { net } : {}) }); };
   const port = (n, p, o) => { ports.push({ id: `${site}:${n}:${p}`, ...o }); };
   const named = (k) => (Array.isArray(patches?.[k]) && patches[k].length ? { patches: [...patches[k]] } : {});
+  const mapped = (k) => (drums?.[k] && typeof drums[k].name === 'string' ? { drums: { ...drums[k],
+    map: drums[k].map ? { ...drums[k].map } : null, labels: { ...(drums[k].labels || {}) } } } : {});
 
   // The synths the board can start. `pappusFx` is an insert on another sound,
   // not a sound of its own, so it is not a node here.
@@ -162,7 +166,7 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     port('collide', 'value-in', { label: 'SuperCollider', dir: 'in', medium: 'value', shape: { of: 'param' }, address: room });
     sound('collide', 'SuperCollider');
     node('drums', 'engine', 'drums');
-    port('drums', 'midi-in', { label: 'drums', dir: 'in', medium: 'midi', accepts: ['note'], never: [], address: room });
+    port('drums', 'midi-in', { label: 'drums', dir: 'in', medium: 'midi', accepts: ['note'], never: [], address: room, ...mapped('drums') });
     sound('drums', 'drums');
   }
   // Plaits, the same DSP as the browser's `web:plaits` compiled natively (rig/board/plaits.mjs).
@@ -210,8 +214,17 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     if (i.midi) {
       inputPorts.add(String(i.midi.port).toLowerCase());
       port(n, 'midi-in', { label: i.name, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], never: ['sysex'],
-        shape: { channels: i.midi.channels }, address: `${room}-${i.name}` });
+        shape: { channels: i.midi.channels }, address: `${room}-${i.name}`, ...mapped(n) });
     }
+  }
+  // The board's own step sequencer: GM drum notes on channel 10 out, a pattern in, its steps out for
+  // the screen. Notes only, plus CC 123 on stop; never SysEx or a program change.
+  // why: lessons/kit-graph-registry.md#sequencer
+  if (sequencer) {
+    node('sequencer', 'engine', 'sequencer');
+    port('sequencer', 'midi-out', { label: 'sequencer', dir: 'out', medium: 'midi', emits: ['note', 'cc'], shape: { channels: [10] }, address: room });
+    port('sequencer', 'value-in', { label: 'sequencer', dir: 'in', medium: 'value', shape: { of: 'pattern' }, accepts: ['pattern'], address: room });
+    port('sequencer', 'value-out', { label: 'sequencer', dir: 'out', medium: 'value', shape: { of: 'steps' }, emits: ['steps'], address: room });
   }
   // The jackd card's outputs: a link to its audio-in is a JACK connection to `system:playback_N`.
   for (const o of jack ? outputs : []) {

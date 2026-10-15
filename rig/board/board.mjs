@@ -24,6 +24,8 @@ import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
 import { jackRows } from '../../demo/shell/graph-registry.mjs';
 import { listJack, plan as jackPlan, apply as jackApply, canonical as jackCanonical, diff as jackDiff } from './jack.mjs';
 import { openPanel } from './panel.mjs';
+import { createSequencerService } from './sequencer.mjs';
+import { DRUM_MAPS } from '../../demo/shell/drum-maps.mjs';
 import { createScreenCamera } from './screen-camera.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import * as fsMod from 'node:fs';
@@ -87,6 +89,19 @@ const collide = createCollideService({ onFrame: (f) => sendPcm(f), log: (l) => l
 // Plaits as a JACK source beside the sampler and collide (plaits.mjs); starts nothing until
 // audio.start {source: 'plaits'}. A held note is released once its page has been quiet 15 s.
 const plaits = createPlaitsService({ onFrame: (f) => sendPcm(f), log: (l) => log('plaits:', l), heardAt: (f) => clientSeen.get(f) });
+// The board's own step sequencer (sequencer.mjs), on the Pi's clock, into the Circuit through its
+// input's gate and the `drummap circuit` link. It keeps running with no tab open; nothing starts it but seq.start.
+// why: lessons/rig-board-sequencer.md#board
+const drumSeq = createSequencerService({
+  graph: () => (graphFacts ? graphOf(graphFacts) : null),
+  midiSend: (bytes, refused) => {
+    const c = hwInputs.get('circuit');
+    if (!c) { refused('this board has no circuit input'); return; }
+    c.handle({ type: 'midi.send', bytes }, (type, body) => { if (type === 'midi.refused') refused(body?.why || 'refused'); });
+  },
+  screen: (steps) => { if (panel && steps) panel.steps(steps); },
+  log: (l) => log(l),
+});
 let fxOn = false;          // pappus inserted between the instrument and the capture
 // The bay's JACK links, `"<from id> -> <to id>"` to the JACK rows it was
 // applied as. See `jack.link`.
@@ -561,6 +576,7 @@ async function handle(msg, replyVia = null) {
   // and a `note.on {node: 'collide'}` never fall through to Yoshimi.
   if (collide.handles(msg)) return collide.handle(msg, reply).then(() => true);
   if (plaits.handles(msg)) return plaits.handle(msg, reply).then(() => true);
+  if (drumSeq.handles(msg)) return drumSeq.handle(msg, reply).then(() => true);
   switch (msg.type) {
     // A page that joins late asks, and gets the beat now rather than up to five
     // seconds from now. The beat already carries the graph (`beat.mjs`), so the
@@ -994,6 +1010,8 @@ async function handle(msg, replyVia = null) {
     // A drum pattern and its playhead (/devices/drums/), sent per step and not asked; ask.mjs's reply is for a terminal.
     case 'screen.steps': {
       if (!panel) return reply('screen.stepped', { ok: false, why: 'no screen answered at 0x3c on this board' });
+      // While the board's sequencer runs, the screen is its own: it draws from the board's clock.
+      if (drumSeq.core.running()) return msg.ask ? reply('screen.stepped', { ok: false, why: 'the board\'s sequencer is running and draws the screen' }) : undefined;
       panel.steps(msg.steps);
       return msg.ask ? reply('screen.stepped', { ok: true, shown: panel.status().shown }) : undefined;
     }
@@ -1188,6 +1206,8 @@ function connect() {
                    // Patch names on each instrument's midi-in, for a `patch` transform (bay.mjs), in program order.
                    patches: { sampler: Object.values(SAMPLER_SETS).sort((a, b) => a.program - b.program).map((x) => x.name),
                               plaits: PLAITS_PATCHES.map((p) => p.name) },
+                   // Drum maps on each drum instrument's midi-in, for a `drummap` transform (drum-maps.mjs).
+                   drums: { circuit: DRUM_MAPS.circuit, drums: DRUM_MAPS.gm }, sequencer: true,
                    midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable(), camera: cameraFound };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,
@@ -1372,5 +1392,5 @@ const hwInputs = createInputs({
 });
 if (!DRY && !ONCE) hwInputs.start();
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { camera?.stop(); screenCam?.stop(); stopAudio(); collide.stop(); plaits.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { drumSeq.stop(); camera?.stop(); screenCam?.stop(); stopAudio(); collide.stop(); plaits.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
 connect();

@@ -35,11 +35,13 @@ fi
 
 echo "== shipping to $IP:$DEST"
 # rig/board, rig/vis (compiled on the board) and every module rig/board imports from two levels up,
-# by tar over ssh. COPYFILE_DISABLE=1 keeps macOS `._` files out.
+# by tar over ssh. COPYFILE_DISABLE=1 keeps macOS `._` files out. The grep sees only rig/board's own
+# imports, so a module one of those imports in turn (bay.mjs's link-options.mjs) is listed by name.
 # why: lessons/rig-board-io.md#push-tar
 ( cd "$SRC/../.." && COPYFILE_DISABLE=1 tar cf - --no-xattrs --exclude=node_modules --exclude='._*' \
     rig/board rig/vis demo/muta/build/plaits_shim.cc demo/muta/vendor/PROVENANCE-plaits.json \
     demo/resources/pico/oled-ui.wasm demo/shell/panel-screen.mjs demo/shell/rings.mjs demo/shell/bay-oled.mjs demo/shell/dither-oled.mjs demo/shell/steps-oled.mjs demo/shell/bay-layout.mjs \
+    demo/shell/link-options.mjs demo/shell/midi-kinds.mjs \
     $(cd rig/board && grep -ho "from '\.\./\.\./[^']*'" ./*.mjs | sed "s|from '\.\./\.\./||; s|'$||" | sort -u) \
 ) | ssh "$USER_@$IP" "sudo tar xf - -C $DEST && sudo chown -R $USER_ $DEST && echo '   unpacked'"
 
@@ -88,16 +90,19 @@ ssh "$USER_@$IP" "md5sum $DEST/rig/board/board.mjs $DEST/rig/board/jacksynth.mjs
   $DEST/demo/shell/sclang-lite.mjs $DEST/demo/shell/synthdef.mjs \
   $DEST/rig/board/beat.mjs $DEST/demo/shell/graph-registry.mjs \
   $DEST/rig/board/plaits.mjs $DEST/rig/board/plaits/posplaits.cc $DEST/demo/shell/plaits-params.mjs \
+  $DEST/rig/board/sequencer.mjs $DEST/demo/shell/bay.mjs $DEST/demo/shell/drum-pattern.mjs $DEST/demo/shell/drum-maps.mjs $DEST/demo/shell/link-options.mjs \
   $SC_EXT/pappus/lib/Engine_Pappus.sc $SC_EXT/pappus/lib/PosSource.sc 2>/dev/null"
 md5sum "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/scsampler.mjs" "$SRC/sampler.mjs" "$SRC/norns/possampler-defs.scd" "$SRC/norns/run-pappus.scd" \
   "$SRC/scollide.mjs" "$SRC/norns/poscollide-defs.scd" "$SRC/../../demo/shell/sclang-lite.mjs" "$SRC/../../demo/shell/synthdef.mjs" \
   "$SRC/beat.mjs" "$SRC/../../demo/shell/graph-registry.mjs" \
   "$SRC/plaits.mjs" "$SRC/plaits/posplaits.cc" "$SRC/../../demo/shell/plaits-params.mjs" \
+  "$SRC/sequencer.mjs" "$SRC/../../demo/shell/bay.mjs" "$SRC/../../demo/shell/drum-pattern.mjs" "$SRC/../../demo/shell/drum-maps.mjs" "$SRC/../../demo/shell/link-options.mjs" \
   "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc" 2>/dev/null \
   || md5 -r "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/scsampler.mjs" "$SRC/sampler.mjs" "$SRC/norns/possampler-defs.scd" "$SRC/norns/run-pappus.scd" \
      "$SRC/scollide.mjs" "$SRC/norns/poscollide-defs.scd" "$SRC/../../demo/shell/sclang-lite.mjs" "$SRC/../../demo/shell/synthdef.mjs" \
      "$SRC/beat.mjs" "$SRC/../../demo/shell/graph-registry.mjs" \
      "$SRC/plaits.mjs" "$SRC/plaits/posplaits.cc" "$SRC/../../demo/shell/plaits-params.mjs" \
+     "$SRC/sequencer.mjs" "$SRC/../../demo/shell/bay.mjs" "$SRC/../../demo/shell/drum-pattern.mjs" "$SRC/../../demo/shell/drum-maps.mjs" "$SRC/../../demo/shell/link-options.mjs" \
      "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc"
 
 if [ "$RESTART" = 1 ]; then

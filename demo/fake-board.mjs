@@ -13,6 +13,9 @@ import { startRelay } from './fake-relay.mjs';
 import { createCollideService, ENGINES, PAGE_BUS } from '../rig/board/scollide.mjs';
 import { readOsc } from '../rig/board/pappus.mjs';
 import { createPlaitsService, PLAITS_PARAMS } from '../rig/board/plaits.mjs';
+import { createSequencerService } from '../rig/board/sequencer.mjs';
+import { graphOf } from '../rig/board/beat.mjs';
+import { DRUM_MAPS } from './shell/drum-maps.mjs';
 
 export const RATE = 48000;
 export const FRAME = 960;                 // 20 ms, the board's relay frame
@@ -95,7 +98,7 @@ function fakeSpawn(opts) {
 // A fake raw MIDI port: writes are kept (the far side's count); `inbox` is the Circuit's MIDI out,
 // read non-blocking (EAGAIN when empty), one reader at a time (EBUSY).
 // why: lessons/harness.md#fake-fs
-function fakeFs(written, inbox) {
+function fakeFs(written, inbox, writtenAt = []) {
   let reading = false;
   return {
     readlinkSync: () => 'card9',
@@ -105,7 +108,7 @@ function fakeFs(written, inbox) {
       reading = true; return 10;
     },
     closeSync: (fd) => { if (fd === 10) { reading = false; inbox.length = 0; } },
-    writeSync: (fd, buf) => { written.push([...buf]); return buf.length; },
+    writeSync: (fd, buf) => { written.push([...buf]); writtenAt.push(performance.now()); return buf.length; },
     readSync: (fd, buf) => {
       const c = fd === 10 ? inbox.shift() : null;
       if (!c) { const e = new Error('EAGAIN'); e.code = 'EAGAIN'; throw e; }
@@ -179,6 +182,7 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
   const counts = { hello: 0, alive: 0, asked: 0, audioStarts: 0, framesOut: 0, notesOn: 0, notesOff: 0, panics: 0,
     ctlIn: 0, ctlOut: 0, ctlFolded: 0, pings: 0 };
   const written = [];                      // MIDI bytes the input board WROTE, far side
+  const writtenAt = [];                    // performance.now() of each write, for the sequencer's timing
   const since = Date.now();
   const NAME = 'fake-board', ID = 'stand-in';
   const INPUTS = parseInputs(JSON.stringify({
@@ -189,6 +193,7 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     // (above), so its two nodes (`collide`, `drums`) are announced as the Pi does.
     room, instruments: { synth: true, collide: true, plaits: true }, inputs: INPUTS.inputs, ports: [],
     frameMs: FRAME_MS, gpu: false, midiPresent: () => true, plaitsParams: PLAITS_PARAMS,
+    drums: { circuit: DRUM_MAPS.circuit, drums: DRUM_MAPS.gm }, sequencer: true,
   };
 
   // ── the main room ─────────────────────────────────────────────────────────
@@ -250,8 +255,17 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     },
   });
 
+  // The board's own sequencer, into the stand-in Circuit through the same input code and gate.
+  const seqRefusals = [];
+  const drumSeq = createSequencerService({
+    graph: () => graphOf(graphFacts), log: (l) => say(l),
+    midiSend: (bytes, refused) => inputs?.get('circuit')?.handle({ type: 'midi.send', bytes },
+      (type, body) => { if (type === 'midi.refused') { seqRefusals.push(body?.why); refused(body?.why || 'refused'); } }),
+  });
+
   function handle(msg) {
     const reply = (type, body) => send({ type, re: msg.id, ...body });
+    if (drumSeq.handles(msg)) { drumSeq.handle(msg, reply).catch((e) => say('sequencer threw', e.message)); return undefined; }
     if (collide.handles(msg)) { collide.handle(msg, reply).catch((e) => say('collide threw', e.message)); return undefined; }
     if (plaits.handles(msg)) { plaits.handle(msg, reply).catch((e) => say('plaits threw', e.message)); return undefined; }
     switch (msg.type) {
@@ -341,7 +355,7 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
   // ── the input room, through the board's own code ──────────────────────────
   const opened = {};
   const inbox = [];                        // what the stand-in Circuit "sends", read by the board's own code
-  const fs = fakeFs(written, inbox);
+  const fs = fakeFs(written, inbox, writtenAt);
   const macroAt = new Map();
   /** Turn a macro knob on the stand-in Circuit, as a hand does: one CC per
    *  step from where it was to `v`, clock bytes between. Returns the steps. */
@@ -398,11 +412,15 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     /** What the far side did, for a test. `midiWritten` is every message the gate let through. */
     turnMacro,
     stats: () => ({ ...counts, midiWritten: written.length, midi: written.slice(-16),
+      seq: { ...drumSeq.status(), refusals: seqRefusals.slice(-4) },
+      /** Every byte message the gate let through with when it was written, from `since` (performance.now()). */
+      midiSince: (since = 0) => written.map((b, i) => ({ b, at: writtenAt[i] })).filter((x) => x.at >= since),
       collide: { ...(collide.core()?.stats() ?? {}), scsynth: scsynth ? scsynth.counts() : null, skewMs },
       plaits: { ...(plaits.core()?.stats() ?? {}), lines: plaitsLines.length, last: plaitsLines.slice(-8) },
       inputs: inputs ? inputs.status() : null, relay: ownRelay?.stats?.() ?? null }),
     close() {
       closed = true;
+      drumSeq.stop();
       collide.stop();
       plaits.stop();
       clearInterval(beat); clearInterval(listener); clearInterval(handTimer);
@@ -421,6 +439,7 @@ if (resolve(process.argv[1] || '') === fileURLToPath(import.meta.url)) {
   b.ready.then((url) => {
     console.log(`[fake-board] ready in ${url}/room/studio-1 and studio-1-circuit (nobody's board)`);
     console.log(`[fake-board] open http://127.0.0.1:8890/away/?relay=${url}&board=1`);
+    console.log(`[fake-board] or http://127.0.0.1:8890/devices/drums/?relay=${url}&board=1&target=circuit`);
   });
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { b.close(); process.exit(0); });
 }

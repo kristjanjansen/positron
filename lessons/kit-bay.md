@@ -1684,3 +1684,27 @@ The owner: *"you should know patch names not special case rhodes"*.
 - A second link choosing another patch into the same instrument is made with a warning: one
   instrument plays one patch, so two at once is two instruments (`web:sampler-2`).
 - In the text form a name with a space is quoted (`patch "Soft FM"`) so it reads back whole.
+
+<a id="drummap"></a>
+
+## `bay.mjs` the `drummap` op and `drummapFor`
+
+Built 2026-10-15 from `plans/plan-pi-sequencer.md` §3 (asked *"start pi seq -> circuit drums work"*). General MIDI on the wire, voice names in the pattern file, each drum instrument's own notes published once on its `midi-in` as `drums` (`demo/shell/drum-maps.mjs`), and the translation a named transform on the link, `{ op: 'drummap', name: 'circuit' }`. It is resolved against the destination port when the link is made, exactly as `patch` is resolved against `patches`, and `link()` stores the resolved `map`, `channel` and `labels` on the transform, so `apply()` stays pure and never sees a port. The text form prints only the name (`{ drummap circuit }`); a loaded text patch resolves again.
+
+Why not raw device notes in the pattern: the Circuit's drum 3 is note 64, which in General MIDI is a low conga, and `demo/drums/voices.mjs` already plays a conga on 64. Why not a silent translation at the destination: the picture would show a plain wire while the notes changed underneath it.
+
+An unresolved drummap (a bare `{ op, name }` handed to `apply()`) drops every note rather than pass General MIDI to an instrument that reads 36 as nothing. A note the map lacks is dropped on and off alike; anything that is not a note (CC 123 on stop) passes unchanged. Two drummaps on one link are refused, and so is a drummap into a port with no `drums` or naming a map the port does not publish, with the right map offered back.
+
+MEASURED 2026-10-15, `bay-test.mjs`: 212 asserts before, 237 after (25 new, most negative controls). The four Circuit notes are written in the test from the Drum Notes Table, not read from `drum-maps.mjs`; sabotaging the map to `46: 66` takes 3 red (the open hat's note, the stored map, the details row).
+
+<a id="channels-subset"></a>
+
+## `bay.mjs` MIDI channels compared as a set
+
+`pi-1:circuit:midi-in` declares `shape: { channels: [1, 2, 10] }` and shape fields were compared by JSON equality, so a sequencer declaring `channels: [10]` was refused for not being `[1, 2, 10]`. `plans/plan-pi-sequencer.md` §3.5 named it. For a MIDI link the `channels` field is now a subset test: a source on 10 fits a port that plays 1, 2 and 10, and a source on 3 is refused with `sends on channel 3 and Circuit plays only 1, 2, 10` and a `channel` transform offered. Audio `channels` (a count) is unchanged.
+
+<a id="drummap-warn"></a>
+
+## `bay.mjs` the drum warnings
+
+A port whose `drums.map` is not null (not General MIDI) gets a warning on every link that carries notes into it: without a drummap, *"this link sends General MIDI, so a kick (36) will not sound"* with the transform to add; with one, which GM notes it plays and that every other drum note is dropped. The bay's existing `warn` channel, so a person sees it where they see every other one.

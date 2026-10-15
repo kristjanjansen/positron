@@ -1526,5 +1526,91 @@ console.log('\n== choosing a patch ==');
   ok('the patch signature names a word, not a number', sig === 'patch name=NAME', sig);
 }
 
+
+// ── drummap: General MIDI drums on the Circuit's own notes (plans/plan-pi-sequencer.md §3) ──
+// The Circuit's notes are written here from the Drum Notes Table, not read from drum-maps.mjs, so
+// a wrong map (46 to 66) goes red here. Most are NEGATIVE CONTROLS.
+console.log('\n== drummap ==');
+{
+  const { DRUM_MAPS, drumRows } = await import('./drum-maps.mjs');
+  const TABLE = { 36: 60, 38: 62, 42: 64, 46: 65 };   // GM kick, snare, closed hat, open hat; Drum Notes Table 60, 62, 64, 65
+  const got = [];
+  const D = () => {
+    const b = createBay();
+    b.addPort({ id: 'pi-1:sequencer:midi-out', label: 'sequencer', dir: 'out', medium: 'midi', emits: ['note', 'cc'], shape: { channels: [10] } });
+    b.addPort({ id: 'pi-1:circuit:midi-in', label: 'Circuit', dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'],
+      never: ['sysex'], shape: { channels: [1, 2, 10] }, drums: DRUM_MAPS.circuit, deliver: (e) => got.push(e) });
+    b.addPort({ id: 'pi-1:plain:midi-in', label: 'plain synth', dir: 'in', medium: 'midi', accepts: ['note', 'cc'] });
+    b.addPort({ id: 'pi-1:drums:midi-in', label: 'drums', dir: 'in', medium: 'midi', accepts: ['note'], drums: DRUM_MAPS.gm, deliver: (e) => got.push(e) });
+    b.addPort({ id: 'web:other:midi-out', label: 'channel 3 keys', dir: 'out', medium: 'midi', emits: ['note'], shape: { channels: [3] } });
+    b.addPort({ id: 'web:dump:midi-out', label: 'editor', dir: 'out', medium: 'midi', emits: ['note', 'sysex'] });
+    return b;
+  };
+  const b = D();
+  const r = b.link('pi-1:sequencer:midi-out', 'pi-1:circuit:midi-in', [{ op: 'drummap', name: 'circuit' }]);
+  ok('a sequencer on channel 10 links into the Circuit, which plays 1, 2 and 10, with the circuit drum map', r.ok, r.why || r.warn);
+  const L = b.links()[0];
+  for (const [gm, want] of Object.entries(TABLE)) {
+    got.length = 0;
+    b.send('pi-1:sequencer:midi-out', { cls: 'note', ch: 10, d1: Number(gm), d2: 100 });
+    ok(`GM ${gm} arrives at the Circuit as note ${want} on channel 10`, got.length === 1 && got[0].d1 === want && got[0].ch === 10,
+      JSON.stringify(got));
+  }
+  got.length = 0;
+  const dropped0 = L.dropped;
+  b.send('pi-1:sequencer:midi-out', { cls: 'note', ch: 10, d1: 39, d2: 100 });
+  ok('NEGATIVE CONTROL: a clap (39), which the map lacks, never reaches the Circuit and is counted dropped',
+    got.length === 0 && L.dropped === dropped0 + 1, `${got.length} arrived, dropped ${L.dropped}`);
+  got.length = 0;
+  b.send('pi-1:sequencer:midi-out', { cls: 'note', ch: 10, d1: 36, d2: 0, off: true });
+  ok('NEGATIVE CONTROL: the note off finds the same note, 60, or the drum would hang', got.length === 1 && got[0].d1 === 60 && got[0].off === true,
+    JSON.stringify(got));
+  got.length = 0;
+  b.send('pi-1:sequencer:midi-out', { cls: 'cc', ch: 10, d1: 123, d2: 0 });
+  ok('NEGATIVE CONTROL: all notes off (CC 123) passes the map unchanged', got.length === 1 && got[0].cls === 'cc' && got[0].d1 === 123 && got[0].ch === 10,
+    JSON.stringify(got));
+  ok('the link stores the resolved map, so apply() never needs the port', L.transforms[0].map?.[46] === 65 && L.transforms[0].channel === 10,
+    JSON.stringify(L.transforms[0]));
+  const line = printLink(L);
+  ok('the text form prints only the name, never the numbers', line === 'pi-1:sequencer:midi-out -> pi-1:circuit:midi-in { drummap circuit }', line);
+  const back = parseLink(line);
+  ok('and reads back as the bare op, resolved again when it is linked', back.transforms.length === 1 && back.transforms[0].op === 'drummap'
+    && back.transforms[0].name === 'circuit' && !('map' in back.transforms[0]), JSON.stringify(back.transforms));
+  const b2 = D();
+  const bad = b2.load(line);
+  ok('a loaded text patch resolves the map against the port', bad.length === 0 && b2.links()[0].transforms[0].map?.[38] === 62, JSON.stringify(bad));
+  ok('NEGATIVE CONTROL: an unresolved drummap drops every note rather than send General MIDI to the instrument',
+    apply([{ op: 'drummap', name: 'circuit' }], { cls: 'note', ch: 10, d1: 36, d2: 100 }) === null);
+  ok('NEGATIVE CONTROL: identity (gm) passes a note through and puts it on the map\'s channel',
+    apply([{ op: 'drummap', name: 'gm', map: null, channel: 10 }], { cls: 'note', ch: 1, d1: 39, d2: 90 })?.d1 === 39
+    && apply([{ op: 'drummap', name: 'gm', map: null, channel: 10 }], { cls: 'note', ch: 1, d1: 39, d2: 90 })?.ch === 10);
+
+  const wrong = D().link('pi-1:sequencer:midi-out', 'pi-1:circuit:midi-in', [{ op: 'drummap', name: 'gm' }]);
+  ok('NEGATIVE CONTROL: the gm map named into the Circuit is refused, and the fix names the map it lists',
+    !wrong.ok && /plays its drums by the circuit map/.test(wrong.why) && wrong.fix === 'Write it as {"op":"drummap","name":"circuit"}.', `${wrong.why} | ${wrong.fix}`);
+  const none = D().link('pi-1:sequencer:midi-out', 'pi-1:plain:midi-in', [{ op: 'drummap', name: 'circuit' }]);
+  ok('NEGATIVE CONTROL: a drummap into a port with no drums is refused, naming the port', !none.ok && /plain synth lists no drum map/.test(none.why), none.why);
+  const plain = D().link('pi-1:sequencer:midi-out', 'pi-1:circuit:midi-in');
+  ok('NEGATIVE CONTROL: a plain link into the Circuit is made, with a warning that a kick will not sound',
+    plain.ok && /a kick \(36\) will not sound/.test(plain.warn || '') && /"drummap"/.test(plain.warn || ''), plain.warn);
+  ok('the drummap link warns what the map drops', /plays General MIDI 36, 38, 42, 46 and drops every other drum note/.test(r.warn || ''), r.warn);
+  const gmLink = D().link('pi-1:sequencer:midi-out', 'pi-1:drums:midi-in');
+  ok('NEGATIVE CONTROL: a plain link into a General MIDI port carries no drum warning', gmLink.ok && !/drum note|drummap/.test(gmLink.warn || ''), gmLink.warn || 'none');
+  const two = checkTransforms([{ op: 'drummap', name: 'circuit' }, { op: 'drummap', name: 'gm' }]);
+  ok('NEGATIVE CONTROL: two drummaps on one link are refused', /names 2 drum maps/.test(two.why || ''), two.why);
+  const blank = checkTransforms([{ op: 'drummap', name: ' ' }]);
+  ok('NEGATIVE CONTROL: a drummap with an empty name is refused in words', /the name of a drum map came as/.test(blank.why || ''), blank.why);
+  const ch3 = D().link('web:other:midi-out', 'pi-1:circuit:midi-in', [{ op: 'drummap', name: 'circuit' }]);
+  ok('NEGATIVE CONTROL: a source on channel 3 is refused by the channel set, and the fix moves it onto one the Circuit plays',
+    !ch3.ok && /sends on channel 3 and Circuit plays only 1, 2, 10/.test(ch3.why) && /"op":"channel","to":1/.test(ch3.fix), `${ch3.why} | ${ch3.fix}`);
+  const sys = D().link('web:dump:midi-out', 'pi-1:circuit:midi-in', [{ op: 'drummap', name: 'circuit' }]);
+  ok('NEGATIVE CONTROL: a drummap does not make SysEx into the Circuit acceptable', !sys.ok && /does not accept sysex/.test(sys.why), sys.why);
+  const rows = drumRows(L.transforms[0]).map((x) => x.line);
+  ok('the details rows read GM note, voice, the Circuit\'s note and its slot', rows[0] === '36 kick -> 60 drum 1' && rows.length === 4
+    && rows[3] === '46 open hat -> 65 drum 4', rows.join(' | '));
+  const sig = OP_HELP.find((o) => o.op === 'drummap')?.sig;
+  ok('the drummap signature names a word', sig === 'drummap name=NAME', sig);
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

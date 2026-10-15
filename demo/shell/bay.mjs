@@ -267,6 +267,26 @@ const OPS = {
     classes: (set) => set,
     run: (ev) => ev,
   },
+  /**
+   * General MIDI drum notes onto an instrument's own, by the map its midi in publishes as `drums`.
+   * `link` stores the resolved `map` and `channel` on the transform, so `run` never sees a port; an
+   * unresolved one drops every note. A note the map lacks is dropped, on and off alike.
+   * why: lessons/kit-bay.md#drummap
+   */
+  drummap: {
+    args: ['name'], need: ['name'],
+    help: 'play General MIDI drum notes on the drum notes of the instrument this link reaches, by the drum map called NAME that its midi in lists',
+    eg: { op: 'drummap', name: 'circuit' },
+    classes: (set) => set,
+    run: (ev, a) => {
+      if (ev.cls !== 'note') return ev;
+      if (!('map' in a)) return null;
+      const ch = Number.isInteger(a.channel) ? a.channel : ev.ch;
+      if (a.map === null) return { ...ev, ch };
+      const n = a.map[ev.d1];
+      return Number.isInteger(n) ? { ...ev, d1: n, ch } : null;
+    },
+  },
   cc: {
     args: ['from', 'to', 'ch'], need: ['from', 'to'],
     help: 'move the controller numbered from onto the controller numbered to, optionally onto channel ch',
@@ -340,6 +360,11 @@ const SAYS = {
     does: 'chooses the sound the instrument it reaches plays',
     part: { name: 'the name of a patch' },
     ask: { name: 'Name one of the patches the instrument lists, such as Piano or Rhodes.' },
+  },
+  drummap: {
+    does: 'plays General MIDI drums on an instrument\'s own drum notes',
+    part: { name: 'the name of a drum map' },
+    ask: { name: 'Name the drum map the instrument lists, such as circuit, or gm for General MIDI.' },
   },
   cc: {
     does: 'moves one controller onto another',
@@ -479,7 +504,7 @@ export function checkTransforms(transforms) {
      * compares as a string.
      * why: lessons/kit-bay.md#ct-types
      */
-    if (t.op === 'patch' && (typeof t.name !== 'string' || !t.name.trim())) {
+    if ((t.op === 'patch' || t.op === 'drummap') && (typeof t.name !== 'string' || !t.name.trim())) {
       return { why: `${head(t.op)}, and ${part(t.op, 'name')} came as ${JSON.stringify(t.name)} rather than as a word.`,
                fix: ask(t.op, 'name') };
     }
@@ -513,6 +538,11 @@ export function checkTransforms(transforms) {
   if (named.length > 1) {
     return { why: `this link chooses ${named.length} patches, ${named.map((t) => t.name).join(' and ')}, and an instrument plays one at a time.`,
              fix: 'Keep one patch on the link, or send the other to a second instrument of the same kind.' };
+  }
+  const maps = (transforms || []).filter((t) => t?.op === 'drummap');
+  if (maps.length > 1) {
+    return { why: `this link names ${maps.length} drum maps, ${maps.map((t) => t.name).join(' and ')}, and the second would map notes the first already moved.`,
+             fix: 'Keep one drummap on the link, the one the instrument lists.' };
   }
   for (const end of ['lo', 'hi']) {
     const same = (transforms || []).filter((t) => OPS[t?.op]?.oneOf
@@ -558,6 +588,31 @@ export function patchFor(transforms, port) {
   }
   return { name };
 }
+
+/**
+ * A drummap is resolved against the receiving port's `drums` (`{ name, label, channel, map, labels }`,
+ * demo/shell/drum-maps.mjs). Answers the refusal, the resolved map, or `{ drums: null }` with no drummap.
+ * why: lessons/kit-bay.md#drummap
+ */
+export function drummapFor(transforms, port) {
+  const t = (transforms || []).find((x) => x?.op === 'drummap');
+  if (!t) return { drums: null };
+  const d = port?.drums;
+  const label = port?.label || port?.id || 'that input';
+  if (!d || typeof d.name !== 'string') {
+    return { refuse: { why: `${label} lists no drum map, so there is nothing called ${JSON.stringify(t.name)} to play by.`,
+                       fix: 'Make the link without a drummap, or link into an instrument whose midi in lists its drums.' } };
+  }
+  if (String(t.name).trim().toLowerCase() !== d.name.toLowerCase()) {
+    return { refuse: { why: `${label} plays its drums by the ${d.name} map, not ${JSON.stringify(t.name)}.`,
+                       fix: `Write it as ${JSON.stringify({ op: 'drummap', name: d.name })}.` } };
+  }
+  return { drums: d };
+}
+
+/** The drummap transform with its map resolved from `drums`, as `link` stores it. */
+const resolveDrummap = (t, d) => ({ op: 'drummap', name: d.name, map: d.map === null ? null : { ...d.map },
+  ...(Number.isInteger(d.channel) ? { channel: d.channel } : {}), labels: { ...(d.labels || {}) } });
 
 /** Run an ordered list. Returns the event, or null if something dropped it. */
 export function apply(transforms, ev) {
@@ -864,6 +919,8 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     if (badT) return { ok: false, ...badT };
     const chosen = patchFor(transforms, b);
     if (chosen.refuse) return { ok: false, ...chosen.refuse };
+    const drum = drummapFor(transforms, b);
+    if (drum.refuse) return { ok: false, ...drum.refuse };
     const badO = checkOptions(a.medium, opts?.options);   // link options, link-options.mjs
     if (badO) return { ok: false, ...badO };
     const badF = followRefusal(opts?.options?.follow, a, b);
@@ -875,9 +932,19 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     // why: lessons/kit-bay.md#shape-value
     const same = (x, y) => x === y
       || (typeof x === 'object' && x !== null && JSON.stringify(x) === JSON.stringify(y));
+    // MIDI channels are a set: a source on 10 fits a port that plays 1, 2 and 10.
+    // why: lessons/kit-bay.md#channels-subset
+    const fits = (k, x, y) => (k === 'channels' && a.medium === 'midi' && Array.isArray(y)
+      ? [].concat(x).every((c) => y.includes(c)) : same(x, y));
     for (const k of Object.keys(b.shape || {})) {
       if (a.shape?.[k] === undefined) continue;
-      if (!same(a.shape[k], b.shape[k])) {
+      if (k === 'channels' && a.medium === 'midi' && Array.isArray(b.shape[k]) && !fits(k, a.shape[k], b.shape[k])) {
+        const extra = [].concat(a.shape[k]).filter((c) => !b.shape[k].includes(c));
+        return { ok: false,
+                 why: `${a.label} sends on channel ${extra.join(', ')} and ${b.label} plays only ${b.shape[k].join(', ')}.`,
+                 fix: `Put the link on one of ${b.shape[k].join(', ')}: ${JSON.stringify({ op: 'channel', to: b.shape[k][0] })}.` };
+      }
+      if (!fits(k, a.shape[k], b.shape[k])) {
         return { ok: false,
                  why: `${k} does not match: ${a.label} is ${a.shape[k]} and ${b.label} wants ${b.shape[k]}.`,
                  fix: 'Nothing here can change what either end speaks, so this link cannot be made.' };
@@ -944,11 +1011,20 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
         && patchOf(l.transforms).toLowerCase() !== chosen.name.toLowerCase());
       if (other) warns.push(`${b.label} plays ${patchOf(other.transforms)} for another link, and this one switches it to ${chosen.name}`);
     }
+    // A port whose drums are not General MIDI: say what a plain link loses, or what the map drops.
+    // why: lessons/kit-bay.md#drummap-warn
+    const dm = b.drums;
+    if (dm && dm.map && carried.includes('note')) {
+      const notes = Object.values(dm.map).join(', ');
+      if (!drum.drums) {
+        warns.push(`${dm.label || b.label} takes its own drum notes (${notes}); this link sends General MIDI, so a kick (36) will not sound. Add ${JSON.stringify({ op: 'drummap', name: dm.name })}`);
+      } else warns.push(`${dm.label || b.label} plays General MIDI ${Object.keys(dm.map).join(', ')} and drops every other drum note`);
+    }
     const ses = sessionFor(a, b, opts);
     if (ses.refuse) return { ok: false, ...ses.refuse };
     return { ok: true, why: '', ...(warns.length ? { warn: warns.join('. ') } : {}),
              session: ses.session, ...(ses.via ? { via: ses.via } : {}),
-             ...(chosen.name ? { patch: chosen.name } : {}) };
+             ...(chosen.name ? { patch: chosen.name } : {}), ...(drum.drums ? { drums: drum.drums } : {}) };
   }
 
   /**
@@ -1181,6 +1257,7 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     const id = `L${nextLink++}`;
     // The patch is stored in the instrument's own spelling, so a runtime matches it exactly.
     if (v.patch) transforms = transforms.map((t) => (t?.op === 'patch' ? { ...t, name: v.patch } : t));
+    if (v.drums) transforms = transforms.map((t) => (t?.op === 'drummap' ? resolveDrummap(t, v.drums) : t));
     links.set(id, { id, from: fromId, to: toId, transforms, enabled: true, sent: 0, dropped: 0,
                     session: v.session, ...(v.session?.via || v.via ? { via: v.session?.via || v.via } : {}),
                     ...(opts.options && Object.keys(opts.options).length ? { options: { ...opts.options } } : {}) });

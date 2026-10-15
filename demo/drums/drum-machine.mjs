@@ -54,6 +54,11 @@ import { LIFE } from './voices.mjs';
  *   sequencer wires
  * @param {(ev: object) => void} [o.onValue]  what reaches `sequencer:value-in` when it is not a
  *   pattern wire (/devices/drums/'s keys, which edit the grid)
+ * @param {(voice: object) => boolean} [o.silent]  a row this tab will not sound; its lit pads stay grey
+ * @param {(nodeId: string) => boolean} [o.hide]  nodes the patchbay leaves out, with their ports and
+ *   wires; read on every draw
+ * @param {() => boolean} [o.local]  false: Play runs the grid's clock and boots no SuperCollider
+ *   (/devices/drums/ when the Circuit on the Pi plays the notes)
  * @param {{ over: number, node: string, label: (rows: number) => string }} [o.group]  above
  *   `over` rows the patchbay draws them as one box; the picture only, each hit keeps its wire
  * @returns {{ surface: HTMLElement, knobs: ?HTMLElement, scopes: ?HTMLElement[], patchbay: HTMLElement, api: object }}
@@ -61,7 +66,7 @@ import { LIFE } from './voices.mjs';
  */
 export function createDrumMachine(d, { voices, patternIn = false, onBar = null, flowing = null, scopes: wantScopes = false, onWake = null,
   onStart = null, onStop = null, ahead = 150, context = null, mix = null, shape: shapeOpt = null, onShape = null,
-  start: startPattern = true, gain = null, group = null, sequence = null, onValue = null }) {
+  start: startPattern = true, gain = null, group = null, sequence = null, onValue = null, silent = null, local = () => true, hide = null }) {
   const S = 'web';
   const ID = (node, port) => `${S}:${node}:${port}`;
   const SEQ = ID('sequencer', 'midi-out');
@@ -305,6 +310,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     label: (r) => VOICES[r].label,
     padTitle: (r) => VOICES[r].title ?? VOICES[r].label,
     ticks: true, readOnly: patternIn,
+    silent: (r) => !!silent?.(VOICES[r]),
     onToggle: (r, s, lit, why) => { if (why !== 'quiet') d.log(`${VOICES[r].label} step ${s + 1} ${lit ? 'on' : 'off'}`); },
   });
   let grid = makeGrid();
@@ -401,7 +407,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     ctx ??= context ? context() : new AudioContext({ latencyHint: 'interactive' });
     ctx.resume();
     bar.el.dataset.busy = '1';
-    try { await wake(); } catch { delete bar.el.dataset.busy; return; }
+    if (local()) { try { await wake(); } catch { delete bar.el.dataset.busy; return; } }
     if (onStart) { try { await onStart(ctx); } catch (e) { d.log(`before play: ${e.message}`, 'warn'); } }
     delete bar.el.dataset.busy;
     playing = true;
@@ -525,7 +531,13 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       return [...by.values()];
     },
   };
-  const view = group ? groupedView : SPLIT && !shapeOpt ? bay : filtered;
+  const base = group ? groupedView : SPLIT && !shapeOpt ? bay : filtered;
+  const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
+  const view = !hide ? base : {
+    nodes: () => base.nodes().filter((n) => !hide(n.id)),
+    ports: () => base.ports().filter((p) => !hide(nodeOf(p.id))),
+    links: () => base.links().filter((l) => !hide(nodeOf(l.from)) && !hide(nodeOf(l.to))),
+  };
   const pb = createPatchbay(view, { flowing: (l) => (flowing ? flowing(l, playing) : playing) });
 
   // ── the knobs, one row, each sending on its own wire ─────────────────────

@@ -522,5 +522,41 @@ console.log('\n== Plaits on the Pi, route A of plans/plan-plaits-on-pi.md ==');
   ok('NEGATIVE CONTROL: a card with capture only announces no output', !bare.ports.some((p) => p.jack?.includes('system:playback_1')));
 }
 
+console.log('\n== the drum maps and the board\'s sequencer ==');
+{
+  const { DRUM_MAPS } = await import('./drum-maps.mjs');
+  const DRUMS = { circuit: DRUM_MAPS.circuit, drums: DRUM_MAPS.gm };
+  const g = desk({ drums: DRUMS, sequencer: true });
+  const cin = port(g, 'pi-1:circuit:midi-in');
+  ok('pi-1:circuit:midi-in publishes the circuit drum map as drums', cin?.drums?.name === 'circuit' && cin.drums.map[36] === 60
+    && cin.drums.map[46] === 65 && cin.drums.channel === 10, JSON.stringify(cin?.drums));
+  ok('pi-1:drums:midi-in publishes General MIDI, the identity map', port(g, 'pi-1:drums:midi-in')?.drums?.name === 'gm'
+    && port(g, 'pi-1:drums:midi-in').drums.map === null);
+  ok('the map on the port is a copy, so a page cannot edit the board\'s', cin.drums.map !== DRUM_MAPS.circuit.map);
+  ok('pi-1:sequencer is an engine with a midi out on channel 10 and a pattern in', node(g, 'pi-1:sequencer')?.kind === 'engine'
+    && JSON.stringify(port(g, 'pi-1:sequencer:midi-out')?.shape) === '{"channels":[10]}'
+    && port(g, 'pi-1:sequencer:value-in')?.shape?.of === 'pattern' && port(g, 'pi-1:sequencer:value-out')?.shape?.of === 'steps');
+  ok('NEGATIVE CONTROL: the sequencer emits notes and CC only, never SysEx or a program change',
+    JSON.stringify(port(g, 'pi-1:sequencer:midi-out')?.emits) === '["note","cc"]');
+  ok('and the graph with both is one graphProblem accepts', graphProblem(g) === '', graphProblem(g));
+  const plain = desk();
+  ok('NEGATIVE CONTROL: with neither passed, no sequencer and no drums are announced', !node(plain, 'pi-1:sequencer')
+    && !('drums' in (port(plain, 'pi-1:circuit:midi-in') || {})));
+  // Over the wire as JSON, into a registry, into a page's bay: the link resolves from what was announced.
+  const reg = createRegistry();
+  reg.ingest({ type: 'board.alive', from: 'board-x', graph: JSON.parse(JSON.stringify(g)) });
+  const bay = reg.fill(createBay());
+  const r = bay.link('pi-1:sequencer:midi-out', 'pi-1:circuit:midi-in', [{ op: 'drummap', name: 'circuit' }]);
+  ok('a page links the board\'s sequencer into the Circuit with the drum map it heard announced', r.ok && bay.links()[0].transforms[0].map?.[42] === 64,
+    r.why || JSON.stringify(bay.links()[0]?.transforms));
+  const wrong = bay.link('pi-1:sequencer:midi-out', 'pi-1:circuit:midi-in', [{ op: 'drummap', name: 'gm' }]);
+  ok('NEGATIVE CONTROL: and the wrong map name is refused there, against the announced port', !wrong.ok && /by the circuit map/.test(wrong.why), wrong.why);
+  const two = desk({ drums: DRUMS, sequencer: true, inputs: [{ name: 'circuit', channels: 2, midi: { port: 'Circuit', channels: [1, 2] } }] });
+  const reg2 = createRegistry();
+  reg2.ingest({ type: 'board.alive', from: 'board-y', graph: two });
+  const r2 = reg2.fill(createBay()).link('pi-1:sequencer:midi-out', 'pi-1:circuit:midi-in', [{ op: 'drummap', name: 'circuit' }]);
+  ok('NEGATIVE CONTROL: a Circuit input that does not play channel 10 refuses the sequencer by the channel set', !r2.ok && /sends on channel 10/.test(r2.why), r2.why);
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);
