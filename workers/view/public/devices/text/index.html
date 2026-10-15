@@ -5,9 +5,9 @@
 <meta name="robots" content="noindex, nofollow">
 <meta property="og:site_name" content="positron.studio">
 <meta property="og:type" content="website">
-<meta property="og:title" content="OLED on Pi">
+<meta property="og:title" content="Text on Pi screen">
 <meta property="og:description" content="Type a line and it shows on a small screen on the Pi. Its four keys show up here.">
-<meta property="og:url" content="https://positron.studio/remote/oled/">
+<meta property="og:url" content="https://positron.studio/devices/text/">
 <meta property="og:image" content="https://positron.studio/og/site-98871a52.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -18,16 +18,19 @@
 <link rel="manifest" href="/icons/manifest-8e6dda01.webmanifest">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>OLED on Pi</title>
+<title>Text on Pi screen</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
   .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
   /* The simulated module as the video panel's picture: the panel at a whole number scale (2x, or 4x
      zoomed), so a panel pixel stays square, and its four keys in a column on its right as on the module. */
-  /* One height at every zoom, the 4x panel's, so zooming never moves what is under it. */
-  .ol-media { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 24px 16px; height: calc(64px * 4 + 48px); background: #000; overflow-x: auto; }
+  /* One height at every zoom, the 4x panel's, so zooming never moves what is under it; a little tone
+     round the black screen, so the panel reads as its own. */
+  .ol-media { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 24px 16px; height: calc(64px * 4 + 48px); background: #07090d; overflow-x: auto; }
   .ol-media canvas { display: block; flex: none; width: calc(128px * var(--ol-k, 2)); height: calc(64px * var(--ol-k, 2)); image-rendering: pixelated; }
+  /* the panel's edge, a faint line 8 px clear of its pixels; a border on a wrapper, so the canvas keeps its size */
+  .ol-frame { padding: 8px; border: 1px solid var(--line); border-radius: 2px; line-height: 0; background: #000; }
   /* one joined column at its own height, centred beside the screen at every zoom */
   .ol-media .pos-bgroup { flex: none; margin-left: auto; align-self: center; }
   /* the screen centred in what the key column at the right edge leaves */
@@ -41,22 +44,21 @@
   // The 0.96" OLED and its four keys on the Pi's header (rig/board/panel.mjs), as two nodes of the
   // Pi in this page's bay: text from a tab along a link to the screen, the keys along a link to a
   // table here. The board is reached on Connect, never on load.
-  // why: lessons/page-remote.md#oled
+  // why: lessons/page-devices.md#text
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createChatCompose } from '/shell/chat-ui.mjs';
-  import { createTable } from '/shell/table.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
   import { paintFrame } from '/shell/panel-screen.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
 
-  const d = mount({ name: 'OLED on Pi', what: '', readout: null, index: '/', indexLabel: 'positron' });
-  conceptNav('remote/oled');
+  const d = mount({ name: 'Text on Pi screen', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  conceptNav('devices/text');
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';
@@ -65,18 +67,17 @@
   const LIVE = q.get('live') === '1';
 
   // ── the bay: a text box and a key table here, the screen and the keys on the Pi ──
-  const TEXT_OUT = 'web:text:value-out', LOG_IN = 'web:keylog:value-in';
-  const OLED_IN = `${BOARD_SITE}:oled:value-in`, KEYS_OUT = `${BOARD_SITE}:keys:value-out`;
+  const TEXT_OUT = 'web:text:value-out';
+  const OLED_IN = `${BOARD_SITE}:screen:value-in`, KEYS_OUT = `${BOARD_SITE}:keys:value-out`;
   const bay = createBay();
   bay.addNode({ id: 'web:text', kind: 'person', label: 'text box', place: 'browser' });
-  bay.addNode({ id: 'web:keylog', kind: 'screen', label: 'key table', place: 'browser' });
-  bay.addNode({ id: `${BOARD_SITE}:oled`, kind: 'device', label: 'OLED 128x64', place: ROOM });
+  bay.addNode({ id: `${BOARD_SITE}:screen`, kind: 'device', label: 'OLED 128x64', place: ROOM });
   bay.addNode({ id: `${BOARD_SITE}:keys`, kind: 'device', label: 'four keys', place: ROOM });
   // The simulated panel, drawn by demo/shell/panel-screen.mjs as the Pi draws it, and its four keys.
-  // Mirrored by name: web:oled and web:keys are this tab's copies of pi-1:oled and pi-1:keys.
-  bay.addNode({ id: 'web:oled', kind: 'screen', label: 'simulated OLED', place: 'browser' });
+  // Mirrored by name: web:screen and web:keys are this tab's copies of pi-1:screen and pi-1:keys.
+  bay.addNode({ id: 'web:screen', kind: 'screen', label: 'simulated OLED', place: 'browser' });
   bay.addNode({ id: 'web:keys', kind: 'person', label: 'simulated keys', place: 'browser' });
-  const SIM_IN = 'web:oled:value-in', SIMKEYS_OUT = 'web:keys:value-out';
+  const SIM_IN = 'web:screen:value-in', SIMKEYS_OUT = 'web:keys:value-out';
   const sim = { text: 'waiting for a tab', held: new Set(), ui: null, frames: 0, version: '' };
   const simCv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
   function simDraw() { if (!sim.ui) return; paintFrame(simCv, sim.ui.frame({ text: sim.text, held: [...sim.held] })); sim.frames++; }
@@ -87,7 +88,7 @@
 
   bay.addPort({ id: TEXT_OUT, dir: 'out', medium: 'value', emits: ['text'], label: 'text:value-out' });
   // What reaches the screen's in-port leaves for the board, and only once connected.
-  bay.addPort({ id: OLED_IN, dir: 'in', medium: 'value', accepts: ['text'], label: 'oled:value-in',
+  bay.addPort({ id: OLED_IN, dir: 'in', medium: 'value', accepts: ['text'], label: 'screen:value-in',
     deliver: (ev) => {
       if (!board || !connected || !MAY_SEND) return;
       board.ask({ type: 'oled.text', text: ev.text }, 'oled.shown', 3000).then((r) => {
@@ -95,16 +96,14 @@
       });
     } });
   bay.addPort({ id: KEYS_OUT, dir: 'out', medium: 'value', emits: ['key'], label: 'keys:value-out' });
-  bay.addPort({ id: LOG_IN, dir: 'in', medium: 'value', accepts: ['key'], label: 'keylog:value-in',
-    deliver: (ev) => keys.add({ key: `K${ev.k}`, sym: ev.sym, edge: ev.down ? 'press' : 'release', gpio: String(ev.gpio) }) });
   bay.addPort({ id: SIMKEYS_OUT, dir: 'out', medium: 'value', emits: ['key'], label: 'keys:value-out' });
-  bay.addPort({ id: SIM_IN, dir: 'in', medium: 'value', accepts: ['text', 'key'], label: 'oled:value-in',
+  bay.addPort({ id: SIM_IN, dir: 'in', medium: 'value', accepts: ['text', 'key'], label: 'screen:value-in',
     deliver: (ev) => {
       if (ev.cls === 'text') sim.text = ev.text;
       else if (ev.down) sim.held.add(ev.k); else sim.held.delete(ev.k);
       simDraw();
     } });
-  for (const [from, to] of [[TEXT_OUT, OLED_IN], [KEYS_OUT, LOG_IN], [TEXT_OUT, SIM_IN], [KEYS_OUT, SIM_IN], [SIMKEYS_OUT, SIM_IN]]) {
+  for (const [from, to] of [[TEXT_OUT, OLED_IN], [TEXT_OUT, SIM_IN], [KEYS_OUT, SIM_IN], [SIMKEYS_OUT, SIM_IN]]) {
     const r = bay.link(from, to);
     if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
   }
@@ -117,6 +116,9 @@
   }
   const compose = createChatCompose({ placeholder: 'A line for the screen', onSend: send });
   compose.el.classList.add('ol-compose');
+  // Always on: a line reaches the simulated screen here at once, and the Pi's once connected.
+  compose.enable(true);
+  compose.input.blur();
   // Play alone at the top left, as on the other remote pages: play connects, stop lets go.
   const transport = createButtonGroup({ buttons: [
     { id: 'play', icon: 'play', label: 'connect to the Pi', onPress: () => (board ? disconnect() : connect()) },
@@ -152,12 +154,6 @@
       } catch (e) { d.log(`the new layout did not load, keeping the old one: ${e.message}`, 'warn'); }
     }, 1000);
   }
-  const keys = createTable({ columns: [
-    { key: 'key', label: 'key', width: 56 },
-    { key: 'sym', label: 'sym', width: 48 },
-    { key: 'edge', label: 'edge', grow: true },
-    { key: 'gpio', label: 'gpio', width: 56 },
-  ], minRows: 6, stick: true });
 
   function connect() {
     if (board) return;
@@ -166,7 +162,6 @@
       log: (line, kind) => d.log(line, kind),
       onOpen: async () => {
         connected = true;
-        compose.enable(true);
         const st = await board.ask({ type: 'panel.status' }, 'panel.status', 3000);
         d.log(st?.ok ? `the screen shows: ${st.text}` : `no screen on the Pi: ${st?.why || 'no answer in 3 s'}`, st?.ok ? 'ok' : 'warn');
         // the simulated screen takes what the real one shows, so the two match from the start
@@ -185,7 +180,6 @@
   function disconnect() {
     board?.close();
     board = null; connected = false;
-    compose.enable(false);
     transport.setIcon('play', 'play', 'connect to the Pi');
     d.log(`left ${ROOM}`);
   }
@@ -199,7 +193,9 @@
   // The simulated module in a video panel, as the kit shows a picture; zoom out and in step 1x, 2x, 4x.
   const media = el('div', 'ol-media');
   const screenBox = el('div', 'ol-screen');
-  screenBox.append(simCv);
+  const frame = el('div', 'ol-frame');
+  frame.append(simCv);
+  screenBox.append(frame);
   media.append(screenBox, simKeys.el);
   const ZOOMS = [1, 2, 4];
   let zi = 1;
@@ -219,12 +215,12 @@
   const simPanel = createVideoPanel({ media, left: scale, right: zoomBtns.el,
     // the module's own height at either zoom, not a 16:9 box around it
     aspect: 'auto' });
-  d.stack.add(top, simPanel.el, compose.el, keys.el, pb.el);
+  d.stack.add(top, simPanel.el, compose.el, pb.el);
   window.__demo.bay = bay;
   window.__demo.probe = () => ({ connected, sent, shown, simFrames: sim.frames });
 
   if (SELFCHECK) {
-    d.assert('five links: text and keys to the Pi\'s screen, the table and the simulated screen', bay.links().length === 5, bay.links().map((l) => `${l.from} -> ${l.to}`).join(', '));
+    d.assert('four links: text to both screens, the Pi\'s keys and the simulated keys to the simulated screen', bay.links().length === 4, bay.links().map((l) => `${l.from} -> ${l.to}`).join(', '));
     await new Promise((r) => setTimeout(r, 400));
     d.assert('the simulated screen drew a frame', sim.frames > 0, `${sim.frames} frames`);
     d.assert('a visit reaches nothing until Connect', !board);

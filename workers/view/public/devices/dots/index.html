@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta property="og:site_name" content="positron.studio">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Dots on Pi screen">
+<meta property="og:description" content="A short score plays as rings of dots on the Pi&apos;s small screen, the dot piano of the Pico.">
+<meta property="og:url" content="https://positron.studio/devices/dots/">
+<meta property="og:image" content="https://positron.studio/og/site-98871a52.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="positron.studio: Connect anything to everything. Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-c7b28d7f.png">
+<link rel="manifest" href="/icons/manifest-8e6dda01.webmanifest">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Dots on Pi screen</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<style>
+  .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  /* The simulated module as the video panel's picture: the panel at a whole number scale (2x, or 4x
+     zoomed), so a panel pixel stays square, and its four keys in a column on its right as on the module. */
+  /* One height at every zoom, the 4x panel's, so zooming never moves what is under it; a little tone
+     round the black screen, so the panel reads as its own. */
+  .ol-media { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 24px 16px; height: calc(64px * 4 + 48px); background: #07090d; overflow-x: auto; }
+  .ol-media canvas { display: block; flex: none; width: calc(128px * var(--ol-k, 2)); height: calc(64px * var(--ol-k, 2)); image-rendering: pixelated; }
+  /* the panel's edge, a faint line 8 px clear of its pixels; a border on a wrapper, so the canvas keeps its size */
+  .ol-frame { padding: 8px; border: 1px solid var(--line); border-radius: 2px; line-height: 0; background: #000; }
+  /* one joined column at its own height, centred beside the screen at every zoom */
+  .ol-media .pos-bgroup { flex: none; margin-left: auto; align-self: center; }
+  /* the screen centred in what the key column at the right edge leaves */
+  .ol-screen { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-width: 0; }
+  .ol-say { font-size: 12px; color: var(--dim); }
+</style>
+<script type="module">
+  // The dot piano on the Pi's small screen: a short score in a piano roll plays its notes along links
+  // to pi-1:screen (the board draws rings.mjs on the panel) and to web:screen (the same rings here).
+  // The Pi is reached on the first play, never on load.
+  // why: lessons/page-devices.md#dots
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createPatchbay, MEDIUM_COLOURS } from '/shell/patchbay.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
+  import { createRings, LO, HI } from '/shell/rings.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+
+  const d = mount({ name: 'Dots on Pi screen', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  conceptNav('devices/dots');
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  const MAY_SEND = !SELFCHECK || q.get('board') === '1';
+
+  // ── the score: the Ode to Joy theme over C3 and G3, every note inside the rings' C3 to G4 ──
+  const BEAT = 380;
+  const TUNE = [[64, 1], [64, 1], [65, 1], [67, 1], [67, 1], [65, 1], [64, 1], [62, 1],
+    [60, 1], [60, 1], [62, 1], [64, 1], [64, 1.5], [62, 0.5], [62, 2]];
+  const NOTES = [];                          // { n, at, durMs }
+  let beat = 0;
+  for (const [n, b] of TUNE) { NOTES.push({ n, at: beat * BEAT, durMs: b * BEAT - 40 }); beat += b; }
+  for (let b = 0; b < 16; b += 2) NOTES.push({ n: b % 4 ? 55 : 48, at: b * BEAT, durMs: 2 * BEAT - 60 });
+  NOTES.sort((a, b) => a.at - b.at);
+  const LEN = 16 * BEAT + 3000;              // the last arc's fade
+
+  // ── the bay: the score here, the screen on the Pi and its simulator ──
+  const SCORE_OUT = 'web:score:midi-out', PI_IN = `${BOARD_SITE}:screen:midi-in`, SIM_IN = 'web:screen:midi-in';
+  const bay = createBay();
+  bay.addNode({ id: 'web:score', kind: 'store', label: 'sample score', place: 'browser' });
+  bay.addNode({ id: `${BOARD_SITE}:screen`, kind: 'device', label: 'OLED 128x64', place: ROOM });
+  // Mirrored by name: web:screen is this tab's copy of pi-1:screen.
+  bay.addNode({ id: 'web:screen', kind: 'screen', label: 'simulated OLED', place: 'browser' });
+
+  let board = null, connected = false, sent = 0;
+  const flash = new Map();
+  const lit = (from) => { for (const l of bay.links()) if (l.from === from) flash.set(l.id, performance.now() + 250); };
+
+  const rings = createRings();
+  bay.addPort({ id: SCORE_OUT, dir: 'out', medium: 'midi', emits: ['note'], label: 'score:midi-out' });
+  // What reaches the Pi's screen leaves for the board as `screen.note`, sent and not asked.
+  bay.addPort({ id: PI_IN, dir: 'in', medium: 'midi', accepts: ['note'], label: 'screen:midi-in',
+    deliver: (ev) => { if (board && connected && MAY_SEND) board.send({ type: 'screen.note', n: ev.d1, on: ev.d2 > 0 }); } });
+  bay.addPort({ id: SIM_IN, dir: 'in', medium: 'midi', accepts: ['note'], label: 'screen:midi-in',
+    deliver: (ev) => { if (ev.d2 > 0) rings.noteOn(ev.d1, performance.now()); else rings.noteOff(ev.d1, performance.now()); } });
+  for (const [from, to] of [[SCORE_OUT, PI_IN], [SCORE_OUT, SIM_IN]]) {
+    const r = bay.link(from, to);
+    if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
+  }
+
+  // ── the simulated screen: the rings drawn every frame while anything is alive ──
+  const simCv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
+  let ui = null, frames = 0;
+  loadPanelUi(await (await fetch('/resources/pico/oled-ui.wasm')).arrayBuffer()).then((u) => { ui = u; paint(); });
+  function paint() { if (ui) { paintFrame(simCv, ui.frame({ mode: 'rings', rings, t: performance.now() })); frames++; } }
+
+  // ── the deck: each note on and off is an item; the adapter sends it out of score:midi-out ──
+  const items = [];
+  NOTES.forEach((x, i) => {
+    items.push({ at: x.at, kind: 'note', id: `on${i}`, payload: { n: x.n, vel: 90 } });
+    items.push({ at: x.at + x.durMs, kind: 'note', id: `off${i}`, payload: { n: x.n, vel: 0 } });
+  });
+  const allOff = () => {
+    rings.panic(performance.now());
+    if (board && connected && MAY_SEND) board.send({ type: 'screen.note', panic: true });
+  };
+  const adapter = {
+    caps: { rates: [1], continuous: false },
+    actuate(p) { sent++; lit(SCORE_OUT); bay.send(SCORE_OUT, { cls: 'note', ch: 1, d1: p.n, d2: p.vel }); },
+    reduce() { return {}; },
+    assertState() { allOff(); return {}; },
+  };
+  const deck = createDeck({ items, adapters: { note: adapter }, range: [0, LEN] });
+  (function tick() { if (rings.alive(performance.now()) || deck.playing()) paint(); requestAnimationFrame(tick); })();
+
+  function connect() {
+    if (board) return;
+    board = createBoard({ room: ROOM, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind),
+      onOpen: () => { connected = true; d.log(`the Pi's screen follows the score`); } });
+    d.log(`reaching ${ROOM}`);
+  }
+
+  // ── the piano roll: one row per pitch, C3 at the foot and G4 at the top ──
+  const glue = el('div');
+  const bar = createTransportBar(glue, deck, { scrub: false, loop: false, live: false,
+    // the first play also reaches the Pi
+    command: { play: () => { connect(); return deck.play(); } } });
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
+  const strip = createStripView(glue, deck, {
+    size: 'auto', follow: false, gutter: 80,
+    lanes: [{ id: 'score', kind: 'note', label: 'score', height: (HI - LO + 1) * 6 + 8, as: 'spans',
+      slots: HI - LO + 1, slotOf: (s) => HI - s.row.payload.n, barPad: 4, spanLine: false,
+      colorOf: () => MEDIUM_COLOURS.midi, labelOf: () => '',
+      rows: () => NOTES.map((x, i) => ({ at: x.at, id: `n${i}`, kind: 'note', payload: { n: x.n, durMs: x.durMs } })),
+      describeRow: (r) => [nameOf(r.payload.n), `${Math.round(r.payload.durMs)} ms`] }],
+  });
+  const surface = createGlue(bar.el, strip.surface);
+
+  // ── the patchbay: a MIDI wire pulses per note ──
+  const pb = createPatchbay(bay, { room: ROOM, flowing: (l) => (flash.get(l.id) || 0) > performance.now() });
+  setInterval(() => pb.refresh?.(), 200);
+
+  // The simulated panel in a video panel, as on /devices/text/; zoom steps 1x, 2x, 4x.
+  const media = el('div', 'ol-media');
+  const screenBox = el('div', 'ol-screen');
+  const frame = el('div', 'ol-frame');
+  frame.append(simCv);
+  screenBox.append(frame);
+  media.append(screenBox);
+  const ZOOMS = [1, 2, 4];
+  let zi = 1;
+  const scale = el('span', 'ol-say', '');
+  const zoomBtns = createButtonGroup({ buttons: [
+    { id: 'out', icon: 'zoom-out', label: 'zoom out', onPress: () => setZoom(zi - 1) },
+    { id: 'in', icon: 'zoom-in', label: 'zoom in', onPress: () => setZoom(zi + 1) },
+  ] });
+  function setZoom(i) {
+    zi = Math.max(0, Math.min(ZOOMS.length - 1, i));
+    media.style.setProperty('--ol-k', String(ZOOMS[zi]));
+    scale.textContent = `128×64 at ${ZOOMS[zi]}x`;
+    zoomBtns.enable('out', zi > 0, 'smallest');
+    zoomBtns.enable('in', zi < ZOOMS.length - 1, 'largest');
+  }
+  setZoom(zi);
+  const simPanel = createVideoPanel({ media, left: scale, right: zoomBtns.el, aspect: 'auto' });
+  d.stack.add(simPanel.el, surface, pb.el);
+  // the whole score in view, once the strip has a width to fit it into
+  requestAnimationFrame(() => strip.strip.fit(0, LEN));
+  window.__demo.bay = bay;
+  window.__demo.probe = () => ({ connected, sent, frames });
+
+  if (SELFCHECK) {
+    d.assert('two links: the score to the Pi\'s screen and to the simulated one', bay.links().length === 2, bay.links().map((l) => `${l.from} -> ${l.to}`).join(', '));
+    d.assert('every note of the score has a ring', NOTES.every((x) => x.n >= LO && x.n <= HI), `${NOTES.length} notes`);
+    d.assert('a visit reaches nothing until play', !board);
+  }
+  d.ready();
+</script>
