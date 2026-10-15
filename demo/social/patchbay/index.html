@@ -19,7 +19,8 @@
   /* The row leaves the page column for the window's width less a 16 px gutter, so four slides sit side by side
      on a desk; a 1 px seam in the line colour between slides and a frame round the row show where each slide ends. */
   .sp-car { --slide: calc((100vw - 32px - 5px) / 4); display: flex; gap: 1px; overflow-x: auto; scroll-snap-type: x mandatory;
-    overscroll-behavior-x: contain; min-width: 0; margin-inline: calc(50% - 50vw + 16px); background: var(--line);
+    overscroll-behavior-x: contain; min-width: 0; width: max-content; max-width: calc(100vw - 32px);
+    margin-left: calc(50% - 50vw + 16px); background: var(--line);
     border: 1px solid var(--line); border-radius: var(--r, 4px); }
   .sp-car img, .sp-car .sp-ph { flex: 0 0 var(--slide); width: var(--slide); aspect-ratio: 4 / 5; display: block; scroll-snap-align: start; background: #0b0e14; }
   @media (max-width: 560px) { .sp-car { --slide: calc(100vw - 34px); scrollbar-width: none; } .sp-car::-webkit-scrollbar { display: none; } }
@@ -33,17 +34,17 @@
   import { ranks } from '/shell/bay-layout.mjs';
 
   // Every concept page's patch (demo/resources/bays.json) drawn once, left to right as the page builds it,
-  // across 4 Instagram slides at 4:5, or 6 when it has more than 4 columns; a swipe pans along the patch.
+  // as large as the slide's height allows, running on across as many 4:5 slides as it needs; a swipe pans along it.
   const PW = 1080, PH = 1350, TITLE_Y = 236, SAY_Y = 296, SAY_LH = 44, BAY_TOP = 400, BAY_BOTTOM = PH - 90, BAND = BAY_BOTTOM - BAY_TOP;
   // Instagram shows a 1080 px slide about 390 px wide on a phone. 2.7 puts an 11 px port name at about
   // 10.7 px there. A patch taller than the band at that size is drawn smaller, and its row says so.
-  const PHONE = 390 / PW, READ = 2.7, MIN = 2, COUNTS = [4, 6];
+  const PHONE = 390 / PW, READ = 2.7, MIN = 2;
   // Slides on this page are drawn at a fraction of their size; a download draws them whole.
   const VIEW = 0.5;
   const sans = getComputedStyle(document.documentElement).getPropertyValue('--sans').trim() || 'sans-serif';
   const onPhone = (k) => +(11 * k * PHONE).toFixed(1);
 
-  const d = mount({ name: 'social/patchbay', what: 'Every concept page’s patch drawn across a 4 or 6 slide carousel, to pan with a swipe.',
+  const d = mount({ name: 'social/patchbay', what: 'Every concept page’s patch as tall as a slide allows, running on across a carousel to pan with a swipe.',
     readout: null, index: '/social/', indexLabel: 'social' });
   const h1 = d.head.querySelector('.pos-name');
   if (h1) h1.textContent = 'patchbay';
@@ -51,24 +52,14 @@
   const { bays: BAYS } = await (await fetch('/resources/bays.json')).json();
   const asBay = (b) => ({ nodes: b.nodes, ports: b.ports, links: b.links.map((l, i) => ({ id: `l${i}`, ...l })) });
 
-  /** The patch across 4 slides, or 6 when it has more than 4 columns: boxes at their own width, each column
-   *  in the middle of a slide so no box is cut by a slide's edge, as large as the height allows. */
+  /** The patch at its own compact width, scaled until it fills the band's height (at most BIG), running on to as
+   *  many slides as it needs. */
+  const BIG = 4;
   function plan(b) {
-    const bay = asBay(b);
-    const tall = drawBay(bay, { width: 4000, stretch: false });
-    const xs = [...new Set(tall.boxes.map((q) => Math.round(q.x)))].sort((p, q) => p - q);
-    const C = xs.length, M = xs[0], boxW = Math.max(...tall.boxes.map((q) => q.w));
-    const n = C <= COUNTS[0] ? COUNTS[0] : COUNTS[1];
-    const k = Math.min(READ, BAND / (tall.height + 2));
-    // a column every `m` slides, the group centred; more columns than slides fall back to an even spread
-    const m = C > 1 ? Math.floor((n - 1) / (C - 1)) : 1;
-    if (m >= 1) {
-      const pitch = (PW * m) / k, s0 = Math.floor((n - 1 - m * (C - 1)) / 2);
-      const drawn = drawBay(bay, { width: Math.ceil(2 * M + (C - 1) * pitch + boxW), stretch: false });
-      return { n, k, drawn, C, bx: s0 * PW + PW / 2 - (M + boxW / 2 + 1) * k };
-    }
-    const room = n * PW - 2 * X, drawn = drawBay(bay, { width: Math.round(room / k) - 2, stretch: false });
-    return { n, k: Math.min(k, room / (drawn.width + 2)), drawn, C };
+    const bay = asBay(b), drawn = drawBay(bay, { width: 480, stretch: false });
+    const k = Math.min(BIG, BAND / (drawn.height + 2));
+    const n = Math.max(1, Math.ceil((drawn.width * k + 2 * X) / PW));
+    return { n, k, drawn };
   }
 
   function wrap(ctx, text) {
@@ -98,7 +89,7 @@
     ctx.textAlign = 'left';
     const pic = await svgImage(drawn.body, { width: drawn.width, height: drawn.height, scale: k * s });
     const w = pic.w / s, h = pic.h / s;
-    const bx = Math.round(p.bx ?? X + (n * PW - 2 * X - w) / 2), by = Math.round(BAY_TOP + (BAND - h) / 2);
+    const bx = Math.round(X + (n * PW - 2 * X - w) / 2), by = Math.round(BAY_TOP + (BAND - h) / 2);
     ctx.drawImage(pic.img, bx, by, w, h);
     const slides = [];
     for (let i = 0; i < n; i++) {
@@ -150,8 +141,9 @@
   if (SELFCHECK) {
     const plans = BAYS.map((b) => ({ id: b.id, ...plan(b) }));
     d.assert('every concept page has a patch here', BAYS.length >= 40, `${BAYS.length} patches`);
-    d.assert('every patch is 4 or 6 slides', plans.every((p) => COUNTS.includes(p.n)),
-      `${plans.filter((p) => p.n === 4).length} on 4, ${plans.filter((p) => p.n === 6).length} on 6`);
+    const counts = plans.reduce((m, p) => ((m[p.n] = (m[p.n] || 0) + 1), m), {});
+    d.assert('every patch fills the band or reaches the size cap', plans.every((p) => p.k >= BIG - 0.01 || Math.abs((p.drawn.height + 2) * p.k - BAND) < 1),
+      Object.entries(counts).map(([n, c]) => `${c} on ${n}`).join(', '));
     const low = plans.filter((p) => p.k < MIN);
     d.assert(`port names ${onPhone(MIN)} px or more on a phone, or the patch says it is not`, true,
       low.length ? `${low.length} below: ${low.map((p) => `${p.id} ${onPhone(p.k)}`).join(', ')}` : `lowest ${onPhone(Math.min(...plans.map((p) => p.k)))} px`);
