@@ -210,6 +210,8 @@ const FILES = [
   // the build when it is stale against demo/fau/presets.mjs.
   // why: lessons/workers-view.md#organ
   ['demo/resources/faust/organ.json', 'resources/faust/organ.json'],
+  // every concept page's patch, for /social/patchbay/ (demo/resources/dump-bays.mjs)
+  ['demo/resources/bays.json', 'resources/bays.json'],
   ['demo/resources/faust/organ.voice.wasm', 'resources/faust/organ.voice.wasm'],
   ['demo/resources/faust/organ.effect.wasm', 'resources/faust/organ.effect.wasm'],
   ['demo/resources/faust/mixer32.wasm', 'resources/faust/mixer32.wasm'],

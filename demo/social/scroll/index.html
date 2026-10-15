@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON social/scroll</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createReel, font, drawWordmark, svgImage, W, H, X, TEXT_W, SAFE_TOP, SAFE_BOTTOM, C } from '/shell/reel.mjs';
+  import { drawBay } from '/shell/bay-svg.mjs';
+
+  // A concept page's patch in two facing columns, scrolling up through a reel's safe band at a
+  // size a phone can read: held at the top, scrolled at a reading pace, held at the end.
+  const R = 3, SPEED = 150, HOLD = 1500;            // scale, frame px a second, ms held at each end
+  const NAME_Y = SAFE_TOP + 150, WIN_TOP = SAFE_TOP + 210, WIN_BOTTOM = SAFE_BOTTOM, WIN = WIN_BOTTOM - WIN_TOP, FADE = 60;
+
+  const d = mount({ name: 'social/scroll', what: 'A concept page’s patch scrolling up a story frame, large enough to read. Record makes the file.',
+    readout: null, index: '/social/', indexLabel: 'social' });
+  const h1 = d.head.querySelector('.pos-name');
+  if (h1) h1.textContent = 'scroll';
+
+  const { bays: BAYS } = await (await fetch('/resources/bays.json')).json();
+  await document.fonts.ready;
+  let at = 0, shot = null;
+  async function prepare(i) {
+    const b = BAYS[i];
+    const bay = { nodes: b.nodes, ports: b.ports, links: b.links.map((l, j) => ({ id: `l${j}`, ...l })) };
+    const drawn = drawBay(bay, { arrange: 'pair', width: Math.round(TEXT_W / R) - 2 });
+    const k = Math.min(R, TEXT_W / (drawn.width + 2));
+    const pic = await svgImage(drawn.body, { width: drawn.width, height: drawn.height, scale: k });
+    const travel = Math.max(0, pic.h - WIN);
+    return { b, pic, k, travel, end: Math.max(4000, 2 * HOLD + Math.round(travel / SPEED * 1000)) };
+  }
+  const offsetAt = (pos) => (shot.travel ? Math.min(1, Math.max(0, (pos - HOLD) / (shot.end - 2 * HOLD))) * shot.travel : 0);
+
+  function draw(ctx, { pos, idle }) {
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+    drawWordmark(ctx);
+    ctx.fillStyle = C.fg; ctx.font = font(600, 72); ctx.fillText(shot.b.title, X, NAME_Y);
+    const { pic } = shot, y = WIN_TOP - offsetAt(idle ? 0 : pos), x = Math.round(X + (TEXT_W - pic.w) / 2);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, WIN_TOP, W, WIN); ctx.clip();
+    ctx.drawImage(pic.img, x, shot.pic.h <= WIN ? WIN_TOP + (WIN - pic.h) / 2 : y, pic.w, pic.h);
+    ctx.restore();
+    // the band's edges fade into the ground, so boxes slide in and out rather than being cut
+    for (const [y0, y1] of [[WIN_TOP, WIN_TOP + FADE], [WIN_BOTTOM, WIN_BOTTOM - FADE]]) {
+      const g = ctx.createLinearGradient(0, y0, 0, y1);
+      g.addColorStop(0, C.bg); g.addColorStop(1, 'rgba(11,14,20,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, Math.min(y0, y1), W, FADE);
+    }
+  }
+
+  shot = await prepare(at);
+  const note = el('p', 'reel-note', '');
+  const showNote = () => { note.textContent = `/${shot.b.id}/  ${shot.b.nodes.length} boxes  ${(shot.end / 1000).toFixed(1)} s  port names about ${(11 * shot.k * 390 / W).toFixed(1)} px on a phone`; };
+  showNote();
+  const go = async (i) => {
+    at = (i + BAYS.length) % BAYS.length;
+    pick.show(BAYS[at].title, at);
+    shot = await prepare(at);
+    showNote();
+    if (!reel.rebuild()) d.log('stop the take first to change the patch', 'warn');
+  };
+  const pick = createPicker({ what: 'patch', prev: () => go(at - 1), next: () => go(at + 1), onPick: (i) => go(i) });
+  pick.options(BAYS.map((b) => b.title));
+  const reel = await createReel({ d, name: 'scroll', kind: 'scroll', side: [pick.el, note], draw,
+    timeline: () => ({ end: shot.end, items: [{ at: 0, payload: {} }] }) });
+  window.__demo.reel = reel;
+
+  if (SELFCHECK) {
+    d.assert('the scroll is held at the top, moves, and ends on the last box', offsetAt(0) === 0 && offsetAt(shot.end) === shot.travel && (shot.travel === 0 || offsetAt(shot.end / 2) > 0),
+      `travel ${Math.round(shot.travel)} px over ${shot.end} ms`);
+    d.assert('the patch is drawn at a size a phone can read', 11 * shot.k * 390 / W >= 10, `ports ${(11 * shot.k * 390 / W).toFixed(1)} px`);
+    const tall = BAYS.reduce((a, b) => (b.nodes.length > a.nodes.length ? b : a));
+    const big = await prepare(BAYS.indexOf(tall));
+    d.assert('the biggest patch scrolls, under a minute', big.travel > 0 && big.end < 60000, `${tall.id} ${(big.end / 1000).toFixed(1)} s`);
+  }
+  d.ready();
+</script>

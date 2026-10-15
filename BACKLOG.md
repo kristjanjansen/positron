@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Social patchbay: every real example, readable on a phone, carousels and a scrolling reel**~~ (2026-10-15, DONE: 46 patches from bays.json; /social/patchbay/ 24 posts, 10 panoramas, 12 paged; /social/scroll/ the scrolling reel). Asked: *"add more, make all real examples we have done. can they extend over pages on comprex cases? ig scrolling trick. for video vert scrolling patchbay. ttry different"*, after the readability table (box text 5 to 9 px on a phone at 0.36 of the file). Plan: `createPatchbay` publishes `__demo.patch`; a dump script reads every concept page's patch into demo/resources/bays.json; /social/patchbay/ draws a 4:5 post when the patch fits at readable size (ports about 11 px on a phone), a carousel panorama of the left-to-right layout when it does not (wires continue across swipes), and a vertical scrolling reel of the two column layout. Grey label lines dropped on posts to buy height.
+
 - ~~**Front page: the card hover border is far too bright**~~ (2026-10-15, DONE: 35% foreground into --line2). Asked: *"hover border is way too bright"*, on a crop of the Keyboard card.
 
 - ~~**Wish pages: the code box's border shimmers while a wish is written**~~ (2026-10-15, DONE: a --wish sweep on .pos-code[data-busy]; --voice renamed --wish). Asked: *"add shimmer effect to code window border"*.
