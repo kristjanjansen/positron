@@ -923,3 +923,45 @@ The full comments cut from the code under demo/ for code, verbatim. Each heading
  * goes after its first call.
  */
 ````
+
+<a id="sc-sampler-pool"></a>
+## sc-sampler-pool: demo/code/sc-sampler.mjs, BUDGET_MB, the serial allocation, close()
+
+Reported 2026-10-15 from the owner's live test of /connect/, in the device log:
+`a recording did not load: Buffer pool allocation failed: requested 0.73MB, available 0.34MB of
+70.00MB total (max 768.00MB)` after a patch chose the Rhodes, and a minute later
+`a recording did not load: Buffer 361 allocation timeout (30000ms)`.
+
+MEASURED headless the same day (Chrome, `--autoplay-policy=no-user-gesture-required`, one
+AudioContext at 48 kHz, our own media worker):
+
+- The engine runs in SuperSonic's `postMessage` mode, because neither the dev server nor the
+  deploy's `_headers` sends COOP/COEP, so there is no SharedArrayBuffer. Growth works in that
+  mode: the pool grew 11 times, 70 MB to 356 MB, through `growInbox`.
+- What fails is a race in the vendored `BufferPool.grow()`: it returns false when a grow is
+  already in flight (`if (this.#n || !this.canGrow()) return false`), so every allocation that
+  arrives while the pool is growing throws `Buffer pool allocation failed`. Switching to the
+  Rhodes fires its warm, up to 40 loads at once, which is exactly that. Reproduced as
+  `available 1.07MB of 70.00MB total (max 768.00MB)`, the owner's shape, plus two more at 134
+  and 166 MB, three lost recordings in one run. Allocations one at a time: none lost.
+- Decoded, the recordings are 30 times their m4a: the piano across its range at four
+  velocities (208 files, 10.9 MB fetched) is 326.5 MB of float in the pool, the Rhodes warm 21
+  MB more, the Rhodes across its range 24.5 MB more. Kept, that is +570 MB of renderer RSS for
+  one engine. So past BUDGET_MB (128) the least recently played buffers no voice is reading are
+  freed with `/b_free`, which SuperSonic hands back to its pool. A voice's buffer is known from
+  its `/s_new` to scsynth's own `/n_end`. After: kept 126 to 128 MB through the same run, the
+  pool at 164 to 196 MB, nothing lost. The cost is a refetch and a decode when a freed note is
+  played again; /code/piano/'s 22 keys need 98 MB and never reach it.
+- The 30 s is SuperSonic's wait for `/supersonic/buffer/allocated` after `/b_allocPtr`
+  (`prepareFromBlob`, 3e4). A worklet nothing pulls never answers it. rt-sampler's `close()`
+  only disconnected the engine's output, so a load still on its way (a warm, a queued
+  recording) into a closed runtime's engine waited the 30 s out: reproduced with one key press
+  after `out.disconnect()`, `Buffer 354 allocation timeout (30000ms)`. And the closed engine
+  kept its whole pool (388 MB) while the next runtime booted a second one.
+- `sonic.destroy()` closes the AudioContext it was given (`this.#e.close()` in `shutdown`),
+  MEASURED `ctx: closed`, which on /connect/ would be the page's one context. So `close()`
+  shadows `close` on the context for the length of the destroy. MEASURED after: the context
+  stays `running`, a second sampler boots in it and sounds (peak 0.05 at the meter), and the
+  renderer gives back about 500 MB.
+- Each sampler runtime on /connect/ (web:sampler, web:sampler-2) boots its own engine with its
+  own pool; they are not shared. With the budget each is bounded at about 128 MB of samples.

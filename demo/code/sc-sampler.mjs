@@ -61,6 +61,7 @@ function createSamplerCore({ send, buffers, programs, onProgram = () => {}, now 
     const url = set?.releaseFor?.(note);
     const b = url && buffers.get(url);
     if (!b) return;
+    b.used = performance.now();
     const amp = set.releaseGain(fell.vel, now() - fell.at) * (b.channels === 2 ? 0.5 : 1);
     send('/s_new', b.channels === 2 ? 'posSampler2' : 'posSampler1', nextId++, 1, 0, 'buf', b.bufnum, 'rate', 1, 'amp', amp);
     stat.releases++;
@@ -80,6 +81,7 @@ function createSamplerCore({ send, buffers, programs, onProgram = () => {}, now 
     const url = set.fileFor(near, vel);
     const b = url == null ? null : buffers.get(url);
     if (!b) { stat.dropped++; return { ok: false, dropped: true }; }
+    b.used = performance.now();
     for (const v of live) if (v.note === note) damp(v, 0.04);
     while (live.length >= VOICES) { const old = live[0]; damp(old, 0.02); remove(old); stat.stolen++; }
     const rate = Math.pow(2, (note - near) / 12);
@@ -113,6 +115,21 @@ function createSamplerCore({ send, buffers, programs, onProgram = () => {}, now 
 const LATE_S = 0.3;
 
 /**
+ * Decoded recordings kept in scsynth, in MB of float. The whole piano at four velocities is
+ * 326 MB from 11 MB of m4a, so the least recently played are freed past this.
+ * why: lessons/page-code.md#sc-sampler-pool
+ */
+export const BUDGET_MB = 128;
+
+/** Take the engine down without closing a context somebody else gave it (destroy() closes it). */
+async function destroyEngine(e, ownsContext) {
+  const c = e.ctx;
+  if (!ownsContext) c.close = () => Promise.resolve();
+  try { await e.sonic.destroy(); } finally { if (!ownsContext) delete c.close; }
+  try { e.out.disconnect(); } catch { /* not connected */ }
+}
+
+/**
  * The SuperCollider sampler.
  * @param {object} o
  * @param {object[]} [o.instruments]  PIANO, and RHODES if the page has it (sampler.mjs's objects)
@@ -134,7 +151,9 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
   const queue = [];
   let draining = false, loading = 0;
   const held = new Set(), waiting = new Map();   // note -> true once its key came up while its file was loading
+  let closed = false, allocs = Promise.resolve();
   const stat = { files: 0, bytes: 0, urls: [], loadMs: [], started: 0, late: 0, programs: [], firstAt: null,
+    freed: 0, keptMB: 0,
     // When each part of the boot finished, ms after the intent that started it.
     timing: { intent: null, intentAt: null, engineLoadedMs: null, initMs: null, notifyMs: null, defsMs: null,
       runningMs: null, readyMs: null, attempts: 0, contextAtIntent: null } };
@@ -144,7 +163,23 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
   // the `at` the caller gave. The pedal's own release runs inside that call too.
   let at = null;
   const atTime = (t, fn) => { const was = at; at = t; try { return fn(); } finally { at = was; } };
-  const send = (...m) => { if (!eng) return; if (at == null) eng.send(...m); else eng.sendAt(at, ...m); };
+  // Which buffer each voice reads, from its /s_new until scsynth's /n_end, so trim() never frees one in use.
+  const onBuf = new Map(), voiceBuf = new Map();
+  const send = (...m) => {
+    if (!eng) return;
+    if (m[0] === '/s_new') {
+      const b = m[m.indexOf('buf') + 1];
+      voiceBuf.set(m[2], b);
+      onBuf.set(b, (onBuf.get(b) || 0) + 1);
+    }
+    if (at == null) eng.send(...m); else eng.sendAt(at, ...m);
+  };
+  const voiceEnded = (id) => {
+    const b = voiceBuf.get(id);
+    if (b == null) return;
+    voiceBuf.delete(id);
+    if (onBuf.get(b) > 1) onBuf.set(b, onBuf.get(b) - 1); else onBuf.delete(b);
+  };
   const core = createSamplerCore({
     send, buffers, programs,
     onProgram: (set) => { log(`program change ${set.program}: SuperCollider plays the ${set.name} now`); onProgram(set.ins); },
@@ -164,6 +199,7 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
    * See lessons/page-code.md#code-58
    */
   function warm(why = 'intent') {
+    if (closed) { const no = Promise.reject(new Error('the sampler is closed')); no.catch(() => {}); return no; }
     context();
     if (ready) return ready;
     stat.timing.intent = why;
@@ -197,7 +233,7 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
           log: (line) => log(line.replaceAll(' · ', ', ')),
           // scsynth's word that a voice ended, so the core's count stays true.
           onReply: (m) => {
-            if (m[0] === '/n_end') { core.ended(m[1]); return true; }
+            if (m[0] === '/n_end') { core.ended(m[1]); voiceEnded(m[1]); return true; }
             return m[0] === '/n_go' || m[0] === '/n_off' || m[0] === '/n_on' || m[0] === '/n_move';
           },
         });
@@ -220,13 +256,14 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
         }
         stat.timing.defsMs = Math.round(performance.now() - td);
         stat.timing.readyMs = since();
+        if (closed) { await destroyEngine(e, !given); throw new Error('closed while it booted'); }
         eng = e;
         log(`SuperCollider in this tab ${stat.timing.readyMs} ms after the ${stat.timing.intent}, the two sampler definitions taken in ${stat.timing.defsMs} ms`);
         settle.res(eng);
         onReady(eng);
       } catch (err) {
         attempt = null;
-        log(`SuperCollider did not come up: ${err.message}`, 'bad');
+        if (!closed) log(`SuperCollider did not come up: ${err.message}`, 'bad');
         settle.rej(err);
         ready = null;
       }
@@ -247,13 +284,49 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
         stat.bytes += ab.byteLength; stat.files++; stat.urls.push(url);
         const e = await warm('recording');
         const bufnum = BUFNUM.get(url);
-        const info = await e.sonic.loadSample(bufnum, ab);
-        buffers.set(url, { bufnum, channels: info.numChannels, frames: info.numFrames });
+        // One allocation at a time: SuperSonic refuses an allocation while its pool is growing
+        // (grow() returns false when one is in flight), which 40 parallel Rhodes loads hit at 70 MB.
+        // why: lessons/page-code.md#sc-sampler-pool
+        const info = await (allocs = allocs.catch(() => {}).then(async () => {
+          if (closed) return null;
+          await running();
+          return closed ? null : e.sonic.loadSample(bufnum, ab);
+        }));
+        if (!info) return;
+        buffers.set(url, { bufnum, channels: info.numChannels, frames: info.numFrames,
+          mb: info.numFrames * info.numChannels * 4 / 1048576,
+          used: performance.now() });
         stat.loadMs.push(Math.round(performance.now() - t));
-      } catch (e) { log(`a recording did not load: ${e.message}`, 'warn'); }
+        trim();
+      } catch (e) { if (!closed) log(`a recording did not load: ${e.message}`, 'warn'); }
     })().finally(() => inflight.delete(url));
     inflight.set(url, job);
     return job;
+  }
+  /** A suspended worklet never answers an allocation (SuperSonic gives up after 30 s), so wait for it to run. */
+  function running() {
+    if (!ctx || ctx.state === 'running') return Promise.resolve();
+    return new Promise((res) => {
+      const go = () => { if (ctx.state === 'running' || closed) { ctx.removeEventListener('statechange', go); res(); } };
+      ctx.addEventListener('statechange', go);
+    });
+  }
+  /**
+   * Past BUDGET_MB, free the least recently played recordings that no voice is reading.
+   */
+  function trim() {
+    let mb = 0;
+    for (const b of buffers.values()) mb += b.mb;
+    const idle = [...buffers].filter(([u, b]) => !inflight.has(u) && !onBuf.has(b.bufnum))
+      .sort((x, y) => x[1].used - y[1].used);
+    for (const [u, b] of idle) {
+      if (mb <= BUDGET_MB) break;
+      eng?.send('/b_free', b.bufnum);
+      buffers.delete(u);
+      mb -= b.mb;
+      stat.freed++;
+    }
+    stat.keptMB = Math.round(mb * 10) / 10;
   }
   function track(p) {
     loading++; onFetch(true);
@@ -339,8 +412,24 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
     return ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000;
   }
 
+  /**
+   * Done for good: queued recordings dropped, voices stopped, the engine and every buffer in it
+   * freed. A context the caller gave stays open; one this sampler made is closed.
+   */
+  async function close() {
+    if (closed) return;
+    closed = true;
+    panic();
+    waiting.clear();
+    const e = eng;
+    eng = null;
+    buffers.clear();
+    if (e) await destroyEngine(e, !given).catch((err) => log(`SuperCollider did not stop cleanly: ${err.message}`, 'warn'));
+  }
+
   return {
-    midi, noteOn, noteOff, program, panic, warm, latencyMs,
+    midi, noteOn, noteOff, program, panic, warm, latencyMs, close,
+    closed: () => closed,
     inst: () => core.current().ins,
     sounding: () => core.sounding(),
     loading: () => loading > 0 || draining,
