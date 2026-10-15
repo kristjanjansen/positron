@@ -4148,3 +4148,30 @@ a.pos-hero-secret, a.pos-hero-secret:hover, a.pos-hero-secret:visited { color: i
 /* why: lessons/css-shell.md#pos-hero-bay */
 .pos-hero-bay { display: flex; justify-content: center; margin-top: 32px; }
 .pos-hero-bay-in { flex: none; }
+
+/* The ask bar (ask-bar.mjs), lifted from /connect/'s ask field and example pills: a sentence a
+   person says, in --voice, round and in Geist because it is read through rather than named.
+   The send button sits inside the field one inset from its edge, radii concentric. A pill sets
+   background-color, never the shorthand, or it would wipe the busy sweep's background-image. */
+.pos-ask { display: flex; flex-direction: column; gap: 12px; }
+.pos-ask-row { --send-in: 4px; position: relative; }
+.pos-ask-row > .pos-field { display: block; margin: 0; }
+.pos-ask-row .pos-field input { width: 100%; box-sizing: border-box; font-family: var(--sans); color: var(--voice);
+  min-height: calc(var(--ctl-sm) + 2 * var(--send-in)); padding-right: calc(var(--ctl-sm) + 3 * var(--send-in));
+  border-radius: calc(var(--r) + var(--send-in)); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
+.pos-ask-row .pos-field input:focus { border-color: var(--voice); }
+.pos-ask-row > button { position: absolute; bottom: var(--send-in); right: var(--send-in); border-radius: var(--r);
+  color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
+.pos-ask-row > button[aria-pressed="true"] { color: var(--bg); background: var(--voice); border-color: var(--voice); }
+.pos-pills { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); }
+.pos-pills[hidden] { display: none; }
+.pos-pills > button.pos-pill { flex: none; text-transform: none; font-family: var(--sans); font-weight: 400; border-radius: 999px;
+  padding: 0 var(--pad-seg); color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
+  background-color: transparent; }
+.pos-pills > button.pos-pill:hover { border-color: var(--voice); background-color: transparent; }
+/* Focus colours the pill's own edge, lighter; no second ring outside it. */
+.pos-pills > button.pos-pill:focus-visible { outline: none; border-color: color-mix(in oklab, var(--voice) 60%, #fff); }
+/* What came of an ask, centred and balanced like /connect/'s empty picture; hidden until something is said. */
+.pos-ask-say { margin: 0; text-align: center; text-wrap: balance; overflow-wrap: anywhere; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
+.pos-ask-say[hidden] { display: none; }
+.pos-ask-say[data-kind="bad"] { color: var(--dim); }

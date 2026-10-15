@@ -51,6 +51,7 @@ export const CONCEPTS = [
   { id: 'shader/landscape', title: 'Scan landscape', say: 'A radio recording drawn as a scan landscape. Six knobs shape the ridges.' },
   // why: lessons/kit-concept-list.md#shader-remote
   { id: 'shader/remote', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
+  { id: 'shader/write', title: 'Written shader', say: 'Type or say a picture and a model writes its shader. The code stays in the box for you to edit.' },
   // why: lessons/kit-concept-list.md#pico
   { id: 'room/chat', title: 'Chat', say: 'A chat window whose every line crosses the room along a patchbay link, drawn underneath.' },
   // why: lessons/kit-concept-list.md#room-chat

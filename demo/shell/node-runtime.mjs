@@ -33,6 +33,7 @@ export const RUNTIMES = {
   screen: () => import('./rt-screen.mjs'),
   'shader-dither': () => import('./rt-shader-dither.mjs'),
   shader: () => import('./rt-shader.mjs'),
+  writer: () => import('./rt-writer.mjs'),
   player: () => import('./rt-player.mjs'),
   grains: () => import('./rt-grains.mjs'),
   rec: () => import('./rt-rec.mjs'),

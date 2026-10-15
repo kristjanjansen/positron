@@ -49,7 +49,7 @@ export const NODES = {
     variantPages: { unshaped: ['shader/landscape'] },
     pages: ['synth/sound', 'code/faust', 'code/collide', 'code/plaits', 'granulator/grains', 'granulator/beat',
       'remote/circuit', 'remote/collide', 'remote/plaits', 'video/shader', 'shader/mirror', 'shader/landscape',
-      'shader/remote', 'typist/machines', 'drums/knobs'],
+      'shader/remote', 'typist/machines', 'drums/knobs', 'radio/scenery', 'shader/write'],
     labels: { 'remote/circuit': 'macro <n>', 'drums/knobs': '<drum> <param>', 'granulator/grains': 'wet/dry (knob-mix)',
       'granulator/beat': 'wet/dry (knob-mix)' },
   },
@@ -72,7 +72,7 @@ export const NODES = {
   dial: {
     kind: 'person', label: 'dial',
     ports: { 'value-out': P({ ...PARAM }) },
-    pages: ['radio/tuner'],
+    pages: ['radio/tuner', 'radio/scenery'],
   },
   patch: {
     kind: 'person', label: 'patch',
@@ -94,6 +94,12 @@ export const NODES = {
     kind: 'person', label: 'code box',
     ports: { 'program-out': P({ shape: { of: 'glsl' } }) },
     pages: ['shader/remote'],
+  },
+  // A sentence written into a program by a model; what leaves is the code box's event.
+  writer: {
+    kind: 'person', label: 'writer',
+    ports: { 'program-out': P({ shape: { of: 'glsl' } }) },
+    pages: ['shader/write'],
   },
   invert: {
     kind: 'person', label: 'invert',
@@ -192,7 +198,7 @@ export const NODES = {
       'program-in': P({ shape: { of: 'glsl' }, optional: true }),
       'video-out': P({ ...PAGE }),
     },
-    pages: ['shader/mirror', 'shader/remote'],
+    pages: ['shader/mirror', 'shader/remote', 'shader/write'],
     labels: { 'shader/remote': 'mirror shader here' },
   },
   'shader-dots': {
@@ -208,7 +214,7 @@ export const NODES = {
   'shader-landscape': {
     node: 'shader', kind: 'engine', label: 'scan landscape',
     ports: { 'audio-in': P(), 'value-in': P(), 'video-out': P({ ...PAGE }) },
-    pages: ['shader/landscape'],
+    pages: ['shader/landscape', 'radio/scenery'],
   },
   pixelate: {
     kind: 'engine', label: 'squares, dithered',
@@ -221,7 +227,7 @@ export const NODES = {
   player: {
     kind: 'engine', label: 'player',
     ports: { 'file-in': P(), 'audio-out': P() },
-    pages: ['radio/tempo', 'granulator/grains', 'granulator/beat', 'shader/landscape'],
+    pages: ['radio/tempo', 'granulator/grains', 'granulator/beat', 'shader/landscape', 'radio/scenery'],
     labels: { 'granulator/grains': 'radio', 'granulator/beat': 'radio', 'shader/landscape': 'radio' },
   },
   'player-video': {
@@ -240,13 +246,14 @@ export const NODES = {
     kind: 'engine', label: 'grain ring',
     ports: { 'audio-in': P(), 'audio-out': P(), 'value-in': P({ optional: true }), 'value-out': P(),
       'tempo-in': P({ dir: 'in', medium: 'value', optional: true }) },
-    pages: ['granulator/grains', 'granulator/beat', 'shader/landscape'],
-    labels: { 'shader/landscape': 'granulator' },
+    pages: ['granulator/grains', 'granulator/beat', 'shader/landscape', 'radio/scenery'],
+    labels: { 'shader/landscape': 'granulator', 'radio/scenery': 'granulator' },
   },
   'patch-values': {
     node: 'patch', kind: 'engine', label: 'patch',
-    ports: { 'value-out': P(), 'value-out-2': P() },
-    pages: ['granulator/grains', 'granulator/beat'],
+    // value-out-2 (the fixed values) is the grain rig's; /radio/scenery/ sends a whole patch on value-out.
+    ports: { 'value-out': P(), 'value-out-2': P({ optional: true }) },
+    pages: ['granulator/grains', 'granulator/beat', 'radio/scenery'],
   },
   // Formerly `bpm`: radio/rig.mjs asks `{ name: 'tempo', as: 'bpm' }`.
   // why: lessons/kit-nodes.md#tempo-was-bpm
@@ -318,12 +325,14 @@ export const NODES = {
   noise: {
     kind: 'engine', label: 'noise',
     ports: { 'audio-out': P() },
-    pages: ['radio/tuner'],
+    pages: ['radio/tuner', 'radio/scenery'],
   },
   tuner: {
     kind: 'engine', label: 'tuner',
-    ports: { 'audio-in': P(), 'audio-out': P(), 'value-in': P({ shape: { of: 'param', names: ['tune'] } }) },
-    pages: ['radio/tuner'],
+    // value-out says which station the dial has, so a picture can tear when one comes in.
+    ports: { 'audio-in': P(), 'audio-out': P(), 'value-in': P({ shape: { of: 'param', names: ['tune'] } }),
+      'value-out': P({ shape: { of: 'tuned' }, optional: true }) },
+    pages: ['radio/tuner', 'radio/scenery'],
   },
   sequencer: {
     kind: 'engine', label: 'sequencer',
@@ -381,7 +390,7 @@ export const NODES = {
     pages: ['synth/keyboard', 'synth/recorder', 'synth/timeline', 'synth/dots', 'synth/sound', 'code/faust',
       'code/collide', 'code/plaits', 'code/piano', 'granulator/grains', 'granulator/beat', 'remote/circuit',
       'remote/collide', 'remote/piano', 'remote/plaits', 'radio/blend', 'radio/tuner', 'radio/tempo', 'radio/live', 'radio/key',
-      'shader/landscape', 'room/words', 'typist/typewriter', 'typist/machines', 'typist/playback', 'typist/score',
+      'shader/landscape', 'radio/scenery', 'room/words', 'typist/typewriter', 'typist/machines', 'typist/playback', 'typist/score',
       'drums/machine', 'drums/knobs', 'drums/samples', 'drums/camera', 'drums/remote', 'history/newsreels'],
   },
   scope: {
@@ -410,7 +419,7 @@ export const NODES = {
     kind: 'screen', label: 'picture', match: ['screen-<name>'],
     instance: 'screen; a second picture beside it is its own node: screen-pi (Pi picture), dither (dithered), playback, loopback (WebRTC), hls (LL-HLS), moq (MoQ), pixels',
     ports: { 'video-in': P(), 'value-in': P({ optional: true }), 'clock-out': P({ optional: true }) },
-    pages: ['synth/dots', 'shader/mirror', 'shader/remote', 'shader/landscape', 'video/camera', 'video/shader',
+    pages: ['synth/dots', 'shader/mirror', 'shader/remote', 'shader/landscape', 'radio/scenery', 'shader/write', 'video/camera', 'video/shader',
       'video/recorder', 'video/webrtc', 'video/llhls', 'video/moq', 'drums/camera', 'remote/circuit', 'history/newsreels'],
     // `original` where a second picture beside it needs telling apart; "here" pairs with the Pi's.
     labels: { 'video/shader': 'original', 'video/webrtc': 'original', 'video/llhls': 'original', 'video/moq': 'original',
@@ -449,7 +458,7 @@ export const NODES = {
     site: 'cf-r2', place: 'cloudflare', net: 'cloudflare', kind: 'store', label: '<station> recording',
     instance: 'one per recording in the bucket: raadio2, raadio4, ida (Raadio 2 recording ...); the file-out carries its URL as address',
     ports: { 'file-out': P({ ...HTTPS }) },
-    pages: ['granulator/grains', 'granulator/beat', 'shader/landscape', 'radio/tempo'],
+    pages: ['granulator/grains', 'granulator/beat', 'shader/landscape', 'radio/tempo', 'radio/scenery'],
   },
   'piano-samples': {
     node: 'piano', site: 'cf-r2', place: 'cloudflare', net: 'cloudflare', kind: 'store', label: 'piano samples',

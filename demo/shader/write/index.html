@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Written shader</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<style>
+  /* The picture at half the content width, the whole width on a phone, as /shader/mirror/. */
+  .cc-half { width: calc(50% - 8px); }
+  @media (max-width: 560px) { .cc-half { width: 100%; } }
+  .cc-half canvas { display: block; width: 100%; height: 100%; }
+</style>
+<script type="module">
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el, createShipper } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { PARAM_HUES } from '/shell/code-lang.mjs';
+  import { createAskBar } from '/shell/ask-bar.mjs';
+  import { make as makeShader } from '/shell/rt-shader.mjs';
+  import { make as makeWriter, WISH_API } from '/shell/rt-writer.mjs';
+  import { VERSION, hashOf, firstLine } from '/shell/glsl-writer.mjs';
+
+  // A sentence becomes a fragment shader: the writer asks the wish worker's /code, tries each answer
+  // in a sandbox GL of its own, and only a program that compiled and moved leaves on program-out.
+  // The shader keeps drawing its last good program the whole time. Nothing opens on a visit.
+  const S = 'web';
+  const WR_OUT = `${S}:writer:program-out`, SH_PROG = `${S}:shader:program-in`;
+  const KNOB_OUT = `${S}:knob-segments:value-out`, SH_VAL = `${S}:shader:value-in`;
+  const SH_OUT = `${S}:shader:video-out`, SCREEN = `${S}:screen:video-in`;
+  const q = new URLSearchParams(location.search);
+  const API = q.get('api') || WISH_API;
+
+  const d = mount({ name: 'Written shader', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  conceptNav('shader/write');
+  const log = (m, lv) => d.log(m, lv);
+
+  // A person's own requests go to the device log (pub.positron.studio/logs), never a check's.
+  const ship = SELFCHECK ? () => {} : createShipper();
+  const logAsk = (line) => ship(`shader/write ${line}`);
+
+  // ── the self-check's model: canned programs, so a check asks the worker nothing ──
+  const GOOD = `precision highp float;
+uniform float uT; uniform vec2 uRes; uniform float uSegments;
+out vec4 o;
+void main() {
+  vec2 p = gl_FragCoord.xy / uRes;
+  float w = sin(p.x * uSegments * 3.0 + uT * 2.0) * 0.5 + 0.5;
+  o = vec4(0.1, 0.3 + 0.4 * w, 0.6 + 0.4 * p.y, 1.0);
+}
+`;
+  const BROKEN = 'precision highp float;\nout vec4 o;\nvoid main() { o = vec4(nowhere, 1.0); }\n';
+  const canned = async ({ text }) => ({ code: /broken/.test(text) ? BROKEN : GOOD, ms: 0, model: 'canned', usage: { total_tokens: 0 } });
+
+  // ── the runtimes: the shader is /connect/'s, the writer is new ──
+  const bay = createBay();
+  const shader = makeShader({ log });
+  const writer = makeWriter({ log, api: API, model: q.get('model') || '', ask: SELFCHECK ? canned : null,
+    send: (port, ev) => bay.send(`${S}:writer:${port}`, ev) });
+  addNodes(bay, S, ['writer', 'knob-segments', 'shader', 'screen'], {
+    deliver: { 'shader:program-in': shader.deliver['program-in'], 'shader:value-in': shader.deliver['value-in'] },
+    portLabel: 'node:port',
+    ports: {
+      'knob-segments:value-out': { shape: { of: 'param', names: ['segments'] } },
+      'screen:video-in': { label: 'picture' },
+    },
+  });
+  for (const [a, b] of [[WR_OUT, SH_PROG], [KNOB_OUT, SH_VAL], [SH_OUT, SCREEN]]) {
+    bay.seen(a); bay.seen(b);
+    const r = bay.link(a, b, [], { site: S });
+    if (!r.ok) log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+  const sentOn = (from, to) => bay.links().find((l) => l.from === from && l.to === to)?.sent ?? 0;
+
+  // ── the screen ──
+  const count = el('span', 'cc-say', '');
+  const panel = createVideoPanel({ media: shader.shader.canvas, left: el('span', 'cc-say', shader.shader.renderer()) });
+  panel.el.querySelector('.pos-vp-r').prepend(count);
+  panel.el.classList.add('cc-half');
+  let n = 0, since = 0, drawing = false;
+  function frame(t) {
+    shader.video.frame();
+    n++;
+    if (!since) since = t;
+    else if (t - since >= 1000) { count.textContent = `${(n * 1000 / (t - since)).toFixed(1)} fps`; n = 0; since = t; }
+    requestAnimationFrame(frame);
+  }
+
+  // ── the knob, the shader's one parameter ──
+  const HUE = PARAM_HUES[0];
+  const knob = createKnob({ label: 'segments', min: 1, max: 32, step: 1, value: 8, hand: true,
+    format: (v) => `${Math.round(v)}`,
+    onInput: (v) => bay.send(KNOB_OUT, { of: 'param', name: 'segments', v }) });
+  knob.el.dataset.param = 'segments';
+  knob.el.style.setProperty('--param-hue', HUE);
+  const grid = createKnobGrid(new Map([['segments', knob]]), { row: true });
+
+  // ── the ask: a sentence or a pill, then the writer's loop ──
+  const PILLS = ['slow blue waves', 'a pulsing red grid', 'stars drifting left', 'a warm sunset gradient',
+    'rain on a window', 'a breathing kaleidoscope', 'green plasma', 'a tunnel of rings'];
+  const said = (r) => {
+    if (r.verdict === 'ran') return '';
+    if (r.verdict === 'ran still') return 'It runs, and it did not move between the two moments it was checked at.';
+    if (r.verdict === 'failed') return `Nothing was written: ${r.error}. The old shader keeps running.`;
+    return `The picture did not change: ${r.error}. The old shader keeps running.`;
+  };
+  async function write(text, { how = 'typed' } = {}) {
+    bar.say('');
+    log(`writing: ${text}`);
+    const r = await writer.write(text, { onTry: (t) => {
+      for (const f of t.fixed || []) log(`try ${t.attempt}: ${f}`);
+      log(`try ${t.attempt}: ${t.ok && !t.error ? 'compiled and moved' : t.error || 'refused'}${t.ms != null ? `, the answer took ${t.ms} ms` : ''}`, t.ok ? '' : 'warn');
+    } });
+    if (!r) return null;
+    const words = said(r);
+    bar.say(words, r.verdict === 'ran' ? '' : 'bad');
+    if (r.source) log(`running the written shader: ${r.tries.length} ${r.tries.length === 1 ? 'try' : 'tries'}, ${r.ms} ms, ${r.tokens} tokens, by ${r.model}`);
+    const verdict = r.verdict === 'refused' || r.verdict === 'failed' ? `${r.verdict}: ${firstLine(r.error)}` : r.verdict;
+    logAsk(`[code] "${text}" via ${how}, model ${r.model || '?'}, ${r.tries.length} attempt(s), ${r.ms} ms, ${r.tokens} tokens, ${verdict}`
+      + `${r.source ? `, ${r.source.length} chars, hash ${hashOf(r.source)}` : ''}`);
+    return r;
+  }
+  const bar = createAskBar({ placeholder: 'say a picture, and a model writes its shader', api: API, log, ship: logAsk,
+    selfcheck: SELFCHECK, pills: PILLS.map((say) => ({ say })),
+    vocabulary: () => ['shader', 'kaleidoscope', 'plasma', 'gradient'],
+    onAsk: (text, { how }) => write(text, { how }) });
+
+  const pb = createPatchbay(bay, { flowing: (l) => drawing && l.from === SH_OUT });
+  d.stack.add(bar.el, panel.el, grid.el, shader.code.el, pb.el);
+
+  // The knob's first value travels the link too, so the shader's first N came along it.
+  bay.send(KNOB_OUT, { of: 'param', name: 'segments', v: knob.value() });
+  if (shader.shader.ok()) { drawing = true; requestAnimationFrame(frame); pb.refresh(); }
+
+  window.__demo.write = write;
+  window.__demo.writer = writer;
+  window.__demo.shader = shader;
+  window.__demo.bar = bar;
+  window.__demo.bay = bay;
+
+  if (SELFCHECK) await check();
+  d.ready();
+
+  async function check() {
+    const A = d.assert;
+    const fetches = [], sockets = [];
+    const f0 = window.fetch;
+    window.fetch = (u, o) => { fetches.push(String(u)); return f0(u, o); };
+    const W0 = window.WebSocket;
+    window.WebSocket = function (...a) { sockets.push(a[0]); return new W0(...a); };
+    const gum = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
+    let micAsked = 0;
+    if (gum) navigator.mediaDevices.getUserMedia = (o) => { micAsked++; return gum(o); };
+    const frameDone = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const toWorker = () => fetches.filter((u) => u.startsWith(API)).length;
+
+    const first = shader.shader.source();
+    A('nothing is written on a visit: the shader runs its own program and nothing was asked',
+      shader.programs().ran === 0 && writer.asked() === 0 && /uSegments/.test(first || ''), `${shader.programs().ran} programs`);
+
+    // Positive control: a good program reaches the shader along the link and draws.
+    const r1 = await write('canned waves');
+    await frameDone();
+    const px = shader.shader.pixels();
+    let lo = 255, hi = 0;
+    for (let i = 0; px && i < px.length; i += 4 * 97) { lo = Math.min(lo, px[i + 1]); hi = Math.max(hi, px[i + 1]); }
+    A('a good program runs in one try, arrives on program-in along the link, fills the code box and draws',
+      r1?.verdict === 'ran' && r1.tries.length === 1 && shader.programs().ran === 1 && sentOn(WR_OUT, SH_PROG) === 1
+        && shader.shader.source() === VERSION + GOOD && shader.code.value() === VERSION + GOOD && hi - lo > 20,
+      `${r1?.verdict}, sent ${sentOn(WR_OUT, SH_PROG)}, green ${lo} to ${hi}`);
+    const good = shader.shader.source();
+
+    // Negative control: a program that never compiles is refused three times, and the picture stays.
+    const asked0 = r1.tries.length;
+    const r2 = await write('canned broken');
+    A('a broken program is tried three times and refused, the retry counter moves, and the old picture keeps running',
+      r2?.verdict === 'refused' && r2.tries.length === 3 && r2.tries.length > asked0 && shader.programs().ran === 1
+        && sentOn(WR_OUT, SH_PROG) === 1 && shader.shader.source() === good && shader.shader.ok(),
+      `${r2?.verdict}, ${r2?.tries.length} tries, sent ${sentOn(WR_OUT, SH_PROG)}`);
+    A('the refusal is said in one centred line with the compiler\'s own words', /undeclared identifier|nowhere/.test(bar.said()) && /old shader keeps running/.test(bar.said()),
+      bar.said());
+
+    // The shader's own door refuses a body with a version line, and keeps what runs.
+    const door = shader.deliver['program-in']({ of: 'program', source: `${VERSION}${GOOD}` });
+    A('NEGATIVE CONTROL: program-in refuses a body carrying #version and keeps the running program',
+      !door.ok && /^send the body without a #version line/.test(door.error) && shader.shader.source() === good && shader.programs().refused === 1, door.error);
+
+    // A pill is an ask: it shimmers while the writer works, then lets go.
+    const pill = bar.pills[0];
+    pill.click();
+    const busyWhile = pill.dataset.busy === '1';
+    while (bar.busy()) await new Promise((r) => setTimeout(r, 20));
+    A('a pill asks its sentence and shimmers while the writer works', busyWhile && !pill.dataset.busy && bar.field.value() === PILLS[0]
+      && shader.programs().ran === 2, `busy ${busyWhile}, programs ${shader.programs().ran}`);
+
+    A('nothing reaches pi-1: no node or link names it, no relay socket was opened, and the check asked the worker nothing',
+      !bay.nodes().some((x) => x.id.startsWith('pi-1:')) && !bay.links().some((l) => /pi-1:/.test(l.from + l.to))
+        && sockets.length === 0 && toWorker() === 0 && writer.asked() === 0 && micAsked === 0,
+      `${sockets.length} sockets, ${toWorker()} worker calls, ${micAsked} microphone asks`);
+    window.fetch = f0; window.WebSocket = W0;
+    if (gum) navigator.mediaDevices.getUserMedia = gum;
+  }
+</script>

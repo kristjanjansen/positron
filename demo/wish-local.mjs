@@ -217,13 +217,14 @@ http.createServer((req, res) => {
       if (!mod.allowedOrigin(req.headers.origin || null)) {
         return send(403, { error: 'this agent answers pages on positron.studio' });
       }
-      if (req.method !== 'POST') return send(405, { error: 'post to /hear or /wish' });
+      if (req.method !== 'POST') return send(405, { error: 'post to /hear, /wish or /code' });
       try { body = JSON.parse(raw || '{}'); } catch { return send(400, { error: 'body is JSON' }); }
       const out = await mod.handle(new URL(req.url, 'http://x').pathname, body, run);
       // One line per call, so a session can be read afterwards. Never the audio
       // and never the token.
       const what = out.body.text !== undefined ? JSON.stringify(out.body.text)
-        : out.body.links !== undefined ? `${out.body.links.length} link(s)` : out.body.error;
+        : out.body.links !== undefined ? `${out.body.links.length} link(s)`
+        : out.body.code !== undefined ? `${out.body.code.length} chars of code` : out.body.error;
       console.log(`${req.url}  ${out.status}  ${out.body.ms ?? 0} ms  ${out.body.model || ''}  ${what}`);
       send(out.status, out.body);
     } catch (e) {
@@ -249,4 +250,5 @@ http.createServer((req, res) => {
   else console.log(`  credential   the wrangler session, good to ${s.at || 'an unrecorded time'}`);
   console.log('  POST /hear  { audio: base64, model? }');
   console.log('  POST /wish  { text, ports: [...], model?, facts? }');
+  console.log('  POST /code  { text, lang: glsl, contract?, error?, previous?, model? }');
 });
