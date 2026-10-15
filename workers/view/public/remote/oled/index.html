@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta property="og:site_name" content="positron.studio">
+<meta property="og:type" content="website">
+<meta property="og:title" content="OLED on Pi">
+<meta property="og:description" content="Type a line and it shows on a small screen on the Pi. Its four keys show up here.">
+<meta property="og:url" content="https://positron.studio/remote/oled/">
+<meta property="og:image" content="https://positron.studio/og/site-98871a52.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="positron.studio: Connect anything to everything. Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-c7b28d7f.png">
+<link rel="manifest" href="/icons/manifest-8e6dda01.webmanifest">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>OLED on Pi</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<style>
+  .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+</style>
+<script type="module">
+  // The 0.96" OLED and its four keys on the Pi's header (rig/board/panel.mjs), as two nodes of the
+  // Pi in this page's bay: text from a tab along a link to the screen, the keys along a link to a
+  // table here. The board is reached on Connect, never on load.
+  // why: lessons/page-remote.md#oled
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+
+  const d = mount({ name: 'OLED on Pi', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  conceptNav('remote/oled');
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  const MAY_SEND = !SELFCHECK || q.get('board') === '1';
+
+  // ── the bay: a text box and a key table here, the screen and the keys on the Pi ──
+  const TEXT_OUT = 'web:text:value-out', LOG_IN = 'web:keylog:value-in';
+  const OLED_IN = `${BOARD_SITE}:oled:value-in`, KEYS_OUT = `${BOARD_SITE}:keys:value-out`;
+  const bay = createBay();
+  bay.addNode({ id: 'web:text', kind: 'person', label: 'text box', place: 'browser' });
+  bay.addNode({ id: 'web:keylog', kind: 'screen', label: 'key table', place: 'browser' });
+  bay.addNode({ id: `${BOARD_SITE}:oled`, kind: 'device', label: 'OLED 128x64', place: ROOM });
+  bay.addNode({ id: `${BOARD_SITE}:keys`, kind: 'device', label: 'four keys', place: ROOM });
+
+  let board = null, connected = false, sent = 0, shown = 0;
+  const flash = new Map();                  // link id -> until (ms), lit for a moment per event
+  const lit = (from) => { for (const l of bay.links()) if (l.from === from) flash.set(l.id, performance.now() + 400); };
+
+  bay.addPort({ id: TEXT_OUT, dir: 'out', medium: 'value', emits: ['text'], label: 'text:value-out' });
+  // What reaches the screen's in-port leaves for the board, and only once connected.
+  bay.addPort({ id: OLED_IN, dir: 'in', medium: 'value', accepts: ['text'], label: 'oled:value-in',
+    deliver: (ev) => {
+      if (!board || !connected || !MAY_SEND) return;
+      board.ask({ type: 'oled.text', text: ev.text }, 'oled.shown', 3000).then((r) => {
+        if (r?.ok) { shown++; d.log(`on the screen: ${r.text}`); } else d.log(`the board did not draw it: ${r?.why || 'no answer in 3 s'}`, 'warn');
+      });
+    } });
+  bay.addPort({ id: KEYS_OUT, dir: 'out', medium: 'value', emits: ['key'], label: 'keys:value-out' });
+  bay.addPort({ id: LOG_IN, dir: 'in', medium: 'value', accepts: ['key'], label: 'keylog:value-in',
+    deliver: (ev) => keys.add({ key: `K${ev.k}`, sym: ev.sym, edge: ev.down ? 'press' : 'release', gpio: String(ev.gpio) }) });
+  for (const [from, to] of [[TEXT_OUT, OLED_IN], [KEYS_OUT, LOG_IN]]) {
+    const r = bay.link(from, to);
+    if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
+  }
+
+  // ── the controls: connect, a line of text, the keys as they arrive ──────
+  const text = createField({ label: 'text', placeholder: 'hello from a tab', grow: 'wide' });
+  function send() {
+    const t = text.value().trim();
+    if (!t) return;
+    sent++;
+    lit(TEXT_OUT);
+    bay.send(TEXT_OUT, { of: 'text', cls: 'text', text: t });
+  }
+  text.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
+  const buttons = createButtonGroup({ buttons: [
+    { id: 'connect', label: 'Connect', onPress: () => connect() },
+    { id: 'send', label: 'Send', onPress: () => send() },
+  ] });
+  buttons.enable('send', false, 'connect first');
+  const keys = createTable({ columns: [
+    { key: 'key', label: 'key', width: 56 },
+    { key: 'sym', label: 'sym', width: 48 },
+    { key: 'edge', label: 'edge', grow: true },
+    { key: 'gpio', label: 'gpio', width: 56 },
+  ], minRows: 6, stick: true });
+
+  function connect() {
+    if (board) return;
+    board = createBoard({
+      room: ROOM, of: 'Raspberry Pi', showName: false,
+      log: (line, kind) => d.log(line, kind),
+      onOpen: async () => {
+        connected = true;
+        buttons.enable('send', true);
+        buttons.enable('connect', false, 'connected');
+        const st = await board.ask({ type: 'panel.status' }, 'panel.status', 3000);
+        d.log(st?.ok ? `the screen shows: ${st.text}` : `no screen on the Pi: ${st?.why || 'no answer in 3 s'}`, st?.ok ? 'ok' : 'warn');
+      },
+      // A key on the Pi is a `panel.key` to the whole room; it enters this bay at the keys' out-port.
+      onMessage: (m) => {
+        if (m.type !== 'panel.key') return;
+        lit(KEYS_OUT);
+        bay.send(KEYS_OUT, { of: 'key', cls: 'key', k: m.k, sym: m.sym, gpio: m.gpio, down: m.down });
+      },
+    });
+    d.log(`reaching ${ROOM}`);
+  }
+
+  // ── the patchbay: a value wire lights for a moment per event ────────────
+  const pb = createPatchbay(bay, { room: ROOM, flowing: (l) => (flash.get(l.id) || 0) > performance.now() });
+  setInterval(() => pb.refresh?.(), 200);
+
+  const top = el('div', 'cc-top');
+  top.append(text.el, buttons.el);
+  d.stack.add(top, keys.el, pb.el);
+  window.__demo.bay = bay;
+  window.__demo.probe = () => ({ connected, sent, shown });
+
+  if (SELFCHECK) {
+    d.assert('two links: the text to the screen, the keys to the table', bay.links().length === 2, bay.links().map((l) => `${l.from} -> ${l.to}`).join(', '));
+    d.assert('a visit reaches nothing until Connect', !board);
+  }
+  d.ready();
+</script>
