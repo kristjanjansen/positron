@@ -23,7 +23,7 @@ export function drawPanel(ui, state) {
   // The dot piano: the rings alone, the whole panel, as the Pico draws them (rings.mjs).
   if (state.mode === 'rings' && state.rings) { state.rings.draw((x, y) => ui.fill(x, y, 1, 1, 1), state.t); return; }
   // A small patch, as the Pico router drew its route (bay-oled.mjs); the Pi's own boxes filled.
-  if (state.mode === 'patch' && state.patch) { drawBayOled(ui, state.patch, { t: state.t, events: state.events, valueBead: state.valueBead }); return; }
+  if (state.mode === 'patch' && state.patch) { drawBayOled(ui, state.patch, { t: state.t, events: state.events }); return; }
   // A drum step pattern, its playhead and the row the keys edit (steps-oled.mjs).
   if (state.mode === 'steps' && state.steps) { drawStepsOled(ui, state.steps); return; }
   // The keys down the right edge, ^ at the top, level with the module's buttons: no rules, a 14 px square

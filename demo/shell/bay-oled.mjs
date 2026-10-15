@@ -167,26 +167,17 @@ function along(pts, at) {
 const lengthOf = (pts) => pts.slice(1).reduce((n, b, i) => n + Math.abs(b[0] - pts[i][0]) + Math.abs(b[1] - pts[i][1]), 0);
 
 /** Motion, `t` in seconds. A stream (audio, video, or no medium) marches: a 1 px gap every MARCH px at SPEED px a
- *  second, on both rails for video. An event medium sends one dot (MIDI) or bead (value) out to in over EVENT_S
+ *  second, on both rails for video. An event medium (MIDI, value) sends one 2x2 dot out to in over EVENT_S
  *  after each event in `events[i]`, the time of the wire's last event. */
 const SPEED = 20, EVENT_S = 0.6, MARCH = 9;
-/** A bead's shape: `solid` a 3x3 block, `hollow` a 5x5 outline around the wire, `diamond` a 5 px diamond. */
-export const BEADS = ['solid', 'hollow', 'diamond'];
-function bead(ui, [x, y], shape = 'solid') {
-  x = Math.round(x); y = Math.round(y);
-  if (shape === 'hollow') { ui.fill(x - 2, y - 2, 5, 1, 1); ui.fill(x - 2, y + 2, 5, 1, 1); ui.fill(x - 2, y - 1, 1, 3, 1); ui.fill(x + 2, y - 1, 1, 3, 1); }
-  else if (shape === 'diamond') { ui.fill(x, y - 2, 1, 5, 1); ui.fill(x - 1, y - 1, 3, 3, 1); ui.fill(x - 2, y, 5, 1, 1); }
-  else ui.fill(x - 1, y - 1, 3, 3, 1);
-}
-function beads(ui, w, t, events, valueBead) {
+function beads(ui, w, t, events) {
   const len = lengthOf(w.pts);
   if (w.medium === 'midi' || w.medium === 'value') {
     const t0 = events?.[w.i], u = Number.isFinite(t0) ? (t - t0) / EVENT_S : -1;
     if (u >= 0 && u <= 1) {
       const p = along(w.pts, Math.max(2, Math.min(len - 2, u * len)));
-      // MIDI: a 2x2 dot runs the dashed line; a value: its chosen bead
-      if (w.medium === 'midi') ui.fill(Math.round(p[0]), Math.round(p[1]) - 1, 2, 2, 1);
-      else bead(ui, p, valueBead);
+      // an event, MIDI or a value: a 2x2 dot runs its line
+      ui.fill(Math.round(p[0]), Math.round(p[1]) - 1, 2, 2, 1);
     }
     return;
   }
@@ -204,7 +195,7 @@ function beads(ui, w, t, events, valueBead) {
 export function drawBayOled(ui, patch, o = {}) {
   const L = layoutBayOled(patch, { ...o, adv: ui.adv });
   for (const w of L.wires) texture(ui, w.pts, w.medium);
-  if (Number.isFinite(o.t)) for (const w of L.wires) beads(ui, w, o.t, o.events, BEADS.includes(o.valueBead) ? o.valueBead : 'solid');
+  if (Number.isFinite(o.t)) for (const w of L.wires) beads(ui, w, o.t, o.events);
   for (const b of L.boxes) {
     // the firmware's box: an outline with its corners off. Never filled: a lit box drowns its thin letters.
     ui.fill(b.x + 1, b.y, b.w - 2, 1, 1); ui.fill(b.x + 1, b.y + b.h - 1, b.w - 2, 1, 1);
