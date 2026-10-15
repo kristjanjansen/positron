@@ -53,7 +53,7 @@
   const asBay = (b) => ({ nodes: b.nodes, ports: b.ports, links: b.links.map((l, i) => ({ id: `l${i}`, ...l })) });
 
   // Each slide is a board of two columns of boxes, drawn at READ so port names read on a phone. The boxes go in rank
-  // order, sources first; a new rank or a full column starts the next column, and after two the next board.
+  // order, sources first, in as few columns as the height allows; after two columns the next board.
   const K = READ, FONT = Math.round(11 * K), TITLE = Math.round(13 * K), ROW = Math.round(20 * K), PAD = Math.round(10 * K);
   const HEAD = PAD + TITLE + Math.round(6 * K), FIELD = 140, COL_W = (PW - 2 * X - FIELD) / 2, VGAP = 28;
   const colX = (c) => Math.floor(c / 2) * PW + X + (c % 2) * (COL_W + FIELD);
@@ -61,15 +61,15 @@
     const bay = asBay(b), { rank } = ranks(bay.nodes, bay.links);
     const portsOf = (id) => bay.ports.filter((q) => q.id.split(':').slice(0, 2).join(':') === id);
     const order = bay.nodes.map((n, i) => [n, i]).sort((x, y) => rank.get(x[0].id) - rank.get(y[0].id) || x[1] - y[1]).map(([n]) => n);
-    const cols = [];
-    let lastRank = null, used = Infinity;
-    for (const n of order) {
+    const items = order.map((n) => {
       const ps = portsOf(n.id), ins = ps.filter((q) => q.dir === 'in'), outs = ps.filter((q) => q.dir === 'out');
-      const h = HEAD + Math.max(ins.length, outs.length, 1) * ROW + Math.round(PAD / 2);
-      if (rank.get(n.id) !== lastRank || used + VGAP + h > BAND) { cols.push([]); used = -VGAP; }
-      cols.at(-1).push({ n, ins, outs, h });
-      used += VGAP + h; lastRank = rank.get(n.id);
-    }
+      return { n, ins, outs, h: HEAD + Math.max(ins.length, outs.length, 1) * ROW + Math.round(PAD / 2) };
+    });
+    // as few columns as the band's height allows, at least two, then the boxes split evenly between them in order
+    const fill = (limit) => { const cs = [[]]; let u = -VGAP; for (const q of items) { if (cs.at(-1).length && u + VGAP + q.h > limit) { cs.push([]); u = -VGAP; } cs.at(-1).push(q); u += VGAP + q.h; } return cs; };
+    const need = Math.max(Math.min(2, items.length), fill(BAND).length);
+    let cols = fill(BAND);    // then the height lowered while the count holds, which evens the columns
+    for (let lim = BAND; lim > 0 && fill(lim).length <= need; lim -= 10) cols = fill(lim);
     // each column centred in the band; a box's ports at its left (in) and right (out) edge
     const boxes = [], at = new Map();
     cols.forEach((col, c) => {
@@ -78,7 +78,7 @@
       for (const q of col) {
         const x = colX(c);
         boxes.push({ ...q, x, y, w: COL_W });
-        q.ins.forEach((pt, i) => at.set(pt.id, { x, y: y + HEAD + i * ROW + ROW / 2, medium: pt.medium }));
+        q.ins.forEach((pt, i) => at.set(pt.id, { x, y: y + HEAD + i * ROW + ROW / 2, medium: pt.medium, top: y }));
         q.outs.forEach((pt, i) => at.set(pt.id, { x: x + COL_W, y: y + HEAD + i * ROW + ROW / 2, medium: pt.medium }));
         y += q.h + VGAP;
       }
@@ -116,9 +116,17 @@
     for (const l of p.links) {
       const a = p.at.get(l.from), z = p.at.get(l.to);
       if (!a || !z) continue;
-      const dx = Math.max(80, Math.abs(z.x - a.x) / 2);
       ctx.strokeStyle = MEDIUM_COLOURS[a.medium] || C.dim;
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(a.x + dx, a.y, z.x - dx, z.y, z.x, z.y); ctx.stroke();
+      ctx.beginPath();
+      if (z.x > a.x) {
+        const dx = Math.max(80, Math.abs(z.x - a.x) / 2);
+        ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(a.x + dx, a.y, z.x - dx, z.y, z.x, z.y);
+      } else {
+        // a box below in the same column: out to the right, back through the gap above the target, in from the left
+        const gy = z.top - VGAP / 2, r = 32;
+        ctx.moveTo(a.x, a.y); ctx.lineTo(a.x + r, a.y); ctx.lineTo(a.x + r, gy); ctx.lineTo(z.x - r, gy); ctx.lineTo(z.x - r, z.y); ctx.lineTo(z.x, z.y);
+      }
+      ctx.stroke();
     }
     for (const q of p.boxes) {
       ctx.fillStyle = '#151b26'; ctx.strokeStyle = '#2a3240'; ctx.lineWidth = 2;
