@@ -30,6 +30,7 @@
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
   import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
+  import { stepCell } from '/shell/steps-oled.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDrumMachine } from '/drums/drum-machine.mjs';
   import { VOICES } from '/drums/voices.mjs';
@@ -172,8 +173,9 @@
     await new Promise((r) => setTimeout(r, 400));
     d.assert('four links of the page: the pattern to both screens, both sets of keys to the sequencer', OURS.size === 4, [...OURS].join(', '));
     d.assert('the simulated screen drew the pattern', frames > 0 && !!lastFrame, `${frames} frames`);
-    // the kick is on at step 1, so the top left pixel of the grid (x 16, y 0) is lit
-    d.assert('the kick on step 1 is lit on the screen', !!lastFrame && (lastFrame[16] & 1) === 1);
+    // the kick is on at step 1, so the middle of the grid's first cell is lit
+    const k1 = stepCell(0, 0, VOICES.length), kx = k1.x + 2, ky = k1.y + (k1.h >> 1);
+    d.assert('the kick on step 1 is lit on the screen', !!lastFrame && ((lastFrame[(ky >> 3) * 128 + kx] >> (ky & 7)) & 1) === 1);
     const was = m.api.grid.get(1, 0);
     bay.send(SIMKEYS_OUT, { of: 'key', cls: 'key', k: 2, down: true });
     bay.send(SIMKEYS_OUT, { of: 'key', cls: 'key', k: 3, down: true });
