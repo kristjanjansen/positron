@@ -19,6 +19,8 @@
   .pt-frame canvas { display: block; width: 256px; height: 128px; image-rendering: pixelated; }
   .pt-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; }
   .pt-cut { font-size: 12px; color: var(--dim2); }
+  .pt-say { margin: -4px 0 0; font: 400 13px/1.45 var(--sans); color: var(--dim); text-wrap: balance; }
+  .pt-sec { display: flex; flex-direction: column; gap: 12px; }
 </style>
 <script type="module">
   // Small Pi-centric patches drawn as the Pi's 128x64 screen shows them (bay-oled.mjs, two facing
@@ -44,6 +46,20 @@
   const MAY_SEND = !SELFCHECK || q.get('board') === '1';
   const P = BOARD_SITE;
 
+  // [name, what it is for, links as [from node, to node]]; every node a box. The Evolution keyboard
+  // plugs into the Pi, so it is a Pi node, drawn filled; `evo`, since a box holds eight letters.
+  const EVO = `${P}:evo`;
+  const USES = [
+    ['Evolution to the Circuit', 'Play the Circuit from the keyboard on the Pi.', [[EVO, `${P}:circuit`]]],
+    ['A split', 'Low keys play the Circuit, high keys play Plaits on the Pi.', [[EVO, `${P}:circuit`], [EVO, `${P}:plaits`]]],
+    ['A layer', 'Every key plays the Circuit and the sampler\'s piano together.', [[EVO, `${P}:circuit`], [EVO, `${P}:sampler`]]],
+    ['The knobs to Plaits', 'The keyboard plays Plaits and its knobs turn Plaits\'s controls.', [[EVO, `${P}:plaits`], [`${P}:plaits`, `${P}:capture`]]],
+    ['Evolution to Collide', 'Play the SuperCollider synth on the Pi, heard in a tab.', [[EVO, `${P}:collide`], [`${P}:collide`, 'web:speaker']]],
+    ['Camera on the screen', 'The Pi\'s camera drawn in one bit on its own small screen.', [[`${P}:camera`, `${P}:screen`]]],
+    ['Drums from the screen\'s keys', 'The four keys under the screen trigger the drum machine.', [[`${P}:keys`, `${P}:drums`], [`${P}:drums`, 'web:speaker']]],
+    ['Drums in time with the Circuit', 'The Circuit\'s clock drives the drum machine, both on the Pi.', [[`${P}:circuit`, `${P}:drums`], [`${P}:drums`, `${P}:capture`]]],
+    ['Record what you play', 'The Evolution plays the Circuit and every take goes to the bucket.', [[EVO, `${P}:circuit`], [`${P}:circuit`, 'cf-r2:takes']]],
+  ];
   // name, then links as [from node, to node]; every node a box
   const PATCHES = [
     ['Keys to the Circuit', [['web:keys', `${P}:circuit`]]],
@@ -56,10 +72,12 @@
     ['A shader on the GPU', [['web:editor', `${P}:gpu`], [`${P}:gpu`, 'web:screen']]],
     ['The Pi\'s camera live', [[`${P}:camera`, 'cf-stream:live'], ['cf-stream:live', 'web:screen']]],
     ['The screen\'s own keys', [[`${P}:keys`, `${P}:screen`]]],
-  ].map(([name, pairs]) => {
+  ].map(([name, pairs]) => [name, '', pairs]);
+  const asPatch = ([name, say, pairs]) => {
     const nodes = [...new Set(pairs.flat())].map((id) => ({ id }));
-    return { name, patch: { nodes, links: pairs.map(([a, b]) => ({ from: `${a}:out`, to: `${b}:in` })) } };
-  });
+    return { name, say, patch: { nodes, links: pairs.map(([a, b]) => ({ from: `${a}:out`, to: `${b}:in` })) } };
+  };
+  const SECTIONS = [['use cases', USES.map(asPatch)], ['simple patches', PATCHES.map(asPatch)]];
 
   // ── the bay: this list sends a patch along one link to the Pi's screen ──
   const LIST_OUT = 'web:list:value-out', PI_IN = `${P}:screen:value-in`;
@@ -91,9 +109,10 @@
 
   // ── the cards ──
   const ui = await loadPanelUi(await (await fetch('/resources/pico/oled-ui.wasm')).arrayBuffer());
+  const blocks = [], cuts = [];
+  for (const [title, list] of SECTIONS) {
   const grid = el('div', 'pt-grid');
-  const cuts = [];
-  for (const x of PATCHES) {
+  for (const x of list) {
     const card = el('div', 'pt-card');
     const cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
     paintFrame(cv, ui.frame({ mode: 'patch', patch: x.patch }));
@@ -108,18 +127,23 @@
     } }] });
     const foot = el('div', 'pt-foot');
     foot.append(el('span', 'pt-cut', L.cut.length ? `cut: ${L.cut.map((c) => c.split(' as ')[1] || c.split(':')[1]).join(', ')}` : ''), send.el);
-    card.append(el('h3', 'pt-name', x.name), screen, foot);
+    card.append(el('h3', 'pt-name', x.name), ...(x.say ? [el('p', 'pt-say', x.say)] : []), screen, foot);
     grid.append(card);
+  }
+  const block = el('section', 'pt-sec');
+  block.append(el('h3', 'pos-sec-h', title), grid);
+  blocks.push(block);
   }
 
   const pb = createPatchbay(bay, { room: ROOM, flowing: (l) => (flash.get(l.id) || 0) > performance.now() });
   setInterval(() => pb.refresh?.(), 200);
-  d.stack.add(grid, pb.el);
+  d.stack.add(...blocks, pb.el);
   window.__demo.bay = bay;
   window.__demo.probe = () => ({ connected, sent, landed, cuts });
 
   if (SELFCHECK) {
-    d.assert('every patch drawn as a card', grid.children.length === PATCHES.length, `${grid.children.length} cards`);
+    const cards = document.querySelectorAll('.pt-card').length, all = USES.length + PATCHES.length;
+    d.assert('every patch drawn as a card', cards === all, `${cards} of ${all} cards`);
     d.assert('no name is cut on these patches', cuts.every((c) => c === 0), cuts.join(' '));
     d.assert('a visit reaches nothing until a send', !board);
   }
