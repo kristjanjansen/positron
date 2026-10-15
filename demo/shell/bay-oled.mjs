@@ -34,9 +34,9 @@ function layoutPairOled({ nodes, links }, { home = 'pi-1', adv = 6 } = {}) {
   k = Math.max(order.length - MAX_ROWS, Math.min(MAX_ROWS, k));
   const sides = [order.slice(0, k), order.slice(k)].filter((c) => c.length);
   if (sides.length < 2) return layoutColumns({ nodes, links }, { home, adv });
-  // An outer lane of 4 px each side carries the links inside a column, so the field between carries only
+  // An outer lane of 7 px each side carries the links inside a column, so the field between carries only
   // links across and a chain never reads as a fan.
-  const LANE = 4, FIELD = 16, bw = Math.floor((W - FIELD - 2 * LANE) / 2), per = Math.max(1, Math.floor((bw - 2 * PAD - 2 + 1) / adv));
+  const LANE = 7, FIELD = 16, bw = Math.floor((W - FIELD - 2 * LANE) / 2), per = Math.max(1, Math.floor((bw - 2 * PAD - 2 + 1) / adv));
   const boxes = [], at = new Map(), cut = [];
   sides.forEach((col, ci) => {
     col.forEach((n, ri) => {
