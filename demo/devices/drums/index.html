@@ -17,12 +17,6 @@
   .ol-media .pos-bgroup { flex: none; margin-left: auto; align-self: center; }
   .ol-screen { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-width: 0; }
   .ol-say { font-size: 12px; color: var(--dim); }
-  /* Ways to draw the grid, side by side at 2x; pressing one puts it on both screens. */
-  .dr-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 12px; }
-  .dr-opt { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; height: auto; background: #07090d; border: 1px solid var(--line); border-radius: var(--r, 4px); }
-  .dr-opt[aria-pressed="true"] { border-color: var(--hi); }
-  .dr-opt canvas { display: block; width: 256px; height: 128px; image-rendering: pixelated; }
-  .dr-opt span { font: 400 12px/1.3 var(--mono); color: var(--dim); }
 </style>
 <script type="module">
   // The kit's drum machine in this tab, its pattern and playing step along links to pi-1:screen and
@@ -33,6 +27,7 @@
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createOledCard, createOledGrid } from '/shell/oled-card.mjs';
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
   import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
@@ -120,14 +115,19 @@
   // ── the ways to draw it: every empty style with each cursor, and the grid at its most rows ──
   let look = { empty: 'dot', head: 'frame' };
   const OPTS = EMPTIES.flatMap((empty) => HEADS.map((head) => ({ empty, head })));
-  const opts = el('div', 'dr-opts');
+  // one card a way, as /devices/patches/ shows its patches; its chip button puts that way on both screens
+  const opts = createOledGrid(2);
+  const NAMES = { outline: 'Outlined steps', dot: 'Dotted steps', pixel: 'One pixel steps', underline: 'Underlined steps', none: 'Lit steps only' };
   const tiles = OPTS.map((o) => {
-    const b = el('button', 'dr-opt'), cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
-    b.append(cv, el('span', '', `${o.empty}, ${o.head}`));
-    b.addEventListener('click', () => { look = { empty: o.empty, head: o.head }; for (const t of tiles) t.b.setAttribute('aria-pressed', String(t.o === o)); });
-    b.setAttribute('aria-pressed', String(o.empty === look.empty && o.head === look.head));
-    opts.append(b);
-    return { o, b, cv };
+    const cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
+    const pick = createButtonGroup({ buttons: [{ id: 'use', icon: 'board', label: `draw the grid this way on the Pi's screen and here`, onPress: () => {
+      look = { empty: o.empty, head: o.head };
+      for (const t of tiles) t.card.el.setAttribute('aria-current', String(t.o === o));
+    } }] });
+    const card = createOledCard({ name: NAMES[o.empty], say: o.head === 'frame' ? 'The running step framed.' : 'The running step in a lane under the grid.', canvas: cv, right: pick.el });
+    card.el.setAttribute('aria-current', String(o.empty === look.empty && o.head === look.head));
+    opts.append(card.el);
+    return { o, card, cv };
   });
   const paintOpts = (st) => {
     if (!ui) return;

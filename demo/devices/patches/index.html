@@ -9,21 +9,6 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
-  /* One card a patch: its name, the screen as the Pi draws it at 2x, and a footer like the video panel's with the send button. */
-  /* The screens at 2x; a card is at least as wide as its screen and its black border. */
-  .pt-grid { --pt-k: 2; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(calc(128px * var(--pt-k) + 44px), 100%), 1fr)); gap: 16px; }
-  .pt-card { display: flex; flex-direction: column; background: var(--card); border: var(--edge, 1px solid var(--line));
-    border-radius: var(--r, 4px); overflow: hidden; min-width: 0; }
-  .pt-head { display: flex; flex-direction: column; gap: 6px; padding: 12px; }
-  .pt-name { margin: 0; font: 600 14px/1.3 var(--mono); }
-  .pt-say { margin: 0; font: 400 13px/1.45 var(--sans); color: var(--dim); text-wrap: balance; }
-  /* The well runs edge to edge; the screen sits in it with the same air above and below it as its own black border. */
-  .pt-screen { display: flex; justify-content: center; overflow-x: auto; margin-top: auto; padding: 16px 0; background: #07090d; }
-  .pt-frame { padding: 8px; line-height: 0; background: #000; }
-  .pt-frame canvas { display: block; width: calc(128px * var(--pt-k)); height: calc(64px * var(--pt-k)); image-rendering: pixelated; }
-  .pt-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px;
-    border-top: 1px solid var(--line); }
-  .pt-cut { font-size: 12px; color: var(--dim2); }
   .pt-sec { display: flex; flex-direction: column; gap: 12px; }
 </style>
 <script type="module">
@@ -36,6 +21,7 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createOledCard, createOledGrid } from '/shell/oled-card.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
@@ -106,9 +92,8 @@
   const ui = await loadPanelUi(await (await fetch('/resources/pico/oled-ui.wasm')).arrayBuffer());
   const blocks = [], cuts = [], screens = [];
   for (const [title, list] of SECTIONS) {
-  const grid = el('div', 'pt-grid');
+  const grid = createOledGrid(2);
   for (const x of list) {
-    const card = el('div', 'pt-card');
     const cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
     paintFrame(cv, ui.frame({ mode: 'patch', patch: x.patch }));
     const events = {};
@@ -117,8 +102,6 @@
     const evLinks = x.patch.links.map((l, i) => (l.medium === 'midi' || l.medium === 'value' ? i : -1)).filter((i) => i >= 0);
     const L = layoutBayOled(x.patch);
     cuts.push(L.cut.length);
-    const frame = el('div', 'pt-frame'); frame.append(cv);
-    const screen = el('div', 'pt-screen'); screen.append(frame);
     const send = createButtonGroup({ buttons: [
       ...(evLinks.length ? [{ id: 'event', icon: 'music', label: `send a MIDI event along ${x.name}'s wires`, onPress: () => {
         const now = performance.now() / 1000;
@@ -126,17 +109,14 @@
         fired++;
         if (onPi === x.name && board && connected && MAY_SEND) board.send({ type: 'screen.patch.event', links: evLinks });
       } }] : []),
-      { id: 'send', icon: 'send', label: `send ${x.name} to the Pi's screen`, onPress: () => {
+      { id: 'send', icon: 'board', label: `send ${x.name} to the Pi's screen`, onPress: () => {
         sent++;
         flash.set([...bay.links()][0]?.id, performance.now() + 400);
         bay.send(LIST_OUT, { of: 'patch', cls: 'patch', name: x.name, patch: x.patch });
       } }] });
-    const foot = el('div', 'pt-foot');
-    foot.append(el('span', 'pt-cut', L.cut.length ? `cut: ${L.cut.map((c) => c.split(' as ')[1] || c.split(':')[1]).join(', ')}` : ''), send.el);
-    const head = el('div', 'pt-head');
-    head.append(el('h3', 'pt-name', x.name), ...(x.say ? [el('p', 'pt-say', x.say)] : []));
-    card.append(head, screen, foot);
-    grid.append(card);
+    const card = createOledCard({ name: x.name, say: x.say, canvas: cv, right: send.el,
+      left: L.cut.length ? `cut: ${L.cut.map((c) => c.split(' as ')[1] || c.split(':')[1]).join(', ')}` : '' });
+    grid.append(card.el);
   }
   const block = el('section', 'pt-sec');
   block.append(el('h3', 'pos-sec-h', title), grid);
@@ -157,7 +137,7 @@
   window.__demo.probe = () => ({ connected, sent, landed, cuts });
 
   if (SELFCHECK) {
-    const cards = document.querySelectorAll('.pt-card').length, all = USES.length;
+    const cards = document.querySelectorAll('.pos-oc').length, all = USES.length;
     d.assert('every patch drawn as a card', cards === all, `${cards} of ${all} cards`);
     d.assert('no name is cut on these patches', cuts.every((c) => c === 0), cuts.join(' '));
     d.assert('a visit reaches nothing until a send', !board);
