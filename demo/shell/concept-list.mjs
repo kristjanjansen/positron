@@ -13,7 +13,7 @@ export const CONCEPTS = [
   // why: lessons/kit-concept-list.md#envelope-lfo
   { id: 'code/faust', title: 'Faust synth', say: 'A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.' },
   { id: 'code/collide', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
-  { id: 'code/wish', title: 'Sound wish', say: 'Type or say a wish for a sound and a model writes it in SuperCollider. Play it from the keys.' },
+  { id: 'code/wish', group: 'wish', title: 'Sound wish', say: 'Type or say a wish for a sound and a model writes it in SuperCollider. Play it from the keys.' },
   // why: lessons/kit-concept-list.md#plaits
   { id: 'code/plaits', title: 'Plaits', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
   // A row's `group` sets the heading it shows under; its folder and URL stay where they are.
@@ -52,7 +52,7 @@ export const CONCEPTS = [
   { id: 'shader/landscape', title: 'Scan landscape', say: 'A radio recording drawn as a scan landscape. Six knobs shape the ridges.' },
   // why: lessons/kit-concept-list.md#shader-remote
   { id: 'shader/remote', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
-  { id: 'shader/wish', title: 'Picture wish', say: 'Type or say a wish for a picture and a model writes its shader. The code stays in the box to edit.' },
+  { id: 'shader/wish', group: 'wish', title: 'Picture wish', say: 'Type or say a wish for a picture and a model writes its shader. The code stays in the box to edit.' },
   // why: lessons/kit-concept-list.md#pico
   { id: 'room/chat', title: 'Chat', say: 'A chat window whose every line crosses the room along a patchbay link, drawn underneath.' },
   // why: lessons/kit-concept-list.md#room-chat
@@ -88,7 +88,7 @@ export const CONCEPT_DIRS = ['synth', 'code', 'granulator', 'remote', 'radio', '
 // draws it as a demo card, CASE_GROUPS as a use case card. Kept out of CONCEPTS so the pager skips it.
 // `supersededBy: '<group>/<slug>'` labels its card `not needed`, naming that page.
 // why: lessons/kit-concept-list.md#concept-groups
-export const CONCEPT_GROUPS = ['synth', 'code', 'granulator', 'remote', 'drums', 'radio', 'video', 'shader', 'typist', 'sampler', 'archives', 'room'];
+export const CONCEPT_GROUPS = ['wish', 'synth', 'code', 'granulator', 'remote', 'drums', 'radio', 'video', 'shader', 'typist', 'sampler', 'archives', 'room'];
 // A group's heading on the front page is its key unless it is named here.
 // why: lessons/kit-concept-list.md#group-titles
 export const GROUP_TITLES = { archives: 'history', synth: 'building instruments', code: 'instruments in code', remote: 'remote instruments', performances: 'timelines' };
@@ -97,7 +97,7 @@ export const DEMO_CARDS = {
   // kit: its own heading, last.
   // why: lessons/kit-concept-list.md#kit
   kit: { group: 'kit', plain: true, title: 'Kit', say: 'Every part these pages are built from, one page per part.' },
-  connect: { group: 'kit', plain: true, title: 'Connect', say: 'Link the site\'s parts port to port. A part that can run here appears once it is linked.' },
+  connect: { group: 'wish', plain: true, title: 'Connect', say: 'Link the site\'s parts port to port. A part that can run here appears once it is linked.' },
   social: { group: 'kit', plain: true, title: 'Social', say: 'Pictures and reels the site makes of itself. Download one and post it.' },
   // concept like rows first, then use cases; archived rows are listed on /archive/.
   // why: lessons/kit-concept-list.md#archived-rows

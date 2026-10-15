@@ -156,7 +156,8 @@ void main() {
     reset: { say: 'new wish', title: 'the next sentence writes a new shader instead of changing this one',
       onPress: () => { startFresh(); log('a new shader: the next sentence starts from nothing'); logAsk('[new] pressed new wish'); } },
     vocabulary: () => ['shader', 'kaleidoscope', 'plasma', 'gradient'],
-    onAsk: (text, { how }) => write(text, { how }) });
+    // The code box's border shimmers while the wish is written.
+    onAsk: async (text, { how }) => { shader.code.el.dataset.busy = '1'; try { return await write(text, { how }); } finally { delete shader.code.el.dataset.busy; } } });
 
   // Where the conversation stands; the last pill, new wish, forgets it (the picture keeps running).
   const turnSay = el('span', '', '');

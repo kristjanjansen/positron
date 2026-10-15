@@ -130,6 +130,8 @@ export function createWishBar({ onAsk, pills = [], reset = null, placeholder = '
     if (!text || inFlight) return null;
     inFlight = true;
     by.dataset.busy = '1';
+    // The field empties so the one button is the mic again; the wish stays visible as the placeholder.
+    field.set(''); field.input.placeholder = text; showBtn();
     try { return await onAsk(text, { how, by }); } finally { inFlight = false; delete by.dataset.busy; }
   }
   row.addEventListener('submit', (e) => { e.preventDefault(); ask(field.value(), 'typed'); });
@@ -139,7 +141,7 @@ export function createWishBar({ onAsk, pills = [], reset = null, placeholder = '
     b.addEventListener('click', (e) => {
       if (p.onPress) { p.onPress(b, e); return; }
       if (inFlight) return;
-      field.set(p.say); showBtn(); ask(p.say, 'pill', b);
+      ask(p.say, 'pill', b);
     });
     pillRow.append(b);
     return b;

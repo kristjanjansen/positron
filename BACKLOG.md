@@ -1,5 +1,15 @@
 ## Open
 
+- ~~**Front page: the card hover border is far too bright**~~ (2026-10-15, DONE: 35% foreground into --line2). Asked: *"hover border is way too bright"*, on a crop of the Keyboard card.
+
+- ~~**Wish pages: the code box's border shimmers while a wish is written**~~ (2026-10-15, DONE: a --wish sweep on .pos-code[data-busy]; --voice renamed --wish). Asked: *"add shimmer effect to code window border"*.
+
+- ~~**Wish bar: the field empties once a wish is sent, so the mic comes back**~~ (2026-10-15, DONE; /code/wish/ selfcheck 3/3). Asked: *"can not see mic icon??"* on /code/wish/: the sent text stayed in the field, so the one button stayed send. The sent wish shows as the placeholder.
+
+- ~~**A wish group on the front page**~~ (2026-10-15, DONE: first group on the front page). Asked: *"add wish group to frontpage"*. Picture wish, Sound wish and Connect under one heading.
+
+- ~~**Remove the hidden Connect link from the hero headline**~~ (2026-10-15, DONE). Asked: *"rm secret conenct link from title"*. hero.mjs and the .pos-hero-secret rule.
+
 - **Remove the temporary speech switcher** ("speech: chrome | whisper" under the wish bar, localStorage `pos-wish-speech`) once one engine is chosen (2026-10-15). The code comment in wish-bar.mjs points here.
 
 - **Drop the /code alias on the wish worker** after one deploy (2026-10-15); pages call /wish/code.
