@@ -45,7 +45,12 @@
   .cn-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
 
   .cn-say { display: flex; flex-direction: column; gap: 12px; }
-  .cn-ex { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); }
+  .cn-ex { --fade: 16px; display: grid; grid-template-rows: auto auto; grid-auto-flow: column; grid-auto-columns: max-content;
+    justify-items: start; gap: var(--ctl-gap); overflow-x: auto; scrollbar-width: none;
+    margin-inline: calc(-1 * var(--fade)); padding: 2px var(--fade);
+    mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); }
+  .cn-ex::-webkit-scrollbar { display: none; }
+  .cn-ex > button.cn-pill { flex: none; }
 
   /* What a person says, in --voice (shell.css). Round, lowercase and in
      Geist, because a sentence is read through rather than named. */
@@ -53,29 +58,32 @@
     padding: 0 var(--pad-seg); color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
     background: transparent; }
   .cn-ex > button.cn-pill:hover { border-color: var(--voice); background: transparent; }
+  /* Focus colours the pill's own edge, lighter; no second ring outside it. */
+  .cn-ex > button.cn-pill:focus-visible { outline: none; border-color: color-mix(in oklab, var(--voice) 60%, #fff); }
+  /* The ask field in the pills' voice: a sentence a person says. */
+  /* The send button sits inside the field one inset from its edge, radii concentric, as chat-ui's compose. */
+  .cn-ask { --send-in: 4px; position: relative; }
+  .cn-ask > .pos-field { display: block; margin: 0; }
+  .cn-ask .pos-field input { width: 100%; box-sizing: border-box; font-family: var(--sans); color: var(--voice);
+    min-height: calc(var(--ctl-sm) + 2 * var(--send-in)); padding-right: calc(var(--ctl-sm) + 3 * var(--send-in));
+    border-radius: calc(var(--r) + var(--send-in)); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
+  .cn-ask .pos-field input:focus { border-color: var(--voice); }
+  .cn-ask > button[aria-pressed="true"] { color: var(--bg); background: var(--voice); border-color: var(--voice); }
+  .cn-ask > button { position: absolute; bottom: var(--send-in); border-radius: var(--r); right: var(--send-in);
+    color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
 
-  .cn-props { display: flex; flex-direction: column; gap: 12px; }
-  .cn-props[hidden] { display: none; }
-  /* The picture's room is a square held from the first frame, so linking moves
-     nothing above or below it; a patch taller than the square grows it. */
-  .cn-pic { aspect-ratio: 1; }
-  .cn-pic.cn-pic-empty { display: grid; place-items: center; border: 1px dashed var(--line2); border-radius: var(--r, 4px); }
+  /* The picture's room is held from the first frame, 4/5 as tall as wide, so linking moves
+     nothing above or below it; a taller patch grows it. */
+  .cn-pic { aspect-ratio: 5 / 4; }
+  .cn-pic.cn-pic-empty { display: grid; place-items: center; }
   .cn-pic.cn-pic-empty > :not(.cn-empty) { display: none; }
   .cn-pic:not(.cn-pic-empty) > .cn-empty { display: none; }
-  .cn-empty { margin: 0; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
+  .cn-empty { margin: 0; max-width: 46ch; padding: 0 16px; text-align: center; text-wrap: balance; overflow-wrap: anywhere; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
   .cn-ex > button.cn-pill[aria-pressed="true"] { border-color: var(--voice); }
   /* An example whose patch does not run yet is dimmed, never disabled: it still
      builds its picture, and its title says what is missing. */
   .cn-ex > button.cn-pill[data-runs="marked"] { opacity: .5; }
   .cn-ex > button.cn-pill[data-runs="marked"]:hover, .cn-ex > button.cn-pill[data-runs="marked"]:focus-visible { opacity: 1; }
-  .cn-prop { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
-  .cn-prop-t { font: 400 12.5px/1.4 var(--mono); color: var(--fg); overflow-wrap: anywhere; }
-  .cn-prop-n { flex-basis: 100%; font: 400 12px/1.4 var(--sans); color: var(--dim); }
-  .cn-prop-b { display: flex; gap: var(--ctl-gap); }
-  /* Both answers in one case: the shell sets a secondary button in capitals
-     and leaves a primary as written, which read `Connect` beside `DISMISS`. */
-  .cn-prop-b > button.pos-sm { text-transform: none; }
-  .cn-prop-n:empty { display: none; }
 
   /* The faces of the linked nodes, in a concept page's order: pictures, panels, the
      knob row, the keys. Empty paints nothing. */
@@ -117,7 +125,8 @@
   .cn-livemark { fill: var(--ok); }
 </style>
 <script type="module">
-  import { mount, el } from '/shell/shell.mjs';
+  import { mount, el, createShipper } from '/shell/shell.mjs';
+  import { createIconButton } from '/shell/icon-button.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay, checkTransforms, printLink, parseLink } from '/shell/bay.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
@@ -216,20 +225,30 @@
   // ── a second of a kind (decision D6) ─────────────────────────────────────
   // A synth, a scope or a screen may be used twice: once every one of them is linked,
   // the grid offers the next as `synth-2`, `scope-3`, with a runtime and a face of its own.
-  const MULTI = ['synth', 'scope', 'screen'];
+  const MULTI = ['synth', 'scope', 'screen', 'sampler'];
   const instancesOf = (type) => bay.nodes().filter((n) => TYPE.get(n.id) === type).map((n) => n.id);
   // The bay cannot drop a node, so an instance unlinked again stays in it and the grid shows the first free one.
   const firstFree = (type) => { const s = linkedNodes(); return instancesOf(type).find((id) => !s.has(id)) ?? null; };
-  function addInstance(type) {
+  function addInstance(type, on = bay) {
     const e = CATALOGUE[type], label = LABELS[type] ?? e.label;
     let k = 2;
-    while (bay.node(`web:${type}-${k}`)) k++;
+    while (on.node(`web:${type}-${k}`)) k++;
     const as = `${type}-${k}`;
-    addNodes(bay, 'web', [{ name: type, as, label }], { ports: Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${k} ${p}` }])) });
+    addNodes(on, 'web', [{ name: type, as, label }], { ports: Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${k} ${p}` }])) });
+    if (on !== bay) return `web:${as}`;
     TYPE.set(`web:${as}`, type);
     PAGES.set(`web:${as}`, e.pages);
     INSTANCE.set(`web:${as}`, `instance ${k} of ${type}, with its own runtime and face`);
     return `web:${as}`;
+  }
+  /** Every numbered instance an answer names (web:sampler-2) is made first, on `on`. */
+  function ensureNamed(links, on = bay) {
+    for (const id of links.flatMap((l) => [l.from, l.to])) {
+      const m = /^web:([a-z]+)-(\d+):/.exec(id);
+      if (!m || !MULTI.includes(m[1])) continue;
+      let guard = 0;
+      while (!on.node(`web:${m[1]}-${m[2]}`) && guard++ < 8) addInstance(m[1], on);
+    }
   }
   function spares() { for (const t of MULTI) if (!firstFree(t)) addInstance(t); }
   const PI_KEPT = PI.nodes.filter((n) => PI_PAGES[n.id.split(':')[1]]).length;
@@ -255,16 +274,7 @@
   const EXAMPLES = [
     ['the drum machine plays plaits', [[W('sequencer', 'midi-out'), W('plaits', 'midi-in')], [W('plaits', 'audio-out'), SPK]]],
     ['granulate plaits as i play', [[KEYS, W('plaits', 'midi-in')], [W('plaits', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
-    ['one keyboard plays the synth and lights the pico', [[KEYS, W('synth', 'midi-in')], [W('synth', 'audio-out'), SPK], [KEYS, W('pico', 'midi-in')], [W('pico', 'video-out'), W('oled', 'video-in')]]],
     ['granulate the piano as i play it', [[KEYS, W('sampler', 'midi-in')], ['cf-r2:piano-samples:file-out', W('sampler', 'file-in')], [W('sampler', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
-    ['the drum machine plays the circuit', [[W('sequencer', 'midi-out'), `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, SPK]]],
-    ['the drum machine plays the pi piano', [[W('sequencer', 'midi-out'), `${PIANO}:midi-in`], [`${PIANO}:audio-out`, SPK]]],
-    ['record here, play it back on the circuit', [[KEYS, W('rec', 'midi-in')], [W('rec', 'midi-out'), `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, SPK]]],
-    ['granulate the circuit', [[KEYS, `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
-    ['plaits here and the circuit there, one keyboard', [[KEYS, W('plaits', 'midi-in')], [W('plaits', 'audio-out'), SPK], [KEYS, `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, SPK]]],
-    ['my midi keyboard plays the pi drums', [[W('midi', 'midi-out'), `${DRUMS}:midi-in`], [`${DRUMS}:audio-out`, SPK]]],
-    ['the studio camera through my dither shader', [[`${BOARD_SITE}:camera:video-out`, W('shader-dither', 'video-in')], [W('shader-dither', 'video-out'), SCREEN]]],
-    ['a knob here bends the shader on the pi', [[KNOB, `${PI_SHADER}:value-in`], [`${PI_SHADER}:video-out`, SCREEN]]],
   ].map(([say, links]) => ({ say, links: links.map(([from, to, param]) => ({ from, to, transforms: [], ...(param ? { param } : {}) })) }));
   // The patches the concept pages make, one per page: never shown, built only by the
   // self-check to grade each runtime, and the record an example must not copy.
@@ -300,7 +310,7 @@
   const rigOf = (say) => EXAMPLES.find((e) => e.say === say) || RIGS.find((e) => e.say === say);
 
   const d = mount({ name: 'connect',
-    what: 'Press an example to build its patch, or an out port and then an in port. Pressing a wire takes it away.',
+    what: 'Say what should play what, press an example, or press an out port and then an in port. Pressing a wire takes it away.',
     readout: null, index: '/', indexLabel: 'positron' });
   useMediumColours();
 
@@ -314,7 +324,10 @@
     + 'play something includes that link. Transforms work on MIDI links only; every other link has none. '
     + 'Ids starting web: are in this browser tab, pi-1: is a Raspberry Pi in the studio, cf- ids are Cloudflare, '
     + 'cf-r2:recording is a radio programme we recorded, and err:station is a live station on its broadcaster\'s server, '
-    + 'which reaches this tab through cf-shout:relay.';
+    + 'which reaches this tab through cf-shout:relay. Use web: nodes; use pi-1: only when the sentence names the Pi, '
+    + 'the studio, the Circuit or remote.';
+  /** A sentence that names somewhere else may reach it; any other stays in this tab. */
+  const NAMES_PI = /\b(pi|raspberry|studio|circuit|remote|board|there)\b/i;
   // The self-check's stand-in for a sentence nobody listed, with one transform
   // missing its argument so the checkTransforms path is graded too.
   const CANNED = [
@@ -327,22 +340,28 @@
   const MAX_PORTS = 64;
   const EXAMPLE_PORTS = new Set(EXAMPLES.flatMap((e) => e.links.flatMap((l) => [l.from, l.to])));
   const EXAMPLE_NODES = new Set([...EXAMPLE_PORTS].map(nodeOf));
-  const rankOf = (p) => (EXAMPLE_PORTS.has(p.id) ? 0 : EXAMPLE_NODES.has(nodeOf(p.id)) ? 1 : 2);
-  const portsForModel = () => bay.ports()
-    .map((p, i) => ({ p, i, r: rankOf(p) })).filter((x) => x.r < 2)
+  // The examples' ports, then the Pi's when the sentence names it, then this tab's; nothing else.
+  const rankOf = (p, text) => (EXAMPLE_PORTS.has(p.id) ? 0
+    : p.id.startsWith(`${BOARD_SITE}:`) ? (NAMES_PI.test(text) ? 1 : 9)
+      : EXAMPLE_NODES.has(nodeOf(p.id)) ? 2 : p.id.startsWith('web:') || p.id.startsWith('cf-r2:') ? 3 : 9);
+  const portsForModel = (text = '') => bay.ports()
+    .map((p, i) => ({ p, i, r: rankOf(p, text) })).filter((x) => x.r < 9)
     .sort((a, b) => a.r - b.r || a.i - b.i).slice(0, MAX_PORTS)
     .map(({ p }) => ({ id: p.id, dir: p.dir, label: p.label }));
   let reached = 0;
   async function post(text) {
     if (SELFCHECK) {
       const ex = EXAMPLES.find((e) => e.say === text);
+      if (text === 'the keys play the piano') return { links: [{ from: KEYS, to: `${BOARD_SITE}:sampler:midi-in`, transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
+      if (text === 'keys play the sampler, nothing else') return { links: [{ from: KEYS, to: W('sampler', 'midi-in'), transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
+      if (text === 'keys play the synth, nothing else') return { links: [{ from: KEYS, to: W('synth', 'midi-in'), transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       return { links: ex ? ex.links : CANNED, fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
     }
     reached++;
     let r;
     try {
       r = await fetch(`${API}/wish`, { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text, ports: portsForModel(), facts: FACTS }) });
+        body: JSON.stringify({ text, ports: portsForModel(text), facts: FACTS }) });
     } catch {
       throw new Error(`nothing answered at ${API}`);
     }
@@ -371,58 +390,116 @@
     const b = el('button', 'cn-pill', ex.say, { type: 'button', title: lines.join('\n') });
     b.dataset.runs = r.press.length ? 'press' : r.missing.length ? 'marked' : 'runs';
     if (r.missing.length) b.dataset.missing = r.missing.join(' ');
-    b.addEventListener('click', (e) => build(ex, e.isTrusted));
+    b.addEventListener('click', (e) => {
+      b.dataset.busy = '1'; build(ex, e.isTrusted);
+      logAsk(`[pill] built "${ex.say}": ${bay.links().length} of ${ex.links.length} link(s)`);
+      runtime.idle().finally(() => delete b.dataset.busy);
+    });
     exRow.append(b);
   }
 
-  const props = el('div', 'cn-props');
-  props.hidden = true;
-  let asking = Promise.resolve();
-  async function ask(text) {
+  // A person's own requests go to the device log (pub.positron.studio/logs), never a check's.
+  const ship = SELFCHECK ? () => {} : createShipper();
+  const logAsk = (line) => ship(`connect ${line}`);
+  if (!SELFCHECK) { const say = d.log.bind(d); d.log = (m, lv) => { say(m, lv); if (lv === 'warn' || lv === 'bad') logAsk(`[page ${lv}] ${m}`); }; }
+  let asking = Promise.resolve(), inFlight = false;
+  /** A sentence asks the model; its answer replaces the patch, or nothing is built and the reason is said. */
+  let via = 'typed';
+  async function ask(text, by = null, how = 'typed') {
     text = String(text || '').trim();
     if (!text) { d.log('say something first, for example one of the sentences under the box'); return; }
+    if (inFlight) return;
+    inFlight = true;
+    via = how;
+    const busy = by || askBtn.el;
+    busy.dataset.busy = '1';
     const run = (async () => {
       d.log(`asking: ${text}`);
       try {
         const out = await post(text);
         for (const f of out.fixed || []) d.log(`the model wrote "${f.said}" on ${f.op}, read as ${f.read}`);
         d.log(`the answer came back in ${out.ms ?? '?'} ms with ${out.links?.length ?? 0} link(s), ${out.usage?.total_tokens ?? '?'} tokens`);
-        showProposals(out.links || []);
+        buildAsked(text, out.links || [], out);
       } catch (e) {
         d.log(e.message, 'warn');
+        unbuild(`nothing answered: ${e.message}`);
+        logAsk(`[${via}] asked "${text}" -> failed: ${e.message}`);
+      } finally {
+        inFlight = false;
+        delete busy.dataset.busy;
       }
     })();
     asking = run;
     return run;
   }
 
-  function showProposals(links) {
-    props.replaceChildren();
-    if (!links.length) props.append(el('div', 'cn-prop-n', 'nothing proposed: the sentence named nothing here'));
+  /** Every link on a fresh bay, in order, so two that clash are caught too. */
+  function tryLinks(links) {
+    const s2 = makeBay().bay, why = [];
+    ensureNamed(links, s2);
     for (const l of links) {
-      const row = el('div', 'cn-prop');
-      row.dataset.line = printLink(l);
       const bad = checkTransforms(l.transforms || []);
-      const v = bad ? null : bay.validate(l.from, l.to, l.transforms || []);
-      const note = bad ? `cannot be made: ${bad.why}` : v.ok ? '' : `the bay would refuse it: ${v.why}`;
-      const buttons = el('span', 'cn-prop-b');
-      const yes = el('button', 'pos-sm pos-pri', 'connect', { type: 'button' });
-      const no = el('button', 'pos-sm', 'dismiss', { type: 'button' });
-      yes.disabled = !!bad;
-      yes.addEventListener('click', (e) => {
-        if (connect(l.from, l.to, l.transforms || [], e.isTrusted === true)) dropRow(row);
-        else row.querySelector('.cn-prop-n')?.replaceChildren(document.createTextNode(`refused: ${last.why}`));
-      });
-      no.addEventListener('click', () => { d.log(`dismissed ${printLink(l)}`); dropRow(row); });
-      buttons.append(yes, no);
-      row.append(el('span', 'cn-prop-t', printLink(l)), buttons, el('span', 'cn-prop-n', note));
-      props.append(row);
+      if (bad) { why.push(`${printLink(l)}: ${bad.why}`); continue; }
+      const via = viaFor(l.from, l.to);
+      const r = s2.link(l.from, l.to, l.transforms || [], { consent: true, ...(via ? { via } : {}) });
+      if (!r.ok) why.push(`${printLink(l)}: ${r.why}`);
     }
-    props.hidden = false;
+    return { bay: s2, why };
   }
-  function dropRow(row) {
-    row.remove();
-    if (!props.querySelector('.cn-prop')) { props.replaceChildren(); props.hidden = true; }
+  /** A sound that goes nowhere is heard: every audio out the patch leaves dangling goes to the speakers. */
+  function withSpeakers(links) {
+    const used = new Set(links.map((l) => l.from));
+    const nodes = new Set(links.flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]));
+    const add = [];
+    for (const p of bay.ports()) {
+      if (p.dir !== 'out' || p.medium !== 'audio' || !nodes.has(nodeOf(p.id)) || used.has(p.id)) continue;
+      add.push({ from: p.id, to: SPK, transforms: [] });
+    }
+    return [...links, ...add];
+  }
+  /** An instrument with nothing on its file-in is silent, so a request's patch feeds it its usual samples. */
+  const USUAL_FILES = { sampler: 'cf-r2:piano-samples:file-out', typewriter: 'cf-r2:typewriter-samples:file-out', player: 'cf-r2:recording:file-out' };
+  function withSources(links) {
+    const fed = new Set(links.map((l) => l.to));
+    const add = [];
+    for (const n of new Set(links.flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]))) {
+      const src = USUAL_FILES[typeOf(n)], to = `${n}:file-in`;
+      if (src && bay.port(to) && !fed.has(to)) add.push({ from: src, to, transforms: [] });
+    }
+    return [...links, ...add];
+  }
+  function unbuild(msg) {
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    for (const b of exRow.children) b.setAttribute('aria-pressed', 'false');
+    empty.textContent = msg;
+    redraw();
+  }
+  function buildAsked(text, links, out) {
+    if (!links.length) {
+      unbuild('nothing here matches that');
+      logAsk(`[${via}] asked "${text}" -> nothing proposed in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
+      return;
+    }
+    ensureNamed(links);
+    const full = withSpeakers(withSources(links));
+    const away = full.filter((l) => [l.from, l.to].some((p) => p.startsWith(`${BOARD_SITE}:`)));
+    if (away.length && !NAMES_PI.test(text)) {
+      const msg = `not built: the answer reached for the Pi (${[...new Set(away.flatMap((l) => [l.from, l.to]).filter((p) => p.startsWith(`${BOARD_SITE}:`)).map(nodeOf))].join(', ')}), and the sentence did not ask for it`;
+      unbuild(msg);
+      d.log(msg, 'warn');
+      logAsk(`[${via}] asked "${text}" -> NOT BUILT, Pi unasked in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`);
+      return;
+    }
+    const { why } = tryLinks(full);
+    if (why.length) {
+      unbuild(`could not be made: ${why.join('; ')}`);
+      d.log(`could not be made: ${why.join('; ')}`, 'warn');
+      logAsk(`[${via}] asked "${text}" -> NOT BUILT in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')} | ${why.join('; ')}`);
+      return;
+    }
+    const added = full.length - links.length;
+    build({ say: text, links: full }, true);
+    logAsk(`[${via}] asked "${text}" -> BUILT ${full.length} link(s)${added ? `, ${added} to the speakers added` : ''} in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`);
   }
 
   // ── linking, by press or by confirming a proposal ────────────────────────
@@ -447,6 +524,7 @@
   // An example press builds its patch straight away: the links are known, so no
   // model is asked. It replaces whatever was linked, because an example is a whole patch.
   function build(ex, person) {
+    empty.textContent = EMPTY;
     for (const l of [...bay.links()]) bay.unlink(l.id);
     let made = 0;
     for (const l of ex.links) made += connect(l.from, l.to, l.transforms || [], person, l.param) ? 1 : 0;
@@ -510,7 +588,8 @@
   const pb = createPatchbay(shown, { room: 'studio-1' });
   const pic = el('div', 'cn-pic');
   pic.append(pb.el);
-  const empty = el('p', 'cn-empty', 'press an example, or an out port and then an in port');
+  const EMPTY = 'say what should play what, press an example, or an out port and then an in port';
+  const empty = el('p', 'cn-empty', EMPTY);
   pic.append(empty);
 
   // The picture is the kit's and redraws itself on resize, so its ports and
@@ -789,8 +868,84 @@
   const runtime = createRuntimes({ bay, typeOf, log: (m, lv) => d.log(m, lv), onChange: drawFaces, audio: { sharedAudio, claim, release } });
   window.__demo.runtime = runtime;
 
+  // Your own sentence, asked of the model like an example pill's.
+  const askRow = el('form', 'cn-ask');
+  const askField = createField({ placeholder: 'say which part should play which' });
+  // One button: the microphone while the field is empty, send once there is text.
+  const MIC_LABEL = 'Speak: hold Option or Caps Lock, or the sustain pedal, and let go to send';
+  const askBtn = createIconButton({ icon: 'mic', label: MIC_LABEL, small: true, pressed: false,
+    onPress: () => (askField.value().trim() ? askRow.requestSubmit() : micOn ? stopMic() : startMic()) });
+  const showBtn = () => { const typed = !!askField.value().trim(); askBtn.set(typed ? 'arrow-up' : 'mic', typed ? 'Ask' : MIC_LABEL); };
+  askField.input.addEventListener('input', showBtn);
+  askBtn.el.type = 'submit';
+  const micBtn = askBtn;
+  askRow.append(askField.el, askBtn.el);
+  // Spoken requests: recorded here, heard by the wish worker's /hear (Whisper), then asked as typed.
+  let micOn = false, rec = null, micStream = null, chunks = [], cancelMic = false, recAt = 0, pressAt = 0, stopAt = 0;
+  async function startMic() {
+    if (micOn || inFlight) return;
+    pressAt = performance.now();
+    micOn = true; micBtn.el.setAttribute('aria-pressed', 'true');
+    if (SELFCHECK) return;
+    try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { micOn = false; micBtn.el.setAttribute('aria-pressed', 'false'); d.log(`no microphone: ${e.message}`, 'warn'); return; }
+    if (!micOn) { micStream.getTracks().forEach((t) => t.stop()); return; }
+    chunks = [];
+    rec = new MediaRecorder(micStream);
+    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    rec.onstop = heard;
+    rec.start();
+    recAt = performance.now(); pressAt = pressAt || recAt;
+    d.log('listening to the microphone');
+  }
+  function stopMic() {
+    if (!micOn) return;
+    stopAt = performance.now();
+    micOn = false; micBtn.el.setAttribute('aria-pressed', 'false');
+    if (rec && rec.state !== 'inactive') rec.stop(); else { micStream?.getTracks().forEach((t) => t.stop()); }
+  }
+  async function heard() {
+    micStream?.getTracks().forEach((t) => t.stop()); micStream = null;
+    const blob = new Blob(chunks, { type: rec?.mimeType || 'audio/webm' }); rec = null;
+    if (cancelMic) { cancelMic = false; d.log('the talk key was part of a shortcut, so nothing was sent'); return; }
+    if (!blob.size) return;
+    askBtn.el.dataset.busy = '1';
+    try {
+      const buf = new Uint8Array(await blob.arrayBuffer());
+      let b = '';
+      for (let i = 0; i < buf.length; i += 0x8000) b += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      const r = await fetch(`${API}/hear`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ audio: btoa(b) }) });
+      const out = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
+      const text = (out.text || '').trim();
+      logAsk(`[voice] heard "${text}" from ${(blob.size / 1024).toFixed(1)} KB, mic opened ${Math.round(recAt - pressAt)} ms after the press, recorded ${Math.round(stopAt - recAt)} ms, in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
+      delete askBtn.el.dataset.busy;
+      if (!text) { d.log('nothing was heard, so nothing was asked'); return; }
+      askField.set(text); showBtn();
+      ask(text, null, 'voice');
+    } catch (e) {
+      delete askBtn.el.dataset.busy;
+      d.log(`could not hear that: ${e.message}`, 'warn');
+    }
+  }
+  // Hold to talk, let go to send. Caps Lock (macOS Chrome fires its down on turning on and its up
+  // on turning off, so there it is press to talk, press to send) or Option/Alt held on its own.
+  let altAlone = false;
+  addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    if (e.key === 'CapsLock') { startMic(); return; }
+    if (e.key === 'Alt') { altAlone = true; startMic(); return; }
+    if (altAlone) { altAlone = false; if (micOn) { cancelMic = true; stopMic(); } }   // Alt with another key is a shortcut, not a talk
+  });
+  addEventListener('keyup', (e) => {
+    if (e.key === 'CapsLock') stopMic();
+    if (e.key === 'Alt' && altAlone) { altAlone = false; stopMic(); }
+  });
+  // A plugged keyboard's sustain pedal holds to talk (rt-midi.mjs announces it once MIDI is on).
+  addEventListener('pos-sustain', (e) => (e.detail?.down ? startMic() : stopMic()));
+  askRow.addEventListener('submit', (e) => { e.preventDefault(); const t = askField.value().trim(); if (t) ask(t); });
   const say = el('div', 'cn-say');
-  say.append(exRow, props);
+  say.append(askRow, exRow);
   d.stack.add(say, faces, pic, chooser, groups);
   redraw();
   for (const f of failed) d.log(f, 'bad');
@@ -830,7 +985,7 @@
     A('a type made per instance is one box, not one per knob', !bay.nodes().some((n) => /:knob-(?!volume$|mix$)|:midi-\d|:scope-|:screen-/.test(n.id)),
       bay.nodes().filter((n) => /:knob-|:midi-\d|:scope-|:screen-/.test(n.id)).map((n) => n.id).join(', '));
     { const r = pic.getBoundingClientRect();
-      A('nothing is linked on a visit, and the picture\'s square room is held empty', bay.links().length === 0 && pic.classList.contains('cn-pic-empty') && r.height >= r.width - 1, `${r.width.toFixed(0)} x ${r.height.toFixed(0)}`); }
+      A('nothing is linked on a visit, and the picture\'s room is held empty, 4/5 as tall as wide', bay.links().length === 0 && pic.classList.contains('cn-pic-empty') && Math.abs(r.height - 0.8 * r.width) <= 1, `${r.width.toFixed(0)} x ${r.height.toFixed(0)}`); }
 
     // Every example's links can be made, each on a fresh bay so one cannot
     // block another, and with the consent a person's press of Connect gives.
@@ -890,13 +1045,38 @@
         && inPicture('web:plaits') && !inGrid('web:plaits') && reached === reached0,
       `${bay.links().length} links`);
 
-    // A sentence nobody listed gets the stand-in with a broken transform.
-    ask('something else');
-    await frame(); await asking;
-    const broken = [...props.querySelectorAll('.cn-prop')].find((r) => /transpose/.test(r.dataset.line));
-    A('a proposal with a malformed transform is shown and cannot be connected',
-      !!broken && broken.querySelector('.pos-pri').disabled && /cannot be made/.test(broken.textContent));
-    for (const r of [...props.querySelectorAll('.cn-prop')]) r.querySelector('.pos-sm:not(.pos-pri)').click();
+    // A sentence nobody listed gets the stand-in with a broken transform: nothing is built, and the reason is said.
+    const askedBusy = ask('something else');
+    const shimmered = askBtn.el.dataset.busy === '1';
+    await askedBusy; await frame();
+    A('a request whose answer cannot be made builds nothing and says why where the patch goes, with the send button busy while asking',
+      shimmered && !askBtn.el.dataset.busy && bay.links().length === 0 && pic.classList.contains('cn-pic-empty')
+        && /could not be made/.test(empty.textContent) && /transpose/.test(empty.textContent), empty.textContent);
+    // A request that names an instrument but not the speakers is still heard.
+    await ask('keys play the synth, nothing else'); await frame();
+    A('a request that leaves a sound going nowhere gets that sound wired to the speakers',
+      bay.links().length === 2 && has(KEYS, W('synth', 'midi-in')) && has(W('synth', 'audio-out'), SPK), bay.links().map(printLink).join('; '));
+    // A sampler with nothing on its file-in gets its usual samples, and its sound the speakers.
+    await ask('keys play the sampler, nothing else'); await frame();
+    A('a request that leaves a sampler without samples gets the piano samples on its file-in and its sound at the speakers',
+      bay.links().length === 3 && has(KEYS, W('sampler', 'midi-in')) && has('cf-r2:piano-samples:file-out', W('sampler', 'file-in'))
+        && has(W('sampler', 'audio-out'), SPK), bay.links().map(printLink).join('; '));
+    // An answer that reaches for the Pi when the sentence did not ask for it builds nothing.
+    await ask('the keys play the piano'); await frame();
+    A('an answer that reaches for the Pi unasked builds nothing and says so',
+      bay.links().length === 0 && /did not ask for it/.test(empty.textContent) && /pi-1:sampler/.test(empty.textContent), empty.textContent);
+    // The microphone: Caps Lock toggles it, the sustain pedal holds it, and a check opens none.
+    const mic = () => micBtn.el.getAttribute('aria-pressed') === 'true', gum0 = CAMERA_ASKED.length;
+    const keyEv = (type, k) => dispatchEvent(new KeyboardEvent(type, { key: k }));
+    keyEv('keydown', 'CapsLock'); const on1 = mic(); keyEv('keyup', 'CapsLock'); const off1 = !mic();
+    keyEv('keydown', 'Alt'); const onAlt = mic(); keyEv('keyup', 'Alt'); const offAlt = !mic();
+    keyEv('keydown', 'Alt'); keyEv('keydown', 'k'); const altCombo = !mic(); keyEv('keyup', 'k'); keyEv('keyup', 'Alt');
+    dispatchEvent(new CustomEvent('pos-sustain', { detail: { down: true } })); const on2 = mic();
+    dispatchEvent(new CustomEvent('pos-sustain', { detail: { down: false } })); const off2 = !mic();
+    A('Caps Lock and Option talk while down and stop on up, Option with another key is no talk, the sustain pedal holds, and a check opens no microphone',
+      on1 && off1 && onAlt && offAlt && altCombo && on2 && off2 && CAMERA_ASKED.length === gum0,
+      `${on1} ${off1} ${onAlt} ${offAlt} ${altCombo} ${on2} ${off2}, getUserMedia ${CAMERA_ASKED.length - gum0}`);
+    [...exRow.children].find((b) => b.textContent === ex.say).click();
 
     // Pressing a wire removes that link.
     await frame();

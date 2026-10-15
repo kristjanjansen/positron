@@ -16,7 +16,7 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** [group, [names]] in the order the sample sheet shows them. */
-export const GROUPS = [["transport",["play","pause","stop","record","skip-back","skip-forward","rewind","fast-forward","loop","shuffle"]],["sound",["volume","volume-low","mute","mic","mic-off","headphones","speaker","music","waveform","radio"]],["picture",["camera","video","video-off","screen","cast","fullscreen","fullscreen-exit","image","contrast"]],["wiring",["link","sliders","settings","board","power","wifi"]],["files",["upload","download","file","folder","save","copy","trash","edit"]],["people",["chat","send","user","users","lock","unlock","eye","eye-off"]],["state",["info","warning","error","check","close","help"]],["moving around",["plus","minus","arrow-left","arrow-right","chevron-left","chevron-right","chevron-down","menu","more","search","refresh","external","home","grid","list","clock"]]];
+export const GROUPS = [["transport",["play","pause","stop","record","skip-back","skip-forward","rewind","fast-forward","loop","shuffle"]],["sound",["volume","volume-low","mute","mic","mic-off","headphones","speaker","music","waveform","radio"]],["picture",["camera","video","video-off","screen","cast","fullscreen","fullscreen-exit","image","contrast"]],["wiring",["link","sliders","settings","board","power","wifi"]],["files",["upload","download","file","folder","save","copy","trash","edit"]],["people",["chat","send","user","users","lock","unlock","eye","eye-off"]],["state",["info","warning","error","check","close","help"]],["moving around",["plus","minus","arrow-left","arrow-right","arrow-up","chevron-left","chevron-right","chevron-down","menu","more","search","refresh","external","home","grid","list","clock"]]];
 
 /** Each name's Feather name, so the sheet can say where it came from. */
 export const SOURCE = {
@@ -81,6 +81,7 @@ export const SOURCE = {
   "minus": "minus",
   "arrow-left": "arrow-left",
   "arrow-right": "arrow-right",
+  "arrow-up": "arrow-up",
   "chevron-left": "chevron-left",
   "chevron-right": "chevron-right",
   "chevron-down": "chevron-down",
@@ -158,6 +159,7 @@ export const BODIES = {
   "minus": "<path d=\"M5 12h14\"/>",
   "arrow-left": "<path d=\"M19 12H5m7 7l-7-7l7-7\"/>",
   "arrow-right": "<path d=\"M5 12h14m-7-7l7 7l-7 7\"/>",
+  "arrow-up": "<path d=\"M12 19V5m-7 7l7-7l7 7\"/>",
   "chevron-left": "<path d=\"m15 18l-6-6l6-6\"/>",
   "chevron-right": "<path d=\"m9 18l6-6l-6-6\"/>",
   "chevron-down": "<path d=\"m6 9l6 6l6-6\"/>",
