@@ -134,7 +134,16 @@ function solid(ui, pts) {
   }
 }
 function texture(ui, pts, medium) {
-  if (medium === 'video') { for (const r of rails(pts)) solid(ui, r); return; }
+  if (medium === 'video') {
+    for (const r of rails(pts)) solid(ui, r);
+    // the outer rail's corner pixel off at each bend, as a box's corners are, so the turn reads round
+    for (let i = 1; i < pts.length - 1; i++) {
+      const p = pts[i], d0 = [Math.sign(p[0] - pts[i - 1][0]), Math.sign(p[1] - pts[i - 1][1])], d1 = [Math.sign(pts[i + 1][0] - p[0]), Math.sign(pts[i + 1][1] - p[1])];
+      const ix = d1[0] - d0[0], iy = d1[1] - d0[1];            // towards the inside of the turn
+      if (ix && iy) ui.fill(p[0] - ix, p[1] - iy, 1, 1, 0);
+    }
+    return;
+  }
   let c = 0;
   for (let i = 1; i < pts.length; i++) {
     const [a, b] = [pts[i - 1], pts[i]], d = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]);
