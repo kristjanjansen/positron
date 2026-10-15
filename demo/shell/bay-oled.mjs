@@ -1,7 +1,6 @@
 // demo/shell/bay-oled.mjs: a small patch drawn on a 1 bit 128x64 panel, generalised from the Pico
 // router's screen (rig/pico/patch/main.c): rounded boxes with their names, one pixel wires between.
 // Two facing columns by default (`arrange: 'columns'` for up to three by rank), up to 4 boxes a column.
-// Boxes of `home` (the site the panel sits on) are filled, so the device on the desk stands out.
 // Draws through the firmware UI kit's calls (`fill`, `text`, `cap`, `adv`), so the Pi's panel and its
 // simulator make the same pixels.
 // why: lessons/kit-bay-oled.md#header
@@ -118,12 +117,11 @@ export function drawBayOled(ui, patch, o = {}) {
   const line = (x0, y0, x1, y1) => ui.fill(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0) + 1, Math.abs(y1 - y0) + 1, 1);
   for (const w of L.wires) for (let i = 1; i < w.pts.length; i++) line(...w.pts[i - 1], ...w.pts[i]);
   for (const b of L.boxes) {
-    // the firmware's box: an outline with its corners off; home boxes filled, their name cut out
+    // the firmware's box: an outline with its corners off. Never filled: a lit box drowns its thin letters.
     ui.fill(b.x + 1, b.y, b.w - 2, 1, 1); ui.fill(b.x + 1, b.y + b.h - 1, b.w - 2, 1, 1);
     ui.fill(b.x, b.y + 1, 1, b.h - 2, 1); ui.fill(b.x + b.w - 1, b.y + 1, 1, b.h - 2, 1);
     const tw = ui.textW(b.label), tx = b.x + Math.round((b.w - tw) / 2), ty = b.y + Math.round((b.h - ui.cap) / 2);
     ui.text(tx, ty, b.label);
-    if (b.home) ui.fill(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 2);    // flipped: a lit box, dark letters
   }
   return L;
 }
