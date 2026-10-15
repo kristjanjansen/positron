@@ -23,6 +23,7 @@ import { createMainDirect } from './rtc.mjs';
 import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
 import { jackRows } from '../../demo/shell/graph-registry.mjs';
 import { listJack, plan as jackPlan, apply as jackApply, canonical as jackCanonical, diff as jackDiff } from './jack.mjs';
+import { openPanel } from './panel.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import * as fsMod from 'node:fs';
 
@@ -279,6 +280,10 @@ const bankCC = () => 32;
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const send = (msg) => { if (ws?.readyState === 1) { ws.send(format(msg, { from: FROM, seq: seq++ })); return true; } return false; };
+// The OLED and keys, when a screen answers (panel.mjs). A key is a message to the whole room.
+let panel = null;
+openPanel({ log: (l) => log(l), onKey: (k) => send({ type: 'panel.key', ...k, at: Date.now() }) })
+  .then((p) => { panel = p; }).catch((e) => log('panel: did not open:', e.message));
 // The main socket's direct path (rtc.mjs `createMainDirect`), made at the
 // bottom of this file once node-datachannel has been asked for. Null until then.
 let mainDirect = null;
@@ -964,6 +969,15 @@ async function handle(msg, replyVia = null) {
     // their own clock; the field only makes the reply more than an echo.
     // why: lessons/rig-board.md#board-ping
     case 'board.ping':    return reply('board.pong', { pongAt: Date.now() });
+
+    // The OLED and its keys (panel.mjs), for /remote/oled/: a tab's text drawn on the screen, and
+    // a press or release sent to the room as `panel.key`. No screen answers `ok: false`.
+    case 'oled.text': {
+      if (!panel) return reply('oled.shown', { ok: false, why: 'no screen answered at 0x3c on this board' });
+      panel.text(msg.text);
+      return reply('oled.shown', { ok: true, text: panel.status().text });
+    }
+    case 'panel.status': return reply('panel.status', panel ? { ok: true, ...panel.status() } : { ok: false, why: 'no screen on this board' });
 
     // jack.graph reads and writes nothing; jack.rebuild returns the graph before and after, so it
     // is a
