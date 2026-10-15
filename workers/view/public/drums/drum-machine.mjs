@@ -52,6 +52,8 @@ import { LIFE } from './voices.mjs';
  *   it follows how many drums there are in all
  * @param {(ev: object) => void} [o.sequence]  where the grid's notes go instead of the
  *   sequencer wires
+ * @param {(ev: object) => void} [o.onValue]  what reaches `sequencer:value-in` when it is not a
+ *   pattern wire (/devices/drums/'s keys, which edit the grid)
  * @param {{ over: number, node: string, label: (rows: number) => string }} [o.group]  above
  *   `over` rows the patchbay draws them as one box; the picture only, each hit keeps its wire
  * @returns {{ surface: HTMLElement, knobs: ?HTMLElement, scopes: ?HTMLElement[], patchbay: HTMLElement, api: object }}
@@ -59,7 +61,7 @@ import { LIFE } from './voices.mjs';
  */
 export function createDrumMachine(d, { voices, patternIn = false, onBar = null, flowing = null, scopes: wantScopes = false, onWake = null,
   onStart = null, onStop = null, ahead = 150, context = null, mix = null, shape: shapeOpt = null, onShape = null,
-  start: startPattern = true, gain = null, group = null, sequence = null }) {
+  start: startPattern = true, gain = null, group = null, sequence = null, onValue = null }) {
   const S = 'web';
   const ID = (node, port) => `${S}:${node}:${port}`;
   const SEQ = ID('sequencer', 'midi-out');
@@ -281,7 +283,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   // A whole pattern from a wire: every pad set to what the rows say (setPattern, below).
   if (patternIn) {
     deliver['sequencer:value-in'] = (e) => { if (e?.of === 'pattern') setPattern(e.rows); };
-  }
+  } else if (onValue) deliver['sequencer:value-in'] = (e) => onValue(e);
   addNodes(bay, S, names, { deliver, ports, portLabel: 'node:port' });
   const lay = (from, to, tf = []) => { const r = bay.link(from, to, tf, { site: S }); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
   for (const v of ALL) {

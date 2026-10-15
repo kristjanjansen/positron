@@ -5,6 +5,7 @@
 // why: lessons/kit-panel-screen.md#header
 
 import { drawBayOled } from './bay-oled.mjs';
+import { drawStepsOled } from './steps-oled.mjs';
 
 export const W = 128, H = 64;
 /** The four keys as printed on the module, K1 to K4 (measured 2026-10-15). */
@@ -16,13 +17,15 @@ const LIT = [0x40, 0xdc, 0xfa], DARK = [0, 0, 0];
 /**
  * The layout, in the firmware kit's calls. `state` is what the board knows:
  * `{ text, held }`, `held` the keys down as numbers 1 to 4; or `{ mode: 'rings', rings, t }`, a
- * `createRings()` from rings.mjs and its clock.
+ * `createRings()` from rings.mjs and its clock; or `{ mode: 'steps', steps }`, a drum pattern (steps-oled.mjs).
  */
 export function drawPanel(ui, state) {
   // The dot piano: the rings alone, the whole panel, as the Pico draws them (rings.mjs).
   if (state.mode === 'rings' && state.rings) { state.rings.draw((x, y) => ui.fill(x, y, 1, 1, 1), state.t); return; }
   // A small patch, as the Pico router drew its route (bay-oled.mjs); the Pi's own boxes filled.
   if (state.mode === 'patch' && state.patch) { drawBayOled(ui, state.patch); return; }
+  // A drum step pattern, its playhead and the row the keys edit (steps-oled.mjs).
+  if (state.mode === 'steps' && state.steps) { drawStepsOled(ui, state.steps); return; }
   // The keys down the right edge, ^ at the top, level with the module's buttons: no rules, a 14 px square
   // per key that fills while it is held. No header: at 0.96" its line is too small to read.
   const held = new Set(state.held || []), SQ = 14, sx = W - SQ, cell = H / 4;

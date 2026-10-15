@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta property="og:site_name" content="positron.studio">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Drums on Pi screen">
+<meta property="og:description" content="A drum machine plays here and its steps show on the Pi&apos;s small screen. Its keys edit them.">
+<meta property="og:url" content="https://positron.studio/devices/drums/">
+<meta property="og:image" content="https://positron.studio/og/site-98871a52.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="positron.studio: Connect anything to everything. Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-c7b28d7f.png">
+<link rel="manifest" href="/icons/manifest-8e6dda01.webmanifest">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Drums on Pi screen</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<style>
+  /* The simulated module as on /devices/text/: the panel at a whole number scale, its keys on its right.
+     why: lessons/page-devices.md#text */
+  .ol-media { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 24px 16px; height: calc(64px * 4 + 48px); background: #07090d; overflow-x: auto; }
+  .ol-media canvas { display: block; flex: none; width: calc(128px * var(--ol-k, 2)); height: calc(64px * var(--ol-k, 2)); image-rendering: pixelated; }
+  .ol-frame { padding: 8px; border: 1px solid var(--line); border-radius: 2px; line-height: 0; background: #000; }
+  .ol-media .pos-bgroup { flex: none; margin-left: auto; align-self: center; }
+  .ol-screen { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-width: 0; }
+  .ol-say { font-size: 12px; color: var(--dim); }
+</style>
+<script type="module">
+  // The kit's drum machine in this tab, its pattern and playing step along links to pi-1:screen and
+  // to web:screen, drawn by steps-oled.mjs; the Pi's four keys edit the grid. The Pi is reached on
+  // the first play, never on load.
+  // why: lessons/page-devices.md#drums
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createDrumMachine } from '/drums/drum-machine.mjs';
+  import { VOICES } from '/drums/voices.mjs';
+
+  const d = mount({ name: 'Drums on Pi screen', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  conceptNav('devices/drums');
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  const MAY_SEND = !SELFCHECK || q.get('board') === '1';
+  // Two letters a row, the drum machine abbreviations: what fits beside 16 steps on 128 pixels.
+  const SHORT = { kick: 'BD', snare: 'SD', hho: 'OH', hhc: 'CH' };
+
+  // ── the edit state the keys move: the row they edit, and a cursor while stopped ──
+  let voice = 0, cursor = 0, edits = 0;
+  function onKey(ev) {
+    if (ev?.of !== 'key' || !ev.down) return;
+    const a = m.api, g = a.grid, R = a.VOICES.length;
+    if (ev.k === 1) voice = (voice + R - 1) % R;
+    else if (ev.k === 2) voice = (voice + 1) % R;
+    else if (ev.k === 3) {
+      // playing: the step under the playhead; stopped: the cursor's, and the cursor moves on
+      const s = a.playing() ? Math.max(0, g.step()) : cursor;
+      g.set(voice, s, !g.get(voice, s), 'quiet');
+      edits++;
+      d.log(`${a.VOICES[voice].label} step ${s + 1} ${g.get(voice, s) ? 'on' : 'off'}`);
+      if (!a.playing()) { cursor = (cursor + 1) % g.steps; g.at(cursor); }
+    } else if (ev.k === 4) { if (a.playing()) a.stop(); else a.start(); }
+    g.lit(voice);
+  }
+
+  // the page's own links, and when each last carried something (declared before the patchbay draws)
+  const flash = new Map(), OURS = new Set();
+  const m = createDrumMachine(d, { voices: VOICES, onValue: onKey,
+    onStart: async () => { connect(); },
+    onStop: () => { cursor = 0; },
+    flowing: (l, playing) => (flash.get(l.id) || 0) > performance.now() || (playing && !OURS.has(l.id)) });
+  const bay = m.api.bay;
+
+  // ── the screens and the keys, on the drum machine's own bay ──
+  const SEQ_OUT = 'web:sequencer:value-out', SEQ_IN = 'web:sequencer:value-in';
+  const PI_IN = `${BOARD_SITE}:screen:value-in`, SIM_IN = 'web:screen:value-in';
+  const KEYS_OUT = `${BOARD_SITE}:keys:value-out`, SIMKEYS_OUT = 'web:keys:value-out';
+  bay.addNode({ id: `${BOARD_SITE}:screen`, kind: 'device', label: 'OLED 128x64', place: ROOM });
+  bay.addNode({ id: `${BOARD_SITE}:keys`, kind: 'device', label: 'four keys', place: ROOM });
+  // Mirrored by name: web:screen and web:keys are this tab's copies of pi-1:screen and pi-1:keys.
+  bay.addNode({ id: 'web:screen', kind: 'screen', label: 'simulated OLED', place: 'browser' });
+  bay.addNode({ id: 'web:keys', kind: 'person', label: 'simulated keys', place: 'browser' });
+
+  let board = null, connected = false, sent = 0;
+  const lit = (from) => { for (const l of bay.links()) if (l.from === from) flash.set(l.id, performance.now() + 250); };
+
+  const simCv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
+  let ui = null, frames = 0, lastFrame = null;
+  bay.addPort({ id: SEQ_OUT, dir: 'out', medium: 'value', emits: ['steps'], label: 'sequencer:value-out' });
+  // What reaches the Pi's screen leaves for the board as `screen.steps`, sent and not asked.
+  bay.addPort({ id: PI_IN, dir: 'in', medium: 'value', accepts: ['steps'], label: 'screen:value-in',
+    deliver: (ev) => { if (board && connected && MAY_SEND) board.send({ type: 'screen.steps', steps: ev.steps }); } });
+  bay.addPort({ id: SIM_IN, dir: 'in', medium: 'value', accepts: ['steps'], label: 'screen:value-in',
+    deliver: (ev) => { if (ui) { lastFrame = ui.frame({ mode: 'steps', steps: ev.steps }); paintFrame(simCv, lastFrame); frames++; } } });
+  bay.addPort({ id: KEYS_OUT, dir: 'out', medium: 'value', emits: ['key'], label: 'keys:value-out' });
+  bay.addPort({ id: SIMKEYS_OUT, dir: 'out', medium: 'value', emits: ['key'], label: 'keys:value-out' });
+  for (const [from, to] of [[SEQ_OUT, PI_IN], [SEQ_OUT, SIM_IN], [KEYS_OUT, SEQ_IN], [SIMKEYS_OUT, SEQ_IN]]) {
+    const r = bay.link(from, to);
+    if (r.ok) OURS.add(r.id); else d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
+  }
+  m.api.refresh();
+  m.api.grid.lit(voice);
+
+  // ── what the screens show: sent along the links whenever it changes ──
+  function steps() {
+    const a = m.api, g = a.grid;
+    return {
+      voices: a.VOICES.map((v) => SHORT[v.key] ?? v.label.slice(0, 2)),
+      pattern: g.pattern().map((row) => Array.from(row, (x) => (x ? '1' : '0')).join('')),
+      step: a.playing() ? g.step() : cursor, voice, playing: a.playing(),
+    };
+  }
+  let said = '';
+  (function tick() {
+    const s = steps(), sig = JSON.stringify(s);
+    if (ui && sig !== said) { said = sig; sent++; lit(SEQ_OUT); bay.send(SEQ_OUT, { of: 'steps', cls: 'steps', steps: s }); }
+    requestAnimationFrame(tick);
+  })();
+  loadPanelUi(await (await fetch('/resources/pico/oled-ui.wasm')).arrayBuffer()).then((u) => { ui = u; });
+
+  function connect() {
+    if (board || !MAY_SEND) return;
+    board = createBoard({ room: ROOM, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind),
+      onOpen: () => { connected = true; said = ''; d.log(`the Pi's screen follows the pattern`); },
+      // A key on the Pi is a `panel.key` to the whole room; it enters this bay at the keys' out-port.
+      onMessage: (msg) => {
+        if (msg.type !== 'panel.key') return;
+        lit(KEYS_OUT);
+        bay.send(KEYS_OUT, { of: 'key', cls: 'key', k: msg.k, sym: msg.sym, down: msg.down });
+      } });
+    d.log(`reaching ${ROOM}`);
+  }
+
+  // ── the simulated module: the screen and its four keys, as on /devices/text/ ──
+  const SYMS = ['^', 'v', '#', '*'], ICONS = ['chevron-up', 'chevron-down', 'hash', null];
+  const simKeys = createButtonGroup({ orient: 'column', buttons: SYMS.map((s, i) => ({ id: `k${i + 1}`,
+    ...(ICONS[i] ? { icon: ICONS[i], label: `K${i + 1}, the ${s} key` } : { label: s }) })) });
+  simKeys.button('k4').dataset.glyph = '1';
+  const held = new Set();
+  SYMS.forEach((s, i) => {
+    const b = simKeys.button(`k${i + 1}`), k = i + 1;
+    const edge = (down) => { if (down) held.add(k); else held.delete(k); lit(SIMKEYS_OUT); bay.send(SIMKEYS_OUT, { of: 'key', cls: 'key', k, sym: s, down }); };
+    b.addEventListener('pointerdown', () => edge(true));
+    for (const ev of ['pointerup', 'pointerleave']) b.addEventListener(ev, () => { if (held.has(k)) edge(false); });
+  });
+  const media = el('div', 'ol-media');
+  const screenBox = el('div', 'ol-screen');
+  const frame = el('div', 'ol-frame');
+  frame.append(simCv);
+  screenBox.append(frame);
+  media.append(screenBox, simKeys.el);
+  const ZOOMS = [1, 2, 4];
+  let zi = 1;
+  const scale = el('span', 'ol-say', '');
+  const zoomBtns = createButtonGroup({ buttons: [
+    { id: 'out', icon: 'zoom-out', label: 'zoom out', onPress: () => setZoom(zi - 1) },
+    { id: 'in', icon: 'zoom-in', label: 'zoom in', onPress: () => setZoom(zi + 1) },
+  ] });
+  function setZoom(i) {
+    zi = Math.max(0, Math.min(ZOOMS.length - 1, i));
+    media.style.setProperty('--ol-k', String(ZOOMS[zi]));
+    scale.textContent = `128×64 at ${ZOOMS[zi]}x`;
+    zoomBtns.enable('out', zi > 0, 'smallest');
+    zoomBtns.enable('in', zi < ZOOMS.length - 1, 'largest');
+  }
+  setZoom(zi);
+  const simPanel = createVideoPanel({ media, left: scale, right: zoomBtns.el, aspect: 'auto' });
+  d.stack.add(simPanel.el, m.surface, m.patchbay);
+  setInterval(() => { if (m.api.playing() || flash.size) m.api.refresh(); }, 200);
+  window.__demo.bay = bay;
+  window.__demo.probe = () => ({ connected, sent, frames, edits, voice, cursor });
+
+  if (SELFCHECK) {
+    await new Promise((r) => setTimeout(r, 400));
+    d.assert('four links of the page: the pattern to both screens, both sets of keys to the sequencer', OURS.size === 4, [...OURS].join(', '));
+    d.assert('the simulated screen drew the pattern', frames > 0 && !!lastFrame, `${frames} frames`);
+    // the kick is on at step 1, so the top left pixel of the grid (x 16, y 0) is lit
+    d.assert('the kick on step 1 is lit on the screen', !!lastFrame && (lastFrame[16] & 1) === 1);
+    const was = m.api.grid.get(1, 0);
+    bay.send(SIMKEYS_OUT, { of: 'key', cls: 'key', k: 2, down: true });
+    bay.send(SIMKEYS_OUT, { of: 'key', cls: 'key', k: 3, down: true });
+    d.assert('v then # on the keys toggles the snare\'s step 1 and moves the cursor', m.api.grid.get(1, 0) === !was && voice === 1 && cursor === 1);
+    m.api.grid.set(1, 0, was, 'quiet'); voice = 0; cursor = 0; m.api.grid.at(0); m.api.grid.lit(0);
+    d.assert('a visit reaches nothing until play', !board);
+  }
+  d.ready();
+</script>

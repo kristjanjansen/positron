@@ -1,7 +1,6 @@
 // demo/shell/bay-oled.mjs: a small patch drawn on a 1 bit 128x64 panel, generalised from the Pico
 // router's screen (rig/pico/patch/main.c): rounded boxes with their names, one pixel wires between.
 // Two facing columns by default (`arrange: 'columns'` for up to three by rank), up to 4 boxes a column.
-// Boxes of `home` (the site the panel sits on) are filled, so the device on the desk stands out.
 // Draws through the firmware UI kit's calls (`fill`, `text`, `cap`, `adv`), so the Pi's panel and its
 // simulator make the same pixels.
 // why: lessons/kit-bay-oled.md#header
@@ -21,8 +20,8 @@ export function layoutBayOled(patch, o = {}) {
 
 /**
  * Two facing columns, as bay-layout.mjs `layoutPair` draws a patch for a phone: sources left, the rest
- * right, every wire in the field between, a link inside one column a bracket into the field. Two
- * columns of 56 px hold nine letters a name where three hold five.
+ * right, the links across in the field between, a link inside one column a bracket in its outer lane.
+ * Two columns of 52 px hold seven letters a name where three hold five.
  */
 function layoutPairOled({ nodes, links }, { home = 'pi-1', adv = 6 } = {}) {
   const ids = new Set(nodes.map((n) => n.id));
@@ -35,19 +34,21 @@ function layoutPairOled({ nodes, links }, { home = 'pi-1', adv = 6 } = {}) {
   k = Math.max(order.length - MAX_ROWS, Math.min(MAX_ROWS, k));
   const sides = [order.slice(0, k), order.slice(k)].filter((c) => c.length);
   if (sides.length < 2) return layoutColumns({ nodes, links }, { home, adv });
-  const FIELD = 16, bw = Math.floor((W - FIELD) / 2), per = Math.max(1, Math.floor((bw - 2 * PAD - 2 + 1) / adv));
+  // An outer lane of 4 px each side carries the links inside a column, so the field between carries only
+  // links across and a chain never reads as a fan.
+  const LANE = 4, FIELD = 16, bw = Math.floor((W - FIELD - 2 * LANE) / 2), per = Math.max(1, Math.floor((bw - 2 * PAD - 2 + 1) / adv));
   const boxes = [], at = new Map(), cut = [];
   sides.forEach((col, ci) => {
     col.forEach((n, ri) => {
       const name = n.id.split(':')[1] || n.id, label = name.length > per ? name.slice(0, per) : name;
       if (label !== name) cut.push(`${n.id} as ${label}`);
       const y = Math.round((ri + 0.5) * H / col.length - BOX_H / 2);
-      const b = { id: n.id, x: ci ? W - bw : 0, y, w: bw, h: BOX_H, label, home: n.id.split(':')[0] === home, side: ci };
+      const b = { id: n.id, x: ci ? W - LANE - bw : LANE, y, w: bw, h: BOX_H, label, home: n.id.split(':')[0] === home, side: ci };
       boxes.push(b); at.set(n.id, b);
     });
   });
-  const wires = [], mid = bw + (FIELD >> 1);
-  let bracket = 0;
+  const wires = [], mid = LANE + bw + (FIELD >> 1);
+  const bracket = [0, 0];
   for (const l of ls) {
     const a = at.get(l.from), b = at.get(l.to);
     if (!a || !b) continue;
@@ -55,10 +56,10 @@ function layoutPairOled({ nodes, links }, { home = 'pi-1', adv = 6 } = {}) {
     const ea = a.side ? a.x - 1 : a.x + a.w, eb = b.side ? b.x - 1 : b.x + b.w;     // the inner edges
     if (a.side !== b.side) wires.push({ from: l.from, to: l.to, pts: ya === yb ? [[ea, ya], [eb, yb]] : [[ea, ya], [mid, ya], [mid, yb], [eb, yb]] });
     else {
-      // a bracket into the field, each a pixel further out so two do not overlap
-      const x = a.side ? b.x - 3 - 2 * bracket : a.x + a.w + 2 + 2 * bracket;
-      bracket++;
-      wires.push({ from: l.from, to: l.to, pts: [[ea, ya], [x, ya], [x, yb], [eb, yb]] });
+      // a bracket in the column's outer lane, each a second pixel further out so two do not overlap
+      const k = bracket[a.side]++, oa = a.side ? a.x + a.w : a.x - 1, ob = b.side ? b.x + b.w : b.x - 1;
+      const x = a.side ? Math.min(W - 1, a.x + a.w + 1 + 2 * k) : Math.max(0, a.x - 2 - 2 * k);
+      wires.push({ from: l.from, to: l.to, pts: [[oa, ya], [x, ya], [x, yb], [ob, yb]] });
     }
   }
   return { boxes, wires, cut };
@@ -116,12 +117,11 @@ export function drawBayOled(ui, patch, o = {}) {
   const line = (x0, y0, x1, y1) => ui.fill(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0) + 1, Math.abs(y1 - y0) + 1, 1);
   for (const w of L.wires) for (let i = 1; i < w.pts.length; i++) line(...w.pts[i - 1], ...w.pts[i]);
   for (const b of L.boxes) {
-    // the firmware's box: an outline with its corners off; home boxes filled, their name cut out
+    // the firmware's box: an outline with its corners off. Never filled: a lit box drowns its thin letters.
     ui.fill(b.x + 1, b.y, b.w - 2, 1, 1); ui.fill(b.x + 1, b.y + b.h - 1, b.w - 2, 1, 1);
     ui.fill(b.x, b.y + 1, 1, b.h - 2, 1); ui.fill(b.x + b.w - 1, b.y + 1, 1, b.h - 2, 1);
     const tw = ui.textW(b.label), tx = b.x + Math.round((b.w - tw) / 2), ty = b.y + Math.round((b.h - ui.cap) / 2);
     ui.text(tx, ty, b.label);
-    if (b.home) ui.fill(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 2);    // flipped: a lit box, dark letters
   }
   return L;
 }
