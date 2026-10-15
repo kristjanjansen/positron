@@ -1,8 +1,12 @@
 ## Open
 
+- **/connect/: the in-browser SuperCollider runs out of sample memory** (2026-10-15). From the log: "Buffer pool allocation failed: requested 0.73MB, available 0.34MB of 70.00MB", then "Buffer 361 allocation timeout (30000ms)", after piano and Rhodes were switched in one session. Free a sampler's buffers when it closes or changes patch, or raise the pool.
+
+- ~~**/connect/: a long port list makes the model answer nothing**~~ (2026-10-15, DONE: ports of the parts the sentence names, then the essentials, at most 40). From the log: "play Rhodes on the left hand and Piano on the right" heard right, then nothing proposed in 11 s; the same sentence with six ports gave the right split with patches in 5 s. Fix: send only the ports of the parts the sentence names, plus the essentials.
+
 - **Research: text that writes code, shaders, Faust or SuperCollider** (2026-10-15). Asked: *"do resraech of text input generatinv visual shaders, faust or supercollider code"*. A plan in plans/, from a background agent.
 
-- **/connect/: the grains box has at least a patch picker** (2026-10-15). The owner's feedback note: *"grains should have patch selector minimum in ui"*. rt-grains' face; the granulator's PATCHES (grain-rig.mjs).
+- ~~**/connect/: the grains box has at least a patch picker**~~ (2026-10-15, DONE: rt-grains face, the granulator's PATCHES). The owner's feedback note: *"grains should have patch selector minimum in ui"*. rt-grains' face; the granulator's PATCHES (grain-rig.mjs).
 
 - ~~**Keyboard splits shown on the keys**~~ (2026-10-15, DONE: keyboard.mjs `zones`, a 14 px track at each split, zone names above; connect 102/102). Asked: *"can we visualize keyboard splits? add x spacing between split points and labels on top when doing so?"*. A kit option on the keyboard (zones: gap at each split, a label above each zone); /connect/ derives zones from web:keys:midi-out links with range transforms.
 

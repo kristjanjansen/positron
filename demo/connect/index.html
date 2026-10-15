@@ -339,10 +339,27 @@
   const MAX_PORTS = 64;
   const EXAMPLE_PORTS = new Set(EXAMPLES.flatMap((e) => e.links.flatMap((l) => [l.from, l.to])));
   const EXAMPLE_NODES = new Set([...EXAMPLE_PORTS].map(nodeOf));
-  // The examples' ports, then the Pi's when the sentence names it, then this tab's; nothing else.
-  const rankOf = (p, text) => (EXAMPLE_PORTS.has(p.id) ? 0
-    : p.id.startsWith(`${BOARD_SITE}:`) ? (NAMES_PI.test(text) ? 1 : 9)
-      : EXAMPLE_NODES.has(nodeOf(p.id)) ? 2 : p.id.startsWith('web:') || p.id.startsWith('cf-r2:') ? 3 : 9);
+  // Only the parts a sentence is about reach the model: with 64 ports it answered nothing in 11 s
+  // where six ports gave the right patch in 5 s (2026-10-15). A part counts when a word of the
+  // sentence is in its id, label or patch names; then the essentials; the examples only when nothing is named.
+  const ASK_PORTS = 40;
+  const ESSENTIAL = new Set(['web:keys', 'web:midi', 'web:speaker', 'cf-r2:piano-samples', 'cf-r2:rhodes-samples']);
+  const STOP = new Set(['the', 'a', 'an', 'and', 'on', 'of', 'to', 'my', 'with', 'in', 'at', 'play', 'plays', 'playing', 'left', 'right', 'hand', 'it', 'is', 'from', 'into', 'i']);
+  const wordsOf = (t) => (String(t).toLowerCase().match(/[a-z0-9]+/g) || []).filter((w) => !STOP.has(w));
+  const stem = (w) => w.replace(/s$/, '');
+  const named = (text) => {
+    const said = new Set(wordsOf(text).map(stem));
+    if (!said.size) return new Set();
+    return new Set(bay.nodes().map((n) => n.id).filter((id) => {
+      const ws = wordsOf(`${id.replace(/[-:]/g, ' ')} ${bay.node(id)?.label || ''} ${bay.ports().filter((p) => nodeOf(p.id) === id).map((p) => (p.patches || []).join(' ')).join(' ')}`);
+      return ws.some((w) => said.has(stem(w)));
+    }));
+  };
+  const rankOf = (p, text, hit) => {
+    const n = nodeOf(p.id);
+    if (p.id.startsWith(`${BOARD_SITE}:`) && !NAMES_PI.test(text)) return 9;
+    return hit.has(n) ? 0 : ESSENTIAL.has(n) ? 1 : !hit.size && EXAMPLE_PORTS.has(p.id) ? 2 : 9;
+  };
   // A type with patches is offered a second instance's midi-in before it exists, so two patches at once
   // can be two instruments; ensureNamed makes it when an answer names it.
   const secondOf = (p) => {
@@ -350,10 +367,10 @@
     if (!m || !MULTI.includes(m[1]) || !PATCH_NAMES[m[1]] || bay.port(`web:${m[1]}-2:midi-in`)) return [];
     return [{ id: `web:${m[1]}-2:midi-in`, dir: 'in', label: withPatches(`${LABELS[m[1]] ?? CATALOGUE[m[1]].label} 2 midi-in`, PATCH_NAMES[m[1]]) }];
   };
-  const portsForModel = (text = '') => bay.ports()
-    .map((p, i) => ({ p, i, r: rankOf(p, text) })).filter((x) => x.r < 9)
+  const portsForModel = (text = '') => { const hit = named(text); return bay.ports()
+    .map((p, i) => ({ p, i, r: rankOf(p, text, hit) })).filter((x) => x.r < 9)
     .sort((a, b) => a.r - b.r || a.i - b.i)
-    .flatMap(({ p }) => [{ id: p.id, dir: p.dir, label: p.label }, ...secondOf(p)]).slice(0, MAX_PORTS);
+    .flatMap(({ p }) => [{ id: p.id, dir: p.dir, label: p.label }, ...secondOf(p)]).slice(0, ASK_PORTS); };
   let reached = 0;
   async function post(text) {
     if (SELFCHECK) {
