@@ -7,8 +7,9 @@
 export const W = 128, H = 64;
 /** The four keys as printed on the module, K1 to K4 (measured 2026-10-15). */
 export const KEY_SYMBOLS = ['^', 'v', '#', '*'];
-// The lit ink is oled-view.mjs's OLED_LIT; unlit is black, as an OLED pixel that is off (asked darker).
-const LIT = [0x4f, 0xc3, 0xff], DARK = [0, 0, 0];
+// The lit ink sampled from a photo of this module's panel, 2026-10-15 (lit text 51 to 79, 222, 250);
+// unlit is black, as an OLED pixel that is off.
+const LIT = [0x40, 0xdc, 0xfa], DARK = [0, 0, 0];
 
 /**
  * The layout, in the firmware kit's calls. `state` is what the board knows:
