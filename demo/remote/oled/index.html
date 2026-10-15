@@ -12,11 +12,12 @@
   .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
   /* The simulated module as the video panel's picture: the panel at a whole number scale (2x, or 4x
      zoomed), so a panel pixel stays square, and its four keys in a column on its right as on the module. */
-  /* One height at every zoom, the 4x panel's, so zooming never moves what is under it. */
-  .ol-media { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 24px 16px; height: calc(64px * 4 + 48px); background: #000; overflow-x: auto; }
+  /* One height at every zoom, the 4x panel's, so zooming never moves what is under it; a little tone
+     round the black screen, so the panel reads as its own. */
+  .ol-media { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 24px 16px; height: calc(64px * 4 + 48px); background: #07090d; overflow-x: auto; }
   .ol-media canvas { display: block; flex: none; width: calc(128px * var(--ol-k, 2)); height: calc(64px * var(--ol-k, 2)); image-rendering: pixelated; }
   /* the panel's edge, a faint line 8 px clear of its pixels; a border on a wrapper, so the canvas keeps its size */
-  .ol-frame { padding: 8px; border: 1px solid var(--line); border-radius: 2px; line-height: 0; }
+  .ol-frame { padding: 8px; border: 1px solid var(--line); border-radius: 2px; line-height: 0; background: #000; }
   /* one joined column at its own height, centred beside the screen at every zoom */
   .ol-media .pos-bgroup { flex: none; margin-left: auto; align-self: center; }
   /* the screen centred in what the key column at the right edge leaves */
