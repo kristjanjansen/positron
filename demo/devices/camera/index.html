@@ -77,7 +77,12 @@
   // ── the keyed room: a renewal every 5 s while visible, the frames back ──
   let ws = null, on = false, keyed = false, beat = null, lastAt = 0, frames = 0, piFps = null;
   const arrivals = [];
-  const fpsHere = () => { const cut = performance.now() - 1000; while (arrivals.length && arrivals[0] < cut) arrivals.shift(); return arrivals.length; };
+  // Frames over the time they span, as the board measures: a count in a window reads 25 or 26 at 24.
+  const fpsHere = () => {
+    const cut = performance.now() - 2000; while (arrivals.length && arrivals[0] < cut) arrivals.shift();
+    if (arrivals.length < 2) return arrivals.length;
+    return Math.round((arrivals.length - 1) * 10000 / (arrivals.at(-1) - arrivals[0])) / 10;
+  };
   const say = (m) => { if (ws?.readyState === 1) ws.send(JSON.stringify({ ...m, from: ME })); };
   const renew = () => { if (keyed && !document.hidden) say({ type: 'screen.camera', on: true }); };
 

@@ -51,10 +51,15 @@ export function createScreenCamera({ relay, room, key, log = () => {}, panel = (
   const viewers = new Map();     // from -> last renewal
   let ws = null, authed = false, closed = false, backoff = 1000;
   let proc = null, stopping = false, frames = 0, sent = 0, startedAt = 0, source = '';
-  const recent = [];             // frame times in the last second, for the measured rate
+  const recent = [];             // frame times in the last two seconds, for the measured rate
 
   const say = (m) => { if (ws?.readyState === 1 && authed) ws.send(JSON.stringify({ ...m, from: FROM })); };
-  const fps = () => { const cut = now() - 1000; while (recent.length && recent[0] < cut) recent.shift(); return recent.length; };
+  // Frames over the time they span, not a count in a window: a count reads 25 or 26 at a steady 24.
+  const fps = () => {
+    const cut = now() - 2000; while (recent.length && recent[0] < cut) recent.shift();
+    if (recent.length < 2) return recent.length;
+    return Math.round((recent.length - 1) * 10000 / (recent.at(-1) - recent[0])) / 10;
+  };
 
   function onGray(gray) {
     const fb = ditherFrame(gray);
