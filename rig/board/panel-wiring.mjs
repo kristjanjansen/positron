@@ -1,100 +1,103 @@
 // node rig/board/panel-wiring.mjs: the 0.96" OLED with four keys on the Pi 4's header, eight
-// female to female jumpers and no breadboard, as panel-wiring.svg. Pins from plans/plan-pi-oled.md
-// 1.2; module order from
-// rig/pico/oled/wiring.yml (GND VCC SCL SDA K4 K3 K2 K1, keys printed in reverse).
+// female to female jumpers, drawn as the board lies in the owner's photo of 2026-10-15 (header along
+// the top, pin 1 bottom left, USB ports off to the right), as panel-wiring.svg. Pins from
+// plans/plan-pi-oled.md 1.2; module order as printed on the module: GND VCC SCL SDA K4 K3 K2 K1.
 
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const C = { v3: '#d63b3b', v5: '#e0457b', gnd: '#222', sda: '#2f7bd6', scl: '#f08a24', key: '#8a4fd1' };
-// module pin (left to right) -> Pi physical pin, signal, wire colour
+const C = { v3: '#d63b3b', v5: '#ff1a1a', gnd: '#222', sda: '#2f7bd6', scl: '#f08a24', key: '#8a4fd1' };
+// module pin, left to right as printed -> Pi physical pin, wire colour
 const WIRES = [
-  { mod: 'GND', pin: 6, sig: 'GND', c: C.gnd },
-  { mod: 'VCC', pin: 1, sig: '3V3', c: C.v3 },
-  { mod: 'SCL', pin: 5, sig: 'GPIO3 SCL', c: C.scl },
-  { mod: 'SDA', pin: 3, sig: 'GPIO2 SDA', c: C.sda },
-  { mod: 'K4', pin: 37, sig: 'GPIO26', c: C.key },
-  { mod: 'K3', pin: 33, sig: 'GPIO13', c: C.key },
-  { mod: 'K2', pin: 31, sig: 'GPIO6', c: C.key },
-  { mod: 'K1', pin: 29, sig: 'GPIO5', c: C.key },
+  { mod: 'GND', pin: 6, c: C.gnd },
+  { mod: 'VCC', pin: 1, c: C.v3 },
+  { mod: 'SCL', pin: 5, c: C.scl },
+  { mod: 'SDA', pin: 3, c: C.sda },
+  { mod: 'K4', pin: 37, c: C.key },
+  { mod: 'K3', pin: 33, c: C.key },
+  { mod: 'K2', pin: 31, c: C.key },
+  { mod: 'K1', pin: 29, c: C.key },
 ];
-const LABEL = { 2: '5V', 4: '5V' };
 
-const P = 24;                                   // one header pitch in px
-const HX = 80, HY = 150;                        // header's pin 1 column x, outer row y
-// Pin n: column (n+1)>>1 from the left; even pins on the outer (top) row, odd on the inner row.
-const pinXY = (n) => [HX + (((n + 1) >> 1) - 1) * P, HY + (n % 2 ? P : 0)];
+const W = 1200, H = 960;
+const P = 32;                                  // header pitch in px
+const HX = 480, TOP = 190, BOT = TOP + P;      // pin 1's column; top row (even pins), bottom row (odd)
+// Pin n: column (n+1)>>1 from the left; odd pins on the bottom row, toward the middle of the board.
+const pinXY = (n) => [HX + (((n + 1) >> 1) - 1) * P, n % 2 ? BOT : TOP];
+const MX = 70, MY = 450, MP = 40;              // module's first pin x, its top edge, pin pitch
+const modX = (i) => MX + i * MP;
 
-const W = 1120, H = 740;
 const o = [];
-o.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="ui-monospace, Menlo, monospace">`);
+const t = (x, y, s, { size = 14, fill = '#222', weight = 400, anchor = 'start', rot = 0 } = {}) =>
+  o.push(`<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" font-weight="${weight}" text-anchor="${anchor}"${rot ? ` transform="rotate(${rot} ${x} ${y})"` : ''}>${s}</text>`);
+o.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Helvetica, Arial, sans-serif">`);
 o.push(`<rect width="100%" height="100%" fill="#f4f1ea"/>`);
-o.push(`<text x="40" y="40" font-size="20" font-weight="700" fill="#222">0.96" OLED + 4 keys on the Raspberry Pi 4</text>`);
-o.push(`<text x="40" y="64" font-size="13" fill="#555">8 female to female jumpers, Pi pin straight to module pin. Power comes from the Pi's 3.3 V.</text>`);
+t(40, 48, '0.96" OLED with 4 keys on the Raspberry Pi 4', { size: 24, weight: 700 });
+t(40, 76, 'Drawn the way the Pi lies in your photo. Eight female to female jumpers, Pi pin straight to module pin. Unplug the Pi before wiring.', { size: 14, fill: '#555' });
 
-// the Pi's edge and header
-o.push(`<rect x="${HX - 40}" y="${HY - 30}" width="${20 * P + 60}" height="${P + 60}" rx="6" fill="#2e7d4f"/>`);
-o.push(`<text x="${HX - 34}" y="${HY - 44}" font-size="12" fill="#555">Pi header, seen from above. Outer row is even pins. Pin 1 is the end AWAY from the USB ports</text>`);
+// the Pi: header along its top edge
+const bx = HX - 80, bw = 20 * P + 130;
+o.push(`<rect x="${bx}" y="${TOP - 40}" width="${bw}" height="320" rx="14" fill="#2e7d4f"/>`);
+o.push(`<rect x="${HX - 18}" y="${TOP - 18}" width="${20 * P + 4}" height="${P + 36}" rx="3" fill="#1b1b1b"/>`);
+t(bx + bw - 14, TOP + 232, 'USB and Ethernet', { size: 13, fill: '#dfe', anchor: 'end' });
+t(bx + bw - 14, TOP + 250, 'ports this side', { size: 13, fill: '#dfe', anchor: 'end' });
+t(bx + 16, TOP + 262, 'USB-C power', { size: 13, fill: '#dfe' });
 const used = new Map(WIRES.map((w) => [w.pin, w]));
 for (let n = 1; n <= 40; n++) {
-  const [x, y] = pinXY(n);
-  const w = used.get(n), bad = n === 2 || n === 4;
-  o.push(`<rect x="${x - 8}" y="${y - 8}" width="16" height="16" rx="${n === 1 ? 0 : 3}" fill="${w ? w.c : bad ? '#fff' : '#cfc9b8'}" stroke="${bad ? C.v5 : '#111'}" stroke-width="${bad ? 2 : 1}"/>`);
-  if (w) o.push(`<text x="${x}" y="${y + 3.5}" font-size="${n > 9 ? 8 : 10}" text-anchor="middle" fill="#fff" font-weight="700">${n}</text>`);
-  if (LABEL[n]) {
-    const above = n % 2 === 0;
-    o.push(`<text x="${x}" y="${above ? y - 13 : y + 22}" font-size="10" text-anchor="middle" fill="${bad ? C.v5 : '#fff'}" font-weight="700">${LABEL[n]}</text>`);
+  const [x, y] = pinXY(n), w = used.get(n), bad = n === 2 || n === 4;
+  o.push(`<rect x="${x - 10}" y="${y - 10}" width="20" height="20" rx="3" fill="${w ? w.c : bad ? '#fff' : '#bdb6a3'}" stroke="${bad ? C.v5 : '#000'}" stroke-width="${bad ? 3 : 1}"/>`);
+  if (w) t(x, y + 5, n, { size: n > 9 ? 10 : 12, fill: '#fff', weight: 700, anchor: 'middle' });
+  if (bad) o.push(`<g stroke="${C.v5}" stroke-width="3"><line x1="${x - 7}" y1="${y - 7}" x2="${x + 7}" y2="${y + 7}"/><line x1="${x + 7}" y1="${y - 7}" x2="${x - 7}" y2="${y + 7}"/></g>`);
+  // the signal's name beside its pin, on the side its wire arrives from
+  const name = w ? w.mod : bad ? '5V' : '';
+  if (name) {
+    const fill = w ? (w.c === C.gnd ? '#fff' : w.c) : C.v5;
+    if (n % 2) t(x + 13, y + 20, name, { size: 13, fill, weight: 700, rot: 90 });
+    else t(x, y - 16, name, { size: 11, fill, weight: 700, anchor: 'middle' });
   }
 }
-o.push(`<text x="${HX - 30}" y="${HY + P + 5}" font-size="11" fill="#fff" text-anchor="end">1</text>`);
-o.push(`<text x="${HX - 30}" y="${HY + 5}" font-size="11" fill="#fff" text-anchor="end">2</text>`);
-o.push(`<text x="${HX + 19 * P + 28}" y="${HY + P + 5}" font-size="11" fill="#fff">39</text>`);
-o.push(`<text x="${HX + 19 * P + 28}" y="${HY + 5}" font-size="11" fill="#fff">40</text>`);
+t(HX - 26, BOT + 5, 'pin 1', { size: 13, fill: '#fff', weight: 700, anchor: 'end' });
+t(HX - 26, TOP + 5, 'pin 2', { size: 13, fill: '#fff', anchor: 'end' });
+t(pinXY(2)[0] + P / 2, TOP - 40, '5 V: never', { size: 15, fill: C.v5, weight: 700, anchor: 'middle' });
 
-// where the module's pins sit
-const BX = 760, BY = HY + P + 200, MY_ = BY + 18;
-const colX = (i) => BX + 20 + i * 38;
-
-// the module, its header pins pointing up
-const MY = BY + 18;
-o.push(`<rect x="${colX(0) - 26}" y="${MY}" width="${colX(7) - colX(0) + 52}" height="190" rx="6" fill="#1a3a6b"/>`);
-o.push(`<rect x="${colX(0)}" y="${MY + 44}" width="${colX(7) - colX(0)}" height="96" fill="#05070b" stroke="#444"/>`);
-o.push(`<text x="${(colX(0) + colX(7)) / 2}" y="${MY + 96}" font-size="12" fill="#7fd" text-anchor="middle">SSD1306 128x64, I2C 0x3C</text>`);
+// the module, pins up, in its printed order
+o.push(`<rect x="${MX - 34}" y="${MY}" width="${7 * MP + 68}" height="250" rx="10" fill="#111"/>`);
+o.push(`<rect x="${MX - 10}" y="${MY + 60}" width="${5 * MP}" height="120" fill="#05070b" stroke="#444"/>`);
+t(MX + 2.5 * MP - 10, MY + 125, 'SSD1306 128x64', { size: 12, fill: '#7fd', anchor: 'middle' });
+for (const [i, s] of ['^', 'v', '#', '*'].entries()) {
+  o.push(`<rect x="${MX + 5 * MP + 14}" y="${MY + 58 + i * 34}" width="44" height="24" rx="3" fill="#ddd"/>`);
+  t(MX + 5 * MP + 72, MY + 76 + i * 34, s, { size: 16, fill: '#fff', weight: 700 });
+}
 WIRES.forEach((w, i) => {
-  o.push(`<rect x="${colX(i) - 3}" y="${BY - 6}" width="6" height="${MY - BY + 10}" fill="#c8a24a"/>`);
-  o.push(`<text x="${colX(i)}" y="${MY + 26}" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">${w.mod}</text>`);
+  o.push(`<rect x="${modX(i) - 3}" y="${MY - 34}" width="6" height="40" fill="#c8a24a"/>`);
+  t(modX(i), MY + 24, w.mod, { size: 12, fill: '#fff', weight: 700, anchor: 'middle' });
 });
-o.push(`<text x="${(colX(0) + colX(7)) / 2}" y="${MY + 172}" font-size="11" fill="#cde" text-anchor="middle">4 keys under the screen</text>`);
+t(MX - 34, MY + 280, 'module pins, left to right as printed on it', { size: 13, fill: '#555' });
 
-// jumpers: header pin straight to its module pin
+// jumpers: up from the module pin to a lane of its own, across, then into the pin
 WIRES.forEach((w, i) => {
-  const [x, y] = pinXY(w.pin), tx = colX(i), ty = BY;
-  const out = w.pin % 2 === 0 ? -1 : 1;           // even pins leave upward over the edge
-  const lane = HY + P + 60 + i * 14;               // each wire its own horizontal lane
-  const edge = HX + 20 * P + 10;                   // even pins run right along the header's outer margin
-  const d = out < 0
-    ? `M${x} ${y - 9} L${x} ${HY - 21} L${edge} ${HY - 21} L${edge} ${lane} L${tx} ${lane} L${tx} ${ty - 8}`
-    : `M${x} ${y + 9} L${x} ${lane} L${tx} ${lane} L${tx} ${ty - 8}`;
-  // the jumper's housing on the module pin
-  o.push(`<rect x="${tx - 6}" y="${ty - 22}" width="12" height="18" rx="2" fill="#222"/>`);
-  o.push(`<path d="${d}" fill="none" stroke="${w.c}" stroke-width="3.5" stroke-linejoin="round"/>`);
+  const [x, y] = pinXY(w.pin), mx = modX(i), my = MY - 40;
+  // GND is on the top row, so it comes over the header's top edge
+  const lane = w.pin % 2 ? BOT + 80 + i * 10 : TOP - 90;
+  const d = `M${mx} ${my} L${mx} ${lane} L${x} ${lane} L${x} ${w.pin % 2 ? y + 12 : y - 12}`;
+  o.push(`<path d="${d}" fill="none" stroke="${w.c}" stroke-width="4" stroke-linejoin="round"/>`);
+  o.push(`<rect x="${mx - 7}" y="${my - 20}" width="14" height="20" rx="2" fill="#333"/>`);
 });
 
-// the table
-const TY = HY + P + 230;
-o.push(`<text x="40" y="${TY}" font-size="14" font-weight="700" fill="#222">module pin   Pi pin   signal</text>`);
-WIRES.forEach((w, i) => {
-  const y = TY + 26 + i * 24;
-  o.push(`<rect x="40" y="${y - 12}" width="14" height="14" fill="${w.c}"/>`);
-  o.push(`<text x="64" y="${y}" font-size="14" fill="#222" xml:space="preserve">${w.mod.padEnd(9)}${String(w.pin).padStart(4)}     ${w.sig}</text>`);
+// the table, counted the way the photo is read
+const ord = (k) => `${k}${k === 1 ? 'st' : k === 2 ? 'nd' : k === 3 ? 'rd' : 'th'}`;
+const rows = [['module', 'Pi pin', 'row', 'where'], ...WIRES.map((w) => {
+  const col = (w.pin + 1) >> 1;
+  return [w.mod, String(w.pin), w.pin % 2 ? 'bottom' : 'top', w.pin < 10 ? `${ord(col)} from the left` : `${ord(21 - col)} from the right`];
+})];
+const TX = 470, TY = 620;
+rows.forEach((r, i) => {
+  const y = TY + i * 26, w = WIRES[i - 1];
+  if (w) o.push(`<rect x="${TX}" y="${y - 13}" width="14" height="14" fill="${w.c}"/>`);
+  [0, 90, 170, 260].forEach((dx, j) => t(TX + 24 + dx, y, r[j], { size: 15, weight: i ? 400 : 700 }));
 });
-const NY = TY + 26 + 8 * 24 + 16;
-[
-  'Never pins 2 or 4 (5 V). At 5 V the module\'s pull-ups put 5 V on GPIO2/3.',
-  'Keys pull to GND inside the module; the Pi\'s internal pull-ups do the rest.',
-  'Check the order printed on YOUR module and wire by name;',
-  'this order is read off the shop\'s photo.',
-].forEach((t, i) => o.push(`<text x="40" y="${NY + i * 20}" font-size="12" fill="${i === 0 ? C.v5 : '#444'}">${t}</text>`));
+t(TX, TY + 9 * 26 + 10, 'Nothing on the top row but GND. Pin 35, 3rd from the right on the bottom row, stays empty.', { size: 13, fill: '#555' });
+t(TX, TY + 9 * 26 + 30, 'The two top-left pins are 5 V and would put 5 V on the screen and the Pi\'s I2C pins.', { size: 13, fill: C.v5 });
 o.push('</svg>');
 
 const out = fileURLToPath(new URL('./panel-wiring.svg', import.meta.url));
