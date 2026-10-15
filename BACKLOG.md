@@ -1,5 +1,6 @@
 ## Open
 
+- **/devices/drums/: only the dotted steps with the framed running step; the other ways go** (2026-10-15; given to the sequencer agent, which holds the file). Asked: *"active work on http://127.0.0.1:8890/devices/drums/ . keep Dotted steps The running step framed."*.
 - **MK-425C to the Circuit, routed on the Pi, on the next /devices/ page** (2026-10-15; after the sequencer build lands, since both write to the Circuit through one gate). Asked: *"what we need for mk425 to circuit? can we make it happen in next devices page?"*, *"on pi"*.
 - **Build: the Pi's sequencer plays the Circuit's drums** (2026-10-15, a background agent; plans/plan-pi-sequencer.md steps 1 to 5 and the Pi, stage 1 clock (the Pi's own), the owner listens on the Circuit itself, the Fast Track postponed). Asked: *"start pi seq -> circuit drums wotk. i will listen in circuit itself, postpone fasttrack"*.
 - ~~**Pi screen patches: a value's travelling bead hollow or a diamond, to try; the video double line's corners fixed**~~ (2026-10-15, DONE: a value bead picker on /devices/patches/, diamond for now; video drawn as two rails offset 1 px with mitred corners). Asked: *"can value travelling be hollow? or diamond? try"*, *"fix video angle algorithm"*.
