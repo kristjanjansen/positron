@@ -308,7 +308,10 @@
     + 'play something includes that link. Transforms work on MIDI links only; every other link has none. '
     + 'Ids starting web: are in this browser tab, pi-1: is a Raspberry Pi in the studio, cf- ids are Cloudflare, '
     + 'cf-r2:recording is a radio programme we recorded, and err:station is a live station on its broadcaster\'s server, '
-    + 'which reaches this tab through cf-shout:relay.';
+    + 'which reaches this tab through cf-shout:relay. Use web: nodes; use pi-1: only when the sentence names the Pi, '
+    + 'the studio, the Circuit or remote. The piano in this tab is web:sampler, fed by cf-r2:piano-samples on its file-in.';
+  /** A sentence that names somewhere else may reach it; any other stays in this tab. */
+  const NAMES_PI = /\b(pi|raspberry|studio|circuit|remote|board|there)\b/i;
   // The self-check's stand-in for a sentence nobody listed, with one transform
   // missing its argument so the checkTransforms path is graded too.
   const CANNED = [
@@ -330,6 +333,7 @@
   async function post(text) {
     if (SELFCHECK) {
       const ex = EXAMPLES.find((e) => e.say === text);
+      if (text === 'the keys play the piano') return { links: [{ from: KEYS, to: `${BOARD_SITE}:sampler:midi-in`, transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       if (text === 'keys play the synth, nothing else') return { links: [{ from: KEYS, to: W('synth', 'midi-in'), transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       return { links: ex ? ex.links : CANNED, fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
     }
@@ -438,6 +442,14 @@
       return;
     }
     const full = withSpeakers(links);
+    const away = full.filter((l) => [l.from, l.to].some((p) => p.startsWith(`${BOARD_SITE}:`)));
+    if (away.length && !NAMES_PI.test(text)) {
+      const msg = `not built: the answer reached for the Pi (${[...new Set(away.flatMap((l) => [l.from, l.to]).filter((p) => p.startsWith(`${BOARD_SITE}:`)).map(nodeOf))].join(', ')}), and the sentence did not ask for it`;
+      unbuild(msg);
+      d.log(msg, 'warn');
+      logAsk(`asked "${text}" -> NOT BUILT, Pi unasked in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`);
+      return;
+    }
     const { why } = tryLinks(full);
     if (why.length) {
       unbuild(`could not be made: ${why.join('; ')}`);
@@ -985,6 +997,10 @@
     await ask('keys play the synth, nothing else'); await frame();
     A('a request that leaves a sound going nowhere gets that sound wired to the speakers',
       bay.links().length === 2 && has(KEYS, W('synth', 'midi-in')) && has(W('synth', 'audio-out'), SPK), bay.links().map(printLink).join('; '));
+    // An answer that reaches for the Pi when the sentence did not ask for it builds nothing.
+    await ask('the keys play the piano'); await frame();
+    A('an answer that reaches for the Pi unasked builds nothing and says so',
+      bay.links().length === 0 && /did not ask for it/.test(empty.textContent) && /pi-1:sampler/.test(empty.textContent), empty.textContent);
     // The microphone: Caps Lock toggles it, the sustain pedal holds it, and a check opens none.
     const mic = () => micBtn.el.getAttribute('aria-pressed') === 'true', gum0 = CAMERA_ASKED.length;
     const caps = () => dispatchEvent(new KeyboardEvent('keydown', { key: 'CapsLock' }));

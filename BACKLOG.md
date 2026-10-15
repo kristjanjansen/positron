@@ -1,5 +1,7 @@
 ## Open
 
+- **/connect/: a request went to the Pi unasked** (2026-10-15). Asked: *"why we go pi when i did not asked"*, on "keuboard plays rhodes on bottom and piano on top", which the model built as keys to pi-1:sampler and pi-1:drums. Fix: the facts tell the model to stay in this tab, and a request that does not name the Pi, the studio, the Circuit or remote builds nothing that reaches pi-1. Not yet: a Rhodes in this tab (two web:samplers, rhodes-samples offered to the model).
+
 - ~~**/connect/: the example pills in one row that scrolls sideways, edges faded**~~ (2026-10-15, DONE). Asked: *"make suggestions pills one row and overflow-x scrollable. add gradient to cover edges ub a bit"*.
 
 - ~~**/connect/: a microphone button beside send, the standard dictation shortcut, and the sustain pedal starts it, as the old wish demo did**~~ (2026-10-15, DONE: no official in-page shortcut exists in ChatGPT or Claude; Claude's desktop app uses Caps Lock, so Caps Lock toggles; the sustain pedal (CC 64) holds, once MIDI is on; heard by the wish worker's /hear). Asked: *"can we have mike input button next to send button. what is standard dictate button shortcut in claude/chatgpt, use it. also activate on sustain button. see old wish demo"*.
