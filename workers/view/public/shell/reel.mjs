@@ -24,11 +24,10 @@ export const font = (w, px) => {
 
 /** POSITRON.STUDIO as the front page sets it. Returns `pad`, how far below the
  *  frame's top the wordmark's ink starts, which the lower line mirrors. */
-export function drawWordmark(ctx) {
+export function drawWordmark(ctx, base = SAFE_TOP + 40) {
   ctx.font = font(400, 34);
   ctx.letterSpacing = '4.8px';
   ctx.textBaseline = 'alphabetic';
-  const base = SAFE_TOP + 40;
   const pad = base - ctx.measureText('POSITRON').actualBoundingBoxAscent;
   let x = X;
   for (const [s, c] of [['POSITRON', C.dim], ['.', C.hi], ['STUDIO', C.dim]]) {

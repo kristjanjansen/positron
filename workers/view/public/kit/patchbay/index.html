@@ -23,6 +23,9 @@
 <link rel="stylesheet" href="/shell/kit-page.css">
 <style>
   .kit-n a { color: inherit; }
+  .kit-pair { display: flex; flex-wrap: wrap; gap: 16px; }
+  .kit-pair .kit-phone { width: 300px; }
+  .kit-pair + .kit-pair { margin-top: 32px; }
 </style>
 <script type="module">
   import { el } from '/shell/shell.mjs';
@@ -33,6 +36,7 @@
   import { createBayTraffic } from '/shell/bay-traffic.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createKitPage } from '/shell/kit-page.mjs';
+  import { PAIR_EXAMPLES, pairBay } from '/shell/pair-examples.mjs';
   useMediumColours();
 
   /**
@@ -202,6 +206,28 @@
   const LABEL = (node) => [{ text: node.label, sans: true }];
   const EX = EXAMPLES.map((x) => ({ ...x, bay: fakeBay(x.links, x.n, x.labels) }));
   const views = new Map();
+
+  // Newest first: the same bay at phone width, the working one column view beside the two facing
+  // columns (`arrange: 'pair'`) drawn for reels and the front page.
+  const PAIRS = PAIR_EXAMPLES.map((x) => ({ ...x, title: x.title.toUpperCase(), bay: pairBay(x) }));
+  const pairViews = [];
+  section('TWO COLUMNS ON A PHONE', 'The same bay in a phone’s width: one column with a lane per wire for pages, two facing columns with every wire in the middle for reels and the front page.',
+    "createBayView(bay, { detail })\ncreateBayView(bay, { detail, arrange: 'pair' })\ndrawBay(bay, { width, arrange: 'pair' })", (box) => {
+      for (const x of PAIRS) {
+        const row = el('div', 'kit-pair');
+        for (const arrange of ['auto', 'pair']) {
+          const fig = el('div', 'kit-pair-f');
+          const frame = el('div', 'kit-phone');
+          const view = createBayView(x.bay, { detail: LABEL, arrange });
+          frame.append(view.el);
+          fig.append(frame, el('span', 'kit-fig-l', `${x.title}, ${arrange === 'pair' ? 'two columns' : 'one column'}`));
+          row.append(fig);
+          addWires(view, x.bay);
+          pairViews.push({ view, x, arrange });
+        }
+        box.append(row);
+      }
+    });
   for (const x of EX) {
     section(x.title, null, x.bay.links().map(line).join('\n'), (box) => {
       const view = createBayView(x.bay, { detail: LABEL });
@@ -230,6 +256,17 @@
     d.assert('every picture draws one wire per link and one box per node',
       views.size === EXAMPLES.length && bad.length === 0,
       bad.length ? bad.join(', ') : `${views.size} pictures, ${EX.reduce((a, x) => a + x.links.length, 0)} wires`);
+    // Two columns: every box at one of two lefts, and both columns used once there are two boxes.
+    const pairBad = [];
+    for (const { view, x, arrange } of pairViews) {
+      const rects = [...view.el.querySelectorAll('.lv-box rect')].map((r) => Math.round(+r.getAttribute('x')));
+      const lefts = new Set(rects);
+      if (view.wires.size !== x.bay.links().length) pairBad.push(`${x.title} ${arrange} ${view.wires.size} wires`);
+      if (arrange === 'pair' && lefts.size !== 2) pairBad.push(`${x.title} pair has ${lefts.size} columns`);
+      if (arrange === 'auto' && lefts.size !== 1) pairBad.push(`${x.title} phone has ${lefts.size} columns`);
+    }
+    d.assert('at phone width one column stacks and the pair draws two, with every wire', pairViews.length === 6 && !pairBad.length,
+      pairBad.join(', ') || `${pairViews.length} pictures`);
     d.assert('NEGATIVE CONTROL: a picture of no links draws no wire',
       (() => { const v = createBayView(fakeBay([], 0, {})); return v.wires.size === 0; })(), 'empty bay, 0 wires');
   }

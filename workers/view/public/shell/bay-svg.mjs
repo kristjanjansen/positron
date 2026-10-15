@@ -2,7 +2,7 @@
 // or a browser. Every attribute is literal (resvg has no cascade). Layout is bay-layout.mjs;
 // the phone arrangement is not ported, so a width under STACK_BELOW throws.
 // why: lessons/kit-bay-svg.md#header
-import { BAY_GEOMETRY, nodeOf, portName, layoutBay, acrossWire } from './bay-layout.mjs';
+import { BAY_GEOMETRY, nodeOf, portName, layoutBay, layoutPair, acrossWire } from './bay-layout.mjs';
 import { MEDIUM_COLOURS } from './patchbay.mjs';
 import { TIMING_NAMES, printOptions } from './link-options.mjs';
 import M from './font-metrics.mjs';
@@ -40,7 +40,7 @@ const read = (x) => (typeof x === 'function' ? x() : x);
 
 /**
  * The bay at `width` px, as `createBayView(bay, o)` would draw it in a column
- * that wide. Same options: `stretch`, `sizeAs`, `maxWire`, `detail`.
+ * that wide. Same options: `stretch`, `sizeAs`, `maxWire`, `detail`, `arrange` (`pair` draws at any width).
  * Returns `{ width, height, body, svg, boxes }`: `body` is the markup in the
  * layout's own coordinates (0,0 at the top left, the picture `width` by
  * `height`), for a caller placing it inside a bigger SVG; `svg` is the same as
@@ -49,12 +49,12 @@ const read = (x) => (typeof x === 'function' ? x() : x);
  * each link's `{ id, from, to, medium, colour, d }`, so a canvas can light one.
  * `wires: false` leaves the wire paths out of `body` and `svg` for that caller.
  */
-export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infinity, detail = null, wires: withWires = true } = {}) {
+export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infinity, detail = null, wires: withWires = true, arrange = 'auto' } = {}) {
   if (!(width > 0)) throw new Error('drawBay needs a width');
   const nodes = read(bay.nodes), ports = read(bay.ports), links = read(bay.links);
   const fieldsOf = (n) => (detail ? detail(n) || [] : []).map((f) => (f == null ? null : typeof f === 'string' ? { text: f } : f));
   const W = (t, size) => textWidth(t, 'mono', size);
-  const L = layoutBay({ nodes, ports, links }, { avail: width, stretch, sizeAs, maxWire, fieldsOf,
+  const L = (arrange === 'pair' ? layoutPair : layoutBay)({ nodes, ports, links }, { avail: width, stretch, sizeAs, maxWire, fieldsOf,
     width: (t, size, sans) => textWidth(t, sans ? 'sans' : 'mono', size) });
   if (!L.across) throw new Error(`drawBay draws the across arrangement only; ${width} px is under ${STACK_BELOW}, where bay-view stacks`);
   const { avail, H, boxes, at, fieldsR, backs } = L;
@@ -69,7 +69,8 @@ export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infi
     const [f1, f2, f3] = fieldsR(b.n), fy = ty + TGAP + DROW - 2;
     const field = (f, x, y, anchor) => f && g.push(tag('text',
       { x: n2(x), y: n2(y), 'text-anchor': anchor === 'start' ? null : anchor, 'font-family': FAMILY.sans, 'font-size': FONT, fill: INK.dim2 }, f.text));
-    field(f1, b.x + b.w - PAD, ty, 'end');
+    if (b.pair) field(f1, b.x + PAD, ty + DROW, 'start');
+    else field(f1, b.x + b.w - PAD, ty, 'end');
     field(f2, b.x + PAD, fy, 'start');
     field(f3, b.x + b.w - PAD, fy, 'end');
     top.push(`<g>${g.join('')}</g>`);
@@ -90,7 +91,7 @@ export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infi
     const a = at.get(l.from), b = at.get(l.to);
     if (!a || !b) continue;
     const medium = ports.find((p) => p.id === l.from)?.medium || '';
-    const { d, mid } = acrossWire(a, b, o, backs.indexOf(l) + 1, L, n2);
+    const { d, mid } = L.wire ? L.wire(l, o, n2) : acrossWire(a, b, o, backs.indexOf(l) + 1, L, n2);
     const timed = printOptions(l.options, TIMING_NAMES);
     drawn.push({ id: l.id, from: l.from, to: l.to, medium, colour: colour(medium), d });
     if (withWires) wires.unshift(tag('path', { d, fill: 'none', stroke: colour(medium), 'stroke-width': 1.5, 'stroke-linejoin': 'round', 'stroke-dasharray': timed ? '6 4' : null }));

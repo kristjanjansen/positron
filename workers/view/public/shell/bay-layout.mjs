@@ -176,3 +176,69 @@ export function acrossWire(a, b, o, j, { rowH, LANE, STEP }, f = (v) => v) {
   // the cubic's own middle, t = 0.5, where getPointAtLength(n / 2) lands on a symmetric S curve
   return { d: `M${f(a.x)},${f(a.y)} C${f(a.x + k)},${f(a.y + o * 2)} ${f(b.x - k)},${f(b.y + o * 2)} ${f(b.x)},${f(b.y)}`, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + o * 1.5 } };
 }
+
+/**
+ * Two columns facing each other, for a phone or a reel: every port on the
+ * box's inner edge, every wire in the field between the columns. Sources go
+ * left, the rest right, split where the two columns come out closest in
+ * height. Same returns as `layoutBay` (always `across`), plus `pair` and
+ * `wire(link, o)` answering `{ d, mid }`.
+ * why: lessons/kit-bay-layout.md#pair
+ */
+export function layoutPair({ nodes, ports, links }, { avail, fieldsOf, width, gap = 0 }) {
+  const { rank } = ranks(nodes, links);
+  const order = nodes.map((n, i) => [n, i]).sort((p, q) => rank.get(p[0].id) - rank.get(q[0].id) || p[1] - q[1]).map(([n]) => n);
+  const portsOf = (n) => {
+    const mine = ports.filter((p) => nodeOf(p.id) === n.id);
+    return { ins: mine.filter((p) => p.dir === 'in'), outs: mine.filter((p) => p.dir === 'out') };
+  };
+  const field = (n) => { const f = fieldsOf(n); return f[0] || f[1] || null; };
+  const headOf = (n) => PAD + TITLE + (field(n) ? DROW : 0) + TGAP;
+  const hOf = (n) => { const { ins, outs } = portsOf(n); return headOf(n) + Math.max(1, ins.length + outs.length) * ROW + PAD / 2; };
+  const hs = order.map(hOf), total = hs.reduce((a, b) => a + b, 0);
+  // A split inside a rank costs four rows, so a near tie keeps the sources together.
+  let k = order.length, best = Infinity, acc = 0;
+  for (let i = 1; i < order.length; i++) {
+    acc += hs[i - 1];
+    const cost = Math.abs(2 * acc - total) + (rank.get(order[i - 1].id) === rank.get(order[i].id) ? 4 * ROW : 0);
+    if (cost < best) { best = cost; k = i; }
+  }
+  const sides = [order.slice(0, k), order.slice(k)];
+  const longest = (ps) => Math.max(0, ...ps.map((p) => width(portName(p.id), FONT)));
+  const minOf = (col) => Math.ceil(Math.max(0, ...col.map((n) => {
+    const { ins, outs } = portsOf(n), f = field(n);
+    return Math.max(width(n.id, TITLE), f ? width(f.text, FONT, true) : 0, longest(ins), longest(outs)) + 2 * PAD;
+  })));
+  // Each column its own floor; the field gives way first (to 24 px) before the picture outgrows `avail`.
+  const [minL, minR] = sides.map(minOf);
+  const G = sides[1].length ? gap || Math.round(Math.max(24, Math.min(140, avail * 0.22, avail - minL - minR))) : 0;
+  const spare = Math.max(0, avail - G - minL - minR) / 2;
+  const cw = [Math.floor(minL + spare), Math.floor(minR + spare)];
+  avail = cw[0] + G + (sides[1].length ? cw[1] : 0);
+  const colH = sides.map((col) => col.reduce((a, n) => a + hOf(n) + 2 * PAD, -2 * PAD));
+  const H = Math.max(...colH);
+  const boxes = [], at = new Map();
+  sides.forEach((col, ci) => {
+    const x = ci ? cw[0] + G : 0, side = ci ? 'l' : 'r', w = cw[ci];
+    let y = Math.round((H - colH[ci]) / 2);
+    for (const n of col) {
+      const { ins, outs } = portsOf(n), h = hOf(n), top = y + headOf(n);
+      boxes.push({ n, x, y, w, h, ins, outs, pair: true });
+      [...ins, ...outs].forEach((p, i) => at.set(p.id, { x: ci ? x : x + w, y: top + i * ROW + ROW / 2, side }));
+      y += h + 2 * PAD;
+    }
+  });
+  const pairCount = new Map();
+  for (const l of links) { const key = `${l.from} ${l.to}`; pairCount.set(key, (pairCount.get(key) || 0) + 1); }
+  // Across the field an S curve; between two boxes of one column a loop into the field, deeper for a longer span.
+  const wire = (l, o = 0, f = (v) => v) => {
+    const a = at.get(l.from), b = at.get(l.to);
+    const face = (q) => (q.side === 'r' ? 1 : -1);    // each end leaves the way its edge faces
+    const k = a.side !== b.side ? Math.max(24, Math.abs(b.x - a.x) / 2) : Math.min(G / 2 - 6, 18 + Math.abs(b.y - a.y) * 0.3) / 0.75;
+    const c1 = [a.x + face(a) * k, a.y + o * 2], c2 = [b.x + face(b) * k, b.y + o * 2];
+    const mid = { x: (a.x + 3 * c1[0] + 3 * c2[0] + b.x) / 8, y: (a.y + 3 * c1[1] + 3 * c2[1] + b.y) / 8 };
+    return { d: `M${f(a.x)},${f(a.y)} C${f(c1[0])},${f(c1[1])} ${f(c2[0])},${f(c2[1])} ${f(b.x)},${f(b.y)}`, mid };
+  };
+  return { across: true, pair: true, avail, need: avail, boxes, at, H, rowH: H, fieldsR: (n) => [field(n)], portsOf, order,
+    backs: [], pairCount, longest, HEAD: PAD + TITLE + TGAP, LANE: 10, STEP: 6, wire };
+}

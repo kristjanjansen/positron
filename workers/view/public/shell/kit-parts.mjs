@@ -50,9 +50,9 @@ export const KIT_PARTS = [
     'fau-on-a-slide',
   ] },
   { part: 'patchbay', label: 'PATCHBAY', ids: [
-    'mirror-concept', 'chat-concept', 'history-concept', 'admin-concept', 'broadcast-concept',
+    'two-columns-on-a-phone', 'mirror-concept', 'chat-concept', 'history-concept', 'admin-concept', 'broadcast-concept',
     'keyboard-concept', 'effects-concept', 'recorder-concept', 'shader-concept', 'patchbay-demo',
-    'mirror-demo', 'knobs-demo', 'away-demo', 'fau-demo', 'nola-demo', 'wish-demo',
+    'mirror-demo', 'away-demo', 'fau-demo', 'nola-demo', 'wish-demo',
   ] },
   { part: 'logo', label: 'LOGO', ids: [
     'stacked-logo', 'horizontal-logo', 'wordmark-in-fives', 'wordmark-in-threes',

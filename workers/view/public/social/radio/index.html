@@ -187,8 +187,6 @@
     const r = bay.link(a, b, [], { site: S });
     if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
   }
-  // the box notes patchbay.mjs gives a box by default: the node's label, in the sans
-  const drawn = drawBay(bay, { width: 480, wires: false, detail: (n) => [{ text: n.label || '', sans: true }] });
 
   // ── the picture: the station's name, the kit slider with the station names under it,
   // and the patch under that, stacked in the band a story leaves clear
@@ -200,6 +198,12 @@
   const SLD_Y = NAME_Y + 56, SLD_H = look.laneH * SLD_SCALE;
   const LABEL_BOTTOM = SLD_Y + SLD_H + (MARK.gap + MARK.px) * SLD_SCALE;
   const BAY_Y = Math.round(LABEL_BOTTOM + 48);
+  // Two facing columns, as the kit's TWO COLUMNS ON A PHONE: a pair's height does not depend on its
+  // width, so it is drawn as wide as the band's shape asks and scales to fill it.
+  // the box notes patchbay.mjs gives a box by default: the node's label, in the sans
+  const bayOpts = { wires: false, arrange: 'pair', detail: (n) => [{ text: n.label || '', sans: true }] };
+  const probe = drawBay(bay, { ...bayOpts, width: 480 });
+  const drawn = drawBay(bay, { ...bayOpts, width: Math.max(480, Math.round((probe.height + 2) * TEXT_W / (SAFE_BOTTOM - BAY_Y)) - 2) });
   const BAY_SCALE = Math.min(TEXT_W / (drawn.width + 2), (SAFE_BOTTOM - BAY_Y) / (drawn.height + 2));
   const bayPic = await svgImage(drawn.body, { width: drawn.width, height: drawn.height, scale: BAY_SCALE });
   const bayWires = drawn.wires.map((w) => ({ ...w, path: new Path2D(w.d) }));
