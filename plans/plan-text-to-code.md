@@ -544,13 +544,15 @@ one sclang-lite test run, 24 programs written and compiled (8 per language),
 8 Faust renders, one headless Chrome run, all local, zero external API spend.
 Searches: Cloudflare's documentation, and the web for §4.
 
-## 10. Slice 2, built 2026-10-15: a sentence writes a SuperCollider synth (/code/write/)
+## 10. Slice 2, built 2026-10-15: a sentence writes a SuperCollider synth (/code/wish/)
 
-Built locally, not committed, not deployed. Page: `demo/code/write/index.html`.
+Built locally, not committed, not deployed. Page: `demo/code/wish/index.html`.
+Renamed the same day on *"keep wish in naming"*: the pages are /shader/wish/ (Picture wish) and
+/code/wish/ (Sound wish), the node is `wish` (`rt-wish.mjs`), the worker route is `/wish/code`.
 
-- **One loop for both languages.** `demo/shell/code-writer.mjs` (`writeLoop`) asks, adapts, tries and
-  judges; `glsl-writer.mjs` and the new `sclang-writer.mjs` hand it an adapter, a trial and a judge.
-  /shader/write/'s self-check is 15/15 on the shared loop, `glsl-writer-test.mjs` 36/36 unchanged.
+- **One loop for both languages.** `demo/shell/wish-loop.mjs` (`writeLoop`) asks, adapts, tries and
+  judges; `glsl-wish.mjs` and the new `sclang-wish.mjs` hand it an adapter, a trial and a judge.
+  /shader/wish/'s self-check is 15/15 on the shared loop, `glsl-wish-test.mjs` 36/36 unchanged.
 - **The contract is sclang-lite's own tables** (`sclangContract()`: every UGen with its arguments and
   defaults, the Env methods, the methods, minus `NOT_FOR_KEYS`, the eight buffer and bus UGens a key
   cannot use). Examples only on a retry or a revision, as GLSL.
@@ -558,7 +560,7 @@ Built locally, not committed, not deployed. Page: `demo/code/write/index.html`.
   unipolar (Impulse and Dust in the subset); `.range` is the MulAdd, `.exprange` a bare `LinExp`.
   The Pi compiles the same file and needs a push to have them.
 - **Safety before sound.** Every answer that compiles plays one held note (middle C, velocity 100,
-  0.5 s) on a second scsynth in the page's context wired to no speaker (`sclang-trial.mjs`); NaN, a
+  0.5 s) on a second scsynth in the page's context wired to no speaker (`sclang-wish-trial.mjs`); NaN, a
   peak above 1 and a peak under 0.001 are refused and never sent on program-out. The page's output
   runs through a compressor and a hard clip at -1 dBFS (0.891). MEASURED: a program peaking at 5.09
   was refused three times; the same program handed straight to program-in left the limiter at 0.8913.
@@ -576,7 +578,10 @@ run (after the copy refusal and a `60.midicps` fold in the adapter), first run i
 | kimi-k2.6 (thinking off) | 7/10 (6) | 9/10 (9) | 8/10 (9) | 1.4 | 8300 | 18620 | 1397 | 8 of 8 |
 | qwen3-30b-a3b-fp8 | 10/10 (10) | 10/10 (10) | 10/10 (10) | 1.3 | 2648 | 4024 | 1309 | 9 of 10 (2 of 10) |
 
-Default for `lang: 'sclang'` is gpt-oss-120b (`CODE_DEFAULT` in wish.mjs): 20 of 20 ran, distinct,
+Default for `lang: 'sclang'` was gpt-oss-120b (`CODE_DEFAULT` in wish.mjs): 20 of 20 ran, distinct,
 and the most worked programs read (a kick with a pitch envelope and a noise click). qwen3-30b is
 fastest but, even after the copy refusal, mostly swaps one oscillator in the shape. Not settled: how
 any of it sounds, which needs an ear (section 6.5). Both runs cost about $0.10 in total.
+
+The default became qwen2.5-coder-32b the same day (*"go qwen"*): on the owner's live test it ran 4 of
+4 sounds first try in 6 to 7 s, where gpt-oss-120b once used the whole 30 s and timed out.

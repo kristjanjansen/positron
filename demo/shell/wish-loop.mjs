@@ -1,7 +1,7 @@
-// demo/shell/code-writer.mjs: the loop that turns a sentence into a running program, for any language
+// demo/shell/wish-loop.mjs: the loop that turns a sentence into a running program, for any language
 // (plans/plan-text-to-code.md section 3): ask, adapt, try, judge, retry with the refusal. Pure: the
-// model, the adapter, the trial and the judge are handed in, one set per language (glsl-writer.mjs,
-// sclang-writer.mjs). Nothing here touches what is running now.
+// model, the adapter, the trial and the judge are handed in, one set per language (glsl-wish.mjs,
+// sclang-wish.mjs). Nothing here touches what is running now.
 
 export const ATTEMPTS = 3;
 export const BUDGET_MS = 15000;

@@ -193,7 +193,7 @@ async function run(model, payload) {
 }
 
 const PORT = Number(process.env.PORT || 8799);
-// The deployed Worker's per-visitor cap on /code and /wish, so a page meets its 429 here too.
+// The deployed Worker's per-visitor cap on /wish/code and /wish, so a page meets its 429 here too.
 const limiter = createLimiter();
 
 // The deployed Worker's origin rule, from the one module.
@@ -220,7 +220,7 @@ http.createServer((req, res) => {
       if (!mod.allowedOrigin(req.headers.origin || null)) {
         return send(403, { error: 'this agent answers pages on positron.studio' });
       }
-      if (req.method !== 'POST') return send(405, { error: 'post to /hear, /wish or /code' });
+      if (req.method !== 'POST') return send(405, { error: 'post to /hear, /wish or /wish/code' });
       try { body = JSON.parse(raw || '{}'); } catch { return send(400, { error: 'body is JSON' }); }
       const limited = limiter.take(await addressTag(req.socket.remoteAddress), new URL(req.url, 'http://x').pathname);
       if (limited) { console.log(`${req.url}  429  ${limited.error}`); return send(429, { error: limited.error }); }
@@ -255,5 +255,5 @@ http.createServer((req, res) => {
   else console.log(`  credential   the wrangler session, good to ${s.at || 'an unrecorded time'}`);
   console.log('  POST /hear  { audio: base64, model? }');
   console.log('  POST /wish  { text, ports: [...], model?, facts?, history?: [{ said, links, settings? }], current?: [links], currentSettings? }');
-  console.log('  POST /code  { text, lang: glsl or sclang, contract?, error?, previous? (alone: a revision of it), model? }');
+  console.log('  POST /wish/code  { text, lang: glsl or sclang, contract?, error?, previous? (alone: a revision of it), model? }');
 });

@@ -1,9 +1,9 @@
-// demo/shell/glsl-writer.mjs: the GLSL half of code-writer.mjs's loop, a sentence into a running
+// demo/shell/glsl-wish.mjs: the GLSL half of wish-loop.mjs's loop, a sentence into a running
 // fragment shader (plans/plan-text-to-code.md section 3): the adapter, the picture check and the
-// judge. Pure; graded in node by glsl-writer-test.mjs. The old picture is never touched here.
+// judge. Pure; graded in node by glsl-wish-test.mjs. The old picture is never touched here.
 
 import { UNIFORMS } from './mirror-shader.mjs';
-import { writeLoop, hashOf, ATTEMPTS, BUDGET_MS } from './code-writer.mjs';
+import { writeLoop, hashOf, ATTEMPTS, BUDGET_MS } from './wish-loop.mjs';
 
 export { hashOf, ATTEMPTS, BUDGET_MS };
 /** Each end adds its own version line; a body carries none. */

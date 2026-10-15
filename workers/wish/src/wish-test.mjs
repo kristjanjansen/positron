@@ -248,13 +248,13 @@ is('a page this account deployed is allowed',
     r['access-control-allow-origin']);
 }
 
-// ── /code: one program out, under the contract the running shader keeps ──
+// ── /wish/code: one program out, under the contract the running shader keeps ──
 {
   const sent = [];
   const stub = (answer) => async (model, payload) => { sent.push({ model, payload }); return answer; };
-  const out = await handle('/code', { text: 'slow blue waves', lang: 'glsl' }, stub({ response: { code: 'void main(){}' } }));
+  const out = await handle('/wish/code', { text: 'slow blue waves', lang: 'glsl' }, stub({ response: { code: 'void main(){}' } }));
   const p = sent[0]?.payload;
-  is('/code asks the default writing model and returns the program', out.status === 200 && out.body.code === 'void main(){}' && sent[0]?.model === CODE[0],
+  is('/wish/code asks the default writing model and returns the program', out.status === 200 && out.body.code === 'void main(){}' && sent[0]?.model === CODE[0],
     JSON.stringify(out.body));
   is('the system prompt is the contract generated from the shader module', p?.messages?.[0]?.content.startsWith(glslContract())
     && UNIFORMS.every((u) => p.messages[0].content.includes(u.name)), p?.messages?.[0]?.content.slice(0, 80));
@@ -265,20 +265,25 @@ is('a page this account deployed is allowed',
   is('a first ask carries only the sentence', p?.messages?.length === 2 && p.messages[1].content === 'slow blue waves');
 
   sent.length = 0;
-  await handle('/code', { text: 'slow blue waves', previous: 'void main(){ o = x; }', error: "ERROR: 0:1: 'x' : undeclared identifier" }, stub({ response: { code: 'ok' } }));
+  await handle('/wish/code', { text: 'slow blue waves', previous: 'void main(){ o = x; }', error: "ERROR: 0:1: 'x' : undeclared identifier" }, stub({ response: { code: 'ok' } }));
   const m = sent[0]?.payload?.messages || [];
   is('a retry carries the program that failed and the compiler\'s words', m.length === 4 && m[2].role === 'assistant' && m[2].content.includes('o = x')
     && m[3].content.includes("'x' : undeclared identifier"), JSON.stringify(m.slice(2)));
 
-  const notOurs = await handle('/code', { text: 'x', model: '@cf/some/expensive-model' }, stub({}));
+  const notOurs = await handle('/wish/code', { text: 'x', model: '@cf/some/expensive-model' }, stub({}));
   is('NEGATIVE CONTROL: a model outside the allowlist is refused before anything runs', notOurs.status === 400 && /not a writing model/.test(notOurs.body.error)
     && sent.length === 1, notOurs.body.error);
-  const noLang = await handle('/code', { text: 'x', lang: 'faust' }, stub({}));
+  const noLang = await handle('/wish/code', { text: 'x', lang: 'faust' }, stub({}));
   is('NEGATIVE CONTROL: a language with no contract is refused', noLang.status === 400 && /no contract/.test(noLang.body.error), noLang.body.error);
-  const empty = await handle('/code', { text: '  ' }, stub({}));
+  const empty = await handle('/wish/code', { text: '  ' }, stub({}));
   is('NEGATIVE CONTROL: an empty sentence asks nothing', empty.status === 400 && sent.length === 1, empty.body.error);
-  const thrown = await handle('/code', { text: 'x' }, async () => { throw new Error('JSON Mode couldn\'t be met'); });
+  const thrown = await handle('/wish/code', { text: 'x' }, async () => { throw new Error('JSON Mode couldn\'t be met'); });
   is('a model that throws is a 502 with its own words, not a crash', thrown.status === 502 && /JSON Mode/.test(thrown.body.error), JSON.stringify(thrown.body));
+  // /code is the old name, answering for one deploy so a cached page does not break.
+  const alias = await handle('/code', { text: 'slow blue waves', lang: 'glsl' }, stub({ response: { code: 'void main(){}' } }));
+  is('the old /code answers as /wish/code does', alias.status === 200 && alias.body.code === 'void main(){}', JSON.stringify(alias.body));
+  is('NEGATIVE CONTROL: /wish/code is not answered by /wish\'s patch path', (await handle('/wish/code', { text: 'x', ports: [] }, stub({ response: { code: 'y' } }))).body.code === 'y');
+  is('NEGATIVE CONTROL: a path near it is still no such path', (await handle('/wish/codes', { text: 'x' }, stub({}))).status === 404);
 
   is('the shapes Workers AI answers in all give the text', textOf({ response: 'a' }) === 'a' && textOf({ choices: [{ message: { content: 'b' } }] }) === 'b'
     && textOf({ choices: [{ message: { content: null, reasoning_content: 'c' } }] }) === 'c' && textOf({ response: null, choices: [{ message: { content: '' } }] }) === '');
@@ -379,45 +384,49 @@ is('a page this account deployed is allowed',
   is('a patch model that throws is a 502 in its own words', thrown.status === 502 && /5006/.test(thrown.body.error), JSON.stringify(thrown.body));
 }
 
-// ── /code: the examples in the prompt, and a revision ──
+// ── /wish/code: the examples in the prompt, and a revision ──
 {
   const { GLSL_EXAMPLES } = await import('../../../demo/shell/glsl-examples.mjs');
   const sent = [];
   const stub = async (model, payload) => { sent.push(payload); return { response: { code: 'ok' } }; };
-  await handle('/code', { text: 'slow blue waves', contract: 'A PAGE CONTRACT' }, stub);
+  await handle('/wish/code', { text: 'slow blue waves', contract: 'A PAGE CONTRACT' }, stub);
   const sys = sent[0]?.messages?.[0]?.content || '';
-  is('a first /code try carries the page contract and no examples (they doubled its time)', sys.startsWith('A PAGE CONTRACT')
+  is('a first /wish/code try carries the page contract and no examples (they doubled its time)', sys.startsWith('A PAGE CONTRACT')
     && !GLSL_EXAMPLES.some((e) => sys.includes(e.body)) && /Answer as JSON/.test(sys.split('\n').at(-1)), sys.slice(0, 120));
   sent.length = 0;
-  await handle('/code', { text: 'heavier rain', previous: 'void main(){ o = vec4(1.0); }' }, stub);
+  await handle('/wish/code', { text: 'heavier rain', previous: 'void main(){ o = vec4(1.0); }' }, stub);
   const rm = sent[0]?.messages || [];
   is('a revision carries every example after the contract', GLSL_EXAMPLES.every((e) => (rm[0]?.content || '').includes(e.body)));
   is('previous with no error is a revision: one user message carrying the program and the change', rm.length === 2 && rm[1].role === 'user'
     && rm[1].content.includes('o = vec4(1.0)') && /Change it: heavier rain/.test(rm[1].content) && !/refused/.test(rm[1].content), JSON.stringify(rm.slice(1)));
   sent.length = 0;
-  await handle('/code', { text: 'heavier rain', previous: 'void main(){ o = x; }', error: 'ERROR: x' }, stub);
+  await handle('/wish/code', { text: 'heavier rain', previous: 'void main(){ o = x; }', error: 'ERROR: x' }, stub);
   is('NEGATIVE CONTROL: previous with an error is still a retry, not a revision', sent[0]?.messages?.length === 4 && /refused: ERROR: x/.test(sent[0].messages[3].content));
 }
 
-// ── /code in SuperCollider: the contract is sclang-lite's own whitelist ──
+// ── /wish/code in SuperCollider: the contract is sclang-lite's own whitelist ──
 {
   const { UGENS, compile } = await import('../../../demo/shell/sclang-lite.mjs');
-  const { NOT_FOR_KEYS, SCLANG_EXAMPLES } = await import('../../../demo/shell/sclang-writer.mjs');
+  const { NOT_FOR_KEYS, SCLANG_EXAMPLES } = await import('../../../demo/shell/sclang-wish.mjs');
   const sent = [];
   const stub = async (model, payload) => { sent.push({ model, payload }); return { response: { code: '{ SinOsc.ar * 0.1 }' } }; };
-  const out = await handle('/code', { text: 'a warm pad', lang: 'sclang' }, stub);
+  const out = await handle('/wish/code', { text: 'a warm pad', lang: 'sclang' }, stub);
   const sys = sent[0]?.payload?.messages?.[0]?.content || '';
-  is('SuperCollider defaults to gpt-oss-120b at low effort, the measured best', sent[0]?.model === '@cf/openai/gpt-oss-120b' && sent[0]?.payload?.reasoning_effort === 'low', sent[0]?.model);
-  is('/code writes SuperCollider under a contract that offers every UGen the subset has for keys', out.status === 200 && out.body.code === '{ SinOsc.ar * 0.1 }'
+  is('SuperCollider defaults to qwen2.5-coder, the owner\'s choice after a live test', sent[0]?.model === CODE[0] && CODE[0] === '@cf/qwen/qwen2.5-coder-32b-instruct', sent[0]?.model);
+  is('/wish/code writes SuperCollider under a contract that offers every UGen the subset has for keys', out.status === 200 && out.body.code === '{ SinOsc.ar * 0.1 }'
     && Object.keys(UGENS).filter((n) => !NOT_FOR_KEYS.includes(n)).every((n) => sys.includes(`${n}.`)), sys.slice(0, 120));
   is('NEGATIVE CONTROL: the buffer and bus UGens a key cannot use are not offered', NOT_FOR_KEYS.every((n) => !new RegExp(`\\b${n}\\.`).test(sys)));
   is('the SuperCollider contract names .range, the no precedence rule and full scale', /\.range\(lo: 0, hi: 1\)/.test(sys) && /NO PRECEDENCE/.test(sys) && /between -1 and 1/.test(sys));
   is('a first SuperCollider try carries no examples, as GLSL\'s does not', !SCLANG_EXAMPLES.some((e) => sys.includes(e.body)));
   sent.length = 0;
-  await handle('/code', { text: 'darker', lang: 'sclang', previous: SCLANG_EXAMPLES[0].body }, stub);
+  await handle('/wish/code', { text: 'darker', lang: 'sclang', previous: SCLANG_EXAMPLES[0].body }, stub);
   is('a SuperCollider revision carries both examples, and each compiles', SCLANG_EXAMPLES.every((e) => sent[0]?.payload?.messages?.[0]?.content.includes(e.body) && compile(e.body).ok));
   sent.length = 0;
-  await handle('/code', { text: 'a bell', lang: 'sclang', model: '@cf/moonshotai/kimi-k2.6' }, stub);
+  sent.length = 0;
+  await handle('/wish/code', { text: 'a bell', lang: 'sclang', model: '@cf/openai/gpt-oss-120b' }, stub);
+  is('gpt-oss-120b, asked by name, still writes at low effort', sent[0]?.model === '@cf/openai/gpt-oss-120b' && sent[0]?.payload?.reasoning_effort === 'low', sent[0]?.model);
+  sent.length = 0;
+  await handle('/wish/code', { text: 'a bell', lang: 'sclang', model: '@cf/moonshotai/kimi-k2.6' }, stub);
   is('kimi-k2.6 writes with its thinking off', sent[0]?.model === '@cf/moonshotai/kimi-k2.6' && sent[0]?.payload?.chat_template_kwargs?.thinking === false);
 }
 
@@ -426,21 +435,22 @@ is('a page this account deployed is allowed',
   const { createLimiter, addressTag, BURST, PER_MINUTE, LIMITED } = await import('./limit.mjs');
   let t = 0;
   const lim = createLimiter({ now: () => t });
-  const takeN = (n, who, path = '/code') => Array.from({ length: n }, () => lim.take(who, path));
+  const takeN = (n, who, path = '/wish/code') => Array.from({ length: n }, () => lim.take(who, path));
   const first = takeN(BURST.n, 'a');
-  const over = lim.take('a', '/code');
+  const over = lim.take('a', '/wish/code');
   is('a burst is let through and the next one is a 429 with a plain reason and a wait', first.every((x) => x === null) && over?.status === 429
     && /too many requests from here: at most 6 in 10 s, try again in \d+ s/.test(over.error) && over.retryAfter >= 1, JSON.stringify(over));
-  is('/wish counts against the same visitor as /code', lim.take('a', '/wish')?.status === 429);
-  is('NEGATIVE CONTROL: another visitor is not refused for the first one\'s burst', lim.take('b', '/code') === null);
-  is('NEGATIVE CONTROL: /hear is not counted here', LIMITED.join() === '/code,/wish' && lim.take('a', '/hear') === null);
+  is('/wish counts against the same visitor as /wish/code', lim.take('a', '/wish')?.status === 429);
+  is('the old /code counts against the same visitor while it answers', lim.take('a', '/code')?.status === 429);
+  is('NEGATIVE CONTROL: another visitor is not refused for the first one\'s burst', lim.take('b', '/wish/code') === null);
+  is('NEGATIVE CONTROL: /hear is not counted here', LIMITED.join() === '/wish/code,/wish,/code' && lim.take('a', '/hear') === null);
   t += BURST.ms;
-  is('the burst frees itself once its window has passed', lim.take('a', '/code') === null);
+  is('the burst frees itself once its window has passed', lim.take('a', '/wish/code') === null);
   // Spread under the burst until the minute fills: 30 in a minute, then a refusal naming the minute.
   let lim2t = 0;
   const lim2 = createLimiter({ now: () => lim2t });
   let refused = null;
-  for (let i = 0; i < PER_MINUTE.n + 1; i++) { refused = lim2.take('c', '/code'); lim2t += 1900; }
+  for (let i = 0; i < PER_MINUTE.n + 1; i++) { refused = lim2.take('c', '/wish/code'); lim2t += 1900; }
   is('past 30 in a minute the refusal names the minute', refused?.status === 429 && /at most 30 in 60 s/.test(refused.error), JSON.stringify(refused));
   const tagA = await addressTag('203.0.113.5');
   is('an address is kept as 8 hex of its hash, and two addresses differ', /^[0-9a-f]{8}$/.test(tagA) && tagA !== await addressTag('203.0.113.6') && !tagA.includes('203'));

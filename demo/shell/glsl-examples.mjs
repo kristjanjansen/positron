@@ -1,6 +1,6 @@
-// demo/shell/glsl-examples.mjs: two short shaders to the writer's contract (mirror-shader.mjs's
-// glslContract), teaching what the model reached for too rarely. The wish worker's /code puts them
-// in its system prompt; glsl-writer-test.mjs and /shader/write/'s self-check check them.
+// demo/shell/glsl-examples.mjs: two short shaders to the wish contract (mirror-shader.mjs's
+// glslContract), teaching what the model reached for too rarely. The wish worker's /wish/code puts them
+// in its system prompt; glsl-wish-test.mjs and /shader/wish/'s self-check check them.
 // Neither is rain, so a measurement on rain grades no copy. One `hash(vec2)` in both: three
 // examples with two hash signatures made the model call one with the other's argument (measured).
 

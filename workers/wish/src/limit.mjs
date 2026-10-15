@@ -1,13 +1,14 @@
-// workers/wish/src/limit.mjs: a per-visitor cap on the paid routes (/code, /wish), a burst and a
+// workers/wish/src/limit.mjs: a per-visitor cap on the paid routes (/wish/code, /wish), a burst and a
 // per-minute count over stamps, as the relay counts wrong keys and pub counts /ice. In memory, so
 // it holds per isolate: a brake on one runaway page or script, not an account-wide gate.
 // The address is hashed before it is kept, as the relay does.
 
-/** A writer makes up to 3 calls a sentence, so 6 in 10 s is two sentences back to back. */
+/** A wish makes up to 3 calls a sentence, so 6 in 10 s is two sentences back to back. */
 export const BURST = { n: 6, ms: 10_000 };
 /** About ten sentences a minute, which nobody types; room for a few people behind one address. */
 export const PER_MINUTE = { n: 30, ms: 60_000 };
-export const LIMITED = ['/code', '/wish'];
+/** /code is the old name of /wish/code, counted while it still answers (one deploy). */
+export const LIMITED = ['/wish/code', '/wish', '/code'];
 
 /** 4 bytes of SHA-256 of an address, for counting it without keeping it. */
 export async function addressTag(ip) {

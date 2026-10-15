@@ -375,13 +375,13 @@ export function settingsFrom(out, fixed = [], links = []) {
 }
 
 
-// ── /code: a sentence in, one program out (plans/plan-text-to-code.md, slice 1) ──
+// ── /wish/code: a sentence in, one program out (plans/plan-text-to-code.md, slice 1) ──
 // The contract is generated from the module whose program runs it, never typed here.
 import { glslContract } from '../../../demo/shell/mirror-shader.mjs';
 import { glslExamples } from '../../../demo/shell/glsl-examples.mjs';
-import { sclangContract, sclangExamples } from '../../../demo/shell/sclang-writer.mjs';
+import { sclangContract, sclangExamples } from '../../../demo/shell/sclang-wish.mjs';
 
-/** The models that write a program; the first is the default. MEASURED 2026-10-15 on /shader/write/, ten
+/** The models that write a program; the first is the default. MEASURED 2026-10-15 on /shader/wish/, ten
  *  sentences each: qwen2.5-coder compiled 20 of 20 first shot at 6.3 to 6.8 s median, qwen3-30b 18 of 20
  *  at 2.3 s but answers in its reasoning field, kimi 9 of 10 at 15.5 s, which is past the 15 s budget. */
 export const CODE = [
@@ -393,11 +393,11 @@ export const CODE = [
   '@cf/openai/gpt-oss-120b',
   '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
 ];
-/** The model a language gets when a page names none. SuperCollider, MEASURED 2026-10-15 on /code/write/, ten
- *  sentences twice: gpt-oss-120b ran 20 of 20 (9.4 s median, distinct programs), qwen2.5-coder 18 of 20 at 6.3 s,
- *  kimi-k2.6 17 of 20 at 8.3 s, qwen3-30b 20 of 20 at 2.6 s but by changing one oscillator in the contract's shape. */
-export const CODE_DEFAULT = { glsl: CODE[0], sclang: '@cf/openai/gpt-oss-120b' };
-/** The languages /code writes, each with the contract its runtime keeps. */
+/** The model a language gets when a page names none. SuperCollider is qwen2.5-coder too since the owner's live
+ *  test (2026-10-15): 4 of 4 sounds ran first try in 6 to 7 s, where gpt-oss-120b once took the whole 30 s.
+ *  The bench before it, ten sentences twice: gpt-oss 20 of 20 at 9.4 s median, qwen2.5-coder 18 of 20 at 6.3 s. */
+export const CODE_DEFAULT = { glsl: CODE[0], sclang: CODE[0] };
+/** The languages /wish/code writes, each with the contract its runtime keeps. */
 export const CODE_LANGS = { glsl: glslContract, sclang: sclangContract };
 /** Short good programs per language, said after the contract; a page's own contract does not replace them. */
 export const CODE_EXAMPLES = { glsl: glslExamples, sclang: sclangExamples };
@@ -463,10 +463,12 @@ export function codeOf(raw) {
   return f ? f[1] : t;
 }
 
-// handle(path '/hear', '/wish' or '/code', parsed body, run(model, payload)) -> {status, body}.
+// handle(path '/hear', '/wish' or '/wish/code', parsed body, run(model, payload)) -> {status, body}.
 // why: lessons/workers-wish.md#handle
 export async function handle(path, body, run) {
   const bad = (error, status = 400) => ({ status, body: { error } });
+  // /code is the old name of /wish/code, kept answering for one deploy so a cached page does not break.
+  if (path === '/code') path = '/wish/code';
 
   if (path === '/hear') {
     const model = body.model || HEAR[0];
@@ -537,7 +539,7 @@ export async function handle(path, body, run) {
     } };
   }
 
-  if (path === '/code') {
+  if (path === '/wish/code') {
     const lang = body.lang || 'glsl';
     if (!Object.hasOwn(CODE_LANGS, lang)) return bad(`no contract for ${lang}`);
     const model = body.model || CODE_DEFAULT[lang];

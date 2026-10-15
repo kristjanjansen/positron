@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>Written shader</title>
+<title>Picture wish</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
@@ -13,7 +13,7 @@
   .cc-half { width: calc(50% - 8px); }
   @media (max-width: 560px) { .cc-half { width: 100%; } }
   .cc-half canvas { display: block; width: 100%; height: 100%; }
-  /* Where the conversation stands, and New shader, under the ask field as on /connect/. */
+  /* Where the conversation stands, under the wish field. */
   .cc-turn { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
 </style>
 <script type="module">
@@ -27,31 +27,30 @@
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { PARAM_HUES } from '/shell/code-lang.mjs';
-  import { createAskBar } from '/shell/ask-bar.mjs';
+  import { createWishBar } from '/shell/wish-bar.mjs';
   import { make as makeShader } from '/shell/rt-shader.mjs';
-  import { make as makeWriter, WISH_API } from '/shell/rt-writer.mjs';
-  import { VERSION, hashOf, firstLine } from '/shell/glsl-writer.mjs';
+  import { make as makeWish, WISH_API } from '/shell/rt-wish.mjs';
+  import { VERSION, hashOf, firstLine } from '/shell/glsl-wish.mjs';
   import { GLSL_EXAMPLES } from '/shell/glsl-examples.mjs';
-  import { createLinkButton } from '/shell/link-button.mjs';
 
-  // A sentence becomes a fragment shader: the writer asks the wish worker's /code, tries each answer
+  // A sentence becomes a fragment shader: the wish node asks the wish worker's /wish/code, tries each answer
   // in a sandbox GL of its own, and only a program that compiled and moved leaves on program-out.
   // The shader keeps drawing its last good program the whole time. Nothing opens on a visit.
   const S = 'web';
-  const WR_OUT = `${S}:writer:program-out`, SH_PROG = `${S}:shader:program-in`;
+  const WISH_OUT = `${S}:wish:program-out`, SH_PROG = `${S}:shader:program-in`;
   const KNOB_OUT = `${S}:knob-segments:value-out`, SH_VAL = `${S}:shader:value-in`;
   const SH_OUT = `${S}:shader:video-out`, SCREEN = `${S}:screen:video-in`;
   const q = new URLSearchParams(location.search);
   const API = q.get('api') || WISH_API;
 
-  const d = mount({ name: 'Written shader', what: '', readout: null, index: '/', indexLabel: 'positron' });
-  conceptNav('shader/write');
+  const d = mount({ name: 'Picture wish', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  conceptNav('shader/wish');
   const log = (m, lv) => d.log(m, lv);
 
   // A person's own requests go to the device log (pub.positron.studio/logs), never a check's.
   const ship = SELFCHECK ? () => {} : createShipper();
   let lastLine = '';
-  const logAsk = (line) => { lastLine = line; ship(`shader/write ${line}`); };
+  const logAsk = (line) => { lastLine = line; ship(`shader/wish ${line}`); };
 
   // ── the self-check's model: canned programs, so a check asks the worker nothing ──
   const GOOD = `precision highp float;
@@ -71,12 +70,12 @@ void main() {
     return { code: /broken/.test(q.text) ? BROKEN : GOOD, ms: 0, model: 'canned', usage: { total_tokens: 0 } };
   };
 
-  // ── the runtimes: the shader is /connect/'s, the writer is new ──
+  // ── the runtimes: the shader is /connect/'s, the wish is new ──
   const bay = createBay();
   const shader = makeShader({ log });
-  const writer = makeWriter({ log, api: API, model: q.get('model') || '', ask: SELFCHECK ? canned : null,
-    send: (port, ev) => bay.send(`${S}:writer:${port}`, ev) });
-  addNodes(bay, S, ['writer', 'knob-segments', 'shader', 'screen'], {
+  const wish = makeWish({ log, api: API, model: q.get('model') || '', ask: SELFCHECK ? canned : null,
+    send: (port, ev) => bay.send(`${S}:wish:${port}`, ev) });
+  addNodes(bay, S, ['wish', 'knob-segments', 'shader', 'screen'], {
     deliver: { 'shader:program-in': shader.deliver['program-in'], 'shader:value-in': shader.deliver['value-in'] },
     portLabel: 'node:port',
     ports: {
@@ -84,7 +83,7 @@ void main() {
       'screen:video-in': { label: 'picture' },
     },
   });
-  for (const [a, b] of [[WR_OUT, SH_PROG], [KNOB_OUT, SH_VAL], [SH_OUT, SCREEN]]) {
+  for (const [a, b] of [[WISH_OUT, SH_PROG], [KNOB_OUT, SH_VAL], [SH_OUT, SCREEN]]) {
     bay.seen(a); bay.seen(b);
     const r = bay.link(a, b, [], { site: S });
     if (!r.ok) log(`${a} -> ${b} refused: ${r.why}`, 'warn');
@@ -114,7 +113,7 @@ void main() {
   knob.el.style.setProperty('--param-hue', HUE);
   const grid = createKnobGrid(new Map([['segments', knob]]), { row: true });
 
-  // ── the ask: a sentence or a pill, then the writer's loop ──
+  // ── the ask: a sentence or a pill, then the wish loop ──
   const PILLS = ['slow blue waves', 'a pulsing red grid', 'stars drifting left', 'a warm sunset gradient',
     'rain on a window', 'a breathing kaleidoscope', 'green plasma', 'a tunnel of rings'];
   const said = (r) => {
@@ -124,7 +123,7 @@ void main() {
     return `The picture did not change: ${r.error}. The old shader keeps running.`;
   };
   // A conversation: once a written shader runs (or a hand edit to the code box), the next sentence
-  // revises the program in the code box rather than writing a new one. A pill or New shader ends it.
+  // revises the program in the code box rather than writing a new one. A pill or new wish ends it.
   let live = false, follow = 0, handEdited = false;
   const boxBody = () => shader.code.value().replace(/^\s*#version[^\n]*\n/, '');
   shader.code.input.addEventListener('input', () => { handEdited = true; showTurn(); });
@@ -137,7 +136,7 @@ void main() {
     const base = isFollow ? boxBody() : null;
     bar.say('');
     log(isFollow ? `changing the shader in the code box (follow-up ${follow}): ${text}` : `writing: ${text}`);
-    const r = await writer.write(text, { base, onTry: (t) => {
+    const r = await wish.write(text, { base, onTry: (t) => {
       for (const f of t.fixed || []) log(`try ${t.attempt}: ${f}`);
       log(`try ${t.attempt}: ${t.ok && !t.error ? 'compiled and moved' : t.error || 'refused'}${t.ms != null ? `, the answer took ${t.ms} ms` : ''}`, t.ok ? '' : 'warn');
     } });
@@ -148,24 +147,25 @@ void main() {
     bar.say(words, r.verdict === 'ran' ? '' : 'bad');
     if (r.source) log(`running the written shader: ${r.tries.length} ${r.tries.length === 1 ? 'try' : 'tries'}, ${r.ms} ms, ${r.tokens} tokens, by ${r.model}`);
     const verdict = r.verdict === 'refused' || r.verdict === 'failed' ? `${r.verdict}: ${firstLine(r.error)}` : r.verdict;
-    logAsk(`[code] "${text}" via ${how}, ${isFollow ? `follow-up ${follow}` : 'new'}, model ${r.model || '?'}, ${r.tries.length} attempt(s), ${r.ms} ms, ${r.tokens} tokens, ${verdict}`
+    logAsk(`[wish] "${text}" via ${how}, ${isFollow ? `follow-up ${follow}` : 'new'}, model ${r.model || '?'}, ${r.tries.length} attempt(s), ${r.ms} ms, ${r.tokens} tokens, ${verdict}`
       + `${r.source ? `, ${r.source.length} chars, hash ${hashOf(r.source)}` : ''}`);
     return r;
   }
-  const bar = createAskBar({ placeholder: 'say a picture, and a model writes its shader', api: API, log, ship: logAsk,
+  const bar = createWishBar({ placeholder: 'wish for a picture', api: API, log, ship: logAsk,
     selfcheck: SELFCHECK, pills: PILLS.map((say) => ({ say })),
+    reset: { say: 'new wish', title: 'the next sentence writes a new shader instead of changing this one',
+      onPress: () => { startFresh(); log('a new shader: the next sentence starts from nothing'); logAsk('[new] pressed new wish'); } },
     vocabulary: () => ['shader', 'kaleidoscope', 'plasma', 'gradient'],
     onAsk: (text, { how }) => write(text, { how }) });
 
-  // Where the conversation stands, and New shader, which forgets it (the picture keeps running).
+  // Where the conversation stands; the last pill, new wish, forgets it (the picture keeps running).
   const turnSay = el('span', '', '');
-  const newBtn = createLinkButton({ label: 'New shader', title: 'the next sentence writes a new shader instead of changing this one',
-    onPress: () => { startFresh(); log('a new shader: the next sentence starts from nothing'); logAsk('[new] pressed New shader'); } });
+  const newBtn = { el: bar.reset };
   const turnRow = el('p', 'cc-turn');
-  turnRow.append(turnSay, newBtn.el);
+  turnRow.append(turnSay);
   function showTurn() {
     turnSay.textContent = followsNow() ? `the next sentence changes the shader in the code box (follow-up ${follow + 1})` : 'the next sentence writes a new shader';
-    newBtn.el.hidden = !followsNow();
+    bar.showReset(followsNow());
   }
   showTurn();
   bar.el.insertBefore(turnRow, bar.el.children[1]);
@@ -178,7 +178,7 @@ void main() {
   if (shader.shader.ok()) { drawing = true; requestAnimationFrame(frame); pb.refresh(); }
 
   window.__demo.write = write;
-  window.__demo.writer = writer;
+  window.__demo.wish = wish;
   window.__demo.shader = shader;
   window.__demo.bar = bar;
   window.__demo.bay = bay;
@@ -201,7 +201,7 @@ void main() {
 
     const first = shader.shader.source();
     A('nothing is written on a visit: the shader runs its own program and nothing was asked',
-      shader.programs().ran === 0 && writer.asked() === 0 && /uSegments/.test(first || ''), `${shader.programs().ran} programs`);
+      shader.programs().ran === 0 && wish.asked() === 0 && /uSegments/.test(first || ''), `${shader.programs().ran} programs`);
 
     // Positive control: a good program reaches the shader along the link and draws.
     const r1 = await write('canned waves');
@@ -210,9 +210,9 @@ void main() {
     let lo = 255, hi = 0;
     for (let i = 0; px && i < px.length; i += 4 * 97) { lo = Math.min(lo, px[i + 1]); hi = Math.max(hi, px[i + 1]); }
     A('a good program runs in one try, arrives on program-in along the link, fills the code box and draws',
-      r1?.verdict === 'ran' && r1.tries.length === 1 && shader.programs().ran === 1 && sentOn(WR_OUT, SH_PROG) === 1
+      r1?.verdict === 'ran' && r1.tries.length === 1 && shader.programs().ran === 1 && sentOn(WISH_OUT, SH_PROG) === 1
         && shader.shader.source() === VERSION + GOOD && shader.code.value() === VERSION + GOOD && hi - lo > 20,
-      `${r1?.verdict}, sent ${sentOn(WR_OUT, SH_PROG)}, green ${lo} to ${hi}`);
+      `${r1?.verdict}, sent ${sentOn(WISH_OUT, SH_PROG)}, green ${lo} to ${hi}`);
     const good = shader.shader.source();
 
     // Negative control: a program that never compiles is refused three times, and the picture stays.
@@ -220,8 +220,8 @@ void main() {
     const r2 = await write('canned broken');
     A('a broken program is tried three times and refused, the retry counter moves, and the old picture keeps running',
       r2?.verdict === 'refused' && r2.tries.length === 3 && r2.tries.length > asked0 && shader.programs().ran === 1
-        && sentOn(WR_OUT, SH_PROG) === 1 && shader.shader.source() === good && shader.shader.ok(),
-      `${r2?.verdict}, ${r2?.tries.length} tries, sent ${sentOn(WR_OUT, SH_PROG)}`);
+        && sentOn(WISH_OUT, SH_PROG) === 1 && shader.shader.source() === good && shader.shader.ok(),
+      `${r2?.verdict}, ${r2?.tries.length} tries, sent ${sentOn(WISH_OUT, SH_PROG)}`);
     A('the refusal is said in one centred line with the compiler\'s own words', /undeclared identifier|nowhere/.test(bar.said()) && /old shader keeps running/.test(bar.said()),
       bar.said());
     // That second sentence came after a written shader ran, so it was a revision of it.
@@ -235,12 +235,12 @@ void main() {
     A('NEGATIVE CONTROL: program-in refuses a body carrying #version and keeps the running program',
       !door.ok && /^send the body without a #version line/.test(door.error) && shader.shader.source() === good && shader.programs().refused === 1, door.error);
 
-    // A pill is an ask: it shimmers while the writer works, then lets go.
+    // A pill is an ask: it shimmers while the wish works, then lets go.
     const pill = bar.pills[0];
     pill.click();
     const busyWhile = pill.dataset.busy === '1';
     while (bar.busy()) await new Promise((r) => setTimeout(r, 20));
-    A('a pill asks its sentence and shimmers while the writer works', busyWhile && !pill.dataset.busy && bar.field.value() === PILLS[0]
+    A('a pill asks its sentence and shimmers while the wish works', busyWhile && !pill.dataset.busy && bar.field.value() === PILLS[0]
       && shader.programs().ran === 2, `busy ${busyWhile}, programs ${shader.programs().ran}`);
     A('NEGATIVE CONTROL: a pill starts fresh, its ask carries no program', asks.at(-1)?.previous === null && /via pill, new, /.test(lastLine), lastLine.slice(0, 80));
 
@@ -253,8 +253,8 @@ void main() {
       `${(asks.at(-1)?.previous || '').slice(80, 120)}`);
     newBtn.el.click();
     await write('canned waves');
-    A('NEGATIVE CONTROL: after New shader the next sentence asks for a new program', asks.at(-1)?.previous === null && /, new, /.test(lastLine)
-      && newBtn.el.hidden === false && /follow-up 1/.test(turnRow.textContent), lastLine.slice(0, 80));
+    A('NEGATIVE CONTROL: after new wish the next sentence asks for a new program', asks.at(-1)?.previous === null && /, new, /.test(lastLine)
+      && newBtn.el.hidden === false && bar.row.lastElementChild === newBtn.el && /follow-up 1/.test(turnRow.textContent), lastLine.slice(0, 80));
 
     // Asked too often: the worker's own reason is said plainly, and the picture stays.
     const ran0 = shader.programs().ran;
@@ -262,14 +262,51 @@ void main() {
     A('a refusal for asking too often is said plainly and the old shader keeps running',
       busy?.verdict === 'failed' && /^Nothing was written: too many requests from here/.test(bar.said()) && shader.programs().ran === ran0 && shader.shader.ok(), bar.said());
 
-    // The worker's prompt examples compile in this browser's GL and move, in the writer's own sandbox.
-    const ex = GLSL_EXAMPLES.map((e) => ({ name: e.name, ...writer.trial(e.body) }));
+    // Speech: the switcher picks the engine and is remembered; under a check neither engine starts.
+    const kept = (() => { try { return localStorage.getItem('pos-wish-speech'); } catch { return null; } })();
+    const stored = () => { try { return localStorage.getItem('pos-wish-speech'); } catch { return 'unreadable'; } };
+    const keyEv = (type, k) => dispatchEvent(new KeyboardEvent(type, { key: k }));
+    keyEv('keydown', 'CapsLock'); const held = bar.mic.on(); keyEv('keyup', 'CapsLock');
+    keyEv('keydown', 'Alt'); const heldAlt = bar.mic.on(); keyEv('keyup', 'Alt');
+    dispatchEvent(new CustomEvent('pos-sustain', { detail: { down: true } })); const heldPedal = bar.mic.on();
+    dispatchEvent(new CustomEvent('pos-sustain', { detail: { down: false } }));
+    const st = bar.mic.started();
+    A('NEGATIVE CONTROL: Caps Lock, Option and the pedal light the button under a check, and neither speech engine starts',
+      held && heldAlt && heldPedal && !bar.mic.on() && st.chrome === 0 && st.whisper === 0 && micAsked === 0,
+      `chrome ${st.chrome}, whisper ${st.whisper}, microphone asks ${micAsked}`);
+    const sw = bar.switcher.buttons;
+    sw[1].click();
+    const toWhisper = bar.engine() === 'whisper' && stored() === 'whisper' && sw[1].getAttribute('aria-pressed') === 'true';
+    sw[0].click();
+    const back = bar.has().chrome ? bar.engine() === 'chrome' && stored() === 'chrome' : bar.engine() === 'whisper';
+    A('the speech switcher under the bar picks the engine and remembers it', toWhisper && back && bar.el.lastElementChild.contains(bar.switcher.el),
+      `${bar.engine()}, stored ${stored()}, chrome here ${bar.has().chrome}`);
+    // Both engines faked, on a bar of its own: live words while held, the text asked on release.
+    const heardLines = [], askedVoice = [];
+    const t = createWishBar({ keys: false, ship: (l) => heardLines.push(l), onAsk: async (text, { how }) => { askedVoice.push(`${how}:${text}`); },
+      engines: {
+        chrome: ({ onWords }) => ({ start() { onWords('slow'); onWords('slow blue'); }, stop: async () => ({ text: 'slow blue waves' }) }),
+        whisper: () => ({ start: async () => {}, stop: async () => ({ text: 'green plasma', note: 'fake' }) }),
+      } });
+    t.setEngine('chrome'); await t.mic.start(); const live = t.field.value(); await t.mic.stop(); await new Promise((r) => setTimeout(r, 0));
+    t.setEngine('whisper'); await t.mic.start(); const liveW = t.field.value(); await t.mic.stop();
+    A('chrome shows the words in the field while held and asks the final text on release; whisper asks what came back; the log names the engine and the time',
+      live === 'slow blue' && liveW === 'slow blue waves' && askedVoice.join('|') === 'voice:slow blue waves|voice:green plasma'
+        && /by chrome, \d+ ms from release to final text/.test(heardLines[0] || '') && /by whisper, \d+ ms from release/.test(heardLines[1] || ''),
+      `${live} / ${askedVoice.join('|')} / ${heardLines.map((l) => l.slice(0, 60)).join(' | ')}`);
+    A('NEGATIVE CONTROL: an engine that does not exist is not picked', t.setEngine('nonsense') === 'whisper' && t.engine() === 'whisper');
+    t.destroy();
+    try { if (kept === null) localStorage.removeItem('pos-wish-speech'); else localStorage.setItem('pos-wish-speech', kept); } catch { /* not remembered */ }
+    bar.setEngine(kept && bar.has()[kept] ? kept : bar.has().chrome ? 'chrome' : 'whisper');
+
+    // The worker's prompt examples compile in this browser's GL and move, in the wish node's own sandbox.
+    const ex = GLSL_EXAMPLES.map((e) => ({ name: e.name, ...wish.trial(e.body) }));
     A('the examples in the prompt compile here and move', ex.length === GLSL_EXAMPLES.length && ex.length > 0 && ex.every((e) => e.ok && !e.flat && !e.still),
       ex.map((e) => `${e.name} ${e.ok ? (e.flat ? 'flat' : e.still ? 'still' : 'moves') : e.error}`).join(', '));
 
     A('nothing reaches pi-1: no node or link names it, no relay socket was opened, and the check asked the worker nothing',
       !bay.nodes().some((x) => x.id.startsWith('pi-1:')) && !bay.links().some((l) => /pi-1:/.test(l.from + l.to))
-        && sockets.length === 0 && toWorker() === 0 && writer.asked() === 0 && micAsked === 0,
+        && sockets.length === 0 && toWorker() === 0 && wish.asked() === 0 && micAsked === 0,
       `${sockets.length} sockets, ${toWorker()} worker calls, ${micAsked} microphone asks`);
     window.fetch = f0; window.WebSocket = W0;
     if (gum) navigator.mediaDevices.getUserMedia = gum;

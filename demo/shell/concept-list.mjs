@@ -13,7 +13,7 @@ export const CONCEPTS = [
   // why: lessons/kit-concept-list.md#envelope-lfo
   { id: 'code/faust', title: 'Faust synth', say: 'A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.' },
   { id: 'code/collide', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
-  { id: 'code/write', title: 'Written synth', say: 'Type or say a sound and a model writes it in SuperCollider. Play it from the keys or edit the code.' },
+  { id: 'code/wish', title: 'Sound wish', say: 'Type or say a wish for a sound and a model writes it in SuperCollider. Play it from the keys.' },
   // why: lessons/kit-concept-list.md#plaits
   { id: 'code/plaits', title: 'Plaits', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
   // A row's `group` sets the heading it shows under; its folder and URL stay where they are.
@@ -52,7 +52,7 @@ export const CONCEPTS = [
   { id: 'shader/landscape', title: 'Scan landscape', say: 'A radio recording drawn as a scan landscape. Six knobs shape the ridges.' },
   // why: lessons/kit-concept-list.md#shader-remote
   { id: 'shader/remote', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
-  { id: 'shader/write', title: 'Written shader', say: 'Type or say a picture and a model writes its shader. The code stays in the box for you to edit.' },
+  { id: 'shader/wish', title: 'Picture wish', say: 'Type or say a wish for a picture and a model writes its shader. The code stays in the box to edit.' },
   // why: lessons/kit-concept-list.md#pico
   { id: 'room/chat', title: 'Chat', say: 'A chat window whose every line crosses the room along a patchbay link, drawn underneath.' },
   // why: lessons/kit-concept-list.md#room-chat

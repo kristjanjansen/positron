@@ -1,11 +1,11 @@
-// node demo/shell/sclang-writer-test.mjs: the SuperCollider writer with a stub model and a stub render,
-// no browser. The render itself (sclang-trial.mjs) is graded by /code/write/'s ?selfcheck=1.
-// NEGATIVE CONTROL lines must refuse something; a writer that ran anything would pass the rest.
+// node demo/shell/sclang-wish-test.mjs: the SuperCollider wish with a stub model and a stub render,
+// no browser. The render itself (sclang-wish-trial.mjs) is graded by /code/wish/'s ?selfcheck=1.
+// NEGATIVE CONTROL lines must refuse something; a wish that ran anything would pass the rest.
 
 import { compile, UGENS } from './sclang-lite.mjs';
 import { sclangContract, SHAPE, copiesShape, ugenLines, NOT_FOR_KEYS, SCLANG_EXAMPLES, sclangExamples, adaptSclang, checkSound, judgeSclang,
-  writeSclang, SCLANG_MAX, PEAK_MAX } from './sclang-writer.mjs';
-import { ATTEMPTS } from './code-writer.mjs';
+  writeSclang, SCLANG_MAX, PEAK_MAX } from './sclang-wish.mjs';
+import { ATTEMPTS } from './wish-loop.mjs';
 
 let ok = 0;
 const bad = [];
@@ -84,7 +84,7 @@ check('NEGATIVE CONTROL: a NaN program and a silent one are refused', !judgeScla
 check('NEGATIVE CONTROL: a program whose sound could not be checked is not run', !judgeSclang({ ok: true, unchecked: 'no audio here', peak: 0 }).pass);
 check('a program inside full scale passes', judgeSclang({ ok: true, peak: 0.4, rms: 0.1, nan: false, silent: false }).pass === true);
 
-// ── the loop, with the shared code-writer.mjs underneath ──
+// ── the loop, with the shared wish-loop.mjs underneath ──
 const GOOD = SCLANG_EXAMPLES[0].body;
 const LOUD = GOOD.replace('/ 1.75', '* 40');
 const BROKEN = '{ |freq = 220, gate = 1| Pluck.ar(WhiteNoise.ar, gate, 0.01, freq.reciprocal, 2) }';

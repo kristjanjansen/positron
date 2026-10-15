@@ -34,7 +34,7 @@ export default {
     }
 
     if (request.method !== 'POST') {
-      return json({ error: 'post to /hear, /wish or /code' }, 405, cors);
+      return json({ error: 'post to /hear, /wish or /wish/code' }, 405, cors);
     }
 
     // The address is `cf-connecting-ip`, which Cloudflare sets; an empty one shares one bucket.

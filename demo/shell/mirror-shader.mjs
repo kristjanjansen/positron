@@ -33,7 +33,7 @@ void main(){
   o = vec4(mix(c, fb, uFb), 1.0); }`;
 
 // The uniforms a program here may read, parsed out of MIRROR_FS so the list is typed once; build()
-// binds these and the writer's contract (glslContract) names them.
+// binds these and the wish contract (glslContract) names them.
 export const UNIFORMS = [...MIRROR_FS.matchAll(/\buniform\s+(\w+)\s+(\w+)\s*;/g)].map((m) => ({ type: m[1], name: m[2] }));
 /** What each uniform carries, for a reader and for the model. A uniform without one fails the test. */
 export const UNIFORM_MEANING = {
@@ -155,7 +155,7 @@ export function createMirrorShader({ w: W = 640, h: H = 360, log = () => {} } = 
   // The routing follows the links: no link out, the canvas is the page's
   // ground; no value yet, the shader has no N and draws nothing.
   let i = 0;
-  // `t` sets uT for one frame (the writer's trial at times of its choosing); without it uT is the frame clock.
+  // `t` sets uT for one frame (the wish trial at times of its choosing); without it uT is the frame clock.
   function render(segments, { out = true, t } = {}) {
     if (!gl) return;
     const ready = prog && out && segments != null;

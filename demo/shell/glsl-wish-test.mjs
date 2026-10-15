@@ -1,8 +1,8 @@
-// node demo/shell/glsl-writer-test.mjs: the writer's loop with a stub model and a stub compiler,
+// node demo/shell/glsl-wish-test.mjs: the wish loop with a stub model and a stub compiler,
 // no browser. NEGATIVE CONTROL lines must refuse something; a loop that ran anything would pass
 // the rest.
 
-import { adaptGlsl, bodyError, firstLine, checkPicture, hashOf, writeProgram, ATTEMPTS } from './glsl-writer.mjs';
+import { adaptGlsl, bodyError, firstLine, checkPicture, hashOf, writeProgram, ATTEMPTS } from './glsl-wish.mjs';
 import { UNIFORMS, UNIFORM_MEANING, glslContract } from './mirror-shader.mjs';
 
 let ok = 0;

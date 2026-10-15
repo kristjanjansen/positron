@@ -327,6 +327,27 @@ column is a 404**, no forwarding. This table wins over the two above it.
 (`ls` 2026-10-14). The concept back link reads `← positron` since `f06642b1`
 (`indexLabel: 'positron'`), not `← concepts`.
 
+## Wish, 2026-10-15: the written pages and the writer node
+
+Asked: *"writer is no better. keep wish in naming."* *Wish* names what a person
+does and the box carrying their words; what comes back keeps its own name
+(shader, synth, patch). **Both old addresses are a 404**, no forwarding.
+`/wish/` (the archived demo) is a different page and still served.
+
+| old | new |
+| --- | --- |
+| `/shader/write/` (Written shader) | `/shader/wish/` (Picture wish) |
+| `/code/write/` (Written synth) | `/code/wish/` (Sound wish) |
+| node `writer`, `web:writer:program-out` | node `wish`, `web:wish:program-out` |
+| `demo/shell/rt-writer.mjs` | `demo/shell/rt-wish.mjs` |
+| `demo/shell/ask-bar.mjs` (`createAskBar`, `.pos-ask*`) | `demo/shell/wish-bar.mjs` (`createWishBar`, `.pos-wish*`) |
+| `demo/shell/code-writer.mjs` | `demo/shell/wish-loop.mjs` |
+| `demo/shell/glsl-writer.mjs`, `glsl-writer-test.mjs` | `glsl-wish.mjs`, `glsl-wish-test.mjs` |
+| `demo/shell/sclang-writer.mjs`, `sclang-writer-test.mjs` | `sclang-wish.mjs`, `sclang-wish-test.mjs` |
+| `demo/shell/sclang-trial.mjs` | `demo/shell/sclang-wish-trial.mjs` |
+| worker route `/code` | `/wish/code` (`/code` kept answering for one deploy as an alias) |
+| log tag `[code]` | `[wish]` |
+
 ## Archived 2026-10-12 and 2026-10-13: still served, off the index
 
 🔴 **ARCHIVED IS NOT REMOVED.** Each of these keeps its manifest row with

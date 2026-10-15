@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>Written synth</title>
+<title>Sound wish</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/concept.css">
 <script type="module">
@@ -16,19 +16,19 @@
   import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createAskBar } from '/shell/ask-bar.mjs';
+  import { createWishBar } from '/shell/wish-bar.mjs';
   import { make as makeCollide } from '/shell/rt-collide.mjs';
-  import { make as makeWriter, WISH_API } from '/shell/rt-writer.mjs';
-  import { createSclangTrial } from '/shell/sclang-trial.mjs';
-  import { SCLANG_EXAMPLES, checkSound } from '/shell/sclang-writer.mjs';
-  import { hashOf } from '/shell/code-writer.mjs';
+  import { make as makeWish, WISH_API } from '/shell/rt-wish.mjs';
+  import { createSclangTrial } from '/shell/sclang-wish-trial.mjs';
+  import { SCLANG_EXAMPLES, checkSound } from '/shell/sclang-wish.mjs';
+  import { hashOf } from '/shell/wish-loop.mjs';
   import { compile } from '/shell/sclang-lite.mjs';
 
-  // A sentence becomes a SuperCollider synth: the writer asks the wish worker's /code, compiles each
+  // A sentence becomes a SuperCollider synth: the wish node asks the wish worker's /wish/code, compiles each
   // answer and plays one held note of it where nobody hears it, and only a program that compiled and
   // stayed inside full scale leaves on program-out. The keys play the last good synth throughout.
   const S = 'web';
-  const WR_OUT = `${S}:writer:program-out`, SC_PROG = `${S}:collide:program-in`;
+  const WISH_OUT = `${S}:wish:program-out`, SC_PROG = `${S}:collide:program-in`;
   const KEYS_OUT = `${S}:keys:midi-out`, SC_MIDI = `${S}:collide:midi-in`;
   const SC_OUT = `${S}:collide:audio-out`, SPEAKER = `${S}:speaker:audio-in`;
   const q = new URLSearchParams(location.search);
@@ -36,14 +36,14 @@
   /** The limiter's ceiling: -1 dBFS, so nothing written can reach the speakers above it. */
   const CEILING = 10 ** (-1 / 20);
 
-  const d = mount({ name: 'Written synth', what: '', readout: null, index: '/', indexLabel: 'positron' });
-  conceptNav('code/write');
+  const d = mount({ name: 'Sound wish', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  conceptNav('code/wish');
   const log = (m, lv) => d.log(m, lv);
 
   // A person's own requests go to the device log (pub.positron.studio/logs), never a check's.
   const ship = SELFCHECK ? () => {} : createShipper();
   let lastLine = '';
-  const logAsk = (line) => { lastLine = line; ship(`code/write ${line}`); };
+  const logAsk = (line) => { lastLine = line; ship(`code/wish ${line}`); };
 
   // ── the self-check's model: canned programs, so a check asks the worker nothing ──
   const GOOD = SCLANG_EXAMPLES[0].body;
@@ -91,19 +91,19 @@
     return true;
   }
 
-  // ── the runtimes: collide is /connect/'s, the writer is /shader/write/'s in SuperCollider ──
+  // ── the runtimes: collide is /connect/'s, the wish is /shader/wish/'s in SuperCollider ──
   const bay = createBay();
   const collide = makeCollide({ log, wake: () => start(), reroute: route });
   const check = createSclangTrial({ context, log });
-  const writer = makeWriter({ log, api: API, lang: 'sclang', model: q.get('model') || '', ask: SELFCHECK ? canned : null,
-    trial: (src) => check.trial(src), send: (port, ev) => bay.send(`${S}:writer:${port}`, ev) });
-  addNodes(bay, S, [{ name: 'writer', variant: 'sclang' }, 'keys', 'collide', 'speaker'], {
+  const wish = makeWish({ log, api: API, lang: 'sclang', model: q.get('model') || '', ask: SELFCHECK ? canned : null,
+    trial: (src) => check.trial(src), send: (port, ev) => bay.send(`${S}:wish:${port}`, ev) });
+  addNodes(bay, S, [{ name: 'wish', variant: 'sclang' }, 'keys', 'collide', 'speaker'], {
     deliver: {
       'collide:program-in': collide.deliver['program-in'], 'collide:midi-in': collide.deliver['midi-in'],
     },
     portLabel: 'node:port',
   });
-  for (const [a, b] of [[WR_OUT, SC_PROG], [KEYS_OUT, SC_MIDI], [SC_OUT, SPEAKER]]) {
+  for (const [a, b] of [[WISH_OUT, SC_PROG], [KEYS_OUT, SC_MIDI], [SC_OUT, SPEAKER]]) {
     bay.seen(a); bay.seen(b);
     const r = bay.link(a, b, [], { site: S });
     if (!r.ok) log(`${a} -> ${b} refused: ${r.why}`, 'warn');
@@ -123,7 +123,7 @@
   });
   for (const ev of ['pointerenter', 'focusin', 'touchstart']) host.addEventListener(ev, () => collide.voice.warm(), { once: true, passive: true });
 
-  // ── the ask: a sentence or a pill, then the writer's loop ──
+  // ── the ask: a sentence or a pill, then the wish loop ──
   const PILLS = ['a warm pad', 'a plucky bass', 'a bell', 'wind', 'a detuned saw lead', 'a kick drum', 'a soft organ', 'a wobbly bass'];
   const said = (r) => {
     if (r.verdict === 'ran') return '';
@@ -131,7 +131,7 @@
     return `The synth did not change: ${r.error}. The old synth keeps playing.`;
   };
   // A conversation: once a written synth runs (or a hand edit to the code box), the next sentence
-  // revises the program in the code box. A pill or start new begins again from nothing.
+  // revises the program in the code box. A pill or new wish begins again from nothing.
   let live = false, follow = 0, handEdited = false;
   collide.code.input.addEventListener('input', () => { handEdited = true; showTurn(); });
   const followsNow = () => live || handEdited;
@@ -145,7 +145,7 @@
     const base = isFollow ? collide.code.input.value : null;
     bar.say('');
     log(isFollow ? `changing the synth in the code box (follow-up ${follow}): ${text}` : `writing: ${text}`);
-    const r = await writer.write(text, { base, onTry: (t) => {
+    const r = await wish.write(text, { base, onTry: (t) => {
       for (const f of t.fixed || []) log(`try ${t.attempt}: ${f}`);
       const loud = t.peak != null ? `, peak ${t.peak.toFixed(2)}` : '';
       log(`try ${t.attempt}: ${t.ok && !t.error ? `compiled and sounded${loud}` : t.error || 'refused'}${t.ms != null ? `, the answer took ${t.ms} ms` : ''}`, t.ok && !t.error ? '' : 'warn');
@@ -156,20 +156,21 @@
     bar.say(said(r), r.verdict === 'ran' ? '' : 'bad');
     if (r.source) log(`playing the written synth from the next note: ${r.tries.length} ${r.tries.length === 1 ? 'try' : 'tries'}, ${r.ms} ms, ${r.tokens} tokens, by ${r.model}`);
     const verdict = r.verdict === 'ran' ? `ran, peak ${r.tries.at(-1).peak?.toFixed(2)}` : `${r.verdict}: ${String(r.error).split('\n')[0]}`;
-    logAsk(`[code] lang sclang "${text}" via ${how}, ${isFollow ? `follow-up ${follow}` : 'new'}, model ${r.model || '?'}, ${r.tries.length} attempt(s), ${r.ms} ms, ${r.tokens} tokens, ${verdict}`
+    logAsk(`[wish] lang sclang "${text}" via ${how}, ${isFollow ? `follow-up ${follow}` : 'new'}, model ${r.model || '?'}, ${r.tries.length} attempt(s), ${r.ms} ms, ${r.tokens} tokens, ${verdict}`
       + `${r.source ? `, ${r.source.length} chars, hash ${hashOf(r.source)}` : ''}`);
     return r;
   }
-  const bar = createAskBar({ placeholder: 'say a sound, and a model writes its synth', api: API, log, ship: logAsk,
+  const bar = createWishBar({ placeholder: 'wish for a sound', api: API, log, ship: logAsk,
     selfcheck: SELFCHECK,
-    pills: [{ say: 'start new', title: 'the next sentence writes a new synth instead of changing this one', onPress: () => {
-      startFresh(); log('a new synth: the next sentence starts from nothing'); logAsk('[new] pressed start new');
-    } }, ...PILLS.map((say) => ({ say }))],
+    pills: PILLS.map((say) => ({ say })),
+    reset: { say: 'new wish', title: 'the next sentence writes a new synth instead of changing this one', onPress: () => {
+      startFresh(); log('a new synth: the next sentence starts from nothing'); logAsk('[new] pressed new wish');
+    } },
     vocabulary: () => ['SuperCollider', 'synth', 'pad', 'bass', 'organ'],
     onAsk: (text, { how }) => write(text, { how }) });
-  const startPill = bar.pills[0];
-  // start new is shown only while there is a conversation to forget.
-  function showTurn() { startPill.hidden = !followsNow(); }
+  const startPill = bar.reset;
+  // new wish is shown only while there is a conversation to forget.
+  function showTurn() { bar.showReset(followsNow()); }
   showTurn();
 
   const pb = createPatchbay(bay, {
@@ -178,7 +179,7 @@
   d.stack.add(bar.el, host, collide.code.el, pb.el);
 
   window.__demo.write = write;
-  window.__demo.writer = writer;
+  window.__demo.wish = wish;
   window.__demo.collide = collide;
   window.__demo.trial = check;
   window.__demo.keyboard = kb;
@@ -212,9 +213,9 @@
     }
 
     const first = collide.code.input.value;
-    A('nothing is written or opened on a visit: no context, no engine, nothing asked, and start new is not drawn',
-      ctx === null && writer.asked() === 0 && collide.programs().ran === 0 && startPill.hidden && getComputedStyle(startPill).display === 'none',
-      `${collide.programs().ran} programs, start new ${getComputedStyle(startPill).display}`);
+    A('nothing is written or opened on a visit: no context, no engine, nothing asked, and new wish is not drawn',
+      ctx === null && wish.asked() === 0 && collide.programs().ran === 0 && startPill.hidden && getComputedStyle(startPill).display === 'none',
+      `${collide.programs().ran} programs, new wish ${getComputedStyle(startPill).display}`);
 
     // Positive control: a good synth passes the sound check, arrives on program-in along the link, and plays.
     const r1 = await write('canned bell');
@@ -222,19 +223,20 @@
     const t1 = r1?.tries[0] || {};
     A('a good synth runs in one try: it compiled, its held note sounded inside full scale, and it reached collide along the link into the code box',
       r1?.verdict === 'ran' && r1.tries.length === 1 && t1.peak > 0.01 && t1.peak <= 1 && !t1.nan && collide.programs().ran === 1
-        && sentOn(WR_OUT, SC_PROG) === 1 && collide.code.input.value === `${GOOD}\n` && check.renders() === 1,
-      `${r1?.verdict}, peak ${t1.peak?.toFixed(3)}, rms ${t1.rms?.toFixed(3)}, render ${t1.renderMs} ms, sent ${sentOn(WR_OUT, SC_PROG)}`);
+        && sentOn(WISH_OUT, SC_PROG) === 1 && collide.code.input.value === `${GOOD}\n` && check.renders() === 1,
+      `${r1?.verdict}, peak ${t1.peak?.toFixed(3)}, rms ${t1.rms?.toFixed(3)}, render ${t1.renderMs} ms, sent ${sentOn(WISH_OUT, SC_PROG)}`);
     await start();
     const heard = await playNote();
     A('a key plays the written synth through the speakers\' chain', heard && heard.peak > 0.01 && heard.peak <= CEILING + 1e-4 && sentOn(KEYS_OUT, SC_MIDI) >= 2,
       heard ? `peak ${heard.peak.toFixed(3)} after the limiter` : 'no context');
-    A('start new is drawn once there is a synth to forget', !startPill.hidden && getComputedStyle(startPill).display !== 'none');
+    A('new wish is drawn once there is a synth to forget, as the last pill', !startPill.hidden && getComputedStyle(startPill).display !== 'none'
+      && bar.row.lastElementChild === startPill);
     const good = collide.code.input.value;
 
     // Negative control: a synth that clips is refused by the sound check, three times, before the speakers.
     const r2 = await write('canned loud');
     A('a clipping synth is refused before the speakers: three tries, each peaked above full scale, none sent, the old synth stays',
-      r2?.verdict === 'refused' && r2.tries.length === 3 && r2.tries.every((t) => t.peak > 1) && sentOn(WR_OUT, SC_PROG) === 1
+      r2?.verdict === 'refused' && r2.tries.length === 3 && r2.tries.every((t) => t.peak > 1) && sentOn(WISH_OUT, SC_PROG) === 1
         && collide.programs().ran === 1 && collide.code.input.value === good,
       `${r2?.verdict}, peaks ${r2?.tries.map((t) => t.peak?.toFixed(2)).join(' ')}`);
     A('the refusal is said with the peak, and the retry told the model the number', /times full scale/.test(bar.said()) && /old synth keeps playing/.test(bar.said())
@@ -260,15 +262,15 @@
       loudHeard ? `peak ${loudHeard.peak.toFixed(4)}, ceiling ${CEILING.toFixed(4)}` : 'nothing');
     await collide.deliver['program-in']({ of: 'program', source: good }).loaded;
 
-    // A pill starts fresh; start new forgets the conversation and hides itself.
-    const pill = bar.pills[1];
+    // A pill starts fresh; new wish forgets the conversation and hides itself.
+    const pill = bar.pills[0];
     pill.click();
     const busyWhile = pill.dataset.busy === '1';
     while (bar.busy()) await sleep(20);
-    A('a pill asks its sentence, shimmers while the writer works, and starts fresh', busyWhile && !pill.dataset.busy && asks.at(-1)?.previous === null
+    A('a pill asks its sentence, shimmers while the wish works, and starts fresh', busyWhile && !pill.dataset.busy && asks.at(-1)?.previous === null
       && /via pill, new, /.test(lastLine) && collide.programs().ran === 4, `busy ${busyWhile}, ${lastLine.slice(0, 60)}`);
     startPill.click();
-    A('start new forgets the conversation, asks nothing, and is hidden again', startPill.hidden && !followsNow() && /\[new\] pressed start new/.test(lastLine));
+    A('new wish forgets the conversation, asks nothing, and is hidden again', startPill.hidden && !followsNow() && /\[new\] pressed new wish/.test(lastLine));
 
     const ran0 = collide.programs().ran;
     const busy = await write('canned busy');
@@ -281,9 +283,16 @@
     A('the examples in the prompt compile and sound inside full scale here', ex.every((e) => e.ok && !e.unchecked && !e.nan && !e.silent && e.peak <= 1),
       ex.map((e) => `${e.name} ${e.ok ? `peak ${e.peak?.toFixed(2)}` : e.error}`).join(', '));
 
+    // Hold to talk under a check: the button lights and neither speech engine is started.
+    dispatchEvent(new KeyboardEvent('keydown', { key: 'CapsLock' })); const held = bar.mic.on();
+    dispatchEvent(new KeyboardEvent('keyup', { key: 'CapsLock' }));
+    const st = bar.mic.started();
+    A('NEGATIVE CONTROL: Caps Lock lights the button under a check and starts neither speech engine',
+      held && !bar.mic.on() && st.chrome === 0 && st.whisper === 0 && micAsked === 0, `chrome ${st.chrome}, whisper ${st.whisper}, microphone asks ${micAsked}`);
+
     A('nothing reaches pi-1: no node or link names it, no relay socket was opened, and the check asked the worker nothing',
       !bay.nodes().some((x) => x.id.startsWith('pi-1:')) && !bay.links().some((l) => /pi-1:/.test(l.from + l.to))
-        && sockets.length === 0 && toWorker() === 0 && writer.asked() === 0 && micAsked === 0 && first !== good,
+        && sockets.length === 0 && toWorker() === 0 && wish.asked() === 0 && micAsked === 0 && first !== good,
       `${sockets.length} sockets, ${toWorker()} worker calls, ${micAsked} microphone asks`);
     window.fetch = f0; window.WebSocket = W0;
     if (gum) navigator.mediaDevices.getUserMedia = gum;
