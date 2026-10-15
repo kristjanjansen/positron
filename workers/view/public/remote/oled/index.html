@@ -33,6 +33,9 @@
   /* the screen centred in what the key column at the right edge leaves */
   .ol-screen { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-width: 0; }
   .ol-say { font-size: 12px; color: var(--dim); }
+  /* the chat's compose box stands alone here, not inside a chat column, so it drops the column's inset */
+  .pos-chat-compose.ol-compose { padding: 0; }
+  .ol-compose .pos-chat-send { right: var(--send-in); bottom: var(--send-in); }
 </style>
 <script type="module">
   // The 0.96" OLED and its four keys on the Pi's header (rig/board/panel.mjs), as two nodes of the
@@ -44,7 +47,7 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createField } from '/shell/field.mjs';
+  import { createChatCompose } from '/shell/chat-ui.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBoard } from '/shell/board.mjs';
@@ -106,21 +109,18 @@
     if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
   }
 
-  // ── the controls: connect, a line of text, the keys as they arrive ──────
-  const text = createField({ label: 'text', placeholder: 'hello from a tab', grow: 'wide' });
-  function send() {
-    const t = text.value().trim();
-    if (!t) return;
+  // ── the controls: play reaches the Pi, the chat's own compose box sends a line ──
+  function send(t) {
     sent++;
     lit(TEXT_OUT);
     bay.send(TEXT_OUT, { of: 'text', cls: 'text', text: t });
   }
-  text.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
-  const buttons = createButtonGroup({ buttons: [
-    { id: 'connect', label: 'Connect', onPress: () => connect() },
-    { id: 'send', label: 'Send', onPress: () => send() },
+  const compose = createChatCompose({ placeholder: 'A line for the screen', onSend: send });
+  compose.el.classList.add('ol-compose');
+  // Play alone at the top left, as on the other remote pages: play connects, stop lets go.
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'connect to the Pi', onPress: () => (board ? disconnect() : connect()) },
   ] });
-  buttons.enable('send', false, 'connect first');
   // The simulated keys, a column on the screen's right as on the module: down on press, up on release.
   // Feather has no asterisk, so * is the one key drawn as text.
   const SYMS = ['^', 'v', '#', '*'], ICONS = ['chevron-up', 'chevron-down', 'hash', null];
@@ -166,10 +166,11 @@
       log: (line, kind) => d.log(line, kind),
       onOpen: async () => {
         connected = true;
-        buttons.enable('send', true);
-        buttons.enable('connect', false, 'connected');
+        compose.enable(true);
         const st = await board.ask({ type: 'panel.status' }, 'panel.status', 3000);
         d.log(st?.ok ? `the screen shows: ${st.text}` : `no screen on the Pi: ${st?.why || 'no answer in 3 s'}`, st?.ok ? 'ok' : 'warn');
+        // the simulated screen takes what the real one shows, so the two match from the start
+        if (st?.ok) { sim.text = st.text; simDraw(); }
       },
       // A key on the Pi is a `panel.key` to the whole room; it enters this bay at the keys' out-port.
       onMessage: (m) => {
@@ -178,7 +179,15 @@
         bay.send(KEYS_OUT, { of: 'key', cls: 'key', k: m.k, sym: m.sym, gpio: m.gpio, down: m.down });
       },
     });
+    transport.setIcon('play', 'stop', 'let go of the Pi');
     d.log(`reaching ${ROOM}`);
+  }
+  function disconnect() {
+    board?.close();
+    board = null; connected = false;
+    compose.enable(false);
+    transport.setIcon('play', 'play', 'connect to the Pi');
+    d.log(`left ${ROOM}`);
   }
 
   // ── the patchbay: a value wire lights for a moment per event ────────────
@@ -186,7 +195,7 @@
   setInterval(() => pb.refresh?.(), 200);
 
   const top = el('div', 'cc-top');
-  top.append(text.el, buttons.el);
+  top.append(transport.el);
   // The simulated module in a video panel, as the kit shows a picture; zoom out and in step 1x, 2x, 4x.
   const media = el('div', 'ol-media');
   const screenBox = el('div', 'ol-screen');
@@ -207,10 +216,10 @@
     zoomBtns.enable('in', zi < ZOOMS.length - 1, 'largest');
   }
   setZoom(zi);
-  const simPanel = createVideoPanel({ media, left: el('span', 'ol-say', 'web:oled, simulated'), centre: scale, right: zoomBtns.el,
+  const simPanel = createVideoPanel({ media, left: scale, right: zoomBtns.el,
     // the module's own height at either zoom, not a 16:9 box around it
     aspect: 'auto' });
-  d.stack.add(simPanel.el, top, keys.el, pb.el);
+  d.stack.add(top, simPanel.el, compose.el, keys.el, pb.el);
   window.__demo.bay = bay;
   window.__demo.probe = () => ({ connected, sent, shown, simFrames: sim.frames });
 
