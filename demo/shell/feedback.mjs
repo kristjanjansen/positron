@@ -226,6 +226,7 @@ export function openFeedback(d, { slug = '', context = null, onSent = null } = {
         // what was written, which is the failure people do not forgive.
         msg.set('');
         lastAt = Date.now();
+        hide(ui);   // a sent note closes the panel; the page's log says it went
       }
     } finally {
       busy = false;
