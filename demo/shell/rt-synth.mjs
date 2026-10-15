@@ -26,8 +26,8 @@ export function make({ log }) {
     start: (ctx) => v.start(ctx),
     audio: { out: () => v.out() },
     param: (name) => v.get(name),
-    /** A patch link names a wave; the wave param takes its index. */
-    patch(name) { const i = WAVES.indexOf(String(name).toLowerCase()); if (i >= 0) v.set('wave', i); },
+    /** A patch link names a wave; the voice takes the wave's name as an oscillator type. */
+    patch(name) { const w = String(name).toLowerCase(); if (WAVES.includes(w)) v.set('wave', w); },
     heard: () => notes,
     stop: () => v.panic(),
     close: () => v.close(),

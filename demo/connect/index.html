@@ -376,6 +376,7 @@
     if (SELFCHECK) {
       const ex = EXAMPLES.find((e) => e.say === text);
       if (text === 'the keys play the piano') return { links: [{ from: KEYS, to: `${BOARD_SITE}:sampler:midi-in`, transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
+      if (text === 'keys play a sawtooth') return { links: [{ from: KEYS, to: W('synth', 'midi-in'), transforms: [{ op: 'patch', name: 'sawtooth' }] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       if (text === 'keys play the sampler, nothing else') return { links: [{ from: KEYS, to: W('sampler', 'midi-in'), transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       if (text === 'keys play the rhodes') return { links: [{ from: KEYS, to: W('sampler', 'midi-in'), transforms: [{ op: 'patch', name: 'Rhodes' }] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       if (text === 'keys play the harpsichord') return { links: [{ from: KEYS, to: W('sampler', 'midi-in'), transforms: [{ op: 'patch', name: 'Harpsichord' }] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
@@ -1118,6 +1119,10 @@
     const kz = runtime.get('web:keys')?.kb, zl = [...(kz?.keysEl.querySelectorAll('.kbd-zone') || [])].map((e) => e.textContent);
     A('a keyboard split shows its zones on the keys, named for what each plays, with a gap between them',
       zl.length === 2 && /sine|synth/i.test(zl[0]) && /plaits/i.test(zl[1]) && /14px/.test(kz.keysEl.style.gridTemplateColumns), zl.join(' | '));
+    // A patch link naming a wave sets the synth's oscillator to that wave, by its name.
+    await ask('keys play a sawtooth'); await runtime.idle(); await frame();
+    A('a link choosing sawtooth sets the synth to the sawtooth wave', runtime.get('web:synth')?.param('wave') === 'sawtooth',
+      `wave ${runtime.get('web:synth')?.param('wave')}`);
     // An answer that reaches for the Pi when the sentence did not ask for it builds nothing.
     await ask('the keys play the piano'); await frame();
     A('an answer that reaches for the Pi unasked builds nothing and says so',

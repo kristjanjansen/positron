@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**/connect/: "sawtooth" was built but the sound was not sawtooth**~~ (2026-10-15, DONE). The owner's feedback: *"this is not sawtoot"*, *"soud is not sawtooth!"*. rt-synth passed the wave's index where the voice takes its name (`o.type`), so it stayed a sine.
+
 - **Text to code, slice 1: a sentence writes a shader, on its own page** (2026-10-15; changed by the owner: *"make separate page with text input and sample pills for shaders. can reuse connect ui"*; the ask field and pills lifted into a shared kit module). Asked: *"where is textinput to sc code etc?"*, then *"do it, and explain how it works too"*. plans/plan-text-to-code.md §6: a /code route on the wish worker, a writer node, program-in on web:shader, compile, check, retry. Shader first; SuperCollider next with a limiter and .range.
 
 - ~~**A demo: the radio tuner through the granulator into the landscape**~~ (2026-10-15, DONE as /radio/scenery/, 14/14 on a GPU run, sound 0.9 s after Play; its nodes.mjs port changes commit with the shader writer's). Asked: *"make a demo with landscapes and granulator and radio tuner connected"*. A concept page built from /radio/tuner/, the granulator and /shader/landscape/, with /videoradio/ as prior art (owner: *"se also videoradio as prior art"*); background agent.
