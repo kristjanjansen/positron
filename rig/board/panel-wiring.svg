@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="960" viewBox="0 0 1200 960" font-family="Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1130" viewBox="0 0 1200 1130" font-family="Helvetica, Arial, sans-serif">
 <rect width="100%" height="100%" fill="#f4f1ea"/>
 <text x="40" y="48" font-size="24" fill="#222" font-weight="700" text-anchor="start">0.96" OLED with 4 keys on the Raspberry Pi 4</text>
 <text x="40" y="76" font-size="14" fill="#555" font-weight="400" text-anchor="start">Drawn the way the Pi lies in your photo. Eight female to female jumpers, Pi pin straight to module pin. Unplug the Pi before wiring.</text>
@@ -114,50 +114,60 @@
 <rect x="303" y="390" width="14" height="20" rx="2" fill="#333"/>
 <path d="M350 410 L350 372 L928 372 L928 234" fill="none" stroke="#8a4fd1" stroke-width="4" stroke-linejoin="round"/>
 <rect x="343" y="390" width="14" height="20" rx="2" fill="#333"/>
-<text x="494" y="620" font-size="15" fill="#222" font-weight="700" text-anchor="start">module</text>
-<text x="584" y="620" font-size="15" fill="#222" font-weight="700" text-anchor="start">Pi pin</text>
-<text x="664" y="620" font-size="15" fill="#222" font-weight="700" text-anchor="start">row</text>
-<text x="754" y="620" font-size="15" fill="#222" font-weight="700" text-anchor="start">where</text>
-<rect x="470" y="633" width="14" height="14" fill="#222"/>
-<text x="494" y="646" font-size="15" fill="#222" font-weight="400" text-anchor="start">GND</text>
-<text x="584" y="646" font-size="15" fill="#222" font-weight="400" text-anchor="start">6</text>
-<text x="664" y="646" font-size="15" fill="#222" font-weight="400" text-anchor="start">top</text>
-<text x="754" y="646" font-size="15" fill="#222" font-weight="400" text-anchor="start">3rd from the left</text>
-<rect x="470" y="659" width="14" height="14" fill="#d63b3b"/>
-<text x="494" y="672" font-size="15" fill="#222" font-weight="400" text-anchor="start">VCC</text>
-<text x="584" y="672" font-size="15" fill="#222" font-weight="400" text-anchor="start">1</text>
-<text x="664" y="672" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
-<text x="754" y="672" font-size="15" fill="#222" font-weight="400" text-anchor="start">1st from the left</text>
-<rect x="470" y="685" width="14" height="14" fill="#f08a24"/>
-<text x="494" y="698" font-size="15" fill="#222" font-weight="400" text-anchor="start">SCL</text>
-<text x="584" y="698" font-size="15" fill="#222" font-weight="400" text-anchor="start">5</text>
-<text x="664" y="698" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
-<text x="754" y="698" font-size="15" fill="#222" font-weight="400" text-anchor="start">3rd from the left</text>
-<rect x="470" y="711" width="14" height="14" fill="#2f7bd6"/>
-<text x="494" y="724" font-size="15" fill="#222" font-weight="400" text-anchor="start">SDA</text>
-<text x="584" y="724" font-size="15" fill="#222" font-weight="400" text-anchor="start">3</text>
-<text x="664" y="724" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
-<text x="754" y="724" font-size="15" fill="#222" font-weight="400" text-anchor="start">2nd from the left</text>
-<rect x="470" y="737" width="14" height="14" fill="#8a4fd1"/>
-<text x="494" y="750" font-size="15" fill="#222" font-weight="400" text-anchor="start">K4</text>
-<text x="584" y="750" font-size="15" fill="#222" font-weight="400" text-anchor="start">37</text>
-<text x="664" y="750" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
-<text x="754" y="750" font-size="15" fill="#222" font-weight="400" text-anchor="start">2nd from the right</text>
-<rect x="470" y="763" width="14" height="14" fill="#8a4fd1"/>
-<text x="494" y="776" font-size="15" fill="#222" font-weight="400" text-anchor="start">K3</text>
-<text x="584" y="776" font-size="15" fill="#222" font-weight="400" text-anchor="start">33</text>
-<text x="664" y="776" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
-<text x="754" y="776" font-size="15" fill="#222" font-weight="400" text-anchor="start">4th from the right</text>
-<rect x="470" y="789" width="14" height="14" fill="#8a4fd1"/>
-<text x="494" y="802" font-size="15" fill="#222" font-weight="400" text-anchor="start">K2</text>
-<text x="584" y="802" font-size="15" fill="#222" font-weight="400" text-anchor="start">31</text>
-<text x="664" y="802" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
-<text x="754" y="802" font-size="15" fill="#222" font-weight="400" text-anchor="start">5th from the right</text>
-<rect x="470" y="815" width="14" height="14" fill="#8a4fd1"/>
-<text x="494" y="828" font-size="15" fill="#222" font-weight="400" text-anchor="start">K1</text>
-<text x="584" y="828" font-size="15" fill="#222" font-weight="400" text-anchor="start">29</text>
-<text x="664" y="828" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
-<text x="754" y="828" font-size="15" fill="#222" font-weight="400" text-anchor="start">6th from the right</text>
-<text x="470" y="864" font-size="13" fill="#555" font-weight="400" text-anchor="start">Nothing on the top row but GND. Pin 35, 3rd from the right on the bottom row, stays empty.</text>
-<text x="470" y="884" font-size="13" fill="#ff1a1a" font-weight="400" text-anchor="start">The two top-left pins are 5 V and would put 5 V on the screen and the Pi's I2C pins.</text>
+<text x="64" y="790" font-size="15" fill="#222" font-weight="700" text-anchor="start">module</text>
+<text x="154" y="790" font-size="15" fill="#222" font-weight="700" text-anchor="start">Pi pin</text>
+<text x="234" y="790" font-size="15" fill="#222" font-weight="700" text-anchor="start">row</text>
+<text x="324" y="790" font-size="15" fill="#222" font-weight="700" text-anchor="start">where</text>
+<text x="494" y="790" font-size="15" fill="#222" font-weight="700" text-anchor="start">what it is</text>
+<rect x="40" y="803" width="14" height="14" fill="#222"/>
+<text x="64" y="816" font-size="15" fill="#222" font-weight="400" text-anchor="start">GND</text>
+<text x="154" y="816" font-size="15" fill="#222" font-weight="400" text-anchor="start">6</text>
+<text x="234" y="816" font-size="15" fill="#222" font-weight="400" text-anchor="start">top</text>
+<text x="324" y="816" font-size="15" fill="#222" font-weight="400" text-anchor="start">3rd from the left</text>
+<text x="494" y="816" font-size="15" fill="#222" font-weight="400" text-anchor="start">ground, the return for power and signals</text>
+<rect x="40" y="829" width="14" height="14" fill="#d63b3b"/>
+<text x="64" y="842" font-size="15" fill="#222" font-weight="400" text-anchor="start">VCC</text>
+<text x="154" y="842" font-size="15" fill="#222" font-weight="400" text-anchor="start">1</text>
+<text x="234" y="842" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
+<text x="324" y="842" font-size="15" fill="#222" font-weight="400" text-anchor="start">1st from the left</text>
+<text x="494" y="842" font-size="15" fill="#222" font-weight="400" text-anchor="start">power in, 3.3 V from the Pi</text>
+<rect x="40" y="855" width="14" height="14" fill="#f08a24"/>
+<text x="64" y="868" font-size="15" fill="#222" font-weight="400" text-anchor="start">SCL</text>
+<text x="154" y="868" font-size="15" fill="#222" font-weight="400" text-anchor="start">5</text>
+<text x="234" y="868" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
+<text x="324" y="868" font-size="15" fill="#222" font-weight="400" text-anchor="start">3rd from the left</text>
+<text x="494" y="868" font-size="15" fill="#222" font-weight="400" text-anchor="start">I2C clock (GPIO3), the Pi sets the pace</text>
+<rect x="40" y="881" width="14" height="14" fill="#2f7bd6"/>
+<text x="64" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">SDA</text>
+<text x="154" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">3</text>
+<text x="234" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
+<text x="324" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">2nd from the left</text>
+<text x="494" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">I2C data (GPIO2), pictures to the screen</text>
+<rect x="40" y="907" width="14" height="14" fill="#8a4fd1"/>
+<text x="64" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">K4</text>
+<text x="154" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">37</text>
+<text x="234" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
+<text x="324" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">2nd from the right</text>
+<text x="494" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">button 4 (GPIO26)</text>
+<rect x="40" y="933" width="14" height="14" fill="#8a4fd1"/>
+<text x="64" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">K3</text>
+<text x="154" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">33</text>
+<text x="234" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
+<text x="324" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">4th from the right</text>
+<text x="494" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">button 3 (GPIO13)</text>
+<rect x="40" y="959" width="14" height="14" fill="#8a4fd1"/>
+<text x="64" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">K2</text>
+<text x="154" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">31</text>
+<text x="234" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
+<text x="324" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">5th from the right</text>
+<text x="494" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">button 2 (GPIO6)</text>
+<rect x="40" y="985" width="14" height="14" fill="#8a4fd1"/>
+<text x="64" y="998" font-size="15" fill="#222" font-weight="400" text-anchor="start">K1</text>
+<text x="154" y="998" font-size="15" fill="#222" font-weight="400" text-anchor="start">29</text>
+<text x="234" y="998" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
+<text x="324" y="998" font-size="15" fill="#222" font-weight="400" text-anchor="start">6th from the right</text>
+<text x="494" y="998" font-size="15" fill="#222" font-weight="400" text-anchor="start">button 1 (GPIO5)</text>
+<text x="40" y="1034" font-size="13" fill="#555" font-weight="400" text-anchor="start">Nothing on the top row but GND. Pin 35, 3rd from the right on the bottom row, stays empty.</text>
+<text x="40" y="1054" font-size="13" fill="#555" font-weight="400" text-anchor="start">Which K is which of the ^ v # * buttons is not printed on the module: pressing each one and reading the pins tells. A press should read low; not measured yet.</text>
+<text x="40" y="1074" font-size="13" fill="#ff1a1a" font-weight="400" text-anchor="start">The two top-left pins are 5 V and would put 5 V on the screen and the Pi's I2C pins.</text>
 </svg>
