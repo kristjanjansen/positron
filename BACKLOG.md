@@ -30,7 +30,7 @@
 
 - ~~**/connect/: "split onscreen keyboard to play rhodes on top and synth bass on bottom - there is no way to listen"**~~ (2026-10-15, DONE: the log showed the model proposing keys-to-instrument links only; a request's patch now gets every audio out it leaves dangling wired to the speakers). From the owner's own asks on /connect/ (device log). Find why nothing could be heard and what a keyboard split needs.
 
-- **Grains: a default that is heard at once, on every page that has the granulator** (2026-10-15). Asked: *"set grains default to something that is immediately listenambe (in others demos too), currently the sound takes forever to appear"*.
+- ~~**Grains: a default that is heard at once, on every page that has the granulator**~~ (2026-10-15, DONE: Play to sound 2.9 s to under 1 s on grains, beat and landscape; the recording fetched during the boot, its first 512 KB playing at once, grains reading only what has arrived; lessons/page-granulator.md#granulator-first-sound). Asked: *"set grains default to something that is immediately listenambe (in others demos too), currently the sound takes forever to appear"*.
 
 - ~~**/connect/: a Pi node's Join and LEAVE become the standard play and stop icon buttons**~~ (2026-10-15, DONE, rt-pi.mjs). Asked: *"use standard play / stop iconbuttons"*, on a crop of `pi-1:shader`'s face.
 

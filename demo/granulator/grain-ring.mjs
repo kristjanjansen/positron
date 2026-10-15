@@ -30,7 +30,12 @@ export const PROGRAM = `// grains read out of an eight second ring of what comes
   // each grain's length, place, pitch and side; dir -1 plays every grain backwards
   var size = \\size.kr(0.1, spec: [0.02, 4, \\exp]);
   var jitter = \\jitter.kr(0);
-  var pos = read / frames - (\\back.kr(0.5) / secs) + (TRand.ar(jitter.neg, jitter, trig) / secs) % 1;
+  // how long sound has been coming in, since the start or since fresh; a grain reaches
+  // back at most half of it, so the first grains are heard at once and not read from silence
+  var have = Phasor.ar(\\fresh.kr(0), secs / frames, 0, 1000000) * 0.5;
+  var want = \\back.kr(0.5);
+  var back = (want + have - (want - have).abs) * 0.5;
+  var pos = read / frames - (back / secs) + (TRand.ar(jitter.neg, jitter, trig) / secs) % 1;
   var pitch = \\pitch.kr(1) * slow;
   var detune = \\detune.kr(0);
   var rate = TRand.ar(pitch * (1 - detune), pitch * (1 + detune), trig) * \\dir.kr(1);
@@ -167,6 +172,11 @@ export function createRingEngine({ log = () => {} } = {}) {
     land() {
       eng.send('/n_set', NODE, 'sync', 1);
       setTimeout(() => eng.send('/n_set', NODE, 'sync', 0), 40);
+    },
+    // Sound has just come in: grains reach back only as far as it goes, then to the patch's `back`.
+    fresh() {
+      eng.send('/n_set', NODE, 'fresh', 1);
+      setTimeout(() => eng.send('/n_set', NODE, 'fresh', 0), 40);
     },
     knob(name, v) { if (name === 'mix') mixNow = v; else values[name] = v; eng.send('/n_set', NODE, name, v); },
     fixed(set) { Object.assign(values, set); eng.send('/n_set', NODE, ...Object.entries(set).flat()); },

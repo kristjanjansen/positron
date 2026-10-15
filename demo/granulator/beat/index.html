@@ -125,6 +125,11 @@
       // A patch's own echo on the beat (Dub's three quarters) is the patch's.
       sendTimed();
     },
+    // Sound has just come in: grains reach back only as far as it goes (grain-ring.mjs `have`).
+    fresh() {
+      eng.send('/n_set', NODE, 'fresh', 1);
+      setTimeout(() => eng.send('/n_set', NODE, 'fresh', 0), 40);
+    },
     knob(name, v) {
       if (name === 'mix') { mixNow = v; eng.send('/n_set', NODE, 'mix', v); return; }
       want[name] = v;

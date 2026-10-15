@@ -413,3 +413,49 @@ The full comments cut from the code under demo/ for granulator, verbatim. Each h
     // 2026-10-13, *"replace with just a patch selector (no scope/viz/footer)"*
     // and *"patch selector full w"*).
 ````
+
+<a id="granulator-first-sound"></a>
+## granulator-first-sound: demo/granulator/grain-rig.mjs play(), createSources, and grain-ring.mjs `have`
+
+Asked 2026-10-15: *"set grains default to something that is immediately
+listenambe (in others demos too), currently the sound takes forever to
+appear"*. MEASURED before changing anything, headless Chrome with
+`--autoplay-policy=no-user-gesture-required`, an analyser tapped on every
+connection into the destination, from the Play press to the first 20 ms
+window over 0.01 RMS, against the dev server and our own media worker:
+
+| page | before | after |
+| --- | --- | --- |
+| /granulator/grains/ (Raadio 2, Tape stop) | 2912 ms | 797 ms |
+| /granulator/beat/ (Ida, Dub) | 2876 ms | 865 ms |
+| /shader/landscape/ (Raadio 2, Cloud) | 2627 ms | 960 ms |
+
+Three delays in a row, and none of them was a patch value on its own:
+
+1. **The recording came down after the engine booted, not beside it.**
+   `play()` awaited scsynth's boot (about 630 ms) and only then called
+   `plug()`.
+2. **The whole recording came down and was decoded before a sample played.**
+   2.93 MB for Raadio 2 and 7.64 MB for Ida, a fetch, a decode of three
+   minutes and `level()` over all of it: about 1.0 s and 1.5 s on this desk,
+   and many seconds on a phone. Now the first `HEAD_BYTES` (512 KB, cut to
+   whole frames: 32.8 s of Raadio 2, 13.0 s of Ida) arrive with a Range
+   request and play at once, the rest follows with a second Range request, and
+   the whole buffer takes over at the same sample. MEASURED: the head and the
+   whole decode to identical samples (max difference 0 in the middle and in
+   the head's last 100 ms, both files), because it is the same bytes from the
+   same first frame.
+3. **The grains read the silence the ring held before the sound arrived.**
+   The engine writes its eight second ring from the moment it starts, so for
+   `back` seconds after the sound comes in every grain reads zeros: 0.5 s on
+   Dub, 2 s on Cloud. Tape stop's read head also runs at 0.55 of the write
+   head on average, so it drifted into the silent stretch for longer than its
+   0.1 s `back`. The program now caps `back` at half of how long sound has
+   been coming in (`have`, a Phasor reset by `\fresh`), so the first grains
+   read what just arrived and walk back to the patch's own `back` at half
+   speed; and the rig lands the read head on the write head (`sync`) when the
+   sound comes in. A patch's `back` is unchanged once the ring has filled.
+
+What is left is scsynth's boot, about 600 ms, which needs the press.
+`grain-rig.mjs`'s self check asserts the first sound inside two seconds of
+Play, which the old code fails at 2.9 s.

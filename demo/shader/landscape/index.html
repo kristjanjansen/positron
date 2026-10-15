@@ -296,11 +296,17 @@
     playing = true; jolt = 1;
     face(); route();
     const wasUp = !!eng;
-    try { await boot(); } catch (e) { d.log(`the granulator did not come up: ${e?.message || e}`, 'bad'); playing = false; face(); return; }
+    // The recording fetches while the engine boots; once it is in, the read head starts at
+    // the write head and no grain reaches back past it (grain-ring.mjs `have`).
+    const opened = plug();
+    try { await boot(); } catch (e) { d.log(`the granulator did not come up: ${e?.message || e}`, 'bad'); playing = false; source?.stop(); source = null; face(); return; }
     if (!playing) return;
     if (wasUp) eng.send('/n_run', NODE, 1);
     route();
-    await plug();
+    if (await opened && playing) {
+      eng.send('/n_set', NODE, 'fresh', 1, 'sync', 1);
+      setTimeout(() => eng.send('/n_set', NODE, 'fresh', 0, 'sync', 0), 40);
+    }
     pb.refresh();
   }
   function stop() {

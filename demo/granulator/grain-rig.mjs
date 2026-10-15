@@ -3,7 +3,7 @@
 // lessons) and its patches. Nothing opens on a visit: Play boots, fetches and starts.
 // See lessons/page-granulator.md#granulator-5
 import { el } from '/shell/shell.mjs';
-import { fromFirstFrame } from '/shell/mp3-frames.mjs';
+import { fromFirstFrame, frameStarts } from '/shell/mp3-frames.mjs';
 import { SELFCHECK } from '/shell/selfcheck.mjs';
 import { createBay } from '/shell/bay.mjs';
 import { addNodes } from '/shell/nodes.mjs';
@@ -18,6 +18,8 @@ import { createKnobGrid } from '/shell/knob-grid.mjs';
 /** The window both engines read, in seconds, and the source scope's width. */
 export const WINDOW_S = 8;
 export const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media/';
+/** A recording plays from its first bytes while the rest arrives: 512 KB is 32 s of Raadio 2, 13 s of Ida. */
+export const HEAD_BYTES = 512 * 1024;
 
 // Per second gains raised (never lowered) toward -16 dB RMS by at most 36 dB, eased, then a
 // soft knee over 0.8, as on /radio/tempo/: the Ida capture is -44 dB RMS under one loud stretch.
@@ -52,27 +54,88 @@ export function level(b) {
 export function createSources({ log = () => {} } = {}) {
   const asked = new URLSearchParams(location.search).get('src');
   const decoded = new Map();          // source id -> AudioBuffer, decoded once
-  async function openRecording(ac, id, label, url) {
-    let b = decoded.get(id);
-    if (!b) {
-      log(`fetching ${url}`);
+  const heads = new Map();            // source id -> { buffer, rest: Promise<AudioBuffer> }, the first bytes
+  /** Fetched bytes, decoded and levelled. From the first frame: Safari fails a mid frame start. */
+  async function decode(ac, label, ab, say = true) {
+    const { buffer: clean, skipped, framing } = fromFirstFrame(ab);
+    if (skipped && say) log(`${label}: ${skipped} bytes before the first frame, left out`);
+    return { b: await ac.decodeAudioData(clean), skipped, framing };
+  }
+  /** The whole recording, `head` the bytes already here. Levelled once and kept. */
+  async function whole(ac, id, label, url, head) {
+    let ab = head?.raw;
+    if (head) {
+      const r = await fetch(url, { headers: { Range: `bytes=${head.raw.byteLength}-` } });
+      if (r.status !== 206) throw new Error(`${r.status} for the rest of ${url}`);
+      const rest = new Uint8Array(await r.arrayBuffer());
+      const all = new Uint8Array(head.raw.byteLength + rest.byteLength);
+      all.set(new Uint8Array(head.raw)); all.set(rest, head.raw.byteLength);
+      ab = all.buffer;
+    } else {
       const r = await fetch(url);
       if (!r.ok) throw new Error(`${r.status} from ${url}`);
-      const ab = await r.arrayBuffer();
-      const size = ab.byteLength;
-      // From the first frame: Safari answers `Decoding failed` on a recording
-      // cut from a live mount mid frame (`fromFirstFrame` has the measurement).
-      const { buffer: clean, skipped } = fromFirstFrame(ab);
-      if (skipped) log(`${label}: ${skipped} bytes before the first frame, left out`);
-      b = await ac.decodeAudioData(clean);
+      ab = await r.arrayBuffer();
+    }
+    const size = ab.byteLength;
+    const { b } = await decode(ac, label, ab, !head);
+    const raised = level(b);
+    decoded.set(id, b); heads.delete(id);
+    log(`${label}: ${(size / 1e6).toFixed(2)} MB, ${b.duration.toFixed(1)} s, raised ${raised.toFixed(1)} dB on average`);
+    return b;
+  }
+  /** The first HEAD_BYTES, cut to whole frames, playable while the rest arrives. */
+  async function first(ac, id, label, url) {
+    log(`fetching ${url}`);
+    const r = await fetch(url, { headers: { Range: `bytes=0-${HEAD_BYTES - 1}` } });
+    if (!r.ok) throw new Error(`${r.status} from ${url}`);
+    const got = await r.arrayBuffer();
+    // A server that ignores Range sends the whole file: that is the recording itself.
+    if (r.status !== 206) {
+      const { b } = await decode(ac, label, got);
       const raised = level(b);
       decoded.set(id, b);
-      log(`${label}: ${(size / 1e6).toFixed(2)} MB, ${b.duration.toFixed(1)} s, raised ${raised.toFixed(1)} dB on average`);
+      log(`${label}: ${(got.byteLength / 1e6).toFixed(2)} MB, ${b.duration.toFixed(1)} s, raised ${raised.toFixed(1)} dB on average`);
+      return { buffer: b, rest: null };
     }
-    const node = ac.createBufferSource();
-    node.buffer = b; node.loop = true;
-    node.start();
-    return { node, stop: () => { try { node.stop(); node.disconnect(); } catch { /* already stopped */ } } };
+    const { framing, skipped } = fromFirstFrame(got.slice(0));
+    const { end } = frameStarts(new Uint8Array(got), skipped, { framing: framing || 'mpeg' });
+    const raw = got.slice(0, end || got.byteLength);
+    const { b } = await decode(ac, label, raw.slice(0));
+    level(b);
+    const head = { buffer: b, raw, rest: null };
+    head.rest = whole(ac, id, label, url, head);
+    head.rest.catch((e) => { heads.delete(id); log(`${label}: the rest did not arrive (${e?.message || e}), the first ${b.duration.toFixed(1)} s loop`); });
+    return head;
+  }
+  async function openRecording(ac, id, label, url) {
+    let full = decoded.get(id), head = null;
+    if (!full) {
+      if (!heads.has(id)) { const job = first(ac, id, label, url); heads.set(id, job); job.catch(() => heads.delete(id)); }
+      head = await heads.get(id);
+      if (!head.rest) full = head.buffer;
+    }
+    // One gain is the source's output; the buffer behind it changes once, when the whole arrives.
+    const out = ac.createGain();
+    let node = null, stopped = false, t0 = 0;
+    const play = (b, at = 0, when = 0) => {
+      const n = ac.createBufferSource();
+      n.buffer = b; n.loop = true; n.connect(out);
+      n.start(when, at);
+      return n;
+    };
+    if (full) node = play(full);
+    else {
+      node = play(head.buffer); t0 = ac.currentTime;
+      // Same bytes from the same first frame, so the whole one carries on at the same sample.
+      head.rest.then((b) => {
+        if (stopped) return;
+        const when = ac.currentTime + 0.05;
+        const next = play(b, (when - t0) % head.buffer.duration, when);
+        try { node.stop(when); } catch { /* already stopped */ }
+        node = next;
+      }, () => {});
+    }
+    return { node: out, stop: () => { stopped = true; try { node.stop(); node.disconnect(); out.disconnect(); } catch { /* already stopped */ } } };
   }
   const recording = (id, label, key) => {
     const url = asked || `${MEDIA}${key}`;
@@ -490,11 +553,15 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
     face();
     route();
     const wasUp = !!eng;
-    try { await boot(); } catch (e) { d.log(`the granulator did not come up: ${e?.message || e}`, 'bad'); playing = false; face(); return; }
+    // The recording fetches while the engine boots, not after it.
+    // why: lessons/page-granulator.md#granulator-first-sound
+    const opened = plug();
+    try { await boot(); } catch (e) { d.log(`the granulator did not come up: ${e?.message || e}`, 'bad'); playing = false; source?.stop(); source = null; face(); return; }
     if (!playing) return;
     if (wasUp) engine.run(true);
     route();
-    await plug();
+    // Once sound is in, the read head starts at the write head and no grain reaches back past it.
+    if (await opened && playing) { engine.fresh?.(); engine.land(patchAt, { ...cur }); }
     pb.refresh();
     requestAnimationFrame(frame);
   }
@@ -538,9 +605,15 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   async function check() {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     d.assert('a visit opened no audio context and fetched nothing', ctx === null && SOURCES.fetched() === 0);
+    const pressed = performance.now();
     await play();
     d.assert('Play brought the granulator up in this tab', !!eng, JSON.stringify(eng?.timing || {}));
     if (!eng) return;
+    // Measured 2026-10-15: 2.9 s when the whole recording came down after the boot, 0.8 s now.
+    let heardAt = null;
+    for (let i = 0; i < 30 && heardAt === null; i++) if (await meterRms(100) > 0.002) heardAt = performance.now() - pressed;
+    d.assert('the grains are heard within two seconds of Play', heardAt !== null && heardAt < 2000,
+      heardAt === null ? 'nothing heard in 3 s' : `${Math.round(heardAt)} ms after the press`);
     // the ring has to hold something before a grain can sound like the source
     await wait(WINDOW_S * 1000 + 500);
     const lv = await meterRms(1500);
