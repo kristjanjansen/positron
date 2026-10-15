@@ -129,9 +129,7 @@ export function createHero({ tag = 'h2' } = {}) {
   // The headline's full stop in the accent too, as the wordmark's dot.
   // why: lessons/kit-hero.md#headline
   const head = el(tag, 'pos-hero-h');
-  // The first word is a link to /connect/ that looks like nothing: no colour, cursor or hover.
-  const [first, ...rest] = HERO.head.replace(/\.$/, '').split(' ');
-  head.append(el('a', 'pos-hero-secret', first, { href: '/connect/' }), ` ${rest.join(' ')}`, el('b', '', '.'));
+  head.append(HERO.head.replace(/\.$/, ''), el('b', '', '.'));
   big.append(eye, head, el('p', 'pos-hero-l', HERO.line), el('p', 'pos-hero-s', HERO.small));
 
   const frame = el('div', 'pos-hero-bay'), inner = el('div', 'pos-hero-bay-in');

@@ -180,7 +180,8 @@
       startFresh(); log('a new synth: the next sentence starts from nothing'); logAsk('[new] pressed new wish');
     } },
     vocabulary: () => ['SuperCollider', 'synth', 'pad', 'bass', 'organ'],
-    onAsk: (text, { how }) => write(text, { how }) });
+    // The code box's border shimmers while the wish is written.
+    onAsk: async (text, { how }) => { collide.code.el.dataset.busy = '1'; try { return await write(text, { how }); } finally { delete collide.code.el.dataset.busy; } } });
   const startPill = bar.reset;
   // new wish is shown only while there is a conversation to forget.
   function showTurn() { bar.showReset(followsNow()); }
