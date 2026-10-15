@@ -55,7 +55,7 @@
   // Each slide is a board of two columns of boxes, drawn at READ so port names read on a phone. The boxes go in rank
   // order, sources first, in as few columns as the height allows; after two columns the next board.
   const K = READ, FONT = Math.round(11 * K), TITLE = Math.round(13 * K), ROW = Math.round(20 * K), PAD = Math.round(10 * K);
-  const HEAD = PAD + TITLE + Math.round(6 * K), FIELD = 140, COL_W = (PW - 2 * X - FIELD) / 2, VGAP = 60;
+  const HEAD = PAD + TITLE + Math.round(6 * K), FIELD = 140, COL_W = (PW - 2 * X - FIELD) / 2, VGAP = 40, GAP0 = 28, LANE = 12;
   const colX = (c) => Math.floor(c / 2) * PW + X + (c % 2) * (COL_W + FIELD);
   function plan(b) {
     const bay = asBay(b), { rank } = ranks(bay.nodes, bay.links);
@@ -70,17 +70,28 @@
     const need = Math.max(Math.min(2, items.length), fill(BAND).length);
     let cols = fill(BAND);    // then the height lowered while the count holds, which evens the columns
     for (let lim = BAND; lim > 0 && fill(lim).length <= need; lim -= 10) cols = fill(lim);
+    // the gap above a box is GAP0, plus a LANE for every wire inside its column that comes into it there
+    const where = new Map();
+    cols.forEach((col, c) => col.forEach((q, i) => where.set(q.n.id, [c, i])));
+    const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
+    const into = new Map();
+    for (const l of bay.links) {
+      const a = where.get(nodeOf(l.from)), z = where.get(nodeOf(l.to));
+      if (a && z && a[0] === z[0]) into.set(nodeOf(l.to), (into.get(nodeOf(l.to)) || 0) + 1);
+    }
+    const gapAbove = (q) => GAP0 + LANE * (into.get(q.n.id) || 0);
     // each column centred in the band; a box's ports at its left (in) and right (out) edge
     const boxes = [], at = new Map();
     cols.forEach((col, c) => {
-      const total = col.reduce((t, q) => t + q.h, 0) + VGAP * (col.length - 1);
+      const total = col.reduce((t, q, i) => t + q.h + (i ? gapAbove(q) : 0), 0);
       let y = BAY_TOP + Math.max(0, (BAND - total) / 2);
-      for (const q of col) {
+      for (const [i, q] of col.entries()) {
+        if (i) y += gapAbove(q);
         const x = colX(c);
         boxes.push({ ...q, x, y, w: COL_W });
-        q.ins.forEach((pt, i) => at.set(pt.id, { x, y: y + HEAD + i * ROW + ROW / 2, medium: pt.medium, top: y }));
+        q.ins.forEach((pt, i) => at.set(pt.id, { x, y: y + HEAD + i * ROW + ROW / 2, medium: pt.medium, top: y, gap: gapAbove(q) }));
         q.outs.forEach((pt, i) => at.set(pt.id, { x: x + COL_W, y: y + HEAD + i * ROW + ROW / 2, medium: pt.medium }));
-        y += q.h + VGAP;
+        y += q.h;
       }
     });
     return { n: Math.max(1, Math.ceil(cols.length / 2)), k: K, boxes, at, links: bay.links, cols: cols.length };
@@ -134,7 +145,9 @@
         // a box below in the same column: out to the right, back through the gap above the target, in from the left
         // each corner an arc, as the patchbay's own wires bend
         const L = lane.get(l), xr = a.x + 24 + 12 * L.r, xl = z.x - 24 - 12 * L.l;
-        const gy = z.top - VGAP / 2 + (L.l - (L.n - 1) / 2) * Math.min(12, (VGAP - 16) / Math.max(1, L.n - 1)), rr = 10;
+        // the wires into one box share the gap above it, LANE apart
+        const sib = inner.filter(([, , zz]) => zz.top === z.top && zz.x === z.x).map(([w]) => w), j = sib.indexOf(l);
+        const gy = z.top - z.gap / 2 + (j - (sib.length - 1) / 2) * LANE, rr = 10;
         const pts = [[a.x, a.y], [xr, a.y], [xr, gy], [xl, gy], [xl, z.y], [z.x, z.y]];
         ctx.moveTo(...pts[0]);
         for (let i = 1; i < pts.length - 1; i++) ctx.arcTo(...pts[i], ...pts[i + 1], rr);
@@ -145,7 +158,11 @@
     for (const q of p.boxes) {
       ctx.fillStyle = '#151b26'; ctx.strokeStyle = '#2a3240'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.roundRect(q.x, q.y, q.w, q.h, 10); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = C.fg; ctx.font = font(600, TITLE); ctx.fillText(q.n.id, q.x + PAD, q.y + PAD + TITLE * 0.8);
+      // a name wider than the box is set smaller until it fits
+      let tsize = TITLE;
+      ctx.font = font(600, tsize);
+      while (tsize > FONT && ctx.measureText(q.n.id).width > q.w - 2 * PAD) ctx.font = font(600, --tsize);
+      ctx.fillStyle = C.fg; ctx.fillText(q.n.id, q.x + PAD, q.y + PAD + TITLE * 0.8);
       ctx.font = font(400, FONT);
       const name = (pt) => pt.id.split(':').slice(2).join(':');
       q.ins.forEach((pt, i) => { ctx.fillStyle = MEDIUM_COLOURS[pt.medium] || C.dim; ctx.fillText(name(pt), q.x + PAD, q.y + HEAD + i * ROW + ROW / 2 + FONT * 0.35); });
