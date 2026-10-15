@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Patches on Pi screen</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<style>
+  /* One card a patch: its name, the screen as the Pi draws it at 2x, a cut note, and the send button. */
+  .pt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 16px; }
+  .pt-card { display: flex; flex-direction: column; gap: 10px; padding: var(--inset, 12px); background: var(--card);
+    border: var(--edge, 1px solid var(--line)); border-radius: var(--r, 4px); min-width: 0; }
+  .pt-name { margin: 0; font: 600 14px/1.3 var(--mono); }
+  .pt-screen { display: flex; justify-content: center; padding: 12px; background: #07090d; border-radius: 2px; }
+  .pt-frame { padding: 8px; border: 1px solid var(--line); border-radius: 2px; line-height: 0; background: #000; }
+  .pt-frame canvas { display: block; width: 256px; height: 128px; image-rendering: pixelated; }
+  .pt-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; }
+  .pt-cut { font-size: 12px; color: var(--dim2); }
+</style>
+<script type="module">
+  // Small Pi-centric patches drawn as the Pi's 128x64 screen shows them (bay-oled.mjs, two facing
+  // columns, the Pi's own boxes filled), each with a button that puts it on the real screen to check.
+  // The Pi is reached on the first send, never on load.
+  // why: lessons/page-devices.md#patches
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
+  import { layoutBayOled } from '/shell/bay-oled.mjs';
+
+  const d = mount({ name: 'Patches on Pi screen', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  conceptNav('devices/patches');
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  const MAY_SEND = !SELFCHECK || q.get('board') === '1';
+  const P = BOARD_SITE;
+
+  // name, then links as [from node, to node]; every node a box
+  const PATCHES = [
+    ['Keys to the Circuit', [['web:keys', `${P}:circuit`]]],
+    ['The Circuit out loud', [[`${P}:circuit`, 'web:speaker']]],
+    ['Play the Circuit', [['web:keys', `${P}:circuit`], [`${P}:circuit`, 'web:speaker']]],
+    ['Record a take', [['web:keys', `${P}:circuit`], [`${P}:circuit`, 'web:speaker'], [`${P}:circuit`, 'cf-r2:takes']]],
+    ['Piano on the sampler', [['web:keys', `${P}:sampler`], [`${P}:sampler`, 'web:speaker']]],
+    ['Plaits and a knob', [['web:keys', `${P}:plaits`], ['web:knob', `${P}:plaits`], [`${P}:plaits`, 'web:speaker']]],
+    ['Drums from pads', [['web:pads', `${P}:drums`], [`${P}:drums`, 'web:speaker']]],
+    ['A shader on the GPU', [['web:editor', `${P}:gpu`], [`${P}:gpu`, 'web:screen']]],
+    ['The Pi\'s camera live', [[`${P}:camera`, 'cf-stream:live'], ['cf-stream:live', 'web:screen']]],
+    ['The screen\'s own keys', [[`${P}:keys`, `${P}:screen`]]],
+  ].map(([name, pairs]) => {
+    const nodes = [...new Set(pairs.flat())].map((id) => ({ id }));
+    return { name, patch: { nodes, links: pairs.map(([a, b]) => ({ from: `${a}:out`, to: `${b}:in` })) } };
+  });
+
+  // ── the bay: this list sends a patch along one link to the Pi's screen ──
+  const LIST_OUT = 'web:list:value-out', PI_IN = `${P}:screen:value-in`;
+  const bay = createBay();
+  bay.addNode({ id: 'web:list', kind: 'store', label: 'patch list', place: 'browser' });
+  bay.addNode({ id: `${P}:screen`, kind: 'device', label: 'OLED 128x64', place: ROOM });
+  let board = null, connected = false, sent = 0, landed = 0;
+  const flash = new Map();
+  bay.addPort({ id: LIST_OUT, dir: 'out', medium: 'value', emits: ['patch'], label: 'list:value-out' });
+  bay.addPort({ id: PI_IN, dir: 'in', medium: 'value', accepts: ['patch'], label: 'screen:value-in',
+    deliver: async (ev) => {
+      if (!MAY_SEND) return;
+      if (!board) connect();
+      await opened;
+      const r = await board.ask({ type: 'screen.patch', patch: ev.patch }, 'screen.patched', 3000);
+      if (r?.ok) { landed++; d.log(`on the Pi's screen: ${ev.name}`, 'ok'); } else d.log(`the Pi did not draw it: ${r?.why || 'no answer in 3 s'}`, 'warn');
+    } });
+  const r = bay.link(LIST_OUT, PI_IN);
+  if (!r.ok) d.log(`${LIST_OUT} -> ${PI_IN} refused: ${r.why}`, 'warn');
+
+  let opened = null;
+  function connect() {
+    let ready;
+    opened = new Promise((res) => { ready = res; });
+    board = createBoard({ room: ROOM, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind),
+      onOpen: () => { connected = true; ready(); } });
+    d.log(`reaching ${ROOM}`);
+  }
+
+  // ── the cards ──
+  const ui = await loadPanelUi(await (await fetch('/resources/pico/oled-ui.wasm')).arrayBuffer());
+  const grid = el('div', 'pt-grid');
+  const cuts = [];
+  for (const x of PATCHES) {
+    const card = el('div', 'pt-card');
+    const cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
+    paintFrame(cv, ui.frame({ mode: 'patch', patch: x.patch }));
+    const L = layoutBayOled(x.patch);
+    cuts.push(L.cut.length);
+    const frame = el('div', 'pt-frame'); frame.append(cv);
+    const screen = el('div', 'pt-screen'); screen.append(frame);
+    const send = createButtonGroup({ buttons: [{ id: 'send', icon: 'send', label: `send ${x.name} to the Pi's screen`, onPress: () => {
+      sent++;
+      flash.set([...bay.links()][0]?.id, performance.now() + 400);
+      bay.send(LIST_OUT, { of: 'patch', cls: 'patch', name: x.name, patch: x.patch });
+    } }] });
+    const foot = el('div', 'pt-foot');
+    foot.append(el('span', 'pt-cut', L.cut.length ? `cut: ${L.cut.map((c) => c.split(' as ')[1] || c.split(':')[1]).join(', ')}` : ''), send.el);
+    card.append(el('h3', 'pt-name', x.name), screen, foot);
+    grid.append(card);
+  }
+
+  const pb = createPatchbay(bay, { room: ROOM, flowing: (l) => (flash.get(l.id) || 0) > performance.now() });
+  setInterval(() => pb.refresh?.(), 200);
+  d.stack.add(grid, pb.el);
+  window.__demo.bay = bay;
+  window.__demo.probe = () => ({ connected, sent, landed, cuts });
+
+  if (SELFCHECK) {
+    d.assert('every patch drawn as a card', grid.children.length === PATCHES.length, `${grid.children.length} cards`);
+    d.assert('no name is cut on these patches', cuts.every((c) => c === 0), cuts.join(' '));
+    d.assert('a visit reaches nothing until a send', !board);
+  }
+  d.ready();
+</script>

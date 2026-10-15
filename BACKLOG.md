@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**A patch renderer for the Pi's 128x64 screen and a page of simple Pi-centric patches to send to it**~~ (2026-10-15, DONE). Asked: *"lets do a bunch of ... bays, simpler ones, kind of Pi centric ... a list of them in the next demo under devices ... on each a button just to send it to the Pi screen"*, *"what we need is a patch renderer to a screen"*, *"Did you implement the two-column renderer"*. demo/shell/bay-oled.mjs (two facing columns, the Pi's boxes filled), screen.patch on the board, /devices/patches/.
+
 - ~~**Pi screen: rm the * test fill; rename the page "Text on Pi screen"; a dot piano renderer page from a sample score in a piano roll**~~ (2026-10-15, DONE: /devices/text/, /devices/dots/, rings.mjs; the I2C bus to 400 kHz on the way, 227 to 35 ms a frame). Asked: *"rm sceen coloring feat. rename demo to text on pi screen or smh, next is dot piano renderer but jsut have a sample score with piano roll. based on devices/screen"*. /devices/screen/ -> /devices/text/ (the screen now shows more than text); the new page /devices/dots/ plays a fixed score drawn as a piano roll, its notes to pi-1:screen and web:screen as dots (as /synth/dots/ draws arcs on a ring).
 
 - ~~**OLED layout: no header, the keys down the right**~~ (2026-10-15, DONE f87902a4). Asked: *"scren: rm header. its unreadable in small size. move buttons to rigt side"*. drawPanel in demo/shell/panel-screen.mjs; ui.c has keys_right.

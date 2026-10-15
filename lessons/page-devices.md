@@ -7,3 +7,7 @@
 ## dots
 
 `/devices/dots/` (2026-10-15), asked *"next is dot piano renderer but jsut have a sample score with piano roll. based on devices/screen"* and *"lets generalize from pico"*. The renderer is `demo/shell/rings.mjs`, the Pico firmware's rings (`rig/pico/rings/main.c`) with its constants kept: C3 to G4 on radii 4 to 28, 0.7 rad/s, a 3 s fade as thinning. The score is the Ode to Joy theme over C3 and G3, played by a deck through `web:score:midi-out`, linked to `pi-1:screen:midi-in` (the board's `screen.note`) and `web:screen:midi-in` (the same rings in the tab). The piano roll is a `spans` lane with `slots` set to the twenty pitches and `slotOf` by pitch, so it is the kit's strip with no new component; it is fitted after the strip has a width, or it opened on 25 s for a 9 s score.
+
+## patches
+
+`/devices/patches/` (2026-10-15), asked *"a bunch of ... simpler ones, kind of Pi centric ... a list of them in the next demo under devices ... and on each a button just to send it to the Pi screen for verification"*. Ten patches, each a card with the 128x64 picture `bay-oled.mjs` makes and a send button; the list is `web:list:value-out -> pi-1:screen:value-in`, delivered as `screen.patch`, which the board answers `screen.patched`. Names are short on purpose (`takes`, not `recordings`): two columns hold nine letters.
