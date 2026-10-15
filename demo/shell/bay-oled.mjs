@@ -169,7 +169,7 @@ const lengthOf = (pts) => pts.slice(1).reduce((n, b, i) => n + Math.abs(b[0] - p
 /** Beads, `t` in seconds. A stream (audio, video, or no medium) runs a bead every BEAD px at SPEED px a
  *  second while shown; an event medium (midi, value) sends one bead out to in over EVENT_S after each event
  *  in `events[i]`, the time of the wire's last event. */
-const BEAD = 10, SPEED = 20, EVENT_S = 0.6, MARCH = 18;
+const BEAD = 10, SPEED = 20, EVENT_S = 0.6, MARCH = 13;
 /** A bead's shape: `solid` a 3x3 block, `hollow` a 5x5 outline around the wire, `diamond` a 5 px diamond. */
 export const BEADS = ['solid', 'hollow', 'diamond'];
 function bead(ui, [x, y], shape = 'solid') {
