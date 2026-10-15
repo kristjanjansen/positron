@@ -25,6 +25,7 @@ import { jackRows } from '../../demo/shell/graph-registry.mjs';
 import { listJack, plan as jackPlan, apply as jackApply, canonical as jackCanonical, diff as jackDiff } from './jack.mjs';
 import { openPanel } from './panel.mjs';
 import { createSequencerService } from './sequencer.mjs';
+import { createKeyboardService, rawMidiReader } from './keyboard.mjs';
 import { DRUM_MAPS } from '../../demo/shell/drum-maps.mjs';
 import { createScreenCamera } from './screen-camera.mjs';
 import { spawn, execFileSync } from 'node:child_process';
@@ -92,14 +93,36 @@ const plaits = createPlaitsService({ onFrame: (f) => sendPcm(f), log: (l) => log
 // The board's own step sequencer (sequencer.mjs), on the Pi's clock, into the Circuit through its
 // input's gate and the `drummap circuit` link. It keeps running with no tab open; nothing starts it but seq.start.
 // why: lessons/rig-board-sequencer.md#board
+// The Circuit's one writer: every message whole, one writeSync, through its input's gate (inputs.mjs).
+// The sequencer and the keyboard both write here, so their messages interleave and never split.
+// why: lessons/rig-board-keyboard.md#one-writer
+function circuitSend(bytes, refused) {
+  const c = hwInputs.get('circuit');
+  if (!c) { refused('this board has no circuit input'); return; }
+  c.handle({ type: 'midi.send', bytes }, (type, body) => { if (type === 'midi.refused') refused(body?.why || 'refused'); });
+}
 const drumSeq = createSequencerService({
   graph: () => (graphFacts ? graphOf(graphFacts) : null),
-  midiSend: (bytes, refused) => {
-    const c = hwInputs.get('circuit');
-    if (!c) { refused('this board has no circuit input'); return; }
-    c.handle({ type: 'midi.send', bytes }, (type, body) => { if (type === 'midi.refused') refused(body?.why || 'refused'); });
-  },
+  midiSend: circuitSend,
   screen: (steps) => { if (panel && steps) panel.steps(steps); },
+  log: (l) => log(l),
+});
+// The MK-425C on the Pi into the Circuit (keyboard.mjs): held by the board until kbd.unlink, so it
+// outlives the tab that made it. A note on puts a bead on the shown patch's mk-425c -> circuit wire.
+// why: lessons/rig-board-keyboard.md#board
+let screenPatch = null;
+const kbd = createKeyboardService({
+  graph: () => (graphFacts ? graphOf(graphFacts) : null),
+  refresh: () => { state(); },
+  midiSend: circuitSend,
+  open: rawMidiReader({ spawn, readlinkSync: fsMod.readlinkSync }),
+  present: (card) => fsMod.existsSync(`/proc/asound/${card}`),
+  onNote: () => {
+    if (!panel || !screenPatch) return;
+    const node = (id) => String(id).split(':').slice(0, 2).join(':');
+    const idx = (screenPatch.links || []).map((l, i) => (node(l.from).endsWith(':mk-425c') && node(l.to).endsWith(':circuit') ? i : -1)).filter((i) => i >= 0);
+    if (idx.length) panel.patchEvent(idx);
+  },
   log: (l) => log(l),
 });
 let fxOn = false;          // pappus inserted between the instrument and the capture
@@ -577,6 +600,7 @@ async function handle(msg, replyVia = null) {
   if (collide.handles(msg)) return collide.handle(msg, reply).then(() => true);
   if (plaits.handles(msg)) return plaits.handle(msg, reply).then(() => true);
   if (drumSeq.handles(msg)) return drumSeq.handle(msg, reply).then(() => true);
+  if (kbd.handles(msg)) return kbd.handle(msg, reply).then(() => true);
   switch (msg.type) {
     // A page that joins late asks, and gets the beat now rather than up to five
     // seconds from now. The beat already carries the graph (`beat.mjs`), so the
@@ -1005,6 +1029,7 @@ async function handle(msg, replyVia = null) {
     case 'screen.patch': {
       if (!panel) return reply('screen.patched', { ok: false, why: 'no screen answered at 0x3c on this board' });
       panel.patch(msg.patch);
+      screenPatch = msg.patch && typeof msg.patch === 'object' ? msg.patch : null;
       return reply('screen.patched', { ok: true, nodes: msg.patch?.nodes?.length || 0 });
     }
     // A drum pattern and its playhead (/devices/drums/), sent per step and not asked; ask.mjs's reply is for a terminal.
@@ -1212,7 +1237,7 @@ function connect() {
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable(), camera: cameraFound };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,
                     frameMs: 1000 * FRAME / RATE, instruments, error: s.error, hint: s.hint, graphFacts,
-                    direct: !!mainDirect?.direct }));
+                    direct: !!mainDirect?.direct, kbd: kbd.beat() }));
     if (ONCE) { console.log(JSON.stringify(s, null, 2)); setTimeout(() => process.exit(0), 400); }
   };
   ws.onmessage = (e) => {
@@ -1278,7 +1303,7 @@ function alive() {
   return aliveMsg({ name: NAME, id: BOARD_ID, upSec: Math.round((Date.now() - since) / 1000),
                     audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null,
                     voices: synth?.voices ?? 0, frames: sentFrames, insert: insertState(), graphFacts,
-                    direct: !!mainDirect?.direct });
+                    direct: !!mainDirect?.direct, kbd: kbd.beat() });
 }
 setInterval(() => {
   // Sweep before the beat, so no heartbeat announces an orphaned insert. `.catch` because it is not
@@ -1292,6 +1317,15 @@ setInterval(() => {
 
 // The control plane's report, once a second and only while something moves.
 // why: lessons/rig-board.md#ctl-said
+// The keyboard link's state, once a second and only while it forwards, so a page's counts move.
+// why: lessons/rig-board-keyboard.md#board
+let kbdSaid = -1;
+setInterval(() => {
+  const b = kbd.beat();
+  if (!b.held || b.forwarded === kbdSaid) return;
+  kbdSaid = b.forwarded;
+  send({ type: 'kbd.state', ...kbd.status() });
+}, 1000).unref?.();
 let ctlSaid = { in: 0, out: 0 };
 setInterval(() => {
   if (ctl.in === ctlSaid.in && ctl.out === ctlSaid.out) return;
@@ -1392,5 +1426,5 @@ const hwInputs = createInputs({
 });
 if (!DRY && !ONCE) hwInputs.start();
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { drumSeq.stop(); camera?.stop(); screenCam?.stop(); stopAudio(); collide.stop(); plaits.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { drumSeq.stop(); kbd.stop(); camera?.stop(); screenCam?.stop(); stopAudio(); collide.stop(); plaits.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
 connect();

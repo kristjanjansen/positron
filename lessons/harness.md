@@ -4181,3 +4181,10 @@ a run) and is never in a suite: no harness may import or start it.
   A refusal of the model's answer (`could not be made`) is a FAIL: the model or the page.
 - **Chrome is closed on every path**: `launchChrome` kills it on exit and on a signal, and the
   script's own `finally` closes it.
+
+
+<a id="fake-kbd"></a>
+
+## `demo/fake-board.mjs` the keyboard
+
+2026-10-15, for `/devices/keys/`. The stand-in announces the MK-425C (an ALSA row `MK-425C USB MIDI Keyboard` in its graph facts) and runs the board's own `createKeyboardService` into the stand-in Circuit through `inputs.mjs`'s gate. Its device is a stream a page plays with `fake.kbd.play { bytes }`, a verb only the stand-in answers, replying `fake.kbd.played { reading, written, state }` with the messages the gate let through for that play. The real board has no such verb, so nothing can inject notes into the Circuit. It also answers `screen.patch` with `ok: false`, *a stand-in board has no screen*, so a page asking does not wait out its timeout.

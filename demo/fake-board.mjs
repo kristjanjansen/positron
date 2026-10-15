@@ -14,6 +14,7 @@ import { createCollideService, ENGINES, PAGE_BUS } from '../rig/board/scollide.m
 import { readOsc } from '../rig/board/pappus.mjs';
 import { createPlaitsService, PLAITS_PARAMS } from '../rig/board/plaits.mjs';
 import { createSequencerService } from '../rig/board/sequencer.mjs';
+import { createKeyboardService } from '../rig/board/keyboard.mjs';
 import { graphOf } from '../rig/board/beat.mjs';
 import { DRUM_MAPS } from './shell/drum-maps.mjs';
 
@@ -191,7 +192,8 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
   const graphFacts = {
     // `collide`: the collide verbs ARE answered here, by the board's own service
     // (above), so its two nodes (`collide`, `drums`) are announced as the Pi does.
-    room, instruments: { synth: true, collide: true, plaits: true }, inputs: INPUTS.inputs, ports: [],
+    // The MK-425C is plugged in, as on the Pi: its ALSA row puts `pi-1:mk-425c` in the graph.
+    room, instruments: { synth: true, collide: true, plaits: true }, inputs: INPUTS.inputs, ports: [{ client: 'MK-425C USB MIDI Keyboard' }],
     frameMs: FRAME_MS, gpu: false, midiPresent: () => true, plaitsParams: PLAITS_PARAMS,
     drums: { circuit: DRUM_MAPS.circuit, drums: DRUM_MAPS.gm }, sequencer: true,
   };
@@ -202,7 +204,7 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
   const ctl = { ch: 0, last: new Map() };
   const send = (msg) => { if (ws?.readyState === 1) { ws.send(format(msg, { from: FROM, seq: seq++ })); return true; } return false; };
   const alive = () => aliveMsg({ name: NAME, id: ID, upSec: Math.round((Date.now() - since) / 1000), audio: source,
-    voices: 0, frames: counts.framesOut, insert: { fx: false }, graphFacts });
+    voices: 0, frames: counts.framesOut, insert: { fx: false }, graphFacts, kbd: kbd.beat() });
 
   function startTone() {
     if (stopTone) return;
@@ -263,13 +265,31 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
       (type, body) => { if (type === 'midi.refused') { seqRefusals.push(body?.why); refused(body?.why || 'refused'); } }),
   });
 
+  // The keyboard on the Pi into the stand-in Circuit, by the board's own service: the device is a stream
+  // a page plays with `fake.kbd.play`, a verb only this stand-in answers. why: lessons/harness.md#fake-kbd
+  let kbdIn = null;
+  const kbd = createKeyboardService({
+    graph: () => graphOf(graphFacts), log: (l) => say(l), present: () => true,
+    open: (card, h) => { kbdIn = h; return { close: () => { if (kbdIn === h) kbdIn = null; } }; },
+    midiSend: (bytes, refused) => inputs?.get('circuit')?.handle({ type: 'midi.send', bytes },
+      (type, body) => { if (type === 'midi.refused') refused(body?.why || 'refused'); }),
+  });
+
   function handle(msg) {
     const reply = (type, body) => send({ type, re: msg.id, ...body });
+    if (kbd.handles(msg)) { kbd.handle(msg, reply).catch((e) => say('keyboard threw', e.message)); return undefined; }
+    if (msg.type === 'fake.kbd.play') {
+      const from = written.length;
+      const bytes = Array.isArray(msg.bytes) ? msg.bytes.filter((b) => Number.isInteger(b) && b >= 0 && b <= 255) : [];
+      if (kbdIn) kbdIn.data(Uint8Array.from(bytes));
+      return reply('fake.kbd.played', { reading: !!kbdIn, written: written.slice(from), state: kbd.status() });
+    }
     if (drumSeq.handles(msg)) { drumSeq.handle(msg, reply).catch((e) => say('sequencer threw', e.message)); return undefined; }
     if (collide.handles(msg)) { collide.handle(msg, reply).catch((e) => say('collide threw', e.message)); return undefined; }
     if (plaits.handles(msg)) { plaits.handle(msg, reply).catch((e) => say('plaits threw', e.message)); return undefined; }
     switch (msg.type) {
       case 'graph.ask': counts.asked++; send(alive()); return;
+      case 'screen.patch': return reply('screen.patched', { ok: false, why: 'a stand-in board has no screen' });
       case 'board.ping': counts.pings++; return reply('board.pong', { pongAt: Date.now() });
       case 'audio.status':
         return reply('audio.started', { ...(source ? { ok: true, source, jack: false, fx: false, standIn: true }
@@ -413,6 +433,7 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     turnMacro,
     stats: () => ({ ...counts, midiWritten: written.length, midi: written.slice(-16),
       seq: { ...drumSeq.status(), refusals: seqRefusals.slice(-4) },
+      kbd: kbd.status(),
       /** Every byte message the gate let through with when it was written, from `since` (performance.now()). */
       midiSince: (since = 0) => written.map((b, i) => ({ b, at: writtenAt[i] })).filter((x) => x.at >= since),
       collide: { ...(collide.core()?.stats() ?? {}), scsynth: scsynth ? scsynth.counts() : null, skewMs },
@@ -421,6 +442,7 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     close() {
       closed = true;
       drumSeq.stop();
+      kbd.stop();
       collide.stop();
       plaits.stop();
       clearInterval(beat); clearInterval(listener); clearInterval(handTimer);
@@ -440,6 +462,7 @@ if (resolve(process.argv[1] || '') === fileURLToPath(import.meta.url)) {
     console.log(`[fake-board] ready in ${url}/room/studio-1 and studio-1-circuit (nobody's board)`);
     console.log(`[fake-board] open http://127.0.0.1:8890/away/?relay=${url}&board=1`);
     console.log(`[fake-board] or http://127.0.0.1:8890/devices/drums/?relay=${url}&board=1&target=circuit`);
+    console.log(`[fake-board] or http://127.0.0.1:8890/devices/keys/?relay=${url}&board=1`);
   });
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { b.close(); process.exit(0); });
 }

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Keyboard to Circuit on Pi</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<style>
+  .ky-sec { display: flex; flex-direction: column; gap: 12px; }
+</style>
+<script type="module">
+  // The Evolution MK-425C plugged into the Pi plays the Circuit's synth 1 or 2. The board reads the keyboard
+  // and holds the link `pi-1:mk-425c:midi-out -> pi-1:circuit:midi-in { channel N }` (rig/board/keyboard.mjs),
+  // so it outlives this tab; the page asks for it with `kbd.link` and `kbd.unlink`, on a press, never on load.
+  // why: lessons/page-devices.md#keys
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createOledCard, createOledGrid } from '/shell/oled-card.mjs';
+  import { createBay, printLink } from '/shell/bay.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { BOARD_SITE, boardGraph, addBoardNode } from '/shell/graph-registry.mjs';
+  import { relayOverride } from '/shell/wire.mjs';
+  import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
+
+  const d = mount({ name: 'Keyboard to Circuit on Pi', what: '', index: '/', indexLabel: 'positron',
+    // Readouts on top, the log at the foot (positron-concepts). From the board: notes it wrote to the
+    // Circuit, messages the link or the Circuit's gate did not take, and its read to write time.
+    joined: false,
+    readout: { notes: '', 'not taken': '', 'read to write': 'ms', worst: 'ms' } });
+  conceptNav('devices/keys');
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  // A check drives a board only on a relay on this machine (demo/fake-board.mjs), never the Pi.
+  const LOOP = !!relayOverride(location.search);
+  const MAY_SEND = !SELFCHECK || (q.get('board') === '1' && LOOP);
+  const P = BOARD_SITE;
+  const KBD = `${P}:mk-425c`, CIRCUIT = `${P}:circuit`;
+  const KBD_OUT = `${KBD}:midi-out`, CIRCUIT_IN = `${CIRCUIT}:midi-in`;
+  const PATCH_OUT = 'web:patch:value-out', SCREEN_IN = `${P}:screen:value-in`;
+
+  // ── the bay: the keyboard and the Circuit as the board announces them, and this patch to the Pi's screen ──
+  const G = boardGraph({ room: ROOM, gpu: false, alsa: [{ client: 'MK-425C USB MIDI Keyboard' }],
+    inputs: [{ name: 'circuit', channels: 2, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
+  const bay = createBay();
+  addBoardNode(bay, G, 'mk-425c', { withPorts: false });
+  bay.addPort({ ...G.ports.find((p) => p.id === KBD_OUT), label: 'mk-425c:midi-out' });
+  addBoardNode(bay, G, 'circuit', { label: 'Circuit on the Pi', withPorts: false });
+  // The board holds the real link and writes the Circuit; this in-port delivers nothing here.
+  let heard = [];
+  bay.addPort({ ...G.ports.find((p) => p.id === CIRCUIT_IN), label: 'circuit:midi-in', deliver: (ev) => { heard.push(ev); } });
+  bay.addNode({ id: 'web:patch', kind: 'store', label: 'this patch', place: 'browser' });
+  bay.addNode({ id: `${P}:screen`, kind: 'device', label: 'OLED 128x64', place: ROOM });
+  bay.addPort({ id: PATCH_OUT, dir: 'out', medium: 'value', emits: ['patch'], label: 'patch:value-out' });
+  bay.addPort({ id: SCREEN_IN, dir: 'in', medium: 'value', accepts: ['patch'], label: 'screen:value-in', deliver: (ev) => toScreen(ev) });
+  const screenLink = bay.link(PATCH_OUT, SCREEN_IN);
+  if (!screenLink.ok) d.log(`${PATCH_OUT} -> ${SCREEN_IN} refused: ${screenLink.why}`, 'warn');
+
+  let pb = null;
+  /** The one keyboard link this page draws, or null. */
+  const kbdLink = () => bay.links().find((l) => l.from === KBD_OUT && l.to === CIRCUIT_IN) || null;
+  /** Draw the link the board holds: channel 1 or 2, or none. */
+  function draw(ch) {
+    const L = kbdLink();
+    if (L && L.transforms[0]?.to === ch) return L;
+    if (L) bay.unlink(L.id);
+    if (!ch) { pb?.refresh(); return null; }
+    const r = bay.link(KBD_OUT, CIRCUIT_IN, [{ op: 'channel', to: ch }]);
+    if (!r.ok) d.log(`${KBD_OUT} -> ${CIRCUIT_IN} refused: ${r.why}`, 'warn');
+    pb?.refresh();
+    return kbdLink();
+  }
+
+  // ── the Pi's screen: the same patch, drawn here as the Pi draws it ──
+  const PATCH = { nodes: [{ id: KBD }, { id: CIRCUIT }], links: [{ from: `${KBD}:out`, to: `${CIRCUIT}:in`, medium: 'midi' }] };
+  const ui = await loadPanelUi(await (await fetch('/resources/pico/oled-ui.wasm')).arrayBuffer());
+  const cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
+  const events = {};
+  let frames = 0;
+  const card = createOledCard({ name: 'On the Pi\'s screen', say: 'A dot runs along the wire for every key the board passes on.', canvas: cv });
+  const grid = createOledGrid(2);
+  grid.append(card.el);
+
+  // ── the board ──
+  let board = null, connected = false, opened = null, said = null, screenAsked = 0, screenSaid = null, screenP = null, lastNotes = -1;
+  const flash = { until: 0 };
+  function connect() {
+    if (board || !MAY_SEND) return opened;
+    let open;
+    opened = new Promise((r) => { open = r; });
+    board = createBoard({ room: ROOM, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind),
+      onOpen: () => { connected = true; open(true); },
+      onMessage: (msg) => {
+        if (msg.type === 'kbd.state') take(msg);
+        else if (msg.type === 'board.alive' && msg.kbd) take({ held: msg.kbd.held, channel: msg.kbd.channel, beat: msg.kbd });
+      } });
+    d.log(`reaching ${ROOM}`);
+    return opened;
+  }
+  /** What the board says it holds: the picture, the choice and the readout follow it. */
+  function take(st) {
+    said = st.beat ? { ...said, held: st.held, channel: st.channel } : st;
+    const ch = st.held ? st.channel : 0;
+    draw(ch);
+    pick.set([0, 1, 2].indexOf(ch), true);
+    const c = st.counts;
+    if (!c) return;
+    if (lastNotes >= 0 && c.forwarded > lastNotes) { flash.until = performance.now() + 1200; events[0] = performance.now() / 1000; }
+    lastNotes = c.forwarded;
+    d.set('notes', c.forwarded);
+    d.set('not taken', c.dropped + c.refused);
+    d.set('read to write', st.lat?.n ? st.lat.p50 : '');
+    d.set('worst', st.lat?.n ? st.lat.max : '');
+  }
+  async function ask(msg, type, ms = 4000) {
+    connect();
+    const ok = await Promise.race([opened, new Promise((r) => setTimeout(() => r(false), 6000))]);
+    if (!ok) { d.log('the Pi did not answer', 'warn'); return null; }
+    return board.ask(msg, type, ms);
+  }
+  /** What arrives at pi-1:screen:value-in leaves for the board as `screen.patch`. */
+  function toScreen(ev) {
+    if (ev?.of !== 'patch' || !MAY_SEND) return;
+    screenAsked++;
+    screenP = shown(ev);
+  }
+  async function shown(ev) {
+    screenSaid = await ask({ type: 'screen.patch', patch: ev.patch }, 'screen.patched', 3000);
+    d.log(screenSaid?.ok ? 'the Pi\'s screen shows mk-425c to circuit' : `the Pi's screen did not draw it: ${screenSaid?.why || 'no answer in 3 s'}`, screenSaid?.ok ? 'ok' : 'warn');
+  }
+
+  /** A press: ask the board to hold the link on channel `ch` (1 or 2) or to remove it (0). */
+  async function choose(ch) {
+    if (!MAY_SEND) { draw(ch); d.log('this run may not drive the board, add board=1 and a relay on this machine', 'dim'); return null; }
+    const st = await ask(ch ? { type: 'kbd.link', channel: ch } : { type: 'kbd.unlink' }, 'kbd.state');
+    if (!st) { d.log('the Pi did not answer, nothing changed there', 'warn'); return null; }
+    take(st);
+    if (!st.ok) d.log(`the Pi refused: ${st.why || 'no reason given'}`, 'warn');
+    else if (st.held) {
+      d.log(`the Pi holds ${st.link}${st.reading ? '' : `, not reading the keyboard yet: ${st.why || ''}`}`, st.reading ? 'ok' : 'warn');
+      bay.send(PATCH_OUT, { of: 'patch', cls: 'patch', patch: PATCH });
+    } else d.log('the Pi holds no keyboard link, the keyboard plays nothing', 'ok');
+    return st;
+  }
+  let pending = null;
+  const pick = createChoice({ label: 'keyboard plays', options: [['off', 0], ['synth 1', 1], ['synth 2', 2]], at: 0,
+    title: (v) => (v ? `the Circuit's synth ${v}, MIDI channel ${v}` : 'the Pi lets go of the keyboard'),
+    onPick: (v) => { pending = choose(v); } });
+
+  pb = createPatchbay(bay, { room: ROOM, flowing: (l) => l.from === KBD_OUT && flash.until > performance.now() });
+  draw(0);
+  const sec = el('section', 'ky-sec');
+  sec.append(grid, pick.el);
+  d.stack.add(sec, pb.el);
+
+  // The screen's wire runs, about 15 frames a second, as the Pi's does.
+  let last = 0;
+  (function run(now) {
+    if (now - last > 66) { last = now; paintFrame(cv, ui.frame({ mode: 'patch', patch: PATCH, t: now / 1000, events })); frames++; }
+    requestAnimationFrame(run);
+  })(0);
+  setInterval(() => { if (flash.until > performance.now() - 300) pb.refresh?.(); }, 200);
+
+  window.__demo.bay = bay;
+  window.__demo.probe = () => ({ connected, said, screenAsked, screenSaid, frames, link: kbdLink() ? printLink(kbdLink()) : null });
+
+  if (SELFCHECK) {
+    await new Promise((r) => setTimeout(r, 300));
+    d.assert('a visit reaches nothing until a press', !board);
+    d.assert('no keyboard link is drawn before a choice, the screen\'s is', !kbdLink() && bay.links().length === 1);
+    d.assert('the screen drew the patch', frames > 0);
+    if (!MAY_SEND) {
+      // Here alone: the drawn link puts the keyboard's channel 2 on synth 1.
+      pick.buttons[1].click(); await pending;
+      heard = [];
+      bay.send(KBD_OUT, { cls: 'note', ch: 2, d1: 47, d2: 100 });
+      bay.send(KBD_OUT, { cls: 'bend', ch: 2, d1: 0, d2: 80 });
+      d.assert('synth 1 draws mk-425c -> circuit { channel 1 } and a key on channel 2 lands on 1',
+        kbdLink()?.transforms[0]?.to === 1 && heard.length === 1 && heard[0].ch === 1, JSON.stringify(heard));
+      d.assert('NEGATIVE CONTROL: pitch bend is dropped at the Circuit\'s midi-in', kbdLink()?.dropped === 1);
+      pick.buttons[0].click(); await pending;
+      d.assert('off takes the link away and still reaches nothing', !kbdLink() && !board);
+    } else {
+      // Against demo/fake-board.mjs: a key on the stand-in keyboard, and exactly what the stand-in Circuit was written.
+      const hex = (rows) => (rows || []).map((b) => b.map((x) => x.toString(16).padStart(2, '0')).join(' ')).join(' | ');
+      const play = (bytes) => board.ask({ type: 'fake.kbd.play', bytes }, 'fake.kbd.played', 3000);
+      pick.buttons[1].click(); const s1 = await pending;
+      d.assert('synth 1: the board holds mk-425c -> circuit { channel 1 } and reads the keyboard',
+        s1?.ok && s1.held && s1.link === `${KBD_OUT} -> ${CIRCUIT_IN} { channel 1 }` && s1.reading, s1?.link || s1?.why);
+      d.assert('the picture follows the board', kbdLink()?.transforms[0]?.to === 1);
+      let r = await play([0x91, 60, 100, 0x91, 60, 0]);
+      d.assert('a key on channel 2 writes exactly 90 3c 64 then 80 3c 00 to the Circuit', hex(r?.written) === '90 3c 64 | 80 3c 00', hex(r?.written));
+      r = await play([0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x01, 0x00, 0x11, 0x22, 0xF7, 0xF8, 0xFA]);
+      d.assert('NEGATIVE CONTROL: SysEx, clock and start from the keyboard write nothing', r && r.written.length === 0, hex(r?.written) || 'nothing');
+      await screenP;
+      d.assert('the screen was asked to show the patch and answered', screenAsked >= 1 && !!screenSaid, JSON.stringify(screenSaid));
+      pick.buttons[2].click(); const s2 = await pending;
+      r = await play([0x91, 62, 90, 0x81, 62, 0]);
+      d.assert('synth 2: the same key writes on channel 2', s2?.channel === 2 && hex(r?.written) === '91 3e 5a | 81 3e 00', hex(r?.written));
+      pick.buttons[0].click(); const s0 = await pending;
+      r = await play([0x91, 64, 90]);
+      d.assert('off: the board lets go and a key writes nothing', s0?.held === false && r && !r.reading && r.written.length === 0, hex(r?.written) || 'nothing');
+    }
+  }
+  d.ready();
+</script>

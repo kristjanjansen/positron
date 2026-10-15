@@ -45,6 +45,8 @@ export function helloMsg(f) {
            // Whether this socket answers `rtc.offer`, as an input's hello says
            // (inputs.mjs). Left out when not given, so an older caller is unchanged.
            ...(typeof f.direct === 'boolean' ? { direct: f.direct } : {}),
+           // The keyboard link (keyboard.mjs `beat()`), so a page sees whether the board holds it.
+           ...(f.kbd ? { kbd: f.kbd } : {}),
            ...(f.error ? { error: f.error, hint: f.hint } : {}),
            graph: graphOf(f.graphFacts) };
 }
@@ -56,5 +58,6 @@ export function aliveMsg(f) {
   return { type: 'board.alive', name: f.name, id: f.id, upSec: f.upSec,
            audio: f.audio, voices: f.voices, frames: f.frames, ...f.insert,
            ...(typeof f.direct === 'boolean' ? { direct: f.direct } : {}),
+           ...(f.kbd ? { kbd: f.kbd } : {}),
            ...(f.graphFacts ? { graph: graphOf(f.graphFacts) } : {}) };
 }
