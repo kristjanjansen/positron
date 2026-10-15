@@ -1,5 +1,13 @@
 ## Open
 
+- ~~**/radio/scenery/: every ERR station plus Ida in a random order, no visible controls but the patchbay**~~ (2026-10-15, DONE: seven stations from the relay's allowlist shuffled at each press, the picture is the start and stop; 19/19 GPU on the stand-in; its nodes.mjs lines commit with the wish rename). Asked: *"secenery: all err station+idas intially do random list of them. no visuble controls but patrchbay"*. The station list shuffled at Play; patch picker and knobs off screen (their nodes stay in the bay); pressing the picture starts and stops it, since a browser needs a press for sound.
+
+- **Wish input: qwen-coder for sounds, one kit wish bar with the mic and hotkeys everywhere, Chrome speech, a temporary engine switcher** (2026-10-15). Asked: *"go qwen. use kit's wish input along with mic, hotkeys etc. do chrome text input, make temp switcher below"*. Sound wish default qwen2.5-coder; wish-bar.mjs carries the mic, Option/Caps Lock/sustain hold-to-talk and the log lines, and /connect/ moves onto it; Chrome's SpeechRecognition with live words in the field; a small temporary switcher under the field (Chrome / Whisper). Given to the rename agent after the rename. The reset pill is always LAST, on every page (*"always last"*).
+
+- **Wish naming across the system** (2026-10-15). Asked: *"writer is no better. keep wish in naming."* /shader/write/ to /shader/wish/ "Picture wish", /code/write/ to /code/wish/ "Sound wish"; node writer to wish; ask-bar.mjs to wish-bar.mjs; code-writer/glsl-writer/sclang-writer/rt-writer to wish-loop/glsl-wish/sclang-wish/rt-wish; the worker's /code to /wish/code; [code] log lines to [wish]; "start new" pill to "new wish" on the wish pages; placeholders "wish for a picture" and "wish for a sound". /connect/ keeps "say what should play what" and "patch". Old /…/write/ addresses 404.
+
+- **Faust wishes, and the SuperCollider against Faust head to head: PARKED** (2026-10-15). Asked: *"park fi wisher for no"*. The plan for the head to head is in the chat of 2026-10-15 (12 sentences, both languages, two models, offline renders, a blind listen).
+
 - ~~**The busy shimmer in the button's own accent**~~ (2026-10-15, DONE: the sweep is currentColor, so voice pills and send shimmer teal). Asked: *"make shimmer in the accenct colors of buttons"*.
 
 - ~~**/connect/: the model is offered only parts that run here**~~ (2026-10-15, DONE). The owner's feedback: *"hear plaits only. should we have separate drumpad/seq and drum synth?"*: the drums went through web:mix, which has no engine on /connect/. The sequencer and the drum voices were already separate parts.

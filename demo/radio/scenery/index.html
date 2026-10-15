@@ -9,8 +9,9 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
-  .cc-top { display: flex; }
-  .cc-pic canvas { display: block; width: 100%; height: 100%; }
+  .cc-pic canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  /* inside the stage, which clips a ring drawn outside it */
+  .cc-pic canvas:focus-visible { outline-offset: -1px; }
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
@@ -20,10 +21,6 @@
   import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createKnob } from '/shell/knob.mjs';
-  import { createKnobGrid } from '/shell/knob-grid.mjs';
-  import { createPicker } from '/shell/picker.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
   import { createMix, createTunerGraph, pinkNoise } from '/shell/tuner-mix.mjs';
   import { createEnvFollower } from '/shell/pappus-mod.mjs';
@@ -34,21 +31,33 @@
 
   // Live stations through our relay, /radio/tuner/'s AM graph and the grain ring into /shader/landscape/.
   // A drift node on a clock tunes from one station to the next; the waves follow the tuner's noise.
-  // Each ERR connection is a listener: at most two open, only after Play, all closed on Stop or leaving.
+  // Each ERR connection is a listener: at most two open, only after a press on the picture, all
+  // closed on the next press or on leaving. The only controls are the picture and the patchbay.
   const params = new URLSearchParams(location.search);
   const BASE = params.get('base') || 'https://shout.positron.studio';
   const LOCAL = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(BASE);
   const S = 'web';
-  const d = mount({ name: 'Radio landscape', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  const d = mount({ name: 'Radio landscape', what: 'Press the picture to start or stop the radio.', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('radio/scenery');
 
-  // /radio/tuner/'s four stations; Ida (320 kbit/s) stays at the back of the list.
+  // Every mount the relay carries for ERR and Ida (workers/shout/worker.mjs STATIONS), played in a
+  // shuffled order, so no one mount is the one every visit opens.
   const STATIONS = [
     { key: 'viker', site: 'err', node: 'vikerraadio', mount: 'vikerraadio', label: 'Vikerraadio' },
     { key: 'klassika', site: 'err', node: 'klassikaraadio', mount: 'klassikaraadio', label: 'Klassikaraadio' },
     { key: 'r2', site: 'err', node: 'raadio2', mount: 'raadio2', label: 'Raadio 2' },
+    { key: 'r4', site: 'err', node: 'raadio4', mount: 'raadio4', label: 'Raadio 4' },
+    { key: 'tallinn', site: 'err', node: 'raadiotallinn', mount: 'raadiotallinn', label: 'Raadio Tallinn' },
     { key: 'ida', site: 'ida', node: 'tallinn', mount: 'ida-tallinn', label: 'Ida Radio Tallinn' },
+    { key: 'idahel', site: 'ida', node: 'helsinki', mount: 'ida-helsinki', label: 'Ida Radio Helsinki' },
   ];
+  // Fisher-Yates over the whole list; a refill never opens with the station that just played.
+  function shuffled(after = null) {
+    const a = STATIONS.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    if (after && a[0] === after) [a[0], a[1]] = [a[1], a[0]];
+    return a;
+  }
 
   // ── the drift's clock ───────────────────────────────────────────────────
   // Two slots 0.08 apart on the dial, so halfway each station is a quarter clear under noise and
@@ -65,19 +74,10 @@
   const WET = 0.7;
   const TRAIL_S = 1.6, TRAIL_STORM_S = 5.0;
 
-  // landscape's six knobs, each a node whose turn is one event into the shader.
-  const f2 = (v) => v.toFixed(2), f3 = (v) => v.toFixed(3);
-  const K = [
-    { name: 'rows', label: 'rows', min: 8, max: 132, step: 1, fmt: (v) => `${Math.round(v)}` },
-    { name: 'ampM', label: 'height', min: 0.5, max: 8, fmt: f2 },
-    { name: 'ampL', label: 'loud', min: 0, max: 0.5, fmt: f3 },
-    { name: 'swellY', label: 'swell', min: 0, max: 0.05, fmt: f3 },
-    { name: 'bucket', label: 'counts', min: 0, max: 1, fmt: f2 },
-    { name: 'heave', label: 'heave', min: 0, max: 1, fmt: f2 },
-  ];
+  // The landscape keeps its default look; only the storm moves it.
   const LOOK = LOOKS[DEFAULT_LOOK];
   const OPEN = { ...LOOK, ...EXTRA };
-  // What the storm adds at its peak, on top of where the knobs stand.
+  // What the storm adds at its peak, on top of the calm look.
   const STORM = { ampM: (b) => Math.min(8, b * 1.5), swellY: (b) => Math.min(0.05, b + 0.03), heave: (b) => Math.min(1, b + 0.8) };
 
   // ── the bay ─────────────────────────────────────────────────────────────
@@ -93,7 +93,6 @@
   const SPEAKER = `${S}:speaker:audio-in`;
   const SH_AUDIO = `${S}:shader:audio-in`, SH_VAL = `${S}:shader:value-in`, SH_OUT = `${S}:shader:video-out`;
   const SCREEN = `${S}:screen:video-in`;
-  const KNOB_OUT = (c) => `${S}:knob-${c.label}:value-out`;
 
   const bay = createBay();
   for (const st of STATIONS) {
@@ -103,7 +102,7 @@
       { ports: { [relayIn(st)]: { label: 'relay' }, [relayOut(st)]: { label: 'relay', address: `${BASE}/${st.mount}` } } });
   }
   addNodes(bay, S, ['noise', 'drift', 'tuner', 'patch-values', { name: 'grains', label: 'granulator' }, 'speaker',
-    'shader-landscape', 'screen', ...K.map((c) => ({ name: 'knob', as: `knob-${c.label}`, label: c.label }))], {
+    'shader-landscape', 'screen'], {
     ports: {
       'noise:audio-out': { label: 'noise' },
       'drift:value-out': { label: 'tune' }, 'drift:value-out-2': { label: 'storm' },
@@ -115,7 +114,6 @@
       'speaker:audio-in': { label: 'speakers' },
       'shader:audio-in': { label: 'level' }, 'shader:value-in': { label: 'values' }, 'shader:video-out': { label: 'picture' },
       'screen:video-in': { label: 'picture' },
-      ...Object.fromEntries(K.map((c) => [`knob-${c.label}:value-out`, { label: c.label }])),
     },
     deliver: {
       'tuner:value-in': (e) => { if (e?.name === 'tune' && Number.isFinite(e.v)) { tune = e.v; applyTune(); } },
@@ -132,8 +130,8 @@
   const holds = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
   const sentOn = (a, b) => bay.links().find((l) => l.from === a && l.to === b)?.sent ?? 0;
   for (const st of STATIONS) {
-    // Holding a link opens nothing. A stream opens only after Play, where a person asks to
-    // listen, so the consent is named here.
+    // Holding a link opens nothing. A stream opens only after a press on the picture, where a
+    // person asks to listen, so the consent is named here.
     hold(outOf(st), relayIn(st), { consent: true, via: 'https' });
     hold(relayOut(st), TUNER_IN, { via: 'https' });
   }
@@ -147,7 +145,6 @@
   hold(GRAINS_OUT, SH_AUDIO);
   hold(GRAINS_EV, SH_VAL);
   hold(TUNER_EV, SH_VAL);
-  for (const c of K) hold(KNOB_OUT(c), SH_VAL);
   hold(SH_OUT, SCREEN);
 
   // ── the picture ─────────────────────────────────────────────────────────
@@ -158,6 +155,9 @@
   const count = el('span', 'cc-say', '');
   const panel = createVideoPanel({ media: canvas, left: onAir });
   panel.el.classList.add('cc-pic');
+  // The picture is the one control: a browser needs a press before sound, and this is it.
+  canvas.tabIndex = 0;
+  canvas.setAttribute('role', 'button');
   panel.el.querySelector('.pos-vp-r')?.prepend(count);
   let field = null, glErr = 0, frames = 0;
   if (gl) {
@@ -165,9 +165,9 @@
     catch (e) { d.log(`the picture did not compile: ${e.message}`, 'bad'); }
   } else d.log('this browser has no WebGL2, so there is no picture', 'bad');
 
-  // ── what reaches the shader's value inlet: grains, the tuned station, the storm, knobs ─
-  const seen = { grain: 0, tuned: 0, storm: 0, knob: 0 };
-  const base = Object.fromEntries(K.map((c) => [c.name, OPEN[c.name]]));
+  // ── what reaches the shader's value inlet: grains, the tuned station, the storm ─
+  const seen = { grain: 0, tuned: 0, storm: 0 };
+  const base = Object.fromEntries(Object.keys(STORM).map((n) => [n, OPEN[n]]));
   let storm = 0, jolt = 0;
   function shade(name) {
     const b = base[name];
@@ -177,11 +177,7 @@
     if (ev?.of === 'grain') { seen.grain++; bucket(ev); return; }
     // a station coming in tears the picture, as a station change does on /videoradio/
     if (ev?.of === 'tuned') { seen.tuned++; if (ev.station) jolt = 1; return; }
-    if (ev?.of === 'storm' && Number.isFinite(ev.v)) { seen.storm++; storm = ev.v; for (const n of Object.keys(STORM)) shade(n); return; }
-    if (ev?.of !== 'param' || !Number.isFinite(ev.v)) return;
-    seen.knob++;
-    base[ev.name] = ev.v;
-    shade(ev.name);
+    if (ev?.of === 'storm' && Number.isFinite(ev.v)) { seen.storm++; storm = ev.v; for (const n of Object.keys(STORM)) shade(n); }
   }
 
   // ── the data texture, filled every frame as /shader/landscape/ fills it ─
@@ -196,7 +192,7 @@
   }
   // where the grains read: `back` seconds behind the newest, give or take `jitter`
   function windowRow() {
-    const v = valuesOf(PATCHES[patchAt]);
+    const v = valuesOf(PATCH);
     const centre = 1 - v.back / WINDOW_S, half = Math.max(1 / DATA_W, v.jitter / WINDOW_S);
     for (let x = 0; x < DATA_W; x++) {
       const u = Math.abs((x + 0.5) / DATA_W - centre) / half, i = at(x, 2);
@@ -286,17 +282,19 @@
   }
 
   // ── the drift: a clock moving the tuner, and the storm that follows the noise ─
-  let cycleFrom = 0, here = 0, from = 0, nextKey = null, phase = 'off', driftTimer = 0, k = 0;
+  let cycleFrom = 0, from = 0, phase = 'off', driftTimer = 0, k = 0;
+  // `cur` is on air, `queue` is the rest of this shuffle, `played` every station since the press.
+  let cur = null, queue = [], order = [], played = [];
+  const peek = () => { if (!queue.length) queue = shuffled(cur); return queue[0]; };
   const ease = (x) => x * x * (3 - 2 * x);
-  const stationAt = (i) => STATIONS[((i % STATIONS.length) + STATIONS.length) % STATIONS.length];
   function driftTick() {
     if (!playing) return;
     const t = (performance.now() - cycleFrom) / 1000;
     const to = 1 - from;
-    const next = stationAt(here + 1);
+    const next = peek();
     if (t >= DWELL_S - PREROLL_S && !legs.has(next.key)) {
       openLeg(next, to);
-      d.log(`${next.label} opening, ${stationAt(here).label} still on air`);
+      d.log(`${next.label} opening, ${cur.label} still on air`);
     }
     if (t < DWELL_S) { phase = 'dwell'; k = 0; return; }
     if (t < CYCLE_S) {
@@ -312,36 +310,20 @@
     // landed: the leaving station closes, the arriving one plays, and the clock starts again
     bay.send(DRIFT_TUNE, { of: 'param', name: 'tune', v: SLOTS[to].at });
     bay.send(DRIFT_STORM, { of: 'storm', v: 0 });
-    const left = stationAt(here);
-    if (left.key !== next.key) closeLeg(left.key);
-    here += 1; from = to; cycleFrom = performance.now(); phase = 'dwell'; k = 0;
+    const left = cur;
+    closeLeg(left.key);
+    queue.shift(); cur = next; played.push(next.key);
+    from = to; cycleFrom = performance.now(); phase = 'dwell'; k = 0;
     onAir.textContent = next.label;
     d.log(`${next.label} on air, ${left.label} closed`);
   }
 
-  // ── the granulator's patch: one whole patch per event on patch -> grains ─
-  let patchAt = Math.max(0, PATCHES.findIndex((p) => p.name === 'Cloud'));
-  function choosePatch(i) {
-    patchAt = (i + PATCHES.length) % PATCHES.length;
-    patchPick.show(PATCHES[patchAt].name, patchAt);
-    bay.send(PATCH_OUT, { of: 'patch', name: PATCHES[patchAt].name, set: valuesOf(PATCHES[patchAt]) });
-  }
+  // ── the granulator's one patch, sent whole on patch -> grains when the engine is up ─
+  const PATCH = PATCHES.find((p) => p.name === 'Cloud') ?? PATCHES[0];
   function patchIn(ev) {
     if (ev?.of !== 'patch' || !ev.set) return;
     if (eng) { engine.fixed(ev.set); engine.land(); d.log(`${ev.name}: ${PATCHES.find((p) => p.name === ev.name)?.says ?? ''}`); }
   }
-  const patchPick = createPicker({ what: 'patch', cls: 'cc-patch', prev: () => choosePatch(patchAt - 1),
-    next: () => choosePatch(patchAt + 1), onPick: (i) => choosePatch(i) });
-  patchPick.options(PATCHES.map((p) => p.name), patchAt);
-
-  // ── the knobs ───────────────────────────────────────────────────────────
-  const knobs = new Map();
-  for (const c of K) {
-    knobs.set(c.name, createKnob({ label: c.label, min: c.min, max: c.max, value: OPEN[c.name],
-      ...(c.step ? { step: c.step } : {}), format: c.fmt,
-      onInput: (v) => bay.send(KNOB_OUT(c), { of: 'param', name: c.name, v }) }));
-  }
-  const grid = createKnobGrid(knobs, { row: true });
 
   // ── the sound ───────────────────────────────────────────────────────────
   const engine = createRingEngine({ log: (m, k) => d.log(m, k) });
@@ -365,7 +347,6 @@
     booting ??= (async () => {
       const grain = (g) => { if (playing) bay.send(GRAINS_EV, { of: 'grain', at: +ctx.currentTime.toFixed(4), ...g, ago: +g.ago.toFixed(3) }); };
       const e = await engine.boot({ ctx, input: toGrains, grain, log: (m, k) => d.log(m, k) });
-      engine.fixed(valuesOf(PATCHES[patchAt]));
       engine.knob('mix', WET);
       // the shader's audio inlet: an analyser on what the grains send out
       const an = ctx.createAnalyser(); an.fftSize = 2048; an.smoothingTimeConstant = 0.5;
@@ -373,8 +354,8 @@
       const pull = ctx.createGain(); pull.gain.value = 0; an.connect(pull).connect(ctx.destination);
       feats = createFeatures(an, ctx.sampleRate);
       follow = Object.fromEntries(FOLLOWER_NAMES.map((k) => [k, createEnvFollower(MOD_FOLLOWERS[k])]));
-      d.log(`the granulator is up on its ${PATCHES[patchAt].name} patch`);
       eng = e;
+      bay.send(PATCH_OUT, { of: 'patch', name: PATCH.name, set: valuesOf(PATCH) });
       return e;
     })();
     booting.catch(() => { booting = null; eng = null; });
@@ -385,7 +366,7 @@
     if (!playing || firstSoundMs !== null || !heard) return;
     heard.getFloatTimeDomainData(heardBuf);
     let s = 0; for (const v of heardBuf) s += v * v;
-    if (Math.sqrt(s / heardBuf.length) > 0.003) { firstSoundMs = Math.round(performance.now() - pressedAt); d.log(`first sound ${firstSoundMs} ms after Play`); return; }
+    if (Math.sqrt(s / heardBuf.length) > 0.003) { firstSoundMs = Math.round(performance.now() - pressedAt); d.log(`first sound ${firstSoundMs} ms after the press`); return; }
     requestAnimationFrame(listen);
   }
   async function play() {
@@ -400,12 +381,13 @@
     }
     playing = true; jolt = 1;
     noiseSrc = ctx.createBufferSource(); noiseSrc.buffer = pinkNoise(ctx); noiseSrc.loop = true; noiseSrc.start();
-    // A random first station, so no one mount is the one every visit opens.
-    here = Math.floor(Math.random() * STATIONS.length); from = 0;
+    // A fresh shuffle of every station on each press; the drift walks it in order.
+    queue = shuffled(); order = queue.map((s) => s.key);
+    cur = queue.shift(); played = [cur.key]; from = 0;
     tune = SLOTS[0].at; storm = 0;
-    openLeg(stationAt(here), 0);
+    openLeg(cur, 0);
     openOnPlay = legs.size;
-    onAir.textContent = stationAt(here).label;
+    onAir.textContent = cur.label;
     cycleFrom = performance.now(); phase = 'dwell';
     driftTimer = setInterval(driftTick, 50);
     face(); route();
@@ -432,13 +414,20 @@
   }
   // Leaving the page closes every station connection.
   addEventListener('pagehide', () => { if (playing) stop(); });
-  const transport = createButtonGroup({ buttons: [
-    { id: 'play', icon: 'play', label: 'play', onPress: () => (playing ? stop() : play()) },
-  ] });
-  function face() { transport.setIcon('play', playing ? 'stop' : 'play', playing ? 'stop' : 'play'); }
+  // A press on the picture, or Enter or Space while it has focus, starts and stops it.
+  let starting = null;
+  const toggle = () => { if (playing) stop(); else starting = play(); };
+  canvas.addEventListener('click', toggle);
+  canvas.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    if (!e.repeat) toggle();
+  });
+  function face() {
+    canvas.setAttribute('aria-pressed', String(playing));
+    canvas.setAttribute('aria-label', playing ? 'Radio landscape, playing. Press to stop' : 'Radio landscape. Press to play');
+  }
   face();
-  const top = el('div', 'cc-top');
-  top.append(transport.el);
 
   // A station's wires are lit while its stream is open; the tuner's and grains' while playing.
   const pb = createPatchbay(bay, {
@@ -453,13 +442,14 @@
     },
   });
 
-  d.stack.add(top, panel.el, patchPick.el, grid.el, pb.el);
+  d.stack.add(panel.el, pb.el);
 
   // ── read only, for a check over CDP ─────────────────────────────────────
   window.__demo.scenery = {
     bay, field: () => field, playing: () => playing, frames: () => frames, seen: () => ({ ...seen }),
     firstSoundMs: () => firstSoundMs, open: () => [...legs.keys()], conns: () => ({ ...conns, open: legs.size }),
-    drift: () => ({ phase, k, tune, storm, onAir: stationAt(here).key, tuned }), patch: () => PATCHES[patchAt].name,
+    drift: () => ({ phase, k, tune, storm, onAir: cur?.key ?? null, tuned }), patch: () => PATCH.name,
+    order: () => [...order], played: () => [...played],
     params: () => field?.params(), jolt: () => jolt, context: () => ctx, stop: () => stop(),
   };
 
@@ -471,24 +461,40 @@
     d.assert('a visit opened no audio context and no station', ctx === null && conns.opened === 0 && legs.size === 0);
     const want = [...STATIONS.flatMap((s) => [[outOf(s), relayIn(s)], [relayOut(s), TUNER_IN]]), [NOISE_OUT, TUNER_IN],
       [DRIFT_TUNE, TUNER_TUNE], [DRIFT_STORM, SH_VAL], [TUNER_OUT, GRAINS_IN], [PATCH_OUT, GRAINS_VAL], [GRAINS_OUT, SPEAKER],
-      [GRAINS_OUT, SH_AUDIO], [GRAINS_EV, SH_VAL], [TUNER_EV, SH_VAL], ...K.map((c) => [KNOB_OUT(c), SH_VAL]), [SH_OUT, SCREEN]];
+      [GRAINS_OUT, SH_AUDIO], [GRAINS_EV, SH_VAL], [TUNER_EV, SH_VAL], [SH_OUT, SCREEN]];
     const missing = want.filter(([a, b]) => !holds(a, b));
     d.assert('the patch holds every link: stations through the relay to the tuner, drift to tuner and shader',
       !missing.length, missing.length ? `missing ${missing.map((w) => w.join(' -> ')).join(', ')}` : `${want.length} links`);
     if (field) {
       await wait(400);
-      d.assert('the standby picture draws before Play, with no GL error', frames > 10 && glErr === 0, `${frames} frames, gl.getError ${glErr}`);
+      d.assert('the standby picture draws before the press, with no GL error', frames > 10 && glErr === 0, `${frames} frames, gl.getError ${glErr}`);
     }
     const mid = mix((SLOTS[0].at + SLOTS[1].at) / 2), on = mix(SLOTS[0].at);
     d.assert('halfway is a blend under noise and whistle, on a slot it is clear',
       mid.st.every((s) => s.clear > 0.15 && s.clear < 0.5) && mid.noise > 0.2 && mid.whistle > 0.02 && on.st[0].clear > 0.99 && on.noise < 0.05,
       `halfway clear ${mid.st.map((s) => s.clear.toFixed(2)).join(' and ')}, noise ${mid.noise.toFixed(2)}, whistle ${mid.whistle.toFixed(3)}`);
+    // The shuffle, with no station opened: every order holds each station once, orders differ,
+    // and a refill never starts with the station that just played.
+    const keys = STATIONS.map((s) => s.key).sort().join();
+    const orders = Array.from({ length: 40 }, () => shuffled());
+    const seams = STATIONS.flatMap((s) => Array.from({ length: 30 }, () => shuffled(s)[0] === s)).filter(Boolean).length;
+    d.assert('a shuffle holds every station once, shuffles differ, and a refill never repeats the last station',
+      orders.every((o) => o.map((s) => s.key).sort().join() === keys) && new Set(orders.map((o) => o.map((s) => s.key).join())).size > 20 && seams === 0,
+      `${STATIONS.length} stations, ${new Set(orders.map((o) => o.map((s) => s.key).join())).size} distinct orders of 40, ${seams} repeats at a seam of ${STATIONS.length * 30}`);
+    d.assert('the picture is the control: focusable, a button, named', canvas.tabIndex === 0 && canvas.getAttribute('role') === 'button'
+      && /press to play/i.test(canvas.getAttribute('aria-label') || '') && !document.querySelector('.pos-controls button, .pos-knob, .pos-pick'),
+      canvas.getAttribute('aria-label'));
     if (!LOCAL) { d.log('the self check plays only against a stand-in: add ?base=http://127.0.0.1:8899 (node demo/fake-station.mjs)', 'warn'); return; }
 
-    await play();
+    // The real gesture: a click on the picture.
+    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await starting;
     await until(() => firstSoundMs !== null, 4000);
-    d.assert('sound reaches the speakers within 3 s of Play', firstSoundMs !== null && firstSoundMs <= 3000, `${firstSoundMs ?? 'none'} ms`);
-    d.assert('Play opened one station', openOnPlay === 1, `${stationAt(here).label}, ${openOnPlay} open`);
+    d.assert('sound reaches the speakers within 3 s of a press on the picture', firstSoundMs !== null && firstSoundMs <= 3000, `${firstSoundMs ?? 'none'} ms`);
+    d.assert('the press opened one station, the first of a fresh shuffle', openOnPlay === 1 && order.length === STATIONS.length && cur?.key === order[0],
+      `${cur?.label}, ${openOnPlay} open, order ${order.join(' ')}`);
+    d.assert('the granulator took its one patch over its wire', sentOn(PATCH_OUT, GRAINS_VAL) >= 1
+      && Math.abs((await engine.read('size')) - valuesOf(PATCH).size) < 1e-3, `${PATCH.name}, ${sentOn(PATCH_OUT, GRAINS_VAL)} sent`);
     if (!eng) return;
     await wait(1200);
     const g0 = sentOn(GRAINS_EV, SH_VAL);
@@ -496,12 +502,13 @@
     d.assert('the grains reach the shader over their wire', sentOn(GRAINS_EV, SH_VAL) - g0 > 5, `${sentOn(GRAINS_EV, SH_VAL) - g0} in 0.8 s`);
 
     // One whole cycle: the drift moves the tuner, the storm rises and falls, the station changes.
-    const first = stationAt(here).key, firstHere = here;
+    const first = cur.key, n0 = played.length;
     const t0 = sentOn(DRIFT_TUNE, TUNER_TUNE), s0 = sentOn(DRIFT_STORM, SH_VAL), j0 = seen.tuned;
-    const calmAmp = field?.params().ampM ?? 0;
+    // The calm height is the look's own; the storm only adds to it.
+    const calmAmp = base.ampM;
     let maxOpen = 0, peak = 0, peakAmp = 0, waves = null, tore = 0;
     const end = performance.now() + (CYCLE_S + 2) * 1000;
-    while (performance.now() < end && here === firstHere) {
+    while (performance.now() < end && played.length === n0) {
       maxOpen = Math.max(maxOpen, legs.size);
       if (peak > 0.5) tore = Math.max(tore, jolt);
       if (storm > peak) { peak = storm; peakAmp = field?.params().ampM ?? 0; }
@@ -517,8 +524,9 @@
       await wait(50);
     }
     await wait(150);
-    const now = stationAt(here).key;
-    d.assert('the drift tunes the tuner over its wire, and the next station comes in', sentOn(DRIFT_TUNE, TUNER_TUNE) - t0 > 20 && now !== first && tuned === now,
+    const now = cur.key;
+    d.assert('the drift tunes the tuner over its wire, and the next station in the shuffle comes in', sentOn(DRIFT_TUNE, TUNER_TUNE) - t0 > 20
+      && now !== first && now === order[1] && tuned === now,
       `${sentOn(DRIFT_TUNE, TUNER_TUNE) - t0} tune events, ${first} to ${now}, tuned ${tuned}`);
     d.assert('at most two stations were open at once, and one is open after the blend',
       maxOpen <= 2 && legs.size === 1 && conns.opened === 2 && conns.closed === 1, `max ${maxOpen}, now ${legs.size}, opened ${conns.opened}, closed ${conns.closed}`);
@@ -534,15 +542,11 @@
     d.assert('the tuner told the shader the station came in, and the picture tore', seen.tuned > j0 && tore > 0.8,
       `${seen.tuned - j0} tuned events, jolt up to ${tore.toFixed(2)}`);
 
-    const p0 = sentOn(PATCH_OUT, GRAINS_VAL);
-    choosePatch(patchAt + 1);
-    await wait(300);
-    const size = await engine.read('size'), wantSize = valuesOf(PATCHES[patchAt]).size;
-    d.assert('the patch picker reaches the granulator over its wire', sentOn(PATCH_OUT, GRAINS_VAL) === p0 + 1 && Math.abs(size - wantSize) < 1e-3,
-      `${PATCHES[patchAt].name}: size ${size} against ${wantSize}`);
-    stop();
-    d.assert('Stop closed every station it opened', legs.size === 0 && conns.opened === conns.closed,
-      `opened ${conns.opened}, closed ${conns.closed}`);
+    // Stop from the keyboard: Space on the focused picture.
+    canvas.focus();
+    canvas.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+    d.assert('Space on the picture stopped it and closed every station it opened', !playing && legs.size === 0 && conns.opened === conns.closed
+      && canvas.getAttribute('aria-pressed') === 'false', `opened ${conns.opened}, closed ${conns.closed}, played ${played.join(' ')}`);
   }
   if (SELFCHECK) { try { await check(); } catch (e) { d.assert('the self check ran to the end', false, String(e?.stack || e)); } }
   d.ready();
