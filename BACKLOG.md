@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**/devices/patches/: scale buttons**~~ (2026-10-15, DONE: 1x, 2x, 3x for every screen, the cards one column at 3x). Asked: *"add scale buttons to http://127.0.0.1:8890/devices/patches/"*.
+- ~~**Pi screen patches: back to beads**~~ (2026-10-15, DONE). Asked: *"revert to original design. ants are undredable"*.
 - **Web patchbay wires: beads or marching ants as on the Pi's screen, to compare** (2026-10-15; built behind `?wires=beads` and `?wires=ants` on any page, the glow stays the default until the owner picks). Asked: *"show beads in web too"*, *"try also marchin ants?"*.
 - ~~**/devices/patches/: the cards animated**~~ (2026-10-15, DONE: beads run along each wire, out to in, 15 a second, on the page and on the Pi while a patch is shown). Asked: *"make them animated"*.
 - ~~**Web kit drum grids: no row labels on the left, the voice's name on hover**~~ (2026-10-15, DONE by a background agent: step-grid.mjs pads take the row's name as their hover when there is no column, drum-machine.mjs builds no column; /tom/ and the kit's numbered grid keep theirs; LOST: grid.lit(r), so /devices/drums/ no longer marks the row its keys edit in the browser grid). Asked: *"rm left labels from web ui kit drum grids. (arhve that knowledge). on hover say patch name. in bg"*. step-grid.mjs / drum-machine.mjs, every /drums/ page and /devices/drums/ checked after; what the labels were for goes to lessons/ verbatim.
