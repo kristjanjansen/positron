@@ -107,6 +107,13 @@ export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () =
     return { nodes, ports: [...ports, ...extra.values()], links };
   };
   const source = { nodes: () => drawn().nodes, ports: () => drawn().ports, links: () => drawn().links };
+  // The drawn patch as plain data, read by demo/resources/dump-bays.mjs for the social pictures.
+  (window.__bays ??= []).push(() => {
+    const b = drawn();
+    return { nodes: b.nodes.map((n) => ({ id: n.id, label: n.id === RELAY ? 'Cloudflare' : n.label || '' })),
+      ports: b.ports.map((p) => ({ id: p.id, dir: p.dir, medium: p.medium })),
+      links: b.links.map((l) => ({ from: l.from, to: l.to })) };
+  });
   useMediumColours();
   if (!styled) { document.head.append(Object.assign(document.createElement('style'), { textContent: CSS })); styled = true; }
   // The view sees every link under its printed form, so the same link read

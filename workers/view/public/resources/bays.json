@@ -1,0 +1,7209 @@
+{
+ "made": "2026-10-15",
+ "bays": [
+  {
+   "id": "synth/keyboard",
+   "title": "Keyboard",
+   "say": "Play a sine synthesizer from the on-screen keys or a MIDI keyboard plugged into this computer.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:synth",
+     "label": "sine"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:keys:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:synth:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:synth:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:synth:midi-in"
+    },
+    {
+     "from": "web:synth:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "synth/recorder",
+   "title": "Recorder",
+   "say": "Record what you play and play it back, every note in a table with its time, velocity and length.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:synth",
+     "label": "saw"
+    },
+    {
+     "id": "web:rec",
+     "label": "recorder"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:keys:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:synth:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:synth:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:rec:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:rec:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:synth:midi-in"
+    },
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:rec:midi-in"
+    },
+    {
+     "from": "web:rec:midi-out",
+     "to": "web:synth:midi-in"
+    },
+    {
+     "from": "web:synth:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "synth/timeline",
+   "title": "Timeline",
+   "say": "The same recorder drawn on a timeline, so a take shows as notes in time and plays from its start.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:synth",
+     "label": "saw"
+    },
+    {
+     "id": "web:rec",
+     "label": "recorder"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:keys:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:synth:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:synth:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:rec:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:rec:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:synth:midi-in"
+    },
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:rec:midi-in"
+    },
+    {
+     "from": "web:rec:midi-out",
+     "to": "web:synth:midi-in"
+    },
+    {
+     "from": "web:synth:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "synth/sound",
+   "title": "Sound design",
+   "say": "One voice from the keys through a filter, an envelope and an LFO, every knob on a wire of its own.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:knob-wave",
+     "label": "wave"
+    },
+    {
+     "id": "web:knob-cutoff",
+     "label": "cutoff"
+    },
+    {
+     "id": "web:knob-q",
+     "label": "q"
+    },
+    {
+     "id": "web:knob-attack",
+     "label": "attack"
+    },
+    {
+     "id": "web:knob-decay",
+     "label": "decay"
+    },
+    {
+     "id": "web:knob-sustain",
+     "label": "sustain"
+    },
+    {
+     "id": "web:knob-release",
+     "label": "release"
+    },
+    {
+     "id": "web:knob-rate",
+     "label": "rate"
+    },
+    {
+     "id": "web:knob-depth",
+     "label": "depth"
+    },
+    {
+     "id": "web:osc",
+     "label": "oscillator"
+    },
+    {
+     "id": "web:filter",
+     "label": "lowpass filter"
+    },
+    {
+     "id": "web:amp",
+     "label": "amp and envelope"
+    },
+    {
+     "id": "web:lfo",
+     "label": "lfo"
+    },
+    {
+     "id": "web:scope",
+     "label": "waveform"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:knob-wave:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-cutoff:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-q:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-attack:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-decay:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-sustain:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-release:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-rate:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-depth:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:osc:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:osc:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:osc:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:filter:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:filter:cutoff-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:filter:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:filter:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:amp:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:amp:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:amp:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:amp:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:lfo:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:lfo:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:osc:midi-in"
+    },
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:amp:midi-in"
+    },
+    {
+     "from": "web:osc:audio-out",
+     "to": "web:filter:audio-in"
+    },
+    {
+     "from": "web:filter:audio-out",
+     "to": "web:amp:audio-in"
+    },
+    {
+     "from": "web:amp:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:amp:audio-out",
+     "to": "web:scope:audio-in"
+    },
+    {
+     "from": "web:lfo:audio-out",
+     "to": "web:filter:cutoff-in"
+    },
+    {
+     "from": "web:knob-wave:value-out",
+     "to": "web:osc:value-in"
+    },
+    {
+     "from": "web:knob-cutoff:value-out",
+     "to": "web:filter:value-in"
+    },
+    {
+     "from": "web:knob-q:value-out",
+     "to": "web:filter:value-in"
+    },
+    {
+     "from": "web:knob-attack:value-out",
+     "to": "web:amp:value-in"
+    },
+    {
+     "from": "web:knob-decay:value-out",
+     "to": "web:amp:value-in"
+    },
+    {
+     "from": "web:knob-sustain:value-out",
+     "to": "web:amp:value-in"
+    },
+    {
+     "from": "web:knob-release:value-out",
+     "to": "web:amp:value-in"
+    },
+    {
+     "from": "web:knob-rate:value-out",
+     "to": "web:lfo:value-in"
+    },
+    {
+     "from": "web:knob-depth:value-out",
+     "to": "web:lfo:value-in"
+    }
+   ]
+  },
+  {
+   "id": "code/faust",
+   "title": "Faust synth",
+   "say": "A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:knob-detune",
+     "label": "detune"
+    },
+    {
+     "id": "web:knob-sub",
+     "label": "sub"
+    },
+    {
+     "id": "web:knob-cutoff",
+     "label": "cutoff"
+    },
+    {
+     "id": "web:knob-res",
+     "label": "res"
+    },
+    {
+     "id": "web:knob-attack",
+     "label": "attack"
+    },
+    {
+     "id": "web:knob-release",
+     "label": "release"
+    },
+    {
+     "id": "web:knob-env",
+     "label": "env"
+    },
+    {
+     "id": "web:knob-rate",
+     "label": "rate"
+    },
+    {
+     "id": "web:knob-depth",
+     "label": "depth"
+    },
+    {
+     "id": "web:knob-echo",
+     "label": "echo"
+    },
+    {
+     "id": "web:fau",
+     "label": "Faust"
+    },
+    {
+     "id": "web:scope",
+     "label": "waveform"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:knob-detune:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-sub:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-cutoff:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-res:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-attack:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-release:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-env:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-rate:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-depth:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-echo:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:fau:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:fau:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:fau:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:fau:midi-in"
+    },
+    {
+     "from": "web:fau:audio-out",
+     "to": "web:scope:audio-in"
+    },
+    {
+     "from": "web:fau:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:knob-detune:value-out",
+     "to": "web:fau:value-in"
+    },
+    {
+     "from": "web:knob-sub:value-out",
+     "to": "web:fau:value-in"
+    },
+    {
+     "from": "web:knob-cutoff:value-out",
+     "to": "web:fau:value-in"
+    },
+    {
+     "from": "web:knob-res:value-out",
+     "to": "web:fau:value-in"
+    },
+    {
+     "from": "web:knob-attack:value-out",
+     "to": "web:fau:value-in"
+    },
+    {
+     "from": "web:knob-release:value-out",
+     "to": "web:fau:value-in"
+    },
+    {
+     "from": "web:knob-env:value-out",
+     "to": "web:fau:value-in"
+    },
+    {
+     "from": "web:knob-rate:value-out",
+     "to": "web:fau:value-in"
+    },
+    {
+     "from": "web:knob-depth:value-out",
+     "to": "web:fau:value-in"
+    },
+    {
+     "from": "web:knob-echo:value-out",
+     "to": "web:fau:value-in"
+    }
+   ]
+  },
+  {
+   "id": "code/collide",
+   "title": "Collide synth",
+   "say": "Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:knob-bright",
+     "label": "bright"
+    },
+    {
+     "id": "web:knob-decay",
+     "label": "decay"
+    },
+    {
+     "id": "web:collide",
+     "label": "SuperCollider"
+    },
+    {
+     "id": "web:scope",
+     "label": "waveform"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:knob-bright:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-decay:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:collide:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:collide:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:collide:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:collide:midi-in"
+    },
+    {
+     "from": "web:knob-bright:value-out",
+     "to": "web:collide:value-in"
+    },
+    {
+     "from": "web:knob-decay:value-out",
+     "to": "web:collide:value-in"
+    },
+    {
+     "from": "web:collide:audio-out",
+     "to": "web:scope:audio-in"
+    },
+    {
+     "from": "web:collide:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "code/wish",
+   "title": "Sound wish",
+   "say": "Type or say a wish for a sound and a model writes it in SuperCollider. Play it from the keys.",
+   "nodes": [
+    {
+     "id": "web:wish",
+     "label": "wish"
+    },
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:collide",
+     "label": "SuperCollider"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:wish:program-out",
+     "dir": "out",
+     "medium": "program"
+    },
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:collide:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:collide:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:collide:program-in",
+     "dir": "in",
+     "medium": "program"
+    },
+    {
+     "id": "web:collide:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:wish:program-out",
+     "to": "web:collide:program-in"
+    },
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:collide:midi-in"
+    },
+    {
+     "from": "web:collide:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "code/plaits",
+   "title": "Plaits",
+   "say": "The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:knob-model",
+     "label": "model"
+    },
+    {
+     "id": "web:knob-pitch",
+     "label": "pitch"
+    },
+    {
+     "id": "web:knob-harmonics",
+     "label": "harmonics"
+    },
+    {
+     "id": "web:knob-timbre",
+     "label": "timbre"
+    },
+    {
+     "id": "web:knob-morph",
+     "label": "morph"
+    },
+    {
+     "id": "web:knob-timbre-cv",
+     "label": "timbre CV"
+    },
+    {
+     "id": "web:knob-fm-cv",
+     "label": "FM CV"
+    },
+    {
+     "id": "web:knob-morph-cv",
+     "label": "morph CV"
+    },
+    {
+     "id": "web:knob-decay",
+     "label": "decay"
+    },
+    {
+     "id": "web:knob-colour",
+     "label": "colour"
+    },
+    {
+     "id": "web:plaits",
+     "label": "Plaits"
+    },
+    {
+     "id": "web:scope",
+     "label": "waveform"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:keys:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:knob-model:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-pitch:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-harmonics:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-timbre:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-morph:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-timbre-cv:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-fm-cv:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-morph-cv:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-decay:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-colour:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:plaits:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:plaits:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:plaits:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:plaits:midi-in"
+    },
+    {
+     "from": "web:knob-model:value-out",
+     "to": "web:plaits:value-in"
+    },
+    {
+     "from": "web:knob-pitch:value-out",
+     "to": "web:plaits:value-in"
+    },
+    {
+     "from": "web:knob-harmonics:value-out",
+     "to": "web:plaits:value-in"
+    },
+    {
+     "from": "web:knob-timbre:value-out",
+     "to": "web:plaits:value-in"
+    },
+    {
+     "from": "web:knob-morph:value-out",
+     "to": "web:plaits:value-in"
+    },
+    {
+     "from": "web:knob-timbre-cv:value-out",
+     "to": "web:plaits:value-in"
+    },
+    {
+     "from": "web:knob-fm-cv:value-out",
+     "to": "web:plaits:value-in"
+    },
+    {
+     "from": "web:knob-morph-cv:value-out",
+     "to": "web:plaits:value-in"
+    },
+    {
+     "from": "web:knob-decay:value-out",
+     "to": "web:plaits:value-in"
+    },
+    {
+     "from": "web:knob-colour:value-out",
+     "to": "web:plaits:value-in"
+    },
+    {
+     "from": "web:plaits:audio-out",
+     "to": "web:scope:audio-in"
+    },
+    {
+     "from": "web:plaits:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "code/piano",
+   "title": "Piano and Rhodes",
+   "say": "A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:looper",
+     "label": "looper"
+    },
+    {
+     "id": "web:sampler",
+     "label": "SuperCollider sampler"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "cf-r2:piano",
+     "label": "piano samples"
+    },
+    {
+     "id": "cf-r2:rhodes",
+     "label": "Rhodes samples"
+    },
+    {
+     "id": "web:patch",
+     "label": "patch"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:keys:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:looper:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:looper:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:sampler:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:sampler:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "web:sampler:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-r2:piano:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "cf-r2:rhodes:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "web:patch:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:looper:midi-in"
+    },
+    {
+     "from": "web:looper:midi-out",
+     "to": "web:sampler:midi-in"
+    },
+    {
+     "from": "cf-r2:piano:file-out",
+     "to": "web:sampler:file-in"
+    },
+    {
+     "from": "cf-r2:rhodes:file-out",
+     "to": "web:sampler:file-in"
+    },
+    {
+     "from": "web:patch:midi-out",
+     "to": "web:sampler:midi-in"
+    },
+    {
+     "from": "web:sampler:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "synth/dots",
+   "title": "Dot piano",
+   "say": "Each note draws an arc on a ring, by a shader in this tab and by C firmware on an emulated Pico.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:synth",
+     "label": "saw"
+    },
+    {
+     "id": "web:rec",
+     "label": "recorder"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "web:midi",
+     "label": "midi state"
+    },
+    {
+     "id": "web:shader",
+     "label": "shader"
+    },
+    {
+     "id": "web:screen",
+     "label": "picture"
+    },
+    {
+     "id": "web:pico",
+     "label": "Pico (emulated)"
+    },
+    {
+     "id": "web:oled",
+     "label": "OLED"
+    },
+    {
+     "id": "web:knob-volume",
+     "label": "knob"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:keys:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:synth:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:synth:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:rec:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:rec:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:midi:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:midi:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:shader:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:shader:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:pico:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:pico:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:oled:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:knob-volume:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:synth:midi-in"
+    },
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:rec:midi-in"
+    },
+    {
+     "from": "web:rec:midi-out",
+     "to": "web:synth:midi-in"
+    },
+    {
+     "from": "web:synth:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:midi:midi-in"
+    },
+    {
+     "from": "web:rec:midi-out",
+     "to": "web:midi:midi-in"
+    },
+    {
+     "from": "web:midi:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:shader:video-out",
+     "to": "web:screen:video-in"
+    },
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:pico:midi-in"
+    },
+    {
+     "from": "web:rec:midi-out",
+     "to": "web:pico:midi-in"
+    },
+    {
+     "from": "web:pico:video-out",
+     "to": "web:oled:video-in"
+    },
+    {
+     "from": "web:knob-volume:midi-out",
+     "to": "web:midi:midi-in"
+    },
+    {
+     "from": "web:knob-volume:midi-out",
+     "to": "web:pico:midi-in"
+    }
+   ]
+  },
+  {
+   "id": "granulator/grains",
+   "title": "Granulator",
+   "say": "Our radio recordings granulated in this tab, each grain marked on the wave where it read the sound.",
+   "nodes": [
+    {
+     "id": "cf-r2:raadio2",
+     "label": "Raadio 2 recording"
+    },
+    {
+     "id": "cf-r2:raadio4",
+     "label": "Raadio 4 recording"
+    },
+    {
+     "id": "cf-r2:ida",
+     "label": "Ida recording"
+    },
+    {
+     "id": "web:radio",
+     "label": "radio"
+    },
+    {
+     "id": "web:grains",
+     "label": "grain ring"
+    },
+    {
+     "id": "web:wave",
+     "label": "wave"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "web:patch",
+     "label": "patch"
+    },
+    {
+     "id": "web:knob-mix",
+     "label": "wet/dry"
+    },
+    {
+     "id": "web:knob-size",
+     "label": "size"
+    },
+    {
+     "id": "web:knob-density",
+     "label": "density"
+    },
+    {
+     "id": "web:knob-pitch",
+     "label": "pitch"
+    },
+    {
+     "id": "web:knob-back",
+     "label": "back"
+    },
+    {
+     "id": "web:knob-speed",
+     "label": "speed"
+    },
+    {
+     "id": "web:knob-scatter",
+     "label": "scatter"
+    },
+    {
+     "id": "web:knob-freeze",
+     "label": "freeze"
+    }
+   ],
+   "ports": [
+    {
+     "id": "cf-r2:raadio2:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "cf-r2:raadio4:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "cf-r2:ida:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "web:radio:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "web:radio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:grains:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:grains:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:grains:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:grains:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:wave:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:wave:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:patch:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:patch:value-out-2",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-mix:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-size:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-size:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-density:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-density:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-pitch:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-pitch:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-back:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-back:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-speed:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-speed:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-scatter:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-scatter:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-freeze:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-freeze:value-in",
+     "dir": "in",
+     "medium": "value"
+    }
+   ],
+   "links": [
+    {
+     "from": "cf-r2:raadio2:file-out",
+     "to": "web:radio:file-in"
+    },
+    {
+     "from": "cf-r2:raadio4:file-out",
+     "to": "web:radio:file-in"
+    },
+    {
+     "from": "cf-r2:ida:file-out",
+     "to": "web:radio:file-in"
+    },
+    {
+     "from": "web:radio:audio-out",
+     "to": "web:grains:audio-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-size:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-density:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-pitch:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-back:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-speed:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-scatter:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-freeze:value-in"
+    },
+    {
+     "from": "web:patch:value-out-2",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-mix:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-size:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-density:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-pitch:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-back:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-speed:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-scatter:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-freeze:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:radio:audio-out",
+     "to": "web:wave:audio-in"
+    },
+    {
+     "from": "web:grains:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:grains:value-out",
+     "to": "web:wave:value-in"
+    }
+   ]
+  },
+  {
+   "id": "granulator/beat",
+   "title": "Beat granulator",
+   "say": "The Ida recording granulated on Dub, its echo and grains put on the beat a tempo detector hears.",
+   "nodes": [
+    {
+     "id": "cf-r2:raadio2",
+     "label": "Raadio 2 recording"
+    },
+    {
+     "id": "cf-r2:raadio4",
+     "label": "Raadio 4 recording"
+    },
+    {
+     "id": "cf-r2:ida",
+     "label": "Ida recording"
+    },
+    {
+     "id": "web:radio",
+     "label": "radio"
+    },
+    {
+     "id": "web:grains",
+     "label": "grain ring"
+    },
+    {
+     "id": "web:wave",
+     "label": "wave"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "web:patch",
+     "label": "patch"
+    },
+    {
+     "id": "web:knob-mix",
+     "label": "wet/dry"
+    },
+    {
+     "id": "web:knob-size",
+     "label": "size"
+    },
+    {
+     "id": "web:knob-density",
+     "label": "density"
+    },
+    {
+     "id": "web:knob-pitch",
+     "label": "pitch"
+    },
+    {
+     "id": "web:knob-back",
+     "label": "back"
+    },
+    {
+     "id": "web:knob-speed",
+     "label": "speed"
+    },
+    {
+     "id": "web:knob-scatter",
+     "label": "scatter"
+    },
+    {
+     "id": "web:knob-freeze",
+     "label": "freeze"
+    },
+    {
+     "id": "web:tempo",
+     "label": "tempo detector"
+    }
+   ],
+   "ports": [
+    {
+     "id": "cf-r2:raadio2:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "cf-r2:raadio4:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "cf-r2:ida:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "web:radio:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "web:radio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:grains:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:grains:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:grains:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:grains:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:wave:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:wave:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:patch:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:patch:value-out-2",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-mix:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-size:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-size:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-density:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-density:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-pitch:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-pitch:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-back:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-back:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-speed:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-speed:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-scatter:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-scatter:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-freeze:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-freeze:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:tempo:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:tempo:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:grains:tempo-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:wave:value-in-2",
+     "dir": "in",
+     "medium": "value"
+    }
+   ],
+   "links": [
+    {
+     "from": "cf-r2:raadio2:file-out",
+     "to": "web:radio:file-in"
+    },
+    {
+     "from": "cf-r2:raadio4:file-out",
+     "to": "web:radio:file-in"
+    },
+    {
+     "from": "cf-r2:ida:file-out",
+     "to": "web:radio:file-in"
+    },
+    {
+     "from": "web:radio:audio-out",
+     "to": "web:grains:audio-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-size:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-density:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-pitch:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-back:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-speed:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-scatter:value-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:knob-freeze:value-in"
+    },
+    {
+     "from": "web:patch:value-out-2",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-mix:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-size:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-density:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-pitch:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-back:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-speed:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-scatter:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:knob-freeze:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:radio:audio-out",
+     "to": "web:wave:audio-in"
+    },
+    {
+     "from": "web:grains:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:grains:value-out",
+     "to": "web:wave:value-in"
+    },
+    {
+     "from": "web:radio:audio-out",
+     "to": "web:tempo:audio-in"
+    },
+    {
+     "from": "web:tempo:value-out",
+     "to": "web:grains:tempo-in"
+    },
+    {
+     "from": "web:tempo:value-out",
+     "to": "web:wave:value-in-2"
+    }
+   ]
+  },
+  {
+   "id": "remote/circuit",
+   "title": "Circuit on Pi",
+   "say": "A Novation Circuit in another building, played from here through its Pi. Keys, MIDI and 8 macros.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:patch",
+     "label": "patch"
+    },
+    {
+     "id": "pi-1:circuit",
+     "label": "Circuit on the Pi"
+    },
+    {
+     "id": "web:knob-macro-1",
+     "label": "macro 1"
+    },
+    {
+     "id": "web:knob-macro-2",
+     "label": "macro 2"
+    },
+    {
+     "id": "web:knob-macro-3",
+     "label": "macro 3"
+    },
+    {
+     "id": "web:knob-macro-4",
+     "label": "macro 4"
+    },
+    {
+     "id": "web:knob-macro-5",
+     "label": "macro 5"
+    },
+    {
+     "id": "web:knob-macro-6",
+     "label": "macro 6"
+    },
+    {
+     "id": "web:knob-macro-7",
+     "label": "macro 7"
+    },
+    {
+     "id": "web:knob-macro-8",
+     "label": "macro 8"
+    },
+    {
+     "id": "web:scope",
+     "label": "waveform"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "cf-relay:studio-1",
+     "label": "Cloudflare"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:patch:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:knob-macro-1:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-macro-2:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-macro-3:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-macro-4:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-macro-5:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-macro-6:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-macro-7:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-macro-8:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:scope:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "pi-1:circuit:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "pi-1:circuit:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "pi-1:circuit:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:studio-1:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "cf-relay:studio-1:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "cf-relay:studio-1:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:studio-1:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:studio-1:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-relay:studio-1:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "cf-relay:studio-1:midi-in"
+    },
+    {
+     "from": "cf-relay:studio-1:midi-out",
+     "to": "pi-1:circuit:midi-in"
+    },
+    {
+     "from": "web:patch:midi-out",
+     "to": "cf-relay:studio-1:midi-in"
+    },
+    {
+     "from": "web:knob-macro-1:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "cf-relay:studio-1:value-out",
+     "to": "pi-1:circuit:value-in"
+    },
+    {
+     "from": "web:knob-macro-2:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-macro-3:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-macro-4:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-macro-5:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-macro-6:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-macro-7:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-macro-8:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "pi-1:circuit:audio-out",
+     "to": "cf-relay:studio-1:audio-in"
+    },
+    {
+     "from": "cf-relay:studio-1:audio-out",
+     "to": "web:scope:audio-in"
+    },
+    {
+     "from": "pi-1:circuit:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "remote/collide",
+   "title": "Collide on Pi",
+   "say": "SuperCollider here and on a Pi in another building at once. Crossfade between the two.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:knob-bright",
+     "label": "bright"
+    },
+    {
+     "id": "web:knob-decay",
+     "label": "decay"
+    },
+    {
+     "id": "web:collide",
+     "label": "SuperCollider here"
+    },
+    {
+     "id": "web:scope",
+     "label": "waveform here"
+    },
+    {
+     "id": "web:scope-pi",
+     "label": "Pi waveform"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "pi-1:collide",
+     "label": "SuperCollider on the Pi"
+    },
+    {
+     "id": "web:fader",
+     "label": "fader"
+    },
+    {
+     "id": "web:xfade",
+     "label": "crossfader"
+    },
+    {
+     "id": "cf-relay:room",
+     "label": "Cloudflare"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:knob-bright:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-decay:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:collide:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:collide:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:collide:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope-pi:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "pi-1:collide:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "pi-1:collide:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "pi-1:collide:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:fader:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:xfade:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:xfade:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:xfade:audio-in-2",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:xfade:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-relay:room:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "cf-relay:room:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "cf-relay:room:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:room:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:room:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-relay:room:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "web:collide:midi-in"
+    },
+    {
+     "from": "web:keys:midi-out",
+     "to": "cf-relay:room:midi-in"
+    },
+    {
+     "from": "cf-relay:room:midi-out",
+     "to": "pi-1:collide:midi-in"
+    },
+    {
+     "from": "web:knob-bright:value-out",
+     "to": "web:collide:value-in"
+    },
+    {
+     "from": "web:knob-bright:value-out",
+     "to": "cf-relay:room:value-in"
+    },
+    {
+     "from": "cf-relay:room:value-out",
+     "to": "pi-1:collide:value-in"
+    },
+    {
+     "from": "web:knob-decay:value-out",
+     "to": "web:collide:value-in"
+    },
+    {
+     "from": "web:knob-decay:value-out",
+     "to": "cf-relay:room:value-in"
+    },
+    {
+     "from": "web:collide:audio-out",
+     "to": "web:scope:audio-in"
+    },
+    {
+     "from": "web:collide:audio-out",
+     "to": "web:xfade:audio-in"
+    },
+    {
+     "from": "pi-1:collide:audio-out",
+     "to": "cf-relay:room:audio-in"
+    },
+    {
+     "from": "cf-relay:room:audio-out",
+     "to": "web:scope-pi:audio-in"
+    },
+    {
+     "from": "cf-relay:room:audio-out",
+     "to": "web:xfade:audio-in-2"
+    },
+    {
+     "from": "web:fader:value-out",
+     "to": "web:xfade:value-in"
+    },
+    {
+     "from": "web:xfade:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "remote/piano",
+   "title": "Piano and Rhodes on Pi",
+   "say": "A piano and a Rhodes on a Pi in another building, played from here over the relay or direct.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:patch",
+     "label": "patch"
+    },
+    {
+     "id": "pi-1:sampler",
+     "label": "sampler on the Pi"
+    },
+    {
+     "id": "cf-r2:piano",
+     "label": "piano samples"
+    },
+    {
+     "id": "cf-r2:rhodes",
+     "label": "Rhodes samples"
+    },
+    {
+     "id": "web:scope",
+     "label": "waveform"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "cf-relay:studio-1",
+     "label": "Cloudflare"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:patch:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "pi-1:sampler:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "pi-1:sampler:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "pi-1:sampler:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-r2:piano:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "cf-r2:rhodes:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "web:scope:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-relay:studio-1:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "cf-relay:studio-1:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "cf-relay:studio-1:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-relay:studio-1:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "cf-relay:studio-1:midi-in"
+    },
+    {
+     "from": "cf-relay:studio-1:midi-out",
+     "to": "pi-1:sampler:midi-in"
+    },
+    {
+     "from": "web:patch:midi-out",
+     "to": "cf-relay:studio-1:midi-in"
+    },
+    {
+     "from": "cf-r2:piano:file-out",
+     "to": "pi-1:sampler:file-in"
+    },
+    {
+     "from": "cf-r2:rhodes:file-out",
+     "to": "pi-1:sampler:file-in"
+    },
+    {
+     "from": "pi-1:sampler:audio-out",
+     "to": "cf-relay:studio-1:audio-in"
+    },
+    {
+     "from": "cf-relay:studio-1:audio-out",
+     "to": "web:scope:audio-in"
+    },
+    {
+     "from": "pi-1:sampler:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "remote/plaits",
+   "title": "Plaits on Pi",
+   "say": "Emilie Gillet's Plaits running on a Pi in another building. Play it and turn its knobs from here.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:knob-model",
+     "label": "model"
+    },
+    {
+     "id": "web:knob-pitch",
+     "label": "pitch"
+    },
+    {
+     "id": "web:knob-harmonics",
+     "label": "harmonics"
+    },
+    {
+     "id": "web:knob-timbre",
+     "label": "timbre"
+    },
+    {
+     "id": "web:knob-morph",
+     "label": "morph"
+    },
+    {
+     "id": "web:knob-timbre-cv",
+     "label": "timbre CV"
+    },
+    {
+     "id": "web:knob-fm-cv",
+     "label": "FM CV"
+    },
+    {
+     "id": "web:knob-morph-cv",
+     "label": "morph CV"
+    },
+    {
+     "id": "web:knob-decay",
+     "label": "decay"
+    },
+    {
+     "id": "web:knob-colour",
+     "label": "colour"
+    },
+    {
+     "id": "pi-1:plaits",
+     "label": "Plaits on the Pi"
+    },
+    {
+     "id": "web:scope",
+     "label": "waveform"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "cf-relay:studio-1",
+     "label": "Cloudflare"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:keys:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:knob-model:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-pitch:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-harmonics:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-timbre:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-morph:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-timbre-cv:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-fm-cv:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-morph-cv:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-decay:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-colour:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "pi-1:plaits:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "pi-1:plaits:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "pi-1:plaits:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-relay:studio-1:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "cf-relay:studio-1:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "cf-relay:studio-1:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:studio-1:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:studio-1:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-relay:studio-1:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:midi-out",
+     "to": "cf-relay:studio-1:midi-in"
+    },
+    {
+     "from": "cf-relay:studio-1:midi-out",
+     "to": "pi-1:plaits:midi-in"
+    },
+    {
+     "from": "web:knob-model:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "cf-relay:studio-1:value-out",
+     "to": "pi-1:plaits:value-in"
+    },
+    {
+     "from": "web:knob-pitch:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-harmonics:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-timbre:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-morph:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-timbre-cv:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-fm-cv:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-morph-cv:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-decay:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "web:knob-colour:value-out",
+     "to": "cf-relay:studio-1:value-in"
+    },
+    {
+     "from": "pi-1:plaits:audio-out",
+     "to": "cf-relay:studio-1:audio-in"
+    },
+    {
+     "from": "cf-relay:studio-1:audio-out",
+     "to": "web:scope:audio-in"
+    },
+    {
+     "from": "cf-relay:studio-1:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "radio/blend",
+   "title": "Blend",
+   "say": "Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.",
+   "nodes": [
+    {
+     "id": "err:vikerraadio",
+     "label": "Vikerraadio"
+    },
+    {
+     "id": "cf-shout:vikerraadio",
+     "label": "relay"
+    },
+    {
+     "id": "web:wave-err",
+     "label": "ERR wave"
+    },
+    {
+     "id": "ida:tallinn",
+     "label": "Ida Radio Tallinn"
+    },
+    {
+     "id": "cf-shout:ida-tallinn",
+     "label": "relay"
+    },
+    {
+     "id": "web:wave-ida",
+     "label": "Ida wave"
+    },
+    {
+     "id": "web:fader",
+     "label": "crossfader"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "err:vikerraadio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:vikerraadio:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:vikerraadio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:wave-err:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "ida:tallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-tallinn:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-tallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:wave-ida:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:fader:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:fader:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:fader:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "err:vikerraadio:audio-out",
+     "to": "cf-shout:vikerraadio:audio-in"
+    },
+    {
+     "from": "cf-shout:vikerraadio:audio-out",
+     "to": "web:fader:audio-in"
+    },
+    {
+     "from": "cf-shout:vikerraadio:audio-out",
+     "to": "web:wave-err:audio-in"
+    },
+    {
+     "from": "ida:tallinn:audio-out",
+     "to": "cf-shout:ida-tallinn:audio-in"
+    },
+    {
+     "from": "cf-shout:ida-tallinn:audio-out",
+     "to": "web:fader:audio-in"
+    },
+    {
+     "from": "cf-shout:ida-tallinn:audio-out",
+     "to": "web:wave-ida:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "radio/tuner",
+   "title": "Tuner",
+   "say": "Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.",
+   "nodes": [
+    {
+     "id": "err:vikerraadio",
+     "label": "Vikerraadio"
+    },
+    {
+     "id": "cf-shout:vikerraadio",
+     "label": "relay"
+    },
+    {
+     "id": "err:klassikaraadio",
+     "label": "Klassikaraadio"
+    },
+    {
+     "id": "cf-shout:klassikaraadio",
+     "label": "relay"
+    },
+    {
+     "id": "err:raadio2",
+     "label": "Raadio 2"
+    },
+    {
+     "id": "cf-shout:raadio2",
+     "label": "relay"
+    },
+    {
+     "id": "ida:tallinn",
+     "label": "Ida Radio Tallinn"
+    },
+    {
+     "id": "cf-shout:ida-tallinn",
+     "label": "relay"
+    },
+    {
+     "id": "web:noise",
+     "label": "noise"
+    },
+    {
+     "id": "web:dial",
+     "label": "dial"
+    },
+    {
+     "id": "web:tuner",
+     "label": "tuner"
+    },
+    {
+     "id": "web:wave",
+     "label": "wave"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "err:vikerraadio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:vikerraadio:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:vikerraadio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "err:klassikaraadio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:klassikaraadio:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:klassikaraadio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "err:raadio2:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio2:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio2:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "ida:tallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-tallinn:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-tallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:noise:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:dial:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:tuner:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:tuner:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:tuner:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:wave:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "err:vikerraadio:audio-out",
+     "to": "cf-shout:vikerraadio:audio-in"
+    },
+    {
+     "from": "cf-shout:vikerraadio:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "err:klassikaraadio:audio-out",
+     "to": "cf-shout:klassikaraadio:audio-in"
+    },
+    {
+     "from": "cf-shout:klassikaraadio:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "err:raadio2:audio-out",
+     "to": "cf-shout:raadio2:audio-in"
+    },
+    {
+     "from": "cf-shout:raadio2:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "ida:tallinn:audio-out",
+     "to": "cf-shout:ida-tallinn:audio-in"
+    },
+    {
+     "from": "cf-shout:ida-tallinn:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "web:noise:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "web:dial:value-out",
+     "to": "web:tuner:value-in"
+    },
+    {
+     "from": "web:tuner:audio-out",
+     "to": "web:wave:audio-in"
+    },
+    {
+     "from": "web:tuner:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "radio/tempo",
+   "title": "Tempo",
+   "say": "Find the tempo of recordings of Raadio 2, Raadio 4 and Ida, with the beats it hears on the wave.",
+   "nodes": [
+    {
+     "id": "cf-r2:raadio2",
+     "label": "Raadio 2 recording"
+    },
+    {
+     "id": "cf-r2:raadio4",
+     "label": "Raadio 4 recording"
+    },
+    {
+     "id": "cf-r2:ida",
+     "label": "Ida recording"
+    },
+    {
+     "id": "web:player",
+     "label": "player"
+    },
+    {
+     "id": "web:wave",
+     "label": "wave"
+    },
+    {
+     "id": "web:bpm",
+     "label": "tempo detector"
+    },
+    {
+     "id": "web:display",
+     "label": "tempo scope"
+    },
+    {
+     "id": "web:fx",
+     "label": "low cut and click"
+    },
+    {
+     "id": "web:knob-mix",
+     "label": "mix knob"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "cf-r2:raadio2:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "cf-r2:raadio4:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "cf-r2:ida:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "web:player:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "web:player:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:wave:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:wave:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:bpm:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:bpm:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:display:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:fx:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:fx:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:fx:value-in-2",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:fx:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:knob-mix:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "cf-r2:raadio2:file-out",
+     "to": "web:player:file-in"
+    },
+    {
+     "from": "cf-r2:raadio4:file-out",
+     "to": "web:player:file-in"
+    },
+    {
+     "from": "cf-r2:ida:file-out",
+     "to": "web:player:file-in"
+    },
+    {
+     "from": "web:player:audio-out",
+     "to": "web:wave:audio-in"
+    },
+    {
+     "from": "web:player:audio-out",
+     "to": "web:bpm:audio-in"
+    },
+    {
+     "from": "web:player:audio-out",
+     "to": "web:fx:audio-in"
+    },
+    {
+     "from": "web:fx:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:bpm:value-out",
+     "to": "web:display:value-in"
+    },
+    {
+     "from": "web:bpm:value-out",
+     "to": "web:wave:value-in"
+    },
+    {
+     "from": "web:bpm:value-out",
+     "to": "web:fx:value-in"
+    },
+    {
+     "from": "web:knob-mix:value-out",
+     "to": "web:fx:value-in-2"
+    }
+   ]
+  },
+  {
+   "id": "radio/live",
+   "title": "Live tempo",
+   "say": "The same tempo detector on Raadio 2, Raadio 4 or Ida live, one station at a time through our relay.",
+   "nodes": [
+    {
+     "id": "err:raadio2",
+     "label": "ERR Raadio 2"
+    },
+    {
+     "id": "cf-shout:raadio2",
+     "label": "relay"
+    },
+    {
+     "id": "err:raadio4",
+     "label": "ERR Raadio 4"
+    },
+    {
+     "id": "cf-shout:raadio4",
+     "label": "relay"
+    },
+    {
+     "id": "ida:tallinn",
+     "label": "Ida Radio Tallinn"
+    },
+    {
+     "id": "cf-shout:ida-tallinn",
+     "label": "relay"
+    },
+    {
+     "id": "web:level",
+     "label": "level"
+    },
+    {
+     "id": "web:wave",
+     "label": "wave"
+    },
+    {
+     "id": "web:bpm",
+     "label": "tempo detector"
+    },
+    {
+     "id": "web:display",
+     "label": "tempo scope"
+    },
+    {
+     "id": "web:fx",
+     "label": "low cut and click"
+    },
+    {
+     "id": "web:knob-mix",
+     "label": "mix knob"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "err:raadio2:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio2:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio2:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "err:raadio4:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio4:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio4:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "ida:tallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-tallinn:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-tallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:level:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:level:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:wave:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:wave:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:bpm:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:bpm:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:display:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:fx:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:fx:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:fx:value-in-2",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:fx:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:knob-mix:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "err:raadio2:audio-out",
+     "to": "cf-shout:raadio2:audio-in"
+    },
+    {
+     "from": "cf-shout:raadio2:audio-out",
+     "to": "web:level:audio-in"
+    },
+    {
+     "from": "err:raadio4:audio-out",
+     "to": "cf-shout:raadio4:audio-in"
+    },
+    {
+     "from": "cf-shout:raadio4:audio-out",
+     "to": "web:level:audio-in"
+    },
+    {
+     "from": "ida:tallinn:audio-out",
+     "to": "cf-shout:ida-tallinn:audio-in"
+    },
+    {
+     "from": "cf-shout:ida-tallinn:audio-out",
+     "to": "web:level:audio-in"
+    },
+    {
+     "from": "web:level:audio-out",
+     "to": "web:wave:audio-in"
+    },
+    {
+     "from": "web:level:audio-out",
+     "to": "web:bpm:audio-in"
+    },
+    {
+     "from": "web:level:audio-out",
+     "to": "web:fx:audio-in"
+    },
+    {
+     "from": "web:fx:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:bpm:value-out",
+     "to": "web:display:value-in"
+    },
+    {
+     "from": "web:bpm:value-out",
+     "to": "web:wave:value-in"
+    },
+    {
+     "from": "web:bpm:value-out",
+     "to": "web:fx:value-in"
+    },
+    {
+     "from": "web:knob-mix:value-out",
+     "to": "web:fx:value-in-2"
+    }
+   ]
+  },
+  {
+   "id": "radio/key",
+   "title": "Live key",
+   "say": "Hear a live station, see the key a detector finds in it lit on a keyboard, and play along in it.",
+   "nodes": [
+    {
+     "id": "err:raadio2",
+     "label": "ERR Raadio 2"
+    },
+    {
+     "id": "cf-shout:raadio2",
+     "label": "relay"
+    },
+    {
+     "id": "err:raadio4",
+     "label": "ERR Raadio 4"
+    },
+    {
+     "id": "cf-shout:raadio4",
+     "label": "relay"
+    },
+    {
+     "id": "ida:tallinn",
+     "label": "Ida Radio Tallinn"
+    },
+    {
+     "id": "cf-shout:ida-tallinn",
+     "label": "relay"
+    },
+    {
+     "id": "web:level",
+     "label": "level"
+    },
+    {
+     "id": "web:wave",
+     "label": "wave"
+    },
+    {
+     "id": "web:key",
+     "label": "key detector"
+    },
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:autoplay",
+     "label": "autoplay"
+    },
+    {
+     "id": "web:bass",
+     "label": "bass"
+    },
+    {
+     "id": "web:pad",
+     "label": "pad synth"
+    },
+    {
+     "id": "web:mixer",
+     "label": "wet / dry"
+    },
+    {
+     "id": "web:knob-mix",
+     "label": "mix knob"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "err:raadio2:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio2:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio2:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "err:raadio4:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio4:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio4:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "ida:tallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-tallinn:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-tallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:level:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:level:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:level:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:wave:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:key:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:key:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:keys:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:keys:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:keys:value-in-2",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:keys:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:autoplay:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:autoplay:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:autoplay:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:autoplay:midi-out-2",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:bass:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:bass:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:pad:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:pad:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:pad:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:pad:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:mixer:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:mixer:audio-in-2",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:mixer:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:mixer:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:knob-mix:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "err:raadio2:audio-out",
+     "to": "cf-shout:raadio2:audio-in"
+    },
+    {
+     "from": "cf-shout:raadio2:audio-out",
+     "to": "web:level:audio-in"
+    },
+    {
+     "from": "err:raadio4:audio-out",
+     "to": "cf-shout:raadio4:audio-in"
+    },
+    {
+     "from": "cf-shout:raadio4:audio-out",
+     "to": "web:level:audio-in"
+    },
+    {
+     "from": "ida:tallinn:audio-out",
+     "to": "cf-shout:ida-tallinn:audio-in"
+    },
+    {
+     "from": "cf-shout:ida-tallinn:audio-out",
+     "to": "web:level:audio-in"
+    },
+    {
+     "from": "web:level:audio-out",
+     "to": "web:wave:audio-in"
+    },
+    {
+     "from": "web:level:audio-out",
+     "to": "web:key:audio-in"
+    },
+    {
+     "from": "web:level:audio-out",
+     "to": "web:mixer:audio-in"
+    },
+    {
+     "from": "web:key:value-out",
+     "to": "web:keys:value-in"
+    },
+    {
+     "from": "web:autoplay:value-out",
+     "to": "web:keys:value-in-2"
+    },
+    {
+     "from": "web:pad:midi-out",
+     "to": "web:keys:midi-in"
+    },
+    {
+     "from": "web:key:value-out",
+     "to": "web:autoplay:value-in"
+    },
+    {
+     "from": "web:autoplay:midi-out",
+     "to": "web:pad:midi-in"
+    },
+    {
+     "from": "web:autoplay:midi-out-2",
+     "to": "web:bass:midi-in"
+    },
+    {
+     "from": "web:bass:audio-out",
+     "to": "web:mixer:audio-in-2"
+    },
+    {
+     "from": "web:level:value-out",
+     "to": "web:pad:value-in"
+    },
+    {
+     "from": "web:pad:audio-out",
+     "to": "web:mixer:audio-in-2"
+    },
+    {
+     "from": "web:knob-mix:value-out",
+     "to": "web:mixer:value-in"
+    },
+    {
+     "from": "web:mixer:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "radio/scenery",
+   "title": "Radio landscape",
+   "say": "Live radio, granulated, blends slowly from station to station through tuning noise. The waves rise.",
+   "nodes": [
+    {
+     "id": "err:vikerraadio",
+     "label": "Vikerraadio"
+    },
+    {
+     "id": "cf-shout:vikerraadio",
+     "label": "relay"
+    },
+    {
+     "id": "err:klassikaraadio",
+     "label": "Klassikaraadio"
+    },
+    {
+     "id": "cf-shout:klassikaraadio",
+     "label": "relay"
+    },
+    {
+     "id": "err:raadio2",
+     "label": "Raadio 2"
+    },
+    {
+     "id": "cf-shout:raadio2",
+     "label": "relay"
+    },
+    {
+     "id": "err:raadio4",
+     "label": "Raadio 4"
+    },
+    {
+     "id": "cf-shout:raadio4",
+     "label": "relay"
+    },
+    {
+     "id": "err:raadiotallinn",
+     "label": "Raadio Tallinn"
+    },
+    {
+     "id": "cf-shout:raadiotallinn",
+     "label": "relay"
+    },
+    {
+     "id": "ida:tallinn",
+     "label": "Ida Radio Tallinn"
+    },
+    {
+     "id": "cf-shout:ida-tallinn",
+     "label": "relay"
+    },
+    {
+     "id": "ida:helsinki",
+     "label": "Ida Radio Helsinki"
+    },
+    {
+     "id": "cf-shout:ida-helsinki",
+     "label": "relay"
+    },
+    {
+     "id": "web:noise",
+     "label": "noise"
+    },
+    {
+     "id": "web:drift",
+     "label": "drift"
+    },
+    {
+     "id": "web:tuner",
+     "label": "tuner"
+    },
+    {
+     "id": "web:patch",
+     "label": "patch"
+    },
+    {
+     "id": "web:grains",
+     "label": "granulator"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "web:shader",
+     "label": "scan landscape"
+    },
+    {
+     "id": "web:screen",
+     "label": "picture"
+    }
+   ],
+   "ports": [
+    {
+     "id": "err:vikerraadio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:vikerraadio:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:vikerraadio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "err:klassikaraadio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:klassikaraadio:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:klassikaraadio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "err:raadio2:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio2:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio2:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "err:raadio4:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio4:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadio4:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "err:raadiotallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadiotallinn:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:raadiotallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "ida:tallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-tallinn:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-tallinn:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "ida:helsinki:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-helsinki:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-shout:ida-helsinki:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:noise:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:drift:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:drift:value-out-2",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:tuner:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:tuner:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:tuner:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:tuner:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:patch:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:grains:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:grains:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:grains:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:grains:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:shader:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:shader:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:shader:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    }
+   ],
+   "links": [
+    {
+     "from": "err:vikerraadio:audio-out",
+     "to": "cf-shout:vikerraadio:audio-in"
+    },
+    {
+     "from": "cf-shout:vikerraadio:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "err:klassikaraadio:audio-out",
+     "to": "cf-shout:klassikaraadio:audio-in"
+    },
+    {
+     "from": "cf-shout:klassikaraadio:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "err:raadio2:audio-out",
+     "to": "cf-shout:raadio2:audio-in"
+    },
+    {
+     "from": "cf-shout:raadio2:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "err:raadio4:audio-out",
+     "to": "cf-shout:raadio4:audio-in"
+    },
+    {
+     "from": "cf-shout:raadio4:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "err:raadiotallinn:audio-out",
+     "to": "cf-shout:raadiotallinn:audio-in"
+    },
+    {
+     "from": "cf-shout:raadiotallinn:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "ida:tallinn:audio-out",
+     "to": "cf-shout:ida-tallinn:audio-in"
+    },
+    {
+     "from": "cf-shout:ida-tallinn:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "ida:helsinki:audio-out",
+     "to": "cf-shout:ida-helsinki:audio-in"
+    },
+    {
+     "from": "cf-shout:ida-helsinki:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "web:noise:audio-out",
+     "to": "web:tuner:audio-in"
+    },
+    {
+     "from": "web:drift:value-out",
+     "to": "web:tuner:value-in"
+    },
+    {
+     "from": "web:drift:value-out-2",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:tuner:audio-out",
+     "to": "web:grains:audio-in"
+    },
+    {
+     "from": "web:patch:value-out",
+     "to": "web:grains:value-in"
+    },
+    {
+     "from": "web:grains:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:grains:audio-out",
+     "to": "web:shader:audio-in"
+    },
+    {
+     "from": "web:grains:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:tuner:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:shader:video-out",
+     "to": "web:screen:video-in"
+    }
+   ]
+  },
+  {
+   "id": "video/camera",
+   "title": "Camera",
+   "say": "Turn on your camera and see it on the page while the patchbay holds the link from camera to screen.",
+   "nodes": [
+    {
+     "id": "web:camera",
+     "label": "camera"
+    },
+    {
+     "id": "web:screen",
+     "label": "picture"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:camera:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:camera:video-out",
+     "to": "web:screen:video-in"
+    }
+   ]
+  },
+  {
+   "id": "video/shader",
+   "title": "Camera shader",
+   "say": "Your camera beside itself through a two tone dither shader, with one knob for how coarse it is.",
+   "nodes": [
+    {
+     "id": "web:camera",
+     "label": "camera"
+    },
+    {
+     "id": "web:shader",
+     "label": "dither shader"
+    },
+    {
+     "id": "web:screen",
+     "label": "original"
+    },
+    {
+     "id": "web:dither",
+     "label": "dithered"
+    },
+    {
+     "id": "web:knob-size",
+     "label": "size"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:camera:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:shader:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:shader:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:shader:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:dither:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:knob-size:value-out",
+     "dir": "out",
+     "medium": "value"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:camera:video-out",
+     "to": "web:screen:video-in"
+    },
+    {
+     "from": "web:camera:video-out",
+     "to": "web:shader:video-in"
+    },
+    {
+     "from": "web:shader:video-out",
+     "to": "web:dither:video-in"
+    },
+    {
+     "from": "web:knob-size:value-out",
+     "to": "web:shader:value-in"
+    }
+   ]
+  },
+  {
+   "id": "video/recorder",
+   "title": "Camera recorder",
+   "say": "Record up to ten seconds of your camera and play it back on a timeline, kept in this browser.",
+   "nodes": [
+    {
+     "id": "web:camera",
+     "label": "camera"
+    },
+    {
+     "id": "web:screen",
+     "label": "picture"
+    },
+    {
+     "id": "web:rec",
+     "label": "recorder"
+    },
+    {
+     "id": "web:store",
+     "label": "this browser"
+    },
+    {
+     "id": "web:player",
+     "label": "player"
+    },
+    {
+     "id": "web:playback",
+     "label": "playback"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:camera:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:rec:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:rec:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "web:store:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "web:store:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "web:player:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "web:player:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:playback:video-in",
+     "dir": "in",
+     "medium": "video"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:camera:video-out",
+     "to": "web:screen:video-in"
+    },
+    {
+     "from": "web:camera:video-out",
+     "to": "web:rec:video-in"
+    },
+    {
+     "from": "web:rec:file-out",
+     "to": "web:store:file-in"
+    },
+    {
+     "from": "web:store:file-out",
+     "to": "web:player:file-in"
+    },
+    {
+     "from": "web:player:video-out",
+     "to": "web:playback:video-in"
+    }
+   ]
+  },
+  {
+   "id": "video/webrtc",
+   "title": "WebRTC loopback",
+   "say": "Your camera over WebRTC to Cloudflare Stream and back beside the original, with the delay timed.",
+   "nodes": [
+    {
+     "id": "web:camera",
+     "label": "camera"
+    },
+    {
+     "id": "web:screen",
+     "label": "original"
+    },
+    {
+     "id": "cf-stream:live",
+     "label": "Stream WebRTC input"
+    },
+    {
+     "id": "web:loopback",
+     "label": "WebRTC"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:camera:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "cf-stream:live:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "cf-stream:live:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:loopback:video-in",
+     "dir": "in",
+     "medium": "video"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:camera:video-out",
+     "to": "web:screen:video-in"
+    },
+    {
+     "from": "web:camera:video-out",
+     "to": "cf-stream:live:video-in"
+    },
+    {
+     "from": "cf-stream:live:video-out",
+     "to": "web:loopback:video-in"
+    }
+   ]
+  },
+  {
+   "id": "video/llhls",
+   "title": "LL-HLS loopback",
+   "say": "Your camera to Cloudflare Stream and back as LL-HLS beside the original, with the delay timed.",
+   "nodes": [
+    {
+     "id": "web:camera",
+     "label": "camera"
+    },
+    {
+     "id": "web:screen",
+     "label": "original"
+    },
+    {
+     "id": "cf-stream:hls",
+     "label": "Stream LL-HLS input"
+    },
+    {
+     "id": "web:hls",
+     "label": "LL-HLS"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:camera:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "cf-stream:hls:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "cf-stream:hls:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:hls:video-in",
+     "dir": "in",
+     "medium": "video"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:camera:video-out",
+     "to": "web:screen:video-in"
+    },
+    {
+     "from": "web:camera:video-out",
+     "to": "cf-stream:hls:video-in"
+    },
+    {
+     "from": "cf-stream:hls:video-out",
+     "to": "web:hls:video-in"
+    }
+   ]
+  },
+  {
+   "id": "video/moq",
+   "title": "MoQ loopback",
+   "say": "Your camera over MoQ to Cloudflare's relay and back beside the original, with the delay timed.",
+   "nodes": [
+    {
+     "id": "web:camera",
+     "label": "camera"
+    },
+    {
+     "id": "web:screen",
+     "label": "original"
+    },
+    {
+     "id": "cf-moq:relay",
+     "label": "MoQ relay"
+    },
+    {
+     "id": "web:moq",
+     "label": "MoQ"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:camera:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "cf-moq:relay:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "cf-moq:relay:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:moq:video-in",
+     "dir": "in",
+     "medium": "video"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:camera:video-out",
+     "to": "web:screen:video-in"
+    },
+    {
+     "from": "web:camera:video-out",
+     "to": "cf-moq:relay:video-in"
+    },
+    {
+     "from": "cf-moq:relay:video-out",
+     "to": "web:moq:video-in"
+    }
+   ]
+  },
+  {
+   "id": "shader/mirror",
+   "title": "Mirror shader",
+   "say": "A kaleidoscope shader with one knob for its mirrors, and code that recompiles as you edit.",
+   "nodes": [
+    {
+     "id": "web:knob-segments",
+     "label": "segments"
+    },
+    {
+     "id": "web:shader",
+     "label": "mirror shader"
+    },
+    {
+     "id": "web:screen",
+     "label": "picture"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:knob-segments:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:shader:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:shader:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:knob-segments:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:shader:video-out",
+     "to": "web:screen:video-in"
+    }
+   ]
+  },
+  {
+   "id": "shader/landscape",
+   "title": "Scan landscape",
+   "say": "A radio recording drawn as a scan landscape. Six knobs shape the ridges.",
+   "nodes": [
+    {
+     "id": "cf-r2:raadio2",
+     "label": "Raadio 2 recording"
+    },
+    {
+     "id": "web:radio",
+     "label": "radio"
+    },
+    {
+     "id": "web:granulator",
+     "label": "granulator"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "web:shader",
+     "label": "scan landscape"
+    },
+    {
+     "id": "web:screen",
+     "label": "picture"
+    },
+    {
+     "id": "web:knob-rows",
+     "label": "rows"
+    },
+    {
+     "id": "web:knob-height",
+     "label": "height"
+    },
+    {
+     "id": "web:knob-loud",
+     "label": "loud"
+    },
+    {
+     "id": "web:knob-swell",
+     "label": "swell"
+    },
+    {
+     "id": "web:knob-counts",
+     "label": "counts"
+    },
+    {
+     "id": "web:knob-heave",
+     "label": "heave"
+    }
+   ],
+   "ports": [
+    {
+     "id": "cf-r2:raadio2:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "web:radio:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "web:radio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:granulator:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:granulator:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:granulator:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:shader:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:shader:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:shader:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:knob-rows:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-rows:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-height:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-height:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-loud:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-loud:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-swell:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-swell:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-counts:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-counts:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-heave:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-heave:value-in",
+     "dir": "in",
+     "medium": "value"
+    }
+   ],
+   "links": [
+    {
+     "from": "cf-r2:raadio2:file-out",
+     "to": "web:radio:file-in"
+    },
+    {
+     "from": "web:radio:audio-out",
+     "to": "web:granulator:audio-in"
+    },
+    {
+     "from": "web:granulator:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:granulator:audio-out",
+     "to": "web:shader:audio-in"
+    },
+    {
+     "from": "web:granulator:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:knob-rows:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:knob-height:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:knob-loud:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:knob-swell:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:knob-counts:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:knob-heave:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:shader:video-out",
+     "to": "web:screen:video-in"
+    }
+   ]
+  },
+  {
+   "id": "shader/remote",
+   "title": "Shader on Pi",
+   "say": "A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.",
+   "nodes": [
+    {
+     "id": "web:knob-segments",
+     "label": "segments"
+    },
+    {
+     "id": "web:code",
+     "label": "code box"
+    },
+    {
+     "id": "web:shader",
+     "label": "mirror shader here"
+    },
+    {
+     "id": "web:screen",
+     "label": "picture here"
+    },
+    {
+     "id": "pi-1:shader",
+     "label": "v3dpipe on the Pi, simulated"
+    },
+    {
+     "id": "web:screen-pi",
+     "label": "Pi picture"
+    },
+    {
+     "id": "cf-relay:room",
+     "label": "Cloudflare"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:knob-segments:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:code:program-out",
+     "dir": "out",
+     "medium": "program"
+    },
+    {
+     "id": "web:shader:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:shader:program-in",
+     "dir": "in",
+     "medium": "program"
+    },
+    {
+     "id": "web:shader:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen-pi:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "pi-1:shader:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "pi-1:shader:program-in",
+     "dir": "in",
+     "medium": "program"
+    },
+    {
+     "id": "pi-1:shader:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "cf-relay:room:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:room:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:room:program-in",
+     "dir": "in",
+     "medium": "program"
+    },
+    {
+     "id": "cf-relay:room:program-out",
+     "dir": "out",
+     "medium": "program"
+    },
+    {
+     "id": "cf-relay:room:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "cf-relay:room:video-out",
+     "dir": "out",
+     "medium": "video"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:knob-segments:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:knob-segments:value-out",
+     "to": "cf-relay:room:value-in"
+    },
+    {
+     "from": "cf-relay:room:value-out",
+     "to": "pi-1:shader:value-in"
+    },
+    {
+     "from": "web:code:program-out",
+     "to": "web:shader:program-in"
+    },
+    {
+     "from": "web:code:program-out",
+     "to": "cf-relay:room:program-in"
+    },
+    {
+     "from": "cf-relay:room:program-out",
+     "to": "pi-1:shader:program-in"
+    },
+    {
+     "from": "web:shader:video-out",
+     "to": "web:screen:video-in"
+    },
+    {
+     "from": "pi-1:shader:video-out",
+     "to": "cf-relay:room:video-in"
+    },
+    {
+     "from": "cf-relay:room:video-out",
+     "to": "web:screen-pi:video-in"
+    }
+   ]
+  },
+  {
+   "id": "shader/wish",
+   "title": "Picture wish",
+   "say": "Type or say a wish for a picture and a model writes its shader. The code stays in the box to edit.",
+   "nodes": [
+    {
+     "id": "web:wish",
+     "label": "wish"
+    },
+    {
+     "id": "web:knob-segments",
+     "label": "segments"
+    },
+    {
+     "id": "web:shader",
+     "label": "mirror shader"
+    },
+    {
+     "id": "web:screen",
+     "label": "picture"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:wish:program-out",
+     "dir": "out",
+     "medium": "program"
+    },
+    {
+     "id": "web:knob-segments:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:shader:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:shader:program-in",
+     "dir": "in",
+     "medium": "program"
+    },
+    {
+     "id": "web:shader:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:wish:program-out",
+     "to": "web:shader:program-in"
+    },
+    {
+     "from": "web:knob-segments:value-out",
+     "to": "web:shader:value-in"
+    },
+    {
+     "from": "web:shader:video-out",
+     "to": "web:screen:video-in"
+    }
+   ]
+  },
+  {
+   "id": "room/chat",
+   "title": "Chat",
+   "say": "A chat window whose every line crosses the room along a patchbay link, drawn underneath.",
+   "nodes": [
+    {
+     "id": "web-4vt:chat",
+     "label": "chat"
+    },
+    {
+     "id": "*:chat",
+     "label": "every other tab"
+    },
+    {
+     "id": "cf-relay:chat-1",
+     "label": "Cloudflare"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web-4vt:chat:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web-4vt:chat:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "*:chat:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "*:chat:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:chat-1:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:chat-1:value-out",
+     "dir": "out",
+     "medium": "value"
+    }
+   ],
+   "links": [
+    {
+     "from": "web-4vt:chat:value-out",
+     "to": "cf-relay:chat-1:value-in"
+    },
+    {
+     "from": "cf-relay:chat-1:value-out",
+     "to": "*:chat:value-in"
+    },
+    {
+     "from": "*:chat:value-out",
+     "to": "cf-relay:chat-1:value-in"
+    },
+    {
+     "from": "cf-relay:chat-1:value-out",
+     "to": "web-4vt:chat:value-in"
+    }
+   ]
+  },
+  {
+   "id": "room/broadcast",
+   "title": "Broadcast chat",
+   "say": "Whoever joins first is admin and broadcasts in a column of their own while the rest chat beside.",
+   "nodes": [
+    {
+     "id": "web-v2r:chat",
+     "label": "chat"
+    },
+    {
+     "id": "web-v2r:notice",
+     "label": "broadcast"
+    },
+    {
+     "id": "*:chat",
+     "label": "every other tab"
+    },
+    {
+     "id": "*:admin",
+     "label": "every other tab"
+    },
+    {
+     "id": "cf-relay:chat-3",
+     "label": "Cloudflare"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web-v2r:chat:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web-v2r:chat:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web-v2r:notice:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "*:chat:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "*:chat:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "*:admin:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:chat-3:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:chat-3:value-out",
+     "dir": "out",
+     "medium": "value"
+    }
+   ],
+   "links": [
+    {
+     "from": "web-v2r:chat:value-out",
+     "to": "cf-relay:chat-3:value-in"
+    },
+    {
+     "from": "cf-relay:chat-3:value-out",
+     "to": "*:chat:value-in"
+    },
+    {
+     "from": "*:chat:value-out",
+     "to": "cf-relay:chat-3:value-in"
+    },
+    {
+     "from": "cf-relay:chat-3:value-out",
+     "to": "web-v2r:chat:value-in"
+    },
+    {
+     "from": "*:admin:value-out",
+     "to": "cf-relay:chat-3:value-in"
+    },
+    {
+     "from": "cf-relay:chat-3:value-out",
+     "to": "web-v2r:notice:value-in"
+    }
+   ]
+  },
+  {
+   "id": "room/history",
+   "title": "Chat timeline",
+   "say": "The broadcast chat with a memory: until you join, the room's last fifty lines replay at their pace.",
+   "nodes": [
+    {
+     "id": "web-w8a:chat",
+     "label": "chat"
+    },
+    {
+     "id": "web-w8a:notice",
+     "label": "broadcast"
+    },
+    {
+     "id": "*:chat",
+     "label": "every other tab"
+    },
+    {
+     "id": "*:admin",
+     "label": "every other tab"
+    },
+    {
+     "id": "cf-store:history",
+     "label": "history"
+    },
+    {
+     "id": "cf-relay:chat-5",
+     "label": "Cloudflare"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web-w8a:chat:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web-w8a:chat:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web-w8a:notice:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "*:chat:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "*:chat:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "*:admin:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "cf-store:history:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "cf-store:history:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:chat-5:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "cf-relay:chat-5:value-out",
+     "dir": "out",
+     "medium": "value"
+    }
+   ],
+   "links": [
+    {
+     "from": "web-w8a:chat:value-out",
+     "to": "cf-relay:chat-5:value-in"
+    },
+    {
+     "from": "cf-relay:chat-5:value-out",
+     "to": "*:chat:value-in"
+    },
+    {
+     "from": "*:chat:value-out",
+     "to": "cf-relay:chat-5:value-in"
+    },
+    {
+     "from": "cf-relay:chat-5:value-out",
+     "to": "web-w8a:chat:value-in"
+    },
+    {
+     "from": "*:admin:value-out",
+     "to": "cf-relay:chat-5:value-in"
+    },
+    {
+     "from": "cf-relay:chat-5:value-out",
+     "to": "web-w8a:notice:value-in"
+    },
+    {
+     "from": "cf-relay:chat-5:value-out",
+     "to": "cf-store:history:value-in"
+    },
+    {
+     "from": "cf-store:history:value-out",
+     "to": "cf-relay:chat-5:value-in"
+    }
+   ]
+  },
+  {
+   "id": "typist/paper",
+   "title": "Paper",
+   "say": "A sheet of white paper to type on, with a blocky cursor and a page that opens full screen.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:paper",
+     "label": "paper"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:paper:value-in",
+     "dir": "in",
+     "medium": "value"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:value-out",
+     "to": "web:paper:value-in"
+    }
+   ]
+  },
+  {
+   "id": "typist/typewriter",
+   "title": "Typewriter",
+   "say": "The same paper, now sounding like a Hermes Precisa 305 typewriter, bell and all.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:paper",
+     "label": "paper"
+    },
+    {
+     "id": "web:typewriter",
+     "label": "typewriter"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "cf-r2:typewriter",
+     "label": "samples"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:paper:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "web:typewriter:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-r2:typewriter:file-out",
+     "dir": "out",
+     "medium": "file"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:value-out",
+     "to": "web:paper:value-in"
+    },
+    {
+     "from": "web:keys:value-out",
+     "to": "web:typewriter:value-in"
+    },
+    {
+     "from": "cf-r2:typewriter:file-out",
+     "to": "web:typewriter:file-in"
+    },
+    {
+     "from": "web:typewriter:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "typist/machines",
+   "title": "Typewriters",
+   "say": "The typewriter through an effects box where every number gives a different machine.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:paper",
+     "label": "paper"
+    },
+    {
+     "id": "web:typewriter",
+     "label": "typewriter"
+    },
+    {
+     "id": "web:pick",
+     "label": "machine"
+    },
+    {
+     "id": "web:fx",
+     "label": "fx"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "cf-r2:typewriter",
+     "label": "samples"
+    },
+    {
+     "id": "web:knob-distinct",
+     "label": "distinct"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:paper:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter:value-in-3",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter:value-in-2",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "web:typewriter:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:pick:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:fx:value-in-2",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:fx:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:fx:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:fx:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-r2:typewriter:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "web:knob-distinct:value-out",
+     "dir": "out",
+     "medium": "value"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:value-out",
+     "to": "web:paper:value-in"
+    },
+    {
+     "from": "web:keys:value-out",
+     "to": "web:typewriter:value-in"
+    },
+    {
+     "from": "cf-r2:typewriter:file-out",
+     "to": "web:typewriter:file-in"
+    },
+    {
+     "from": "web:typewriter:audio-out",
+     "to": "web:fx:audio-in"
+    },
+    {
+     "from": "web:fx:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:pick:value-out",
+     "to": "web:fx:value-in"
+    },
+    {
+     "from": "web:pick:value-out",
+     "to": "web:typewriter:value-in-2"
+    },
+    {
+     "from": "web:knob-distinct:value-out",
+     "to": "web:fx:value-in-2"
+    },
+    {
+     "from": "web:knob-distinct:value-out",
+     "to": "web:typewriter:value-in-3"
+    }
+   ]
+  },
+  {
+   "id": "typist/playback",
+   "title": "Playback",
+   "say": "Everything you type, deletions included, is kept and played back as the page writes itself again.",
+   "nodes": [
+    {
+     "id": "web:keys",
+     "label": "keyboard"
+    },
+    {
+     "id": "web:rec",
+     "label": "recorder"
+    },
+    {
+     "id": "web:paper",
+     "label": "paper"
+    },
+    {
+     "id": "web:typewriter",
+     "label": "typewriter"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:keys:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:rec:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:rec:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:paper:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys:value-out",
+     "to": "web:paper:value-in"
+    },
+    {
+     "from": "web:keys:value-out",
+     "to": "web:rec:value-in"
+    },
+    {
+     "from": "web:rec:value-out",
+     "to": "web:paper:value-in"
+    },
+    {
+     "from": "web:keys:value-out",
+     "to": "web:typewriter:value-in"
+    },
+    {
+     "from": "web:rec:value-out",
+     "to": "web:typewriter:value-in"
+    },
+    {
+     "from": "web:typewriter:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "typist/score",
+   "title": "Multi typer",
+   "say": "Up to six papers typed at once from a written score, each through a typewriter of its own.",
+   "nodes": [
+    {
+     "id": "web:machines",
+     "label": "machines"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "cf-r2:typewriter",
+     "label": "samples"
+    },
+    {
+     "id": "web:keys-1",
+     "label": "typist 1"
+    },
+    {
+     "id": "web:paper-1",
+     "label": "paper 1"
+    },
+    {
+     "id": "web:typewriter-1",
+     "label": "typewriter 1"
+    },
+    {
+     "id": "web:fx-1",
+     "label": "fx 1"
+    },
+    {
+     "id": "web:keys-2",
+     "label": "typist 2"
+    },
+    {
+     "id": "web:paper-2",
+     "label": "paper 2"
+    },
+    {
+     "id": "web:typewriter-2",
+     "label": "typewriter 2"
+    },
+    {
+     "id": "web:fx-2",
+     "label": "fx 2"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:machines:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:machines:value-out-2",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-r2:typewriter:file-out",
+     "dir": "out",
+     "medium": "file"
+    },
+    {
+     "id": "web:keys-1:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:paper-1:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter-1:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter-1:value-in-2",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter-1:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "web:typewriter-1:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:fx-1:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:fx-1:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:fx-1:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:keys-2:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:paper-2:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter-2:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter-2:value-in-2",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:typewriter-2:file-in",
+     "dir": "in",
+     "medium": "file"
+    },
+    {
+     "id": "web:typewriter-2:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:fx-2:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:fx-2:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:fx-2:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:keys-1:value-out",
+     "to": "web:paper-1:value-in"
+    },
+    {
+     "from": "web:keys-1:value-out",
+     "to": "web:typewriter-1:value-in"
+    },
+    {
+     "from": "cf-r2:typewriter:file-out",
+     "to": "web:typewriter-1:file-in"
+    },
+    {
+     "from": "web:typewriter-1:audio-out",
+     "to": "web:fx-1:audio-in"
+    },
+    {
+     "from": "web:fx-1:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:machines:value-out",
+     "to": "web:fx-1:value-in"
+    },
+    {
+     "from": "web:machines:value-out",
+     "to": "web:typewriter-1:value-in-2"
+    },
+    {
+     "from": "web:keys-2:value-out",
+     "to": "web:paper-2:value-in"
+    },
+    {
+     "from": "web:keys-2:value-out",
+     "to": "web:typewriter-2:value-in"
+    },
+    {
+     "from": "cf-r2:typewriter:file-out",
+     "to": "web:typewriter-2:file-in"
+    },
+    {
+     "from": "web:typewriter-2:audio-out",
+     "to": "web:fx-2:audio-in"
+    },
+    {
+     "from": "web:fx-2:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:machines:value-out-2",
+     "to": "web:fx-2:value-in"
+    },
+    {
+     "from": "web:machines:value-out-2",
+     "to": "web:typewriter-2:value-in-2"
+    }
+   ]
+  },
+  {
+   "id": "drums/machine",
+   "title": "Drum machine",
+   "say": "Four SuperCollider drums on 16 steps, each on a patchbay wire that silences it when taken away.",
+   "nodes": [
+    {
+     "id": "web:sequencer",
+     "label": "sequencer"
+    },
+    {
+     "id": "web:kick",
+     "label": "kick, SuperCollider"
+    },
+    {
+     "id": "web:snare",
+     "label": "snare, SuperCollider"
+    },
+    {
+     "id": "web:hho",
+     "label": "open hat, SuperCollider"
+    },
+    {
+     "id": "web:hhc",
+     "label": "closed hat, SuperCollider"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:sequencer:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:kick:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:kick:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:snare:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:snare:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:hho:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:hho:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:hhc:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:hhc:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:kick:midi-in"
+    },
+    {
+     "from": "web:kick:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:snare:midi-in"
+    },
+    {
+     "from": "web:snare:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:hho:midi-in"
+    },
+    {
+     "from": "web:hho:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:hhc:midi-in"
+    },
+    {
+     "from": "web:hhc:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "drums/knobs",
+   "title": "Drum knobs",
+   "say": "The same drum machine with a knob and a waveform for each drum, heard from the next hit.",
+   "nodes": [
+    {
+     "id": "web:sequencer",
+     "label": "sequencer"
+    },
+    {
+     "id": "web:kick",
+     "label": "kick, SuperCollider"
+    },
+    {
+     "id": "web:snare",
+     "label": "snare, SuperCollider"
+    },
+    {
+     "id": "web:hho",
+     "label": "open hat, SuperCollider"
+    },
+    {
+     "id": "web:hhc",
+     "label": "closed hat, SuperCollider"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "web:scope-kick",
+     "label": "waveform"
+    },
+    {
+     "id": "web:scope-snare",
+     "label": "waveform"
+    },
+    {
+     "id": "web:scope-hho",
+     "label": "waveform"
+    },
+    {
+     "id": "web:scope-hhc",
+     "label": "waveform"
+    },
+    {
+     "id": "web:knob-pitch",
+     "label": "kick pitch"
+    },
+    {
+     "id": "web:knob-snap",
+     "label": "snare snap"
+    },
+    {
+     "id": "web:knob-length",
+     "label": "open hat length"
+    },
+    {
+     "id": "web:knob-bright",
+     "label": "closed hat bright"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:sequencer:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:kick:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:kick:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:kick:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:snare:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:snare:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:snare:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:hho:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:hho:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:hho:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:hhc:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:hhc:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:hhc:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope-kick:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope-kick:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:scope-snare:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope-snare:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:scope-hho:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope-hho:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:scope-hhc:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope-hhc:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:knob-pitch:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-snap:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-length:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:knob-bright:value-out",
+     "dir": "out",
+     "medium": "value"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:kick:midi-in"
+    },
+    {
+     "from": "web:kick:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:kick:audio-out",
+     "to": "web:scope-kick:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:scope-kick:midi-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:snare:midi-in"
+    },
+    {
+     "from": "web:snare:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:snare:audio-out",
+     "to": "web:scope-snare:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:scope-snare:midi-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:hho:midi-in"
+    },
+    {
+     "from": "web:hho:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:hho:audio-out",
+     "to": "web:scope-hho:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:scope-hho:midi-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:hhc:midi-in"
+    },
+    {
+     "from": "web:hhc:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:hhc:audio-out",
+     "to": "web:scope-hhc:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:scope-hhc:midi-in"
+    },
+    {
+     "from": "web:knob-pitch:value-out",
+     "to": "web:kick:value-in"
+    },
+    {
+     "from": "web:knob-snap:value-out",
+     "to": "web:snare:value-in"
+    },
+    {
+     "from": "web:knob-length:value-out",
+     "to": "web:hho:value-in"
+    },
+    {
+     "from": "web:knob-bright:value-out",
+     "to": "web:hhc:value-in"
+    }
+   ]
+  },
+  {
+   "id": "drums/samples",
+   "title": "Sample drums",
+   "say": "Drop a Circuit pack or WAVs and each sample becomes a named row. Drag across the grid to draw hits.",
+   "nodes": [
+    {
+     "id": "web:sequencer",
+     "label": "sequencer"
+    },
+    {
+     "id": "web:s0",
+     "label": "slot 1, SuperCollider"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:sequencer:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:s0:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:s0:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:s0:midi-in"
+    },
+    {
+     "from": "web:s0:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "drums/camera",
+   "title": "Camera drums",
+   "say": "Point your camera and its picture plays as a 16 by 9 drum pattern, where brighter areas play busier.",
+   "nodes": [
+    {
+     "id": "web:sequencer",
+     "label": "sequencer"
+    },
+    {
+     "id": "web:kick",
+     "label": "kick, SuperCollider"
+    },
+    {
+     "id": "web:snare",
+     "label": "snare, SuperCollider"
+    },
+    {
+     "id": "web:hho",
+     "label": "open hat, SuperCollider"
+    },
+    {
+     "id": "web:hhc",
+     "label": "closed hat, SuperCollider"
+    },
+    {
+     "id": "web:clap",
+     "label": "clap, SuperCollider"
+    },
+    {
+     "id": "web:tomlo",
+     "label": "low tom, SuperCollider"
+    },
+    {
+     "id": "web:tomhi",
+     "label": "high tom, SuperCollider"
+    },
+    {
+     "id": "web:cowbell",
+     "label": "cowbell, SuperCollider"
+    },
+    {
+     "id": "web:rim",
+     "label": "rim shot, SuperCollider"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "web:camera",
+     "label": "camera"
+    },
+    {
+     "id": "web:pixelate",
+     "label": "squares, dithered"
+    },
+    {
+     "id": "web:screen",
+     "label": "original"
+    },
+    {
+     "id": "web:pixels",
+     "label": "pixels"
+    },
+    {
+     "id": "web:invert",
+     "label": "invert"
+    },
+    {
+     "id": "web:scale",
+     "label": "1x or 2x"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:sequencer:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:sequencer:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:kick:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:kick:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:snare:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:snare:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:hho:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:hho:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:hhc:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:hhc:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:clap:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:clap:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:tomlo:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:tomlo:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:tomhi:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:tomhi:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:cowbell:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:cowbell:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:rim:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:rim:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:camera:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:pixelate:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:pixelate:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "web:pixelate:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:pixelate:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:pixels:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:invert:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:scale:value-out",
+     "dir": "out",
+     "medium": "value"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:kick:midi-in"
+    },
+    {
+     "from": "web:kick:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:snare:midi-in"
+    },
+    {
+     "from": "web:snare:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:hho:midi-in"
+    },
+    {
+     "from": "web:hho:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:hhc:midi-in"
+    },
+    {
+     "from": "web:hhc:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:clap:midi-in"
+    },
+    {
+     "from": "web:clap:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:tomlo:midi-in"
+    },
+    {
+     "from": "web:tomlo:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:tomhi:midi-in"
+    },
+    {
+     "from": "web:tomhi:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:cowbell:midi-in"
+    },
+    {
+     "from": "web:cowbell:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:rim:midi-in"
+    },
+    {
+     "from": "web:rim:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:camera:video-out",
+     "to": "web:screen:video-in"
+    },
+    {
+     "from": "web:camera:video-out",
+     "to": "web:pixelate:video-in"
+    },
+    {
+     "from": "web:pixelate:video-out",
+     "to": "web:pixels:video-in"
+    },
+    {
+     "from": "web:pixelate:value-out",
+     "to": "web:sequencer:value-in"
+    },
+    {
+     "from": "web:invert:value-out",
+     "to": "web:pixelate:value-in"
+    },
+    {
+     "from": "web:scale:value-out",
+     "to": "web:pixelate:value-in"
+    }
+   ]
+  },
+  {
+   "id": "drums/remote",
+   "title": "Drums on the Pi",
+   "say": "One drum pattern here and on a Pi in another building at the same moment. Crossfade the two.",
+   "nodes": [
+    {
+     "id": "web:sequencer",
+     "label": "sequencer"
+    },
+    {
+     "id": "web:kick",
+     "label": "kick, SuperCollider"
+    },
+    {
+     "id": "web:snare",
+     "label": "snare, SuperCollider"
+    },
+    {
+     "id": "web:hho",
+     "label": "open hat, SuperCollider"
+    },
+    {
+     "id": "web:hhc",
+     "label": "closed hat, SuperCollider"
+    },
+    {
+     "id": "web:mix",
+     "label": "drums mixed"
+    },
+    {
+     "id": "pi-1:drums",
+     "label": "drums on the Pi"
+    },
+    {
+     "id": "web:scope",
+     "label": "waveform"
+    },
+    {
+     "id": "web:fader",
+     "label": "fader"
+    },
+    {
+     "id": "web:xfade",
+     "label": "crossfader"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "cf-relay:room",
+     "label": "Cloudflare"
+    }
+   ],
+   "ports": [
+    {
+     "id": "web:sequencer:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "web:kick:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:kick:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:snare:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:snare:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:hho:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:hho:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:hhc:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "web:hhc:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:mix:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:mix:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "pi-1:drums:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "pi-1:drums:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:scope:audio-in-2",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:fader:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:xfade:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:xfade:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:xfade:audio-in-2",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:xfade:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-relay:room:midi-in",
+     "dir": "in",
+     "medium": "midi"
+    },
+    {
+     "id": "cf-relay:room:midi-out",
+     "dir": "out",
+     "medium": "midi"
+    },
+    {
+     "id": "cf-relay:room:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "cf-relay:room:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    }
+   ],
+   "links": [
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:kick:midi-in"
+    },
+    {
+     "from": "web:kick:audio-out",
+     "to": "web:mix:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:snare:midi-in"
+    },
+    {
+     "from": "web:snare:audio-out",
+     "to": "web:mix:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:hho:midi-in"
+    },
+    {
+     "from": "web:hho:audio-out",
+     "to": "web:mix:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "web:hhc:midi-in"
+    },
+    {
+     "from": "web:hhc:audio-out",
+     "to": "web:mix:audio-in"
+    },
+    {
+     "from": "web:sequencer:midi-out",
+     "to": "cf-relay:room:midi-in"
+    },
+    {
+     "from": "cf-relay:room:midi-out",
+     "to": "pi-1:drums:midi-in"
+    },
+    {
+     "from": "web:mix:audio-out",
+     "to": "web:scope:audio-in"
+    },
+    {
+     "from": "web:mix:audio-out",
+     "to": "web:xfade:audio-in"
+    },
+    {
+     "from": "pi-1:drums:audio-out",
+     "to": "cf-relay:room:audio-in"
+    },
+    {
+     "from": "cf-relay:room:audio-out",
+     "to": "web:scope:audio-in-2"
+    },
+    {
+     "from": "cf-relay:room:audio-out",
+     "to": "web:xfade:audio-in-2"
+    },
+    {
+     "from": "web:fader:value-out",
+     "to": "web:xfade:value-in"
+    },
+    {
+     "from": "web:xfade:audio-out",
+     "to": "web:speaker:audio-in"
+    }
+   ]
+  },
+  {
+   "id": "history/newsreels",
+   "title": "Newsreels",
+   "say": "ERR's 1965 newsreels on a line, each silent film played with that day's surviving radio.",
+   "nodes": [
+    {
+     "id": "err:newsreel",
+     "label": "newsreel"
+    },
+    {
+     "id": "err:radio",
+     "label": "radio"
+    },
+    {
+     "id": "web:screen",
+     "label": "picture"
+    },
+    {
+     "id": "web:speaker",
+     "label": "speakers"
+    },
+    {
+     "id": "web:timeline",
+     "label": "timeline"
+    }
+   ],
+   "ports": [
+    {
+     "id": "err:newsreel:video-out",
+     "dir": "out",
+     "medium": "video"
+    },
+    {
+     "id": "err:radio:audio-out",
+     "dir": "out",
+     "medium": "audio"
+    },
+    {
+     "id": "web:screen:video-in",
+     "dir": "in",
+     "medium": "video"
+    },
+    {
+     "id": "web:screen:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:screen:clock-out",
+     "dir": "out",
+     "medium": "clock"
+    },
+    {
+     "id": "web:speaker:audio-in",
+     "dir": "in",
+     "medium": "audio"
+    },
+    {
+     "id": "web:speaker:value-in",
+     "dir": "in",
+     "medium": "value"
+    },
+    {
+     "id": "web:speaker:clock-in",
+     "dir": "in",
+     "medium": "clock"
+    },
+    {
+     "id": "web:timeline:value-out",
+     "dir": "out",
+     "medium": "value"
+    },
+    {
+     "id": "web:timeline:clock-in",
+     "dir": "in",
+     "medium": "clock"
+    }
+   ],
+   "links": [
+    {
+     "from": "err:newsreel:video-out",
+     "to": "web:screen:video-in"
+    },
+    {
+     "from": "err:radio:audio-out",
+     "to": "web:speaker:audio-in"
+    },
+    {
+     "from": "web:timeline:value-out",
+     "to": "web:screen:value-in"
+    },
+    {
+     "from": "web:timeline:value-out",
+     "to": "web:speaker:value-in"
+    },
+    {
+     "from": "web:screen:clock-out",
+     "to": "web:timeline:clock-in"
+    },
+    {
+     "from": "web:screen:clock-out",
+     "to": "web:speaker:clock-in"
+    }
+   ]
+  }
+ ]
+}
