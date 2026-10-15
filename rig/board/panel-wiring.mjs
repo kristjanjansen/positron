@@ -6,7 +6,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const C = { v3: '#d63b3b', v5: '#ff1a1a', gnd: '#222', sda: '#2f7bd6', scl: '#f08a24', key: '#9b5cf0' };
+const C = { v3: '#d63b3b', v5: '#ff1a1a', gnd: '#222', sda: '#ffffff', scl: '#f08a24', key: '#9b5cf0' };
 // module pin, left to right as printed -> Pi physical pin, wire colour
 const WIRES = [
   { mod: 'GND', pin: 6, c: C.gnd, what: 'ground, the return for power and signals', long: 'Ground' },
@@ -46,7 +46,7 @@ const used = new Map(WIRES.map((w) => [w.pin, w]));
 for (let n = 1; n <= 40; n++) {
   const [x, y] = pinXY(n), w = used.get(n), bad = n === 2 || n === 4;
   o.push(`<rect x="${x - 10}" y="${y - 10}" width="20" height="20" rx="3" fill="${w ? w.c : bad ? '#fff' : '#bdb6a3'}" stroke="${bad ? C.v5 : '#000'}" stroke-width="${bad ? 3 : 1}"/>`);
-  if (w) t(x, y + 5, n, { size: n > 9 ? 10 : 12, fill: '#fff', weight: 700, anchor: 'middle' });
+  if (w) t(x, y + 5, n, { size: n > 9 ? 10 : 12, fill: w.c === '#ffffff' ? '#000' : '#fff', weight: 700, anchor: 'middle' });
   if (bad) o.push(`<g stroke="${C.v5}" stroke-width="3"><line x1="${x - 7}" y1="${y - 7}" x2="${x + 7}" y2="${y + 7}"/><line x1="${x + 7}" y1="${y - 7}" x2="${x - 7}" y2="${y + 7}"/></g>`);
   // the signal's name beside its pin, on the side its wire arrives from
   const name = w ? w.mod : bad ? '5V' : '';
@@ -84,7 +84,7 @@ WIRES.forEach((w, i) => {
   const lane = w.pin % 2 ? BOT + 80 + i * 10 : TOP - 90;
   const d = `M${mx} ${my} L${mx} ${lane} L${x} ${lane} L${x} ${w.pin % 2 ? y + 12 : y - 12}`;
   // a white casing under every wire, so purple and black read on the green board
-  o.push(`<path d="${d}" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>`);
+  o.push(`<path d="${d}" fill="none" stroke="${w.c === '#ffffff' ? '#444' : '#fff'}" stroke-width="8" stroke-linejoin="round"/>`);
   o.push(`<path d="${d}" fill="none" stroke="${w.c}" stroke-width="4" stroke-linejoin="round"/>`);
   o.push(`<rect x="${mx - 7}" y="${my - 20}" width="14" height="20" rx="2" fill="#333"/>`);
 });
@@ -98,7 +98,7 @@ const rows = [['module', 'stands for', 'Pi pin', 'row', 'where', 'what it does']
 const TX = 40, TY = 790;
 rows.forEach((r, i) => {
   const y = TY + i * 26, w = WIRES[i - 1];
-  if (w) o.push(`<rect x="${TX}" y="${y - 13}" width="14" height="14" fill="${w.c}"/>`);
+  if (w) o.push(`<rect x="${TX}" y="${y - 13}" width="14" height="14" fill="${w.c}" stroke="#444"/>`);
   [0, 70, 250, 320, 400, 560].forEach((dx, j) => t(TX + 24 + dx, y, r[j], { size: 15, weight: i ? 400 : 700 }));
 });
 t(TX, TY + 9 * 26 + 10, 'I2C (Inter-Integrated Circuit) is the two wire bus the screen talks on. GPIO (General Purpose Input/Output) is a Pi pin a program reads or sets.', { size: 13, fill: '#555' });

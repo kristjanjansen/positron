@@ -13,8 +13,8 @@
 <rect x="470" y="180" width="20" height="20" rx="3" fill="#fff" stroke="#ff1a1a" stroke-width="3"/>
 <g stroke="#ff1a1a" stroke-width="3"><line x1="473" y1="183" x2="487" y2="197"/><line x1="487" y1="183" x2="473" y2="197"/></g>
 <text x="480" y="174" font-size="12" fill="#ff1a1a" font-weight="700" text-anchor="middle" stroke="#fff" stroke-width="4" paint-order="stroke">5V</text>
-<rect x="502" y="212" width="20" height="20" rx="3" fill="#2f7bd6" stroke="#000" stroke-width="1"/>
-<text x="512" y="227" font-size="12" fill="#fff" font-weight="700" text-anchor="middle">3</text>
+<rect x="502" y="212" width="20" height="20" rx="3" fill="#ffffff" stroke="#000" stroke-width="1"/>
+<text x="512" y="227" font-size="12" fill="#000" font-weight="700" text-anchor="middle">3</text>
 <text x="525" y="242" font-size="14" fill="#fff" font-weight="700" text-anchor="start" stroke="#000" stroke-width="4" paint-order="stroke" transform="rotate(90 525 242)">SDA</text>
 <rect x="502" y="180" width="20" height="20" rx="3" fill="#fff" stroke="#ff1a1a" stroke-width="3"/>
 <g stroke="#ff1a1a" stroke-width="3"><line x1="505" y1="183" x2="519" y2="197"/><line x1="519" y1="183" x2="505" y2="197"/></g>
@@ -107,8 +107,8 @@
 <path d="M150 410 L150 322 L544 322 L544 234" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
 <path d="M150 410 L150 322 L544 322 L544 234" fill="none" stroke="#f08a24" stroke-width="4" stroke-linejoin="round"/>
 <rect x="143" y="390" width="14" height="20" rx="2" fill="#333"/>
-<path d="M190 410 L190 332 L512 332 L512 234" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
-<path d="M190 410 L190 332 L512 332 L512 234" fill="none" stroke="#2f7bd6" stroke-width="4" stroke-linejoin="round"/>
+<path d="M190 410 L190 332 L512 332 L512 234" fill="none" stroke="#444" stroke-width="8" stroke-linejoin="round"/>
+<path d="M190 410 L190 332 L512 332 L512 234" fill="none" stroke="#ffffff" stroke-width="4" stroke-linejoin="round"/>
 <rect x="183" y="390" width="14" height="20" rx="2" fill="#333"/>
 <path d="M230 410 L230 342 L1056 342 L1056 234" fill="none" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
 <path d="M230 410 L230 342 L1056 342 L1056 234" fill="none" stroke="#9b5cf0" stroke-width="4" stroke-linejoin="round"/>
@@ -128,56 +128,56 @@
 <text x="384" y="790" font-size="15" fill="#222" font-weight="700" text-anchor="start">row</text>
 <text x="464" y="790" font-size="15" fill="#222" font-weight="700" text-anchor="start">where</text>
 <text x="624" y="790" font-size="15" fill="#222" font-weight="700" text-anchor="start">what it does</text>
-<rect x="40" y="803" width="14" height="14" fill="#222"/>
+<rect x="40" y="803" width="14" height="14" fill="#222" stroke="#444"/>
 <text x="64" y="816" font-size="15" fill="#222" font-weight="400" text-anchor="start">GND</text>
 <text x="134" y="816" font-size="15" fill="#222" font-weight="400" text-anchor="start">Ground</text>
 <text x="314" y="816" font-size="15" fill="#222" font-weight="400" text-anchor="start">6</text>
 <text x="384" y="816" font-size="15" fill="#222" font-weight="400" text-anchor="start">top</text>
 <text x="464" y="816" font-size="15" fill="#222" font-weight="400" text-anchor="start">3rd from the left</text>
 <text x="624" y="816" font-size="15" fill="#222" font-weight="400" text-anchor="start">ground, the return for power and signals</text>
-<rect x="40" y="829" width="14" height="14" fill="#d63b3b"/>
+<rect x="40" y="829" width="14" height="14" fill="#d63b3b" stroke="#444"/>
 <text x="64" y="842" font-size="15" fill="#222" font-weight="400" text-anchor="start">VCC</text>
 <text x="134" y="842" font-size="15" fill="#222" font-weight="400" text-anchor="start">power supply Voltage</text>
 <text x="314" y="842" font-size="15" fill="#222" font-weight="400" text-anchor="start">1</text>
 <text x="384" y="842" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
 <text x="464" y="842" font-size="15" fill="#222" font-weight="400" text-anchor="start">1st from the left</text>
 <text x="624" y="842" font-size="15" fill="#222" font-weight="400" text-anchor="start">power in, 3.3 V from the Pi</text>
-<rect x="40" y="855" width="14" height="14" fill="#f08a24"/>
+<rect x="40" y="855" width="14" height="14" fill="#f08a24" stroke="#444"/>
 <text x="64" y="868" font-size="15" fill="#222" font-weight="400" text-anchor="start">SCL</text>
 <text x="134" y="868" font-size="15" fill="#222" font-weight="400" text-anchor="start">Serial CLock</text>
 <text x="314" y="868" font-size="15" fill="#222" font-weight="400" text-anchor="start">5</text>
 <text x="384" y="868" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
 <text x="464" y="868" font-size="15" fill="#222" font-weight="400" text-anchor="start">3rd from the left</text>
 <text x="624" y="868" font-size="15" fill="#222" font-weight="400" text-anchor="start">I2C clock (GPIO3), the Pi sets the pace</text>
-<rect x="40" y="881" width="14" height="14" fill="#2f7bd6"/>
+<rect x="40" y="881" width="14" height="14" fill="#ffffff" stroke="#444"/>
 <text x="64" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">SDA</text>
 <text x="134" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">Serial DAta</text>
 <text x="314" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">3</text>
 <text x="384" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
 <text x="464" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">2nd from the left</text>
 <text x="624" y="894" font-size="15" fill="#222" font-weight="400" text-anchor="start">I2C data (GPIO2), pictures to the screen</text>
-<rect x="40" y="907" width="14" height="14" fill="#9b5cf0"/>
+<rect x="40" y="907" width="14" height="14" fill="#9b5cf0" stroke="#444"/>
 <text x="64" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">K4</text>
 <text x="134" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">Key 4, a button</text>
 <text x="314" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">37</text>
 <text x="384" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
 <text x="464" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">2nd from the right</text>
 <text x="624" y="920" font-size="15" fill="#222" font-weight="400" text-anchor="start">button 4 (GPIO26)</text>
-<rect x="40" y="933" width="14" height="14" fill="#9b5cf0"/>
+<rect x="40" y="933" width="14" height="14" fill="#9b5cf0" stroke="#444"/>
 <text x="64" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">K3</text>
 <text x="134" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">Key 3, a button</text>
 <text x="314" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">33</text>
 <text x="384" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
 <text x="464" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">4th from the right</text>
 <text x="624" y="946" font-size="15" fill="#222" font-weight="400" text-anchor="start">button 3 (GPIO13)</text>
-<rect x="40" y="959" width="14" height="14" fill="#9b5cf0"/>
+<rect x="40" y="959" width="14" height="14" fill="#9b5cf0" stroke="#444"/>
 <text x="64" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">K2</text>
 <text x="134" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">Key 2, a button</text>
 <text x="314" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">31</text>
 <text x="384" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">bottom</text>
 <text x="464" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">5th from the right</text>
 <text x="624" y="972" font-size="15" fill="#222" font-weight="400" text-anchor="start">button 2 (GPIO6)</text>
-<rect x="40" y="985" width="14" height="14" fill="#9b5cf0"/>
+<rect x="40" y="985" width="14" height="14" fill="#9b5cf0" stroke="#444"/>
 <text x="64" y="998" font-size="15" fill="#222" font-weight="400" text-anchor="start">K1</text>
 <text x="134" y="998" font-size="15" fill="#222" font-weight="400" text-anchor="start">Key 1, a button</text>
 <text x="314" y="998" font-size="15" fill="#222" font-weight="400" text-anchor="start">29</text>
