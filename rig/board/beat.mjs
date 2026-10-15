@@ -47,6 +47,8 @@ export function helloMsg(f) {
            ...(typeof f.direct === 'boolean' ? { direct: f.direct } : {}),
            // The keyboard link (keyboard.mjs `beat()`), so a page sees whether the board holds it.
            ...(f.kbd ? { kbd: f.kbd } : {}),
+           // The Circuit drums link (circuit-drums.mjs `beat()`).
+           ...(f.cdrums ? { cdrums: f.cdrums } : {}),
            ...(f.error ? { error: f.error, hint: f.hint } : {}),
            graph: graphOf(f.graphFacts) };
 }
@@ -59,5 +61,6 @@ export function aliveMsg(f) {
            audio: f.audio, voices: f.voices, frames: f.frames, ...f.insert,
            ...(typeof f.direct === 'boolean' ? { direct: f.direct } : {}),
            ...(f.kbd ? { kbd: f.kbd } : {}),
+           ...(f.cdrums ? { cdrums: f.cdrums } : {}),
            ...(f.graphFacts ? { graph: graphOf(f.graphFacts) } : {}) };
 }

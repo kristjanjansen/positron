@@ -1612,5 +1612,62 @@ console.log('\n== drummap ==');
   ok('the drummap signature names a word', sig === 'drummap name=NAME', sig);
 }
 
+// ── drummap read back: the Circuit's drum notes out onto General MIDI drums (lessons/kit-bay.md#drummap-back) ──
+// The table is written here, not read from drum-maps.mjs, so an inverse that slips a note goes red.
+console.log('\n== drummap read back ==');
+{
+  const { DRUM_MAPS, drumRows } = await import('./drum-maps.mjs');
+  const BACK = { 60: 36, 62: 38, 64: 42, 65: 46 };   // drum 1 to 4 onto kick, snare, closed hat, open hat
+  const got = [];
+  const D = () => {
+    const b = createBay();
+    b.addPort({ id: 'pi-1:circuit:midi-out', label: 'circuit', dir: 'out', medium: 'midi', emits: ['note', 'cc', 'program', 'clock'],
+      shape: { channels: [1, 2, 10] }, drums: DRUM_MAPS.circuit });
+    b.addPort({ id: 'pi-1:circuit:midi-in', label: 'circuit in', dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'],
+      never: ['sysex'], shape: { channels: [1, 2, 10] }, drums: DRUM_MAPS.circuit, deliver: () => {} });
+    b.addPort({ id: 'pi-1:drums:midi-in', label: 'drums', dir: 'in', medium: 'midi', accepts: ['note'], drums: DRUM_MAPS.gm, deliver: (e) => got.push(e) });
+    b.addPort({ id: 'pi-1:plain:midi-in', label: 'plain synth', dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => got.push(e) });
+    b.addPort({ id: 'web:keys:midi-out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
+    return b;
+  };
+  const b = D();
+  const r = b.link('pi-1:circuit:midi-out', 'pi-1:drums:midi-in', [{ op: 'drummap', name: 'circuit' }]);
+  ok('the Circuit\'s out links into the GM drums by its own map, read back', r.ok, r.why || r.warn || '');
+  const L = b.links()[0];
+  for (const [own, gm] of Object.entries(BACK)) {
+    got.length = 0;
+    b.send('pi-1:circuit:midi-out', { cls: 'note', ch: 10, d1: Number(own), d2: 96 });
+    ok(`Circuit ${own} on channel 10 arrives at the drums as GM ${gm}`, got.length === 1 && got[0].d1 === gm && got[0].ch === 10, JSON.stringify(got));
+  }
+  got.length = 0;
+  const d0 = L.dropped;
+  b.send('pi-1:circuit:midi-out', { cls: 'note', ch: 1, d1: 60, d2: 100 });
+  b.send('pi-1:circuit:midi-out', { cls: 'note', ch: 2, d1: 64, d2: 100 });
+  ok('NEGATIVE CONTROL: synth 1 and synth 2 playing 60 and 64 never reach the drums', got.length === 0 && L.dropped === d0 + 2, `${got.length} arrived, dropped ${L.dropped - d0}`);
+  b.send('pi-1:circuit:midi-out', { cls: 'note', ch: 10, d1: 66, d2: 96 });
+  ok('NEGATIVE CONTROL: a channel 10 note the map lacks (66) is dropped', got.length === 0, JSON.stringify(got));
+  b.send('pi-1:circuit:midi-out', { cls: 'cc', ch: 10, d1: 8, d2: 64 });
+  b.send('pi-1:circuit:midi-out', { cls: 'program', ch: 10, d1: 3 });
+  ok('NEGATIVE CONTROL: a CC and a program change on channel 10 are refused by the drums\' midi in', got.length === 0, JSON.stringify(got));
+  ok('the link stores the inverse and the channel it reads', L.transforms[0].map?.[65] === 46 && L.transforms[0].only === 10 && L.transforms[0].back === true,
+    JSON.stringify(L.transforms[0]));
+  const line = printLink(L);
+  ok('the text form is the same one word', line === 'pi-1:circuit:midi-out -> pi-1:drums:midi-in { drummap circuit }', line);
+  const b2 = D();
+  ok('a loaded text patch resolves the read back again', b2.load(line).length === 0 && b2.links()[0].transforms[0].map?.[62] === 38);
+  const rows = drumRows(L.transforms[0]).map((x) => x.line);
+  ok('the details rows read the Circuit\'s slot and the GM voice', rows[0] === '60 drum 1 -> 36 kick' && rows[3] === '65 drum 4 -> 46 open hat', rows.join(' | '));
+  const { drummapFor } = await import('./bay.mjs');
+  const fwd = drummapFor([{ op: 'drummap', name: 'circuit' }], { label: 'circuit in', drums: DRUM_MAPS.circuit }, { label: 'circuit', drums: DRUM_MAPS.circuit });
+  ok('NEGATIVE CONTROL: when both ends list the map, the receiving port wins and it resolves FORWARD, never as a read back',
+    fwd.drums && !fwd.drums.back && fwd.drums.map[36] === 60, JSON.stringify(fwd.drums));
+  const plain = D().link('pi-1:circuit:midi-out', 'pi-1:plain:midi-in', [{ op: 'drummap', name: 'circuit' }]);
+  ok('a read back into a port that lists no map plays GM there too', plain.ok, plain.why || '');
+  const keys = D().link('web:keys:midi-out', 'pi-1:drums:midi-in', [{ op: 'drummap', name: 'circuit' }]);
+  ok('NEGATIVE CONTROL: a source with no drums naming circuit into the GM drums is refused', !keys.ok && /plays its drums by the gm map/.test(keys.why), keys.why);
+  ok('NEGATIVE CONTROL: a read back transform drops another channel in apply() too',
+    apply([L.transforms[0]], { cls: 'note', ch: 1, d1: 60, d2: 90 }) === null && apply([L.transforms[0]], { cls: 'note', ch: 10, d1: 60, d2: 90 })?.d1 === 36);
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

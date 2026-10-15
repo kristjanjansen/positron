@@ -26,6 +26,7 @@ import { listJack, plan as jackPlan, apply as jackApply, canonical as jackCanoni
 import { openPanel } from './panel.mjs';
 import { createSequencerService } from './sequencer.mjs';
 import { createKeyboardService, rawMidiReader } from './keyboard.mjs';
+import { createCircuitDrumsService } from './circuit-drums.mjs';
 import { DRUM_MAPS } from '../../demo/shell/drum-maps.mjs';
 import { createScreenCamera } from './screen-camera.mjs';
 import { spawn, execFileSync } from 'node:child_process';
@@ -104,7 +105,8 @@ function circuitSend(bytes, refused) {
 const drumSeq = createSequencerService({
   graph: () => (graphFacts ? graphOf(graphFacts) : null),
   midiSend: circuitSend,
-  screen: (steps) => { if (panel && steps) panel.steps(steps); },
+  // While the Circuit's drums hold the screen, the sequencer runs without drawing.
+  screen: (steps) => { if (panel && steps && !cdrums.held()) panel.steps(steps); },
   log: (l) => log(l),
 });
 // The MK-425C on the Pi into the Circuit (keyboard.mjs): held by the board until kbd.unlink, so it
@@ -125,6 +127,24 @@ const kbd = createKeyboardService({
   },
   log: (l) => log(l),
 });
+// The Circuit's drums into the board's SuperCollider drums (circuit-drums.mjs): read off the Circuit's
+// out by its input's tap, never written to it, held until cdrums.unlink. The screen is its grid meanwhile.
+// why: lessons/rig-board-circuit-drums.md#board
+const cdrums = createCircuitDrumsService({
+  graph: () => (graphFacts ? graphOf(graphFacts) : null),
+  tap: (fn) => hwInputs.get('circuit')?.tap(fn) ?? null,
+  hit: (name) => {
+    const core = collide.core();
+    if (!core) return { ok: false, why: 'the drums are not running on the Pi, a page starts them (Listen on /devices/circuit/)' };
+    const choke = name === 'hhc' && core.loaded().some((d) => d.name === 'hho') ? { choke: 'hho' } : {};
+    const r = core.hit({ hits: [{ name, ...choke }] }, { from: 'circuit-drums' });
+    return r.ok ? { ok: true } : { ok: false, why: r.refused?.[0]?.reason || 'refused' };
+  },
+  screen: (steps) => { if (panel && steps) panel.steps(steps); },
+  log: (l) => log(l),
+});
+/** Why a page may not draw on the screen now, or ''. */
+const screenTaken = () => (cdrums.held() ? 'the Circuit\'s drums hold the screen while that link is held (cdrums.unlink lets it go)' : '');
 let fxOn = false;          // pappus inserted between the instrument and the capture
 // The bay's JACK links, `"<from id> -> <to id>"` to the JACK rows it was
 // applied as. See `jack.link`.
@@ -601,6 +621,7 @@ async function handle(msg, replyVia = null) {
   if (plaits.handles(msg)) return plaits.handle(msg, reply).then(() => true);
   if (drumSeq.handles(msg)) return drumSeq.handle(msg, reply).then(() => true);
   if (kbd.handles(msg)) return kbd.handle(msg, reply).then(() => true);
+  if (cdrums.handles(msg)) return cdrums.handle(msg, reply).then(() => true);
   switch (msg.type) {
     // A page that joins late asks, and gets the beat now rather than up to five
     // seconds from now. The beat already carries the graph (`beat.mjs`), so the
@@ -1015,11 +1036,12 @@ async function handle(msg, replyVia = null) {
     // a press or release sent to the room as `panel.key`. No screen answers `ok: false`.
     case 'oled.text': {
       if (!panel) return reply('oled.shown', { ok: false, why: 'no screen answered at 0x3c on this board' });
+      if (screenTaken()) return reply('oled.shown', { ok: false, why: screenTaken() });
       panel.text(msg.text);
       return reply('oled.shown', { ok: true, text: panel.status().text });
     }
     // The dot piano on the same screen (/devices/dots/): a note on or off, sent and not asked, as keys are.
-    case 'screen.note': { if (panel) { if (msg.panic) panel.panic(); else panel.note(Number(msg.n), !!msg.on); } return; }
+    case 'screen.note': { if (panel && !screenTaken()) { if (msg.panic) panel.panic(); else panel.note(Number(msg.n), !!msg.on); } return; }
     // A small patch for the screen (/devices/patches/), asked so the page can say it landed.
     case 'screen.patch.event': {
       if (!panel) return reply('screen.patched', { ok: false, why: 'no screen answered at 0x3c on this board' });
@@ -1028,6 +1050,7 @@ async function handle(msg, replyVia = null) {
     }
     case 'screen.patch': {
       if (!panel) return reply('screen.patched', { ok: false, why: 'no screen answered at 0x3c on this board' });
+      if (screenTaken()) return reply('screen.patched', { ok: false, why: screenTaken() });
       panel.patch(msg.patch);
       screenPatch = msg.patch && typeof msg.patch === 'object' ? msg.patch : null;
       return reply('screen.patched', { ok: true, nodes: msg.patch?.nodes?.length || 0 });
@@ -1037,6 +1060,7 @@ async function handle(msg, replyVia = null) {
       if (!panel) return reply('screen.stepped', { ok: false, why: 'no screen answered at 0x3c on this board' });
       // While the board's sequencer runs, the screen is its own: it draws from the board's clock.
       if (drumSeq.core.running()) return msg.ask ? reply('screen.stepped', { ok: false, why: 'the board\'s sequencer is running and draws the screen' }) : undefined;
+      if (screenTaken()) return msg.ask ? reply('screen.stepped', { ok: false, why: screenTaken() }) : undefined;
       panel.steps(msg.steps);
       return msg.ask ? reply('screen.stepped', { ok: true, shown: panel.status().shown }) : undefined;
     }
@@ -1237,7 +1261,7 @@ function connect() {
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable(), camera: cameraFound };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,
                     frameMs: 1000 * FRAME / RATE, instruments, error: s.error, hint: s.hint, graphFacts,
-                    direct: !!mainDirect?.direct, kbd: kbd.beat() }));
+                    direct: !!mainDirect?.direct, kbd: kbd.beat(), cdrums: cdrums.beat() }));
     if (ONCE) { console.log(JSON.stringify(s, null, 2)); setTimeout(() => process.exit(0), 400); }
   };
   ws.onmessage = (e) => {
@@ -1303,7 +1327,7 @@ function alive() {
   return aliveMsg({ name: NAME, id: BOARD_ID, upSec: Math.round((Date.now() - since) / 1000),
                     audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null,
                     voices: synth?.voices ?? 0, frames: sentFrames, insert: insertState(), graphFacts,
-                    direct: !!mainDirect?.direct, kbd: kbd.beat() });
+                    direct: !!mainDirect?.direct, kbd: kbd.beat(), cdrums: cdrums.beat() });
 }
 setInterval(() => {
   // Sweep before the beat, so no heartbeat announces an orphaned insert. `.catch` because it is not
@@ -1325,6 +1349,14 @@ setInterval(() => {
   if (!b.held || b.forwarded === kbdSaid) return;
   kbdSaid = b.forwarded;
   send({ type: 'kbd.state', ...kbd.status() });
+}, 1000).unref?.();
+// The Circuit drums link's state, once a second while hits go through it.
+let cdrumsSaid = -1;
+setInterval(() => {
+  const b = cdrums.beat();
+  if (!b.held || b.played + b.refused === cdrumsSaid) return;
+  cdrumsSaid = b.played + b.refused;
+  send({ type: 'cdrums.state', ...cdrums.status() });
 }, 1000).unref?.();
 let ctlSaid = { in: 0, out: 0 };
 setInterval(() => {
@@ -1368,7 +1400,7 @@ const camera = (DRY || ONCE) ? null : createCameraRoom({
 // why: lessons/rig-board-panel.md#screen-camera
 const screenCam = (DRY || ONCE) ? null : createScreenCamera({
   relay: RELAY, room: `${ROOM}-cam`, key: process.env.BOARD_CAM_KEY || '',
-  log: (l) => log(l), panel: () => panel, cameraBusy: () => !!camera?.running(),
+  log: (l) => log(l), panel: () => (screenTaken() ? null : panel), cameraBusy: () => !!camera?.running(),
 });
 
 // Announce `pi-1:camera` only with a key and a camera found, asked once (findCamera spawns
@@ -1426,5 +1458,5 @@ const hwInputs = createInputs({
 });
 if (!DRY && !ONCE) hwInputs.start();
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { drumSeq.stop(); kbd.stop(); camera?.stop(); screenCam?.stop(); stopAudio(); collide.stop(); plaits.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { drumSeq.stop(); kbd.stop(); cdrums.stop(); camera?.stop(); screenCam?.stop(); stopAudio(); collide.stop(); plaits.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
 connect();

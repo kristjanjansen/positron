@@ -1708,3 +1708,9 @@ MEASURED 2026-10-15, `bay-test.mjs`: 212 asserts before, 237 after (25 new, most
 ## `bay.mjs` the drum warnings
 
 A port whose `drums.map` is not null (not General MIDI) gets a warning on every link that carries notes into it: without a drummap, *"this link sends General MIDI, so a kick (36) will not sound"* with the transform to add; with one, which GM notes it plays and that every other drum note is dropped. The bay's existing `warn` channel, so a person sees it where they see every other one.
+
+<a id="drummap-back"></a>
+
+## `drummapFor` read back
+
+2026-10-15. A drummap is resolved against the RECEIVING port first, as before. When that port does not list the named map and the SENDING port does (`pi-1:circuit:midi-out` publishes `drums: circuit`), the link resolves to that map read back (`readBack`, `lessons/kit-drum-maps.md#read-back`), and only into a port that plays General MIDI: into a port with its own non-GM map it is refused in words, since one map cannot carry both. The text form is unchanged, `{ drummap circuit }`. The resolved transform carries `only` (the source's drum channel) and `back: true`; `run` drops any event on another channel before anything else, so it stays pure and never sees a port. bay-test's read back block has 15 asserts, most negative controls; removing the `only` line took 4 of them red.

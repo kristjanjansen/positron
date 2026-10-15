@@ -414,3 +414,9 @@ a board that cannot run that thing announces none of it.
 ## `graph-registry.mjs` `pi-1:sequencer` and `drums` on a midi in
 
 2026-10-15, `plans/plan-pi-sequencer.md` §1.4. `boardGraph({ sequencer: true })` announces `pi-1:sequencer` (kind engine): `midi-out` emitting `note` and `cc` on `shape: { channels: [10] }` (CC only for CC 123 on stop; never SysEx or a program change), `value-in` shaped `{ of: 'pattern' }`, and `value-out` shaped `{ of: 'steps' }` for the screen. `boardGraph({ drums: { circuit, drums } })` puts a copy of each map on that node's `midi-in` as `drums`, passed in like `patches` so this file stays import free. Both default off, so an older caller's graph is unchanged. MEASURED on the real board after the 2026-10-15 push: the announced graph carries `pi-1:sequencer:{midi-out,value-in,value-out}`, `pi-1:circuit:midi-in` with the circuit map `{36:60, 38:62, 42:64, 46:65}`, and `pi-1:drums:midi-in` with `gm`. `graph-registry-test.mjs` 124 before, 134 after.
+
+<a id="input-midi-out"></a>
+
+## a hardware input's `midi-out`
+
+2026-10-15. An input with MIDI (the Circuit) announces `midi-out` beside its `midi-in`: what the instrument plays, read by the board through the input's `tap` (inputs.mjs), with the same channel set and the same `drums` map, which a drummap link out of it reads backwards. Before this the Circuit's ALSA row was skipped as already described, so it had no out port at all. Like `midi-in`, it is announced only while the device is present.

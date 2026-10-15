@@ -215,6 +215,10 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
       inputPorts.add(String(i.midi.port).toLowerCase());
       port(n, 'midi-in', { label: i.name, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], never: ['sysex'],
         shape: { channels: i.midi.channels }, address: `${room}-${i.name}`, ...mapped(n) });
+      // What the instrument plays, read by the board (inputs.mjs `tap`); its drum map read back by a drummap.
+      // why: lessons/kit-graph-registry.md#input-midi-out
+      port(n, 'midi-out', { label: i.name, dir: 'out', medium: 'midi', emits: ['note', 'cc', 'program', 'clock'],
+        shape: { channels: i.midi.channels }, address: `${room}-${i.name}`, ...mapped(n) });
     }
   }
   // The board's own step sequencer: GM drum notes on channel 10 out, a pattern in, its steps out for

@@ -2014,3 +2014,9 @@ Above `setTimeout(() => {`, lines 294 to 301 before the cut.
 // process alive for two minutes once, and SIGKILL after a grace period is
 // the only guarantee. It was not applied here.
 ~~~
+
+<a id="tap"></a>
+
+## inputs.mjs `tap`
+
+2026-10-15, for the Circuit's drums (`lessons/rig-board-circuit-drums.md`). The input's raw MIDI out can be opened once (a second open is EBUSY), so the macro listener's open is shared: `tap(fn)` hands every raw chunk (clock and all) to `fn(bytes, readAt)`, opens the input if it is not open, and keeps it open while any tap is held, lease or no lease. While tapped it is polled every 5 ms instead of 20, so a pad waits at most 5 ms in the kernel's buffer. The macros reach the room only while a page holds the lease, so the board reading for itself does not start sending `midi.cc`. Untapping closes the input when no lease holds it.

@@ -266,7 +266,7 @@ export function createInputs({
       ws: null, seq: 0, aseq: 0, proc: null, lease: 0, frames: 0, startedAt: null, lastHeard: now(),
       backoff: 500, closed: false, midiFd: null, held: new Set(), notesOut: 0, refused: 0, rtc: null,
       bridge: null, bridgeAt: 0, bridgeBackoff: 2000, bridgeStarts: 0, fed: null, dump: null, onCard: false,
-      back: null, backSaid: '', backSent: 0, backDirect: 0,
+      back: null, backSaid: '', backSent: 0, backDirect: 0, taps: new Set(), tapped: 0,
     };
     // An input on JACK: `alsa_in` puts it on the graph, always on (3.4% of a core, no relay time),
     // and ffmpeg -f jack reads it back for the room under the same lease. `plughw:`, not `hw:` (hw
@@ -289,7 +289,7 @@ export function createInputs({
     const status = () => ({ ok: !!s.proc, source: cfg.name, room: s.room, device: cfg.device, via: onJack ? 'jack' : 'arecord',
                             ...(onJack ? { jack: { port: jackPort, bridge: s.onCard || !!s.bridge, by: s.onCard ? 'jackd' : s.bridge ? 'alsa_in' : null, bridgeStarts: s.bridgeStarts, reader: `${reader}:input_1`, fed: s.fed } } : {}),
                             frames: s.frames, midi: cfg.midi ? { port: cfg.midi.port, channels: cfg.midi.channels, out: s.notesOut, held: s.held.size, refused: s.refused,
-                              back: { open: !!s.back, sent: s.backSent, direct: s.backDirect, ...(s.back ? s.back.limiter.counts() : {}) } } : null,
+                              back: { open: !!s.back, sent: s.backSent, direct: s.backDirect, taps: s.taps.size, tapped: s.tapped, ...(s.back ? s.back.limiter.counts() : {}) } } : null,
                             leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0,
                             direct: s.rtc ? s.rtc.status() : null,
                             ...(s.proc ? {} : { reason: 'nothing playing' }) });
@@ -528,6 +528,10 @@ export function createInputs({
     // is said once and retried, never thrown.
     // why: lessons/rig-board.md#macro-back
     const BACK_POLL_MS = 20;
+    // While something on the board reads the instrument's out (`tap`), polled every 5 ms.
+    // why: lessons/rig-board-io.md#tap
+    const TAP_POLL_MS = 5;
+    const leased = () => !leaseExpired(s.lease, now());
     function backOpen() {
       if (s.back || !cfg.midi || !fs?.readSync) return;
       let fd;
@@ -552,7 +556,7 @@ export function createInputs({
       const tick = () => {
         if (s.back !== b) return;
         pollBack(b);
-        if (s.back === b) b.timer = setTimer(tick, BACK_POLL_MS);
+        if (s.back === b) b.timer = setTimer(tick, s.taps.size ? TAP_POLL_MS : BACK_POLL_MS);
       };
       tick();
     }
@@ -570,9 +574,16 @@ export function createInputs({
         if (!n) return;
         const buf = chunk.subarray(0, n);
         if (s.dump && s.dump.fd === null) feedDump(s.dump, buf);
+        if (s.taps.size) {
+          const readAt = performance.now();
+          s.tapped += n;
+          for (const fn of s.taps) { try { fn(buf, readAt); } catch (e) { log(`${cfg.name}: a reader of the instrument's out threw, ${e.message}`); } }
+        }
+        // The macros go to the room only under a page's lease, not because the board itself reads.
+        const toRoom = leased();
         for (const m of b.parser.feed(buf)) {
           const v = backVerdict(m);
-          if (v) b.limiter.push(v);
+          if (v && toRoom) b.limiter.push(v);
         }
       }
     }
@@ -683,7 +694,7 @@ export function createInputs({
       }
       if (msg.type === 'input.stop') {
         s.lease = 0;
-        backClose('asked');
+        if (!s.taps.size) backClose('asked');
         return reply('input.stopped', { ok: stopCapture('asked'), source: cfg.name });
       }
       if (msg.type === 'audio.status') return reply('audio.started', status());
@@ -740,8 +751,8 @@ export function createInputs({
     // always close.
     function beat() {
       if (s.proc && leaseExpired(s.lease, now())) { stopCapture('nobody renewed the lease'); midiPanic('the lease ran out'); }
-      if (s.back && leaseExpired(s.lease, now())) backClose('nobody renewed the lease');
-      else if (!s.back && !leaseExpired(s.lease, now())) backOpen();
+      if (s.back && leaseExpired(s.lease, now()) && !s.taps.size) backClose('nobody renewed the lease');
+      else if (!s.back && (!leaseExpired(s.lease, now()) || s.taps.size)) backOpen();
       s.rtc?.sweep();
       if (s.ws?.readyState === 1 && now() - s.lastHeard > 3 * beatMs + 1000) {
         log(`${cfg.name}: no echo, reconnecting`);
@@ -771,8 +782,24 @@ export function createInputs({
       });
     }
 
+    /**
+     * Every chunk off the instrument's MIDI out, raw (clock and all), to `fn(bytes, readAt)` until the
+     * returned function is called. Shares the one open of the input with the macros and the dumps.
+     * why: lessons/rig-board-io.md#tap
+     */
+    function tap(fn) {
+      if (!cfg.midi) return null;
+      s.taps.add(fn);
+      backOpen();
+      return () => {
+        if (!s.taps.delete(fn)) return;
+        if (!s.taps.size && !leased()) backClose('nothing on the board reads it');
+      };
+    }
+
     return {
-      s, connect, beat, handle, status, stopCapture, startBridge, onJack, jackPort,
+      s, connect, beat, handle, status, stopCapture, startBridge, onJack, jackPort, tap,
+      reading: () => !!s.back,
       close() {
         s.closed = true; midiPanic('shutting down'); stopCapture('shutting down'); backClose('shutting down'); s.rtc?.close();
         if (s.bridge) { try { s.bridge.kill('SIGTERM'); } catch { /* gone */ } s.bridge = null; }

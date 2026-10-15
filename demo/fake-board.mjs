@@ -15,6 +15,7 @@ import { readOsc } from '../rig/board/pappus.mjs';
 import { createPlaitsService, PLAITS_PARAMS } from '../rig/board/plaits.mjs';
 import { createSequencerService } from '../rig/board/sequencer.mjs';
 import { createKeyboardService } from '../rig/board/keyboard.mjs';
+import { createCircuitDrumsService } from '../rig/board/circuit-drums.mjs';
 import { graphOf } from '../rig/board/beat.mjs';
 import { DRUM_MAPS } from './shell/drum-maps.mjs';
 
@@ -204,7 +205,7 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
   const ctl = { ch: 0, last: new Map() };
   const send = (msg) => { if (ws?.readyState === 1) { ws.send(format(msg, { from: FROM, seq: seq++ })); return true; } return false; };
   const alive = () => aliveMsg({ name: NAME, id: ID, upSec: Math.round((Date.now() - since) / 1000), audio: source,
-    voices: 0, frames: counts.framesOut, insert: { fx: false }, graphFacts, kbd: kbd.beat() });
+    voices: 0, frames: counts.framesOut, insert: { fx: false }, graphFacts, kbd: kbd.beat(), cdrums: cdrums.beat() });
 
   function startTone() {
     if (stopTone) return;
@@ -275,8 +276,36 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
       (type, body) => { if (type === 'midi.refused') refused(body?.why || 'refused'); }),
   });
 
+  // The Circuit's drums into the drums, by the board's own service, read off the stand-in Circuit's out
+  // through the input's own tap: `fake.circuit.play` puts bytes on that out, a verb only this stand-in answers.
+  // why: lessons/harness.md#fake-circuit-drums
+  let screenSteps = null, screenDraws = 0;
+  const cdrums = createCircuitDrumsService({
+    graph: () => graphOf(graphFacts), log: (l) => say(l),
+    tap: (fn) => inputs?.get('circuit')?.tap(fn) ?? null,
+    hit: (name) => {
+      const core = collide.core();
+      if (!core) return { ok: false, why: 'the drums are not running on the Pi, a page starts them (Listen on /devices/circuit/)' };
+      const choke = name === 'hhc' && core.loaded().some((x) => x.name === 'hho') ? { choke: 'hho' } : {};
+      const r = core.hit({ hits: [{ name, ...choke }] }, { from: 'circuit-drums' });
+      return r.ok ? { ok: true } : { ok: false, why: r.refused?.[0]?.reason || 'refused' };
+    },
+    screen: (st) => { screenSteps = st; screenDraws++; },
+  });
+
   function handle(msg) {
     const reply = (type, body) => send({ type, re: msg.id, ...body });
+    if (cdrums.handles(msg)) { cdrums.handle(msg, reply).catch((e) => say('circuit drums threw', e.message)); return undefined; }
+    if (msg.type === 'fake.circuit.play') {
+      const from = written.length, started = scsynth?.counts().started ?? 0, draws = screenDraws;
+      const bytes = Array.isArray(msg.bytes) ? msg.bytes.filter((b) => Number.isInteger(b) && b >= 0 && b <= 255) : [];
+      inbox.push(Uint8Array.from(bytes));
+      // Two polls of the tapped input (5 ms each) and then some.
+      setTimeout(() => reply('fake.circuit.played', { reading: !!inputs?.get('circuit')?.reading(),
+        written: written.slice(from), started: (scsynth?.counts().started ?? 0) - started, draws: screenDraws - draws,
+        screen: screenSteps, state: cdrums.status() }), 60);
+      return undefined;
+    }
     if (kbd.handles(msg)) { kbd.handle(msg, reply).catch((e) => say('keyboard threw', e.message)); return undefined; }
     if (msg.type === 'fake.kbd.play') {
       const from = written.length;
@@ -434,6 +463,7 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     stats: () => ({ ...counts, midiWritten: written.length, midi: written.slice(-16),
       seq: { ...drumSeq.status(), refusals: seqRefusals.slice(-4) },
       kbd: kbd.status(),
+      cdrums: cdrums.status(),
       /** Every byte message the gate let through with when it was written, from `since` (performance.now()). */
       midiSince: (since = 0) => written.map((b, i) => ({ b, at: writtenAt[i] })).filter((x) => x.at >= since),
       collide: { ...(collide.core()?.stats() ?? {}), scsynth: scsynth ? scsynth.counts() : null, skewMs },
@@ -443,6 +473,7 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
       closed = true;
       drumSeq.stop();
       kbd.stop();
+      cdrums.stop();
       collide.stop();
       plaits.stop();
       clearInterval(beat); clearInterval(listener); clearInterval(handTimer);
@@ -463,6 +494,7 @@ if (resolve(process.argv[1] || '') === fileURLToPath(import.meta.url)) {
     console.log(`[fake-board] open http://127.0.0.1:8890/away/?relay=${url}&board=1`);
     console.log(`[fake-board] or http://127.0.0.1:8890/devices/drums/?relay=${url}&board=1&target=circuit`);
     console.log(`[fake-board] or http://127.0.0.1:8890/devices/keys/?relay=${url}&board=1`);
+    console.log(`[fake-board] or http://127.0.0.1:8890/devices/circuit/?relay=${url}&board=1`);
   });
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { b.close(); process.exit(0); });
 }

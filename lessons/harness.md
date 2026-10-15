@@ -4188,3 +4188,9 @@ a run) and is never in a suite: no harness may import or start it.
 ## `demo/fake-board.mjs` the keyboard
 
 2026-10-15, for `/devices/keys/`. The stand-in announces the MK-425C (an ALSA row `MK-425C USB MIDI Keyboard` in its graph facts) and runs the board's own `createKeyboardService` into the stand-in Circuit through `inputs.mjs`'s gate. Its device is a stream a page plays with `fake.kbd.play { bytes }`, a verb only the stand-in answers, replying `fake.kbd.played { reading, written, state }` with the messages the gate let through for that play. The real board has no such verb, so nothing can inject notes into the Circuit. It also answers `screen.patch` with `ok: false`, *a stand-in board has no screen*, so a page asking does not wait out its timeout.
+
+<a id="fake-circuit-drums"></a>
+
+## the stand-in's Circuit drums
+
+2026-10-15. `demo/fake-board.mjs` runs the board's own `createCircuitDrumsService`, reading the stand-in Circuit's out through the input's own `tap` and hitting the stand-in's collide engine. `fake.circuit.play { bytes }` puts the bytes on that out and answers after 60 ms with `started` (drums the fake scsynth started), `written` (anything written to the stand-in Circuit, which must stay empty), the last screen frame and the service's state. A verb only the stand-in answers.

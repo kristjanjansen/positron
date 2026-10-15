@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Circuit drums on Pi</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<style>
+  .cd-sec { display: flex; flex-direction: column; gap: 12px; }
+  .cd-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+</style>
+<script type="module">
+  // The Circuit's drum notes play the Pi's SuperCollider drums. The board reads the Circuit and holds
+  // `pi-1:circuit:midi-out -> pi-1:drums:midi-in { drummap circuit }` (rig/board/circuit-drums.mjs), so it
+  // outlives this tab; Listen starts the drums and plays the Pi's sound here over the relay.
+  // why: lessons/page-devices.md#circuit
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createOledCard, createOledGrid } from '/shell/oled-card.mjs';
+  import { createBay, printLink } from '/shell/bay.mjs';
+  import { createBoard, BOARD_RATE } from '/shell/board.mjs';
+  import { createBoardCollide } from '/shell/board-collide.mjs';
+  import { BOARD_SITE, boardGraph, addBoardNode } from '/shell/graph-registry.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
+  import { DRUM_MAPS, drumRows } from '/shell/drum-maps.mjs';
+  import { relayOverride } from '/shell/wire.mjs';
+  import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
+  import { VOICES } from '/drums/voices.mjs';
+
+  const d = mount({ name: 'Circuit drums on Pi', what: '', index: '/', indexLabel: 'positron',
+    // Readouts on top, the log at the foot (positron-concepts). From the board: hits it played, hits its
+    // drums refused, the Circuit's tempo off its clock, and the read to hit time on the Pi.
+    joined: false,
+    readout: { hits: '', refused: '', tempo: 'bpm', 'read to hit': 'ms' } });
+  conceptNav('devices/circuit');
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  // A check drives a board only on a relay on this machine (demo/fake-board.mjs), never the Pi.
+  const LOOP = !!relayOverride(location.search);
+  const MAY_SEND = !SELFCHECK || (q.get('board') === '1' && LOOP);
+  const P = BOARD_SITE;
+  const C_OUT = `${P}:circuit:midi-out`, DRUMS_IN = `${P}:drums:midi-in`, DRUMS_OUT = `${P}:drums:audio-out`;
+  const SPEAKER_IN = 'web:speaker:audio-in', PI_SCREEN = `${P}:screen:value-out`, SIM_IN = 'web:screen:value-in';
+  // The board's capture halves the Pi's sound (two ports, one silent), as on /drums/remote/ (PI_LIFT there).
+  const LIFT = 2 * 0.9;
+  const POLL_MS = 250;
+
+  // ── the bay: the Circuit and the drums as the board announces them, this tab's speakers, and the screen ──
+  const G = boardGraph({ room: ROOM, gpu: false, instruments: { collide: true },
+    drums: { circuit: DRUM_MAPS.circuit, drums: DRUM_MAPS.gm },
+    inputs: [{ name: 'circuit', channels: 2, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
+  const bay = createBay();
+  addBoardNode(bay, G, 'circuit', { label: 'Circuit on the Pi', withPorts: false });
+  bay.addPort({ ...G.ports.find((p) => p.id === C_OUT), label: 'circuit:midi-out' });
+  // The board plays the hits; here the in-port only counts what this picture's link lets through.
+  let heard = [];
+  addBoardNode(bay, G, 'drums', { label: 'drums on the Pi', deliver: { 'midi-in': (ev) => { heard.push(ev); } } });
+  addNodes(bay, 'web', ['speaker'], { portLabel: 'node:port' });
+  bay.addNode({ id: `${P}:screen`, kind: 'device', label: 'OLED 128x64', place: ROOM });
+  bay.addNode({ id: 'web:screen', kind: 'screen', label: 'simulated OLED', place: 'browser' });
+  bay.addPort({ id: PI_SCREEN, dir: 'out', medium: 'value', emits: ['steps'], label: 'screen:value-out' });
+  bay.addPort({ id: SIM_IN, dir: 'in', medium: 'value', accepts: ['steps'], label: 'screen:value-in', deliver: (ev) => paint(ev) });
+  const lay = (from, to, t = [], opts) => { const r = bay.link(from, to, t, opts); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); return r; };
+  lay(DRUMS_OUT, SPEAKER_IN, [], { via: 'relay' });
+  lay(PI_SCREEN, SIM_IN);
+
+  let pb = null;
+  /** The drum link this page draws, or null. */
+  const drumLink = () => bay.links().find((l) => l.from === C_OUT && l.to === DRUMS_IN) || null;
+  /** Draw the link the board holds, or take it away. */
+  function draw(held) {
+    const L = drumLink();
+    if (!!L === held) return L;
+    if (L) bay.unlink(L.id);
+    else lay(C_OUT, DRUMS_IN, [{ op: 'drummap', name: 'circuit' }]);
+    mapT.set(held ? drumRows(drumLink().transforms[0]).map((x) => ({ line: x.line })) : []);
+    pb?.refresh();
+    return drumLink();
+  }
+
+  // ── the Pi's screen, mirrored: the board's grid, drawn here as the Pi draws it ──
+  const ui = await loadPanelUi(await (await fetch('/resources/pico/oled-ui.wasm')).arrayBuffer());
+  const cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
+  let frames = 0, lastSteps = null;
+  function paint(ev) {
+    if (ev?.of !== 'steps') return;
+    lastSteps = ev.steps;
+    paintFrame(cv, ui.frame({ mode: 'steps', steps: ev.steps }));
+    frames++;
+  }
+  const EMPTY = { voices: ['KI', 'SN', 'CH', 'OH'], pattern: ['', '', '', ''], step: -1, voice: -1, playing: false, look: { empty: 'dot', head: 'frame' } };
+  paint({ of: 'steps', steps: EMPTY });
+  const card = createOledCard({ name: 'On the Pi\'s screen', say: 'The Circuit\'s four drums on its clock, as the board draws them.', canvas: cv });
+  const grid = createOledGrid(2);
+  grid.append(card.el);
+
+  // ── the board ──
+  let board = null, kit = null, connected = false, opened = null, said = null, lastPlayed = -1, poll = 0;
+  let ctx = null, lift = null, listening = false;
+  const flash = { until: 0 };
+  function connect() {
+    if (board || !MAY_SEND) return opened;
+    let open;
+    opened = new Promise((r) => { open = r; });
+    ctx ??= new AudioContext({ sampleRate: BOARD_RATE, latencyHint: 'interactive' });
+    board = createBoard({ room: ROOM, of: 'Raspberry Pi', showName: false, audioContext: ctx, toDestination: false,
+      log: (line, kind) => d.log(`Pi: ${line}`, kind),
+      onOpen: () => { connected = true; open(true); },
+      onMessage: (msg) => {
+        if (msg.type === 'cdrums.state') take(msg);
+        else if (msg.type === 'board.alive' && msg.cdrums) take({ held: msg.cdrums.held, beat: msg.cdrums });
+      } });
+    kit = createBoardCollide({ board, log: (line, kind) => d.log(`Pi: ${line}`, kind) });
+    d.log(`reaching ${ROOM}`);
+    return opened;
+  }
+  /** What the board says it holds: the picture, the choice, the readout and the screen follow it. */
+  function take(st) {
+    said = st.beat ? { ...said, held: st.held } : st;
+    draw(!!st.held);
+    pick.set(st.held ? 1 : 0, true);
+    if (st.beat) return;
+    const c = st.counts;
+    if (c) {
+      if (lastPlayed >= 0 && c.played > lastPlayed) flash.until = performance.now() + 600;
+      lastPlayed = c.played;
+      d.set('hits', c.played);
+      d.set('refused', c.refused);
+    }
+    d.set('tempo', st.clock?.bpm ?? '');
+    d.set('read to hit', st.lat?.n ? st.lat.p50 : '');
+    if (st.grid) bay.send(PI_SCREEN, { of: 'steps', cls: 'steps', steps: { ...EMPTY, pattern: st.grid, step: st.held ? st.clock.step : -1, playing: st.clock.playing !== false } });
+    if (st.lastRefusal && st.lastRefusal !== take.said) { take.said = st.lastRefusal; d.log(`the Pi refused a hit: ${st.lastRefusal}`, 'warn'); }
+  }
+  async function ask(msg, type, ms = 4000) {
+    connect();
+    const ok = await Promise.race([opened, new Promise((r) => setTimeout(() => r(false), 6000))]);
+    if (!ok) { d.log('the Pi did not answer', 'warn'); return null; }
+    return board.ask(msg, type, ms);
+  }
+  /** While this tab is open and the link is held, the grid every 250 ms for the mirrored screen. */
+  function watch(on) {
+    clearInterval(poll); poll = 0;
+    if (on) poll = setInterval(async () => { if (!document.hidden) { const st = await board?.ask({ type: 'cdrums.status' }, 'cdrums.state', 2000); if (st) take(st); } }, POLL_MS);
+  }
+
+  /** A press: ask the board to hold the link, or to let it go. */
+  async function link(on) {
+    if (!MAY_SEND) { draw(on); d.log('this run may not drive the board, add board=1 and a relay on this machine', 'dim'); return null; }
+    const st = await ask({ type: on ? 'cdrums.link' : 'cdrums.unlink' }, 'cdrums.state');
+    if (!st) { d.log('the Pi did not answer, nothing changed there', 'warn'); return null; }
+    take(st);
+    if (!st.ok) d.log(`the Pi refused: ${st.why || 'no reason given'}`, 'warn');
+    else if (st.held) d.log(`the Pi holds ${st.link}, reading the Circuit${st.reading ? '' : ' not yet'}`, 'ok');
+    else d.log('the Pi holds no Circuit drums link, its pads play nothing on the Pi', 'ok');
+    watch(!!st.held);
+    return st;
+  }
+  /** Listen: the drums on the Pi's SuperCollider, its sound here, and the link. One press, a browser needs one. */
+  async function listen() {
+    if (listening) return stopListening();
+    if (!MAY_SEND) { d.log('this run may not drive the board, add board=1 and a relay on this machine', 'dim'); return null; }
+    if (!await ask({ type: 'audio.status' }, 'audio.started', 3000)) return null;
+    ctx.resume().catch(() => {});
+    const up = await kit.start();
+    if (!up?.ok) { d.log(`the Pi did not start its drums: ${up?.reason ?? 'no answer'}`, 'warn'); return null; }
+    for (const v of VOICES) {
+      const r = await kit.load(v.name, v.program);
+      if (!r?.ok) { d.log(`the Pi did not take ${v.name}: ${r?.reason ?? 'no answer'}`, 'warn'); return null; }
+    }
+    d.log(`the Pi compiled the four drums: ${VOICES.map((v) => v.name).join(', ')}`, 'ok');
+    if (!await board.startAudio()) { d.log('the Pi\'s sound cannot be played in this page', 'warn'); return null; }
+    lift ??= ctx.createGain();
+    lift.gain.value = LIFT;
+    board.playout().connect(lift);
+    lift.connect(ctx.destination);
+    listening = true;
+    play.button('listen').textContent = 'Stop';
+    if (!said?.held) await link(true);
+    else watch(true);
+    pb.refresh();
+    return true;
+  }
+  function stopListening() {
+    try { lift?.disconnect(); } catch { /* not connected */ }
+    try { board?.playout()?.disconnect(lift); } catch { /* not connected */ }
+    listening = false;
+    play.button('listen').textContent = 'Listen';
+    d.log(said?.held ? 'not listening here; the Pi still holds the link and plays its drums' : 'not listening here', 'dim');
+    pb.refresh();
+    return true;
+  }
+
+  let pending = null;
+  const pick = createChoice({ label: 'Circuit drums to the Pi', options: [['off', 0], ['on', 1]], at: 0,
+    title: (v) => (v ? 'the Pi reads the Circuit and plays its drums on channel 10' : 'the Pi lets go of the Circuit\'s drums'),
+    onPick: (v) => { pending = link(!!v); } });
+  const play = createButtonGroup({ buttons: [{ id: 'listen', label: 'Listen', primary: true, title: 'start the drums on the Pi and hear them here', onPress: () => listen() }] });
+  const mapT = createTable({ columns: [{ key: 'line', label: 'drummap circuit', grow: true, hi: true, clip: true, hover: 'line' }], minRows: 4 });
+
+  pb = createPatchbay(bay, { room: ROOM, flowing: (l) => (l.from === C_OUT ? flash.until > performance.now()
+    : l.from === DRUMS_OUT ? listening : l.from === PI_SCREEN ? !!poll : false) });
+  const row = el('div', 'cd-row');
+  row.append(play.el, pick.el);
+  const sec = el('section', 'cd-sec');
+  sec.append(row, grid, el('h3', 'pos-sec-h', 'drum map'), mapT.el);
+  d.stack.add(sec, pb.el);
+  setInterval(() => { if (flash.until > performance.now() - 300) pb.refresh?.(); }, 200);
+
+  window.__demo.bay = bay;
+  window.__demo.probe = () => ({ connected, said, frames, listening, lastSteps, link: drumLink() ? printLink(drumLink()) : null,
+    framesIn: board?.stats?.().frames ?? 0 });
+
+  if (SELFCHECK) {
+    await new Promise((r) => setTimeout(r, 300));
+    d.assert('a visit reaches nothing until a press', !board);
+    d.assert('no drum link is drawn before a choice', !drumLink());
+    d.assert('the simulated screen drew the empty grid', frames > 0);
+    if (!MAY_SEND) {
+      // Here alone: the drawn link, its read back map, and the Circuit's synth channels kept out.
+      pick.buttons[1].click(); await pending;
+      heard = [];
+      bay.send(C_OUT, { cls: 'note', ch: 10, d1: 60, d2: 96 });
+      bay.send(C_OUT, { cls: 'note', ch: 10, d1: 65, d2: 96 });
+      d.assert('on draws circuit -> drums { drummap circuit }, and drum 1 and 4 arrive as GM 36 and 46',
+        heard.map((e) => e.d1).join(',') === '36,46', JSON.stringify(heard));
+      heard = [];
+      bay.send(C_OUT, { cls: 'note', ch: 1, d1: 60, d2: 100 });
+      d.assert('NEGATIVE CONTROL: synth 1 playing 60 never reaches the drums', heard.length === 0 && drumLink()?.dropped === 1, JSON.stringify(heard));
+      pick.buttons[0].click(); await pending;
+      d.assert('off takes the link away and still reaches nothing', !drumLink() && !board);
+    } else {
+      // Against demo/fake-board.mjs: Listen, then bytes on the stand-in Circuit's out, and what the board did with them.
+      const hex = (rows) => (rows || []).map((b) => b.map((x) => x.toString(16).padStart(2, '0')).join(' ')).join(' | ');
+      const fake = (bytes) => board.ask({ type: 'fake.circuit.play', bytes }, 'fake.circuit.played', 3000);
+      await play.button('listen').click();
+      for (let i = 0; i < 100 && !(listening && said?.held); i++) await new Promise((r) => setTimeout(r, 50));
+      d.assert('Listen starts the drums and the board holds circuit -> drums { drummap circuit }',
+        listening && said?.held && said.link === `${C_OUT} -> ${DRUMS_IN} { drummap circuit }`, said?.link || said?.why);
+      let r = await fake([0x99, 60, 96, 0x89, 60, 0]);
+      d.assert('a drum 1 pad on channel 10 starts one drum on the board\'s SuperCollider', r?.started === 1 && r.state.counts.played === 1, JSON.stringify(r?.state?.counts));
+      d.assert('and lights row 1 of the Pi\'s screen', r?.screen?.pattern?.[0]?.includes('1'), JSON.stringify(r?.screen?.pattern));
+      r = await fake([0x90, 60, 100, 0x80, 60, 0, 0xB9, 8, 64]);
+      d.assert('NEGATIVE CONTROL: a synth 1 note 60 and a drum CC start nothing', r?.started === 0, `${r?.started} started`);
+      r = await fake([0xFA, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8, 0xF8]);
+      d.assert('Start and seven clock ticks put the screen\'s frame on step 1', r?.screen?.step === 1 && r.state.clock.aligned === 'start', JSON.stringify(r?.screen?.step));
+      d.assert('NEGATIVE CONTROL: nothing was written to the Circuit at any point', r && r.written.length === 0, hex(r?.written) || 'nothing');
+      r = await fake([0x99, 62, 96]);
+      d.assert('Start cleared the last bar, and a snare now lights row 2 at step 1', r?.screen?.pattern?.[0] === '0'.repeat(16) && r?.screen?.pattern?.[1]?.[1] === '1',
+        JSON.stringify(r?.screen?.pattern));
+      await new Promise((res) => setTimeout(res, 700));
+      d.assert('the mirrored screen here follows the board\'s', frames > 1 && lastSteps?.step === 1 && lastSteps?.pattern?.[1]?.[1] === '1', JSON.stringify(lastSteps));
+      d.assert('the board\'s sound arrives here', (board.stats?.().frames ?? 0) > 0, String(board.stats?.().frames));
+      pick.buttons[0].click(); await pending;
+      r = await fake([0x99, 60, 96]);
+      d.assert('off: the board lets go and a pad starts nothing', said?.held === false && r?.started === 0 && !r.reading, `${r?.started} started, reading ${r?.reading}`);
+      stopListening();
+    }
+  }
+  d.ready();
+</script>
