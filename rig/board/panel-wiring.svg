@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="740" viewBox="0 0 1120 740" font-family="ui-monospace, Menlo, monospace">
 <rect width="100%" height="100%" fill="#f4f1ea"/>
 <text x="40" y="40" font-size="20" font-weight="700" fill="#222">0.96" OLED + 4 keys on the Raspberry Pi 4</text>
-<text x="40" y="64" font-size="13" fill="#555">8 jumpers, female on the Pi, male in the breadboard. Power comes from the Pi's 3.3 V. The breadboard's own supply stays OFF.</text>
+<text x="40" y="64" font-size="13" fill="#555">8 female to female jumpers, Pi pin straight to module pin. Power comes from the Pi's 3.3 V.</text>
 <rect x="40" y="120" width="540" height="84" rx="6" fill="#2e7d4f"/>
 <text x="46" y="106" font-size="12" fill="#555">Pi header, seen from above. Outer row is even pins. Pin 1 is the end AWAY from the USB ports</text>
 <rect x="72" y="166" width="16" height="16" rx="0" fill="#d63b3b" stroke="#111" stroke-width="1"/>
@@ -58,88 +58,41 @@
 <text x="50" y="155" font-size="11" fill="#fff" text-anchor="end">2</text>
 <text x="564" y="179" font-size="11" fill="#fff">39</text>
 <text x="564" y="155" font-size="11" fill="#fff">40</text>
-<rect x="740" y="354" width="306" height="150" rx="6" fill="#fbfbf8" stroke="#c9c5bb"/>
-<text x="740" y="690" font-size="12" fill="#555">breadboard: holes a to e in one column are one wire</text>
-<text x="750" y="378" font-size="10" fill="#999" text-anchor="end">a</text>
-<text x="750" y="400" font-size="10" fill="#999" text-anchor="end">b</text>
-<text x="750" y="422" font-size="10" fill="#999" text-anchor="end">c</text>
-<text x="750" y="444" font-size="10" fill="#999" text-anchor="end">d</text>
-<text x="750" y="466" font-size="10" fill="#999" text-anchor="end">e</text>
-<rect x="776" y="370" width="8" height="8" fill="#555"/>
-<rect x="776" y="392" width="8" height="8" fill="#555"/>
-<rect x="776" y="414" width="8" height="8" fill="#555"/>
-<rect x="776" y="436" width="8" height="8" fill="#555"/>
-<rect x="776" y="458" width="8" height="8" fill="#555"/>
-<line x1="780" y1="374" x2="780" y2="462" stroke="#222" stroke-width="2" opacity=".35"/>
-<rect x="814" y="370" width="8" height="8" fill="#555"/>
-<rect x="814" y="392" width="8" height="8" fill="#555"/>
-<rect x="814" y="414" width="8" height="8" fill="#555"/>
-<rect x="814" y="436" width="8" height="8" fill="#555"/>
-<rect x="814" y="458" width="8" height="8" fill="#555"/>
-<line x1="818" y1="374" x2="818" y2="462" stroke="#d63b3b" stroke-width="2" opacity=".35"/>
-<rect x="852" y="370" width="8" height="8" fill="#555"/>
-<rect x="852" y="392" width="8" height="8" fill="#555"/>
-<rect x="852" y="414" width="8" height="8" fill="#555"/>
-<rect x="852" y="436" width="8" height="8" fill="#555"/>
-<rect x="852" y="458" width="8" height="8" fill="#555"/>
-<line x1="856" y1="374" x2="856" y2="462" stroke="#f08a24" stroke-width="2" opacity=".35"/>
-<rect x="890" y="370" width="8" height="8" fill="#555"/>
-<rect x="890" y="392" width="8" height="8" fill="#555"/>
-<rect x="890" y="414" width="8" height="8" fill="#555"/>
-<rect x="890" y="436" width="8" height="8" fill="#555"/>
-<rect x="890" y="458" width="8" height="8" fill="#555"/>
-<line x1="894" y1="374" x2="894" y2="462" stroke="#2f7bd6" stroke-width="2" opacity=".35"/>
-<rect x="928" y="370" width="8" height="8" fill="#555"/>
-<rect x="928" y="392" width="8" height="8" fill="#555"/>
-<rect x="928" y="414" width="8" height="8" fill="#555"/>
-<rect x="928" y="436" width="8" height="8" fill="#555"/>
-<rect x="928" y="458" width="8" height="8" fill="#555"/>
-<line x1="932" y1="374" x2="932" y2="462" stroke="#8a4fd1" stroke-width="2" opacity=".35"/>
-<rect x="966" y="370" width="8" height="8" fill="#555"/>
-<rect x="966" y="392" width="8" height="8" fill="#555"/>
-<rect x="966" y="414" width="8" height="8" fill="#555"/>
-<rect x="966" y="436" width="8" height="8" fill="#555"/>
-<rect x="966" y="458" width="8" height="8" fill="#555"/>
-<line x1="970" y1="374" x2="970" y2="462" stroke="#8a4fd1" stroke-width="2" opacity=".35"/>
-<rect x="1004" y="370" width="8" height="8" fill="#555"/>
-<rect x="1004" y="392" width="8" height="8" fill="#555"/>
-<rect x="1004" y="414" width="8" height="8" fill="#555"/>
-<rect x="1004" y="436" width="8" height="8" fill="#555"/>
-<rect x="1004" y="458" width="8" height="8" fill="#555"/>
-<line x1="1008" y1="374" x2="1008" y2="462" stroke="#8a4fd1" stroke-width="2" opacity=".35"/>
-<rect x="1042" y="370" width="8" height="8" fill="#555"/>
-<rect x="1042" y="392" width="8" height="8" fill="#555"/>
-<rect x="1042" y="414" width="8" height="8" fill="#555"/>
-<rect x="1042" y="436" width="8" height="8" fill="#555"/>
-<rect x="1042" y="458" width="8" height="8" fill="#555"/>
-<line x1="1046" y1="374" x2="1046" y2="462" stroke="#8a4fd1" stroke-width="2" opacity=".35"/>
-<rect x="754" y="480" width="318" height="190" rx="6" fill="#1a3a6b"/>
-<rect x="780" y="524" width="266" height="96" fill="#05070b" stroke="#444"/>
-<text x="913" y="576" font-size="12" fill="#7fd" text-anchor="middle">SSD1306 128x64, I2C 0x3C</text>
-<line x1="780" y1="462" x2="780" y2="488" stroke="#bbb" stroke-width="3"/>
-<text x="780" y="506" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">GND</text>
-<line x1="818" y1="462" x2="818" y2="488" stroke="#bbb" stroke-width="3"/>
-<text x="818" y="506" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">VCC</text>
-<line x1="856" y1="462" x2="856" y2="488" stroke="#bbb" stroke-width="3"/>
-<text x="856" y="506" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">SCL</text>
-<line x1="894" y1="462" x2="894" y2="488" stroke="#bbb" stroke-width="3"/>
-<text x="894" y="506" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">SDA</text>
-<line x1="932" y1="462" x2="932" y2="488" stroke="#bbb" stroke-width="3"/>
-<text x="932" y="506" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">K4</text>
-<line x1="970" y1="462" x2="970" y2="488" stroke="#bbb" stroke-width="3"/>
-<text x="970" y="506" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">K3</text>
-<line x1="1008" y1="462" x2="1008" y2="488" stroke="#bbb" stroke-width="3"/>
-<text x="1008" y="506" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">K2</text>
-<line x1="1046" y1="462" x2="1046" y2="488" stroke="#bbb" stroke-width="3"/>
-<text x="1046" y="506" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">K1</text>
-<text x="913" y="652" font-size="11" fill="#cde" text-anchor="middle">4 keys under the screen</text>
+<rect x="754" y="392" width="318" height="190" rx="6" fill="#1a3a6b"/>
+<rect x="780" y="436" width="266" height="96" fill="#05070b" stroke="#444"/>
+<text x="913" y="488" font-size="12" fill="#7fd" text-anchor="middle">SSD1306 128x64, I2C 0x3C</text>
+<rect x="777" y="368" width="6" height="28" fill="#c8a24a"/>
+<text x="780" y="418" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">GND</text>
+<rect x="815" y="368" width="6" height="28" fill="#c8a24a"/>
+<text x="818" y="418" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">VCC</text>
+<rect x="853" y="368" width="6" height="28" fill="#c8a24a"/>
+<text x="856" y="418" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">SCL</text>
+<rect x="891" y="368" width="6" height="28" fill="#c8a24a"/>
+<text x="894" y="418" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">SDA</text>
+<rect x="929" y="368" width="6" height="28" fill="#c8a24a"/>
+<text x="932" y="418" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">K4</text>
+<rect x="967" y="368" width="6" height="28" fill="#c8a24a"/>
+<text x="970" y="418" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">K3</text>
+<rect x="1005" y="368" width="6" height="28" fill="#c8a24a"/>
+<text x="1008" y="418" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">K2</text>
+<rect x="1043" y="368" width="6" height="28" fill="#c8a24a"/>
+<text x="1046" y="418" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">K1</text>
+<text x="913" y="564" font-size="11" fill="#cde" text-anchor="middle">4 keys under the screen</text>
+<rect x="774" y="352" width="12" height="18" rx="2" fill="#222"/>
 <path d="M128 141 L128 129 L570 129 L570 234 L780 234 L780 366" fill="none" stroke="#222" stroke-width="3.5" stroke-linejoin="round"/>
+<rect x="812" y="352" width="12" height="18" rx="2" fill="#222"/>
 <path d="M80 183 L80 248 L818 248 L818 366" fill="none" stroke="#d63b3b" stroke-width="3.5" stroke-linejoin="round"/>
+<rect x="850" y="352" width="12" height="18" rx="2" fill="#222"/>
 <path d="M128 183 L128 262 L856 262 L856 366" fill="none" stroke="#f08a24" stroke-width="3.5" stroke-linejoin="round"/>
+<rect x="888" y="352" width="12" height="18" rx="2" fill="#222"/>
 <path d="M104 183 L104 276 L894 276 L894 366" fill="none" stroke="#2f7bd6" stroke-width="3.5" stroke-linejoin="round"/>
+<rect x="926" y="352" width="12" height="18" rx="2" fill="#222"/>
 <path d="M512 183 L512 290 L932 290 L932 366" fill="none" stroke="#8a4fd1" stroke-width="3.5" stroke-linejoin="round"/>
+<rect x="964" y="352" width="12" height="18" rx="2" fill="#222"/>
 <path d="M464 183 L464 304 L970 304 L970 366" fill="none" stroke="#8a4fd1" stroke-width="3.5" stroke-linejoin="round"/>
+<rect x="1002" y="352" width="12" height="18" rx="2" fill="#222"/>
 <path d="M440 183 L440 318 L1008 318 L1008 366" fill="none" stroke="#8a4fd1" stroke-width="3.5" stroke-linejoin="round"/>
+<rect x="1040" y="352" width="12" height="18" rx="2" fill="#222"/>
 <path d="M416 183 L416 332 L1046 332 L1046 366" fill="none" stroke="#8a4fd1" stroke-width="3.5" stroke-linejoin="round"/>
 <text x="40" y="404" font-size="14" font-weight="700" fill="#222">module pin   Pi pin   signal</text>
 <rect x="40" y="418" width="14" height="14" fill="#222"/>
@@ -160,6 +113,6 @@
 <text x="64" y="598" font-size="14" fill="#222" xml:space="preserve">K1         29     GPIO5</text>
 <text x="40" y="638" font-size="12" fill="#e0457b">Never pins 2 or 4 (5 V). At 5 V the module's pull-ups put 5 V on GPIO2/3.</text>
 <text x="40" y="658" font-size="12" fill="#444">Keys pull to GND inside the module; the Pi's internal pull-ups do the rest.</text>
-<text x="40" y="678" font-size="12" fill="#444">Breadboard is only a holder here. Female-female jumpers straight to the</text>
-<text x="40" y="698" font-size="12" fill="#444">module pins work too.</text>
+<text x="40" y="678" font-size="12" fill="#444">Check the order printed on YOUR module and wire by name;</text>
+<text x="40" y="698" font-size="12" fill="#444">this order is read off the shop's photo.</text>
 </svg>

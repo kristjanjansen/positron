@@ -1,5 +1,6 @@
-// node rig/board/panel-wiring.mjs: the 0.96" OLED with four keys on the Pi 4's header, through a
-// breadboard, as panel-wiring.svg. Pins from plans/plan-pi-oled.md 1.2; module order from
+// node rig/board/panel-wiring.mjs: the 0.96" OLED with four keys on the Pi 4's header, eight
+// female to female jumpers and no breadboard, as panel-wiring.svg. Pins from plans/plan-pi-oled.md
+// 1.2; module order from
 // rig/pico/oled/wiring.yml (GND VCC SCL SDA K4 K3 K2 K1, keys printed in reverse).
 
 import { writeFileSync } from 'node:fs';
@@ -29,7 +30,7 @@ const o = [];
 o.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="ui-monospace, Menlo, monospace">`);
 o.push(`<rect width="100%" height="100%" fill="#f4f1ea"/>`);
 o.push(`<text x="40" y="40" font-size="20" font-weight="700" fill="#222">0.96" OLED + 4 keys on the Raspberry Pi 4</text>`);
-o.push(`<text x="40" y="64" font-size="13" fill="#555">8 jumpers, female on the Pi, male in the breadboard. Power comes from the Pi's 3.3 V. The breadboard's own supply stays OFF.</text>`);
+o.push(`<text x="40" y="64" font-size="13" fill="#555">8 female to female jumpers, Pi pin straight to module pin. Power comes from the Pi's 3.3 V.</text>`);
 
 // the Pi's edge and header
 o.push(`<rect x="${HX - 40}" y="${HY - 30}" width="${20 * P + 60}" height="${P + 60}" rx="6" fill="#2e7d4f"/>`);
@@ -50,29 +51,22 @@ o.push(`<text x="${HX - 30}" y="${HY + 5}" font-size="11" fill="#fff" text-ancho
 o.push(`<text x="${HX + 19 * P + 28}" y="${HY + P + 5}" font-size="11" fill="#fff">39</text>`);
 o.push(`<text x="${HX + 19 * P + 28}" y="${HY + 5}" font-size="11" fill="#fff">40</text>`);
 
-// breadboard: 8 columns of 5 tied holes (a to e), module in row e
-const BX = 760, BY = HY + P + 200, BP = 22, MY_ = BY + 4 * BP + 18;
+// where the module's pins sit
+const BX = 760, BY = HY + P + 200, MY_ = BY + 18;
 const colX = (i) => BX + 20 + i * 38;
-o.push(`<rect x="${BX - 20}" y="${BY - 20}" width="${7 * 38 + 40}" height="${5 * BP + 40}" rx="6" fill="#fbfbf8" stroke="#c9c5bb"/>`);
-o.push(`<text x="${BX - 20}" y="${MY_ + 210}" font-size="12" fill="#555">breadboard: holes a to e in one column are one wire</text>`);
-'abcde'.split('').forEach((r, j) => o.push(`<text x="${BX - 10}" y="${BY + j * BP + 4}" font-size="10" fill="#999" text-anchor="end">${r}</text>`));
-WIRES.forEach((w, i) => {
-  for (let j = 0; j < 5; j++) o.push(`<rect x="${colX(i) - 4}" y="${BY + j * BP - 4}" width="8" height="8" fill="#555"/>`);
-  o.push(`<line x1="${colX(i)}" y1="${BY}" x2="${colX(i)}" y2="${BY + 4 * BP}" stroke="${w.c}" stroke-width="2" opacity=".35"/>`);
-});
 
-// the module, pins down into row e
-const MY = BY + 4 * BP + 18;
+// the module, its header pins pointing up
+const MY = BY + 18;
 o.push(`<rect x="${colX(0) - 26}" y="${MY}" width="${colX(7) - colX(0) + 52}" height="190" rx="6" fill="#1a3a6b"/>`);
 o.push(`<rect x="${colX(0)}" y="${MY + 44}" width="${colX(7) - colX(0)}" height="96" fill="#05070b" stroke="#444"/>`);
 o.push(`<text x="${(colX(0) + colX(7)) / 2}" y="${MY + 96}" font-size="12" fill="#7fd" text-anchor="middle">SSD1306 128x64, I2C 0x3C</text>`);
 WIRES.forEach((w, i) => {
-  o.push(`<line x1="${colX(i)}" y1="${BY + 4 * BP}" x2="${colX(i)}" y2="${MY + 8}" stroke="#bbb" stroke-width="3"/>`);
+  o.push(`<rect x="${colX(i) - 3}" y="${BY - 6}" width="6" height="${MY - BY + 10}" fill="#c8a24a"/>`);
   o.push(`<text x="${colX(i)}" y="${MY + 26}" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">${w.mod}</text>`);
 });
 o.push(`<text x="${(colX(0) + colX(7)) / 2}" y="${MY + 172}" font-size="11" fill="#cde" text-anchor="middle">4 keys under the screen</text>`);
 
-// jumpers: header pin to row a of its column
+// jumpers: header pin straight to its module pin
 WIRES.forEach((w, i) => {
   const [x, y] = pinXY(w.pin), tx = colX(i), ty = BY;
   const out = w.pin % 2 === 0 ? -1 : 1;           // even pins leave upward over the edge
@@ -81,6 +75,8 @@ WIRES.forEach((w, i) => {
   const d = out < 0
     ? `M${x} ${y - 9} L${x} ${HY - 21} L${edge} ${HY - 21} L${edge} ${lane} L${tx} ${lane} L${tx} ${ty - 8}`
     : `M${x} ${y + 9} L${x} ${lane} L${tx} ${lane} L${tx} ${ty - 8}`;
+  // the jumper's housing on the module pin
+  o.push(`<rect x="${tx - 6}" y="${ty - 22}" width="12" height="18" rx="2" fill="#222"/>`);
   o.push(`<path d="${d}" fill="none" stroke="${w.c}" stroke-width="3.5" stroke-linejoin="round"/>`);
 });
 
@@ -96,8 +92,8 @@ const NY = TY + 26 + 8 * 24 + 16;
 [
   'Never pins 2 or 4 (5 V). At 5 V the module\'s pull-ups put 5 V on GPIO2/3.',
   'Keys pull to GND inside the module; the Pi\'s internal pull-ups do the rest.',
-  'Breadboard is only a holder here. Female-female jumpers straight to the',
-  'module pins work too.',
+  'Check the order printed on YOUR module and wire by name;',
+  'this order is read off the shop\'s photo.',
 ].forEach((t, i) => o.push(`<text x="40" y="${NY + i * 20}" font-size="12" fill="${i === 0 ? C.v5 : '#444'}">${t}</text>`));
 o.push('</svg>');
 
