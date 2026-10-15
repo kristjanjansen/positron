@@ -17,7 +17,7 @@
   .ol-media canvas { display: block; flex: none; width: calc(128px * var(--ol-k, 2)); height: calc(64px * var(--ol-k, 2)); image-rendering: pixelated; }
   /* the panel's edge, a light line clear of its pixels as the module's print frames it; a border on a
      wrapper, since an outline rounds its corners by its offset */
-  .ol-frame { padding: 6px; border: 1px solid var(--dim2); border-radius: 2px; line-height: 0; }
+  .ol-frame { padding: 6px; border: 1px solid var(--line); border-radius: 2px; line-height: 0; }
   /* one joined column at its own height, centred beside the screen at every zoom */
   .ol-media .pos-bgroup { flex: none; margin-left: auto; align-self: center; }
   /* the screen centred in what the key column at the right edge leaves */
@@ -103,6 +103,9 @@
   }
   const compose = createChatCompose({ placeholder: 'A line for the screen', onSend: send });
   compose.el.classList.add('ol-compose');
+  // Always on: a line reaches the simulated screen here at once, and the Pi's once connected.
+  compose.enable(true);
+  compose.input.blur();
   // Play alone at the top left, as on the other remote pages: play connects, stop lets go.
   const transport = createButtonGroup({ buttons: [
     { id: 'play', icon: 'play', label: 'connect to the Pi', onPress: () => (board ? disconnect() : connect()) },
@@ -146,7 +149,6 @@
       log: (line, kind) => d.log(line, kind),
       onOpen: async () => {
         connected = true;
-        compose.enable(true);
         const st = await board.ask({ type: 'panel.status' }, 'panel.status', 3000);
         d.log(st?.ok ? `the screen shows: ${st.text}` : `no screen on the Pi: ${st?.why || 'no answer in 3 s'}`, st?.ok ? 'ok' : 'warn');
         // the simulated screen takes what the real one shows, so the two match from the start
@@ -165,7 +167,6 @@
   function disconnect() {
     board?.close();
     board = null; connected = false;
-    compose.enable(false);
     transport.setIcon('play', 'play', 'connect to the Pi');
     d.log(`left ${ROOM}`);
   }
