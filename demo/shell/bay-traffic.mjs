@@ -30,15 +30,14 @@ const WAVE_STOPS = 12;              // one sine period, repeated along the wire
 const POOL = 8;                     // pulses alive at once on one wire; 900 ms each is 9 a second
 let seq = 0;
 // How traffic is drawn, chosen by `?wires=` while the options are compared: `glow` (the shading above),
-// `beads` (dots moving out to in) or `ants` (the 1 px wire itself turns into running 1 px dots). A stream moves along the whole wire while
-// it flows; an event sends one bead, or one short run of ants, from outlet to inlet.
-export const WIRE_STYLES = ['glow', 'beads', 'ants'];
+// or `beads` (dots moving out to in). A stream moves along the whole wire while
+// it flows; an event sends one bead from outlet to inlet.
+export const WIRE_STYLES = ['glow', 'beads'];
 const STYLE = (() => {
   try { const v = new URLSearchParams(globalThis.location?.search || '').get('wires'); return WIRE_STYLES.includes(v) ? v : 'glow'; } catch { return 'glow'; }
 })();
 const DASH = { beads: { w: 4, on: 0, off: 14, cap: 'round' } };
-const ANT_GAP = 2;                  // ants: a 1 px dot, then this many px of gap
-const MARCH = 24;                   // px a second the beads or ants move
+const MARCH = 24;                   // px a second the beads move
 
 const make = (tag, attrs) => {
   const e = document.createElementNS(NS, tag);
@@ -76,12 +75,6 @@ export function createBayTraffic() {
     path.style.strokeWidth = W;
     path.style.opacity = row.streamy ? IDLE : EVENT_LINE;
     row.op = null;
-    if (STYLE === 'ants') {
-      // the wire itself: 1 px, solid at rest, running 1 px dots while something passes
-      path.style.strokeWidth = 1; path.style.opacity = 1; row.on = false; row.lastEv = -1e9;
-      row.path = path;
-      return true;
-    }
     if (STYLE !== 'glow') {
       const D = DASH[STYLE];
       row.len = len;
@@ -97,8 +90,8 @@ export function createBayTraffic() {
         row.glow = dash(`${D.on} ${D.off}`); row.glow.style.opacity = 0; row.glowOp = '0'; row.off = '';
         path.after(row.glow);
       } else {
-        // one bead, or one run of three ants, then a gap longer than the wire
-        const run = STYLE === 'beads' ? `0 ${len + 20}` : `${D.on} ${D.off} ${D.on} ${D.off} ${D.on} ${len + 20}`;
+        // one bead, then a gap longer than the wire
+        const run = `0 ${len + 20}`;
         row.pool = Array.from({ length: POOL }, () => {
           const e = dash(run);
           e.setAttribute('display', 'none');
@@ -154,13 +147,6 @@ export function createBayTraffic() {
       const { n = 0, flowing = false } = asked.get(row.read);
       if (!attach(row)) continue;
       const shown = seen.get(row.path.ownerSVGElement) !== false;
-      if (STYLE === 'ants') {
-        if (n > 0) row.lastEv = t;
-        const on = row.streamy ? flowing : t - row.lastEv < PULSE.ms;
-        if (on !== row.on) { row.on = on; row.path.style.strokeDasharray = on ? `1 ${ANT_GAP}` : ''; if (!on) row.path.style.strokeDashoffset = ''; }
-        if (on && shown) row.path.style.strokeDashoffset = (-((t / 1000) * MARCH) % (1 + ANT_GAP)).toFixed(2);
-        continue;
-      }
       if (row.streamy) {
         row.level += ((flowing ? 1 : 0) - row.level) * Math.min(1, dt / FADE_MS);
         if (row.level < 0.002 && !flowing) row.level = 0;

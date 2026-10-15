@@ -112,24 +112,26 @@ function layoutColumns({ nodes, links }, { home = 'pi-1', adv = 6 } = {}) {
   return { boxes, wires, cut };
 }
 
-/** Beads along a wire when `t` is given: one every BEAD px, moving at SPEED px a second, out to in. */
-const BEAD = 10, SPEED = 20;
-function beads(ui, pts, t) {
-  const segs = [];
-  let len = 0;
-  for (let i = 1; i < pts.length; i++) { const [a, b] = [pts[i - 1], pts[i]], d = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]); segs.push([a, b, len, d]); len += d; }
-  for (let at = (t * SPEED) % BEAD + 2; at < len - 2; at += BEAD) {
-    const [a, b, from, d] = segs.find(([, , f, dd]) => at <= f + dd), k = d ? (at - from) / d : 0;
-    ui.fill(Math.round(a[0] + (b[0] - a[0]) * k) - 1, Math.round(a[1] + (b[1] - a[1]) * k) - 1, 3, 3, 1);
+/** A wire as running 1 px dots when `t` is given: a dot every ANT px, moving at SPEED px a second, out to in. */
+const ANT = 3, SPEED = 20;
+function ants(ui, pts, t) {
+  let at = 0;
+  const phase = Math.floor(t * SPEED) % ANT;
+  for (let i = 1; i < pts.length; i++) {
+    const [a, b] = [pts[i - 1], pts[i]], d = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]);
+    const sx = Math.sign(b[0] - a[0]), sy = Math.sign(b[1] - a[1]);
+    for (let j = i === 1 ? 0 : 1; j <= d; j++) if ((at + j - phase + ANT * 1000) % ANT === 0) ui.fill(a[0] + sx * j, a[1] + sy * j, 1, 1, 1);
+    at += d;
   }
 }
 
-/** The patch drawn with the UI kit's calls; `o.t` (seconds) runs beads along the wires. Answers the layout, `cut` naming what did not fit. */
+/** The patch drawn with the UI kit's calls; with `o.t` (seconds) every wire is running 1 px dots, without it a
+ *  solid line. Answers the layout, `cut` naming what did not fit. */
 export function drawBayOled(ui, patch, o = {}) {
   const L = layoutBayOled(patch, { ...o, adv: ui.adv });
   const line = (x0, y0, x1, y1) => ui.fill(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0) + 1, Math.abs(y1 - y0) + 1, 1);
-  for (const w of L.wires) for (let i = 1; i < w.pts.length; i++) line(...w.pts[i - 1], ...w.pts[i]);
-  if (Number.isFinite(o.t)) for (const w of L.wires) beads(ui, w.pts, o.t);
+  if (Number.isFinite(o.t)) for (const w of L.wires) ants(ui, w.pts, o.t);
+  else for (const w of L.wires) for (let i = 1; i < w.pts.length; i++) line(...w.pts[i - 1], ...w.pts[i]);
   for (const b of L.boxes) {
     // the firmware's box: an outline with its corners off. Never filled: a lit box drowns its thin letters.
     ui.fill(b.x + 1, b.y, b.w - 2, 1, 1); ui.fill(b.x + 1, b.y + b.h - 1, b.w - 2, 1, 1);
