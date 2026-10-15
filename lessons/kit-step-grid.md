@@ -336,6 +336,10 @@ axis along, and then the budget is that caller's problem to keep.
 
 ## step-grid.mjs, the corner cell
 
+2026-10-15: the drum grids dropped the label column on the owner's ask, so they
+have no corner either (see `#no-column`). The corner is still reserved on every
+grid that has a column.
+
 ⚠️ THE CORNER IS RESERVED EVEN WHEN IT IS EMPTY, or the first label sits
 a ruler's height above the first row of pads and the two columns never
 line up again. A component's invisible reservations have to be made or
@@ -505,6 +509,9 @@ a pause and has to behave like one.
 
 ## step-grid.mjs, lit
 
+2026-10-15: on a grid with no label column (the drum grids since the owner's ask
+that day, see `#no-column`) there is no label to flash and `lit` does nothing.
+
 Flash one label, for a row that just did something.
 
 🔴 A COLOUR, NEVER A BOX, ASKED FOR AS *"rm bg on sample preview, just
@@ -660,3 +667,25 @@ header; these read the rules for the shapes that must not be there.
 ⚠️ THE NUMBER ONLY MEANS ANYTHING AS A FRACTION OF A STEP. At 120 beats a
     minute with four to a beat a step is 125 ms, so 320 ms was 2.6 steps of
     tail and the third column behind the head was still visibly lit.
+
+<a id="no-column"></a>
+
+## step-grid.mjs, createStepGrid, a grid with no label column
+
+2026-10-15: the drum grids (`demo/drums/drum-machine.mjs`, every `/drums/` page,
+`/devices/drums/` and the kit's DRUM GRID specimen on `/kit/devices/`) dropped the
+label column on the owner's ask: *"rm left labels from web ui kit drum grids.
+(arhve that knowledge). on hover say patch name."*
+
+So a grid built with no `fixed` now says each row's name on the pad itself: the
+pad's `title` defaults to `label(r)` (a caller's `padTitle` still wins), and a
+read only cell gets `aria-label` `<label>, step <n>` the way a pressable pad
+always had. With a `fixed` column nothing changes; `/tom/` and the numbered
+specimen on `/kit/devices/` still draw the column, and every rule above about it
+(the corner, the shared pitch, `--pg-cell` on the column, the pressable label,
+`lit`) still holds for them.
+
+⚠️ `lit(r)` flashes a LABEL, so on a grid with no column it does nothing.
+`/devices/drums/` calls `grid.lit(voice)` to show which row the Pi's keys are
+editing; on the browser grid that cue is gone, and the OLED picture is what
+still shows it.

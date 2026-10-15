@@ -297,14 +297,13 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   for (const v of KNOBS) for (const p of paramsOf(v)) lay(ID(`knob-${p.name}`, 'value-out'), ID(v.key, 'value-in'));
 
   // ── the grid ─────────────────────────────────────────────────────────────
-  const panel = createPanelLayout({ side: 'left', flow: false, strip: { role: 'group', label: 'steps' } });
+  // No label column: a pad's hover says its row's patch name.
+  // why: lessons/page-drums.md#drums-no-column
+  const panel = createPanelLayout({ side: null, flow: false, strip: { role: 'group', label: 'steps' } });
   const makeGrid = () => createStepGrid({
-    fixed: panel.fixed, strip: panel.strip, rows: VOICES.length, steps: STEPS,
-    // A voice may carry a `short` grid label (rhythm/020's row numbers); the
-    // full name stays in the row's hover and everywhere else.
-    label: (r) => VOICES[r].short ?? VOICES[r].label,
-    title: (r) => VOICES[r].title ?? `${VOICES[r].label}, note ${VOICES[r].note}`,
-    padTitle: (r, s) => `${VOICES[r].label}, step ${s + 1}`,
+    strip: panel.strip, rows: VOICES.length, steps: STEPS,
+    label: (r) => VOICES[r].label,
+    padTitle: (r) => VOICES[r].title ?? VOICES[r].label,
     ticks: true, readOnly: patternIn,
     onToggle: (r, s, lit, why) => { if (why !== 'quiet') d.log(`${VOICES[r].label} step ${s + 1} ${lit ? 'on' : 'off'}`); },
   });
@@ -314,7 +313,6 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     VOICES = ALL.slice(0, sh.rows);
     STEPS = sh.steps;
     grid.destroy();
-    panel.fixed.textContent = '';
     panel.strip.textContent = '';
     grid = makeGrid();
     if (playing) grid.live(true);

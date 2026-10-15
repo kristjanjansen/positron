@@ -280,6 +280,25 @@ The full comments cut from the code under demo/ for kit-devices, verbatim. Each 
 <a id="kit-devices-14"></a>
 ## kit-devices-14: demo/kit/devices/index.html, inline script, line 332
 
+2026-10-15: this block is DRUM GRID now, the step grid with no label column and
+each row's name on its pads' hover, since the drum grids dropped the column on
+the owner's ask (lessons/kit-step-grid.md#no-column). Its code comment and
+specimen were, verbatim:
+
+````js
+  /**
+   * A step grid with rows named in words: createStepGrid, with its label column as wide
+   * as its widest name (.pos-pg-labs) and 22 px as the floor, so STEP GRID still
+   * measures 22 px. No control in a .pos-controls row.
+   * See lessons/page-kit-devices.md#kit-devices-14
+   */
+  section('STEP GRID WITH NAMED ROWS',
+    'The same step grid with its rows named in words, the label column as wide as the widest name.',
+    `createStepGrid({ fixed, strip, rows: 4, steps: 16,
+  label: (r) => ['kick', 'snare', 'open hat', 'closed hat'][r],
+  ticks: true })`,
+````
+
 ````js
   /**
    * 🔴 ONCE THE NEWEST BLOCK, NOW SECOND. A step
@@ -2144,6 +2163,26 @@ The full comments cut from the code under demo/ for kit-devices, verbatim. Each 
 
 <a id="kit-devices-133"></a>
 ## kit-devices-133: demo/kit/devices/index.html, inline script, line 2464
+
+2026-10-15: the named grid left this assert with its label column (the drum
+grids dropped it on the owner's ask); it measures the numbered grid alone, and a
+second assert grades the drum grid's pad hovers instead. The assert was, verbatim:
+
+````js
+  if (namedSpec && gridSpec) {
+    /* Nothing in either label column is cut. The numbered grid's column is over 22 px since
+       its corner says `beat`; its digits alone would sit at the 22 px floor.
+       See lessons/page-kit-devices.md#kit-devices-133 */
+    const cutIn = (g) => [...g.labels, g.fixed.querySelector('.pos-pg-corner')]
+      .filter((l) => l && l.scrollWidth > l.clientWidth + 0.5).map((l) => l.textContent);
+    const cut = [...cutIn(namedSpec.named), ...cutIn(gridSpec.edit)];
+    const w = namedSpec.named.fixed.getBoundingClientRect().width;
+    const nw = gridSpec.edit.fixed.getBoundingClientRect().width;
+    d.assert('a step grid label column is as wide as its widest label, so no name and no corner word is cut',
+      cut.length === 0 && w > 22 && nw >= 22,
+      `named column ${w.toFixed(1)} px, numbered column ${nw.toFixed(1)} px, ${cut.length ? `${cut.join(', ')} cut` : 'nothing cut'}`);
+  }
+````
 
 ````js
     /* 🔴 NOTHING IN EITHER LABEL COLUMN IS CUT, which is what a column sized to

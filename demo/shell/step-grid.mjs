@@ -127,7 +127,8 @@ function ensureSteps(steps) {
 
 /**
  * @param {object} o
- * @param {HTMLElement} [o.fixed]  where the label column goes; omit it for no column
+ * @param {HTMLElement} [o.fixed]  where the label column goes; omit it for no column, and then
+ *   each pad's hover and accessible name carry `label(r)`
  * @param {HTMLElement} o.strip    the scroller for ruler and rows; pad size is measured from it
  * @param {number} o.rows
  * @param {number} o.steps
@@ -138,7 +139,7 @@ function ensureSteps(steps) {
  * @param {string} [o.corner]  the cell above the label column; '' is a plain spacer
  * @param {boolean} [o.readOnly]  pads cannot be pressed and do not look pressable
  * @param {(r:number)=>boolean} [o.silent]  this row makes no sound, so its lit pads stay grey
- * @param {(r:number,s:number)=>string} [o.padTitle]  the hover on one pad
+ * @param {(r:number,s:number)=>string} [o.padTitle]  the hover on one pad; with no column it defaults to `label(r)`
  * @param {(r:number,s:number,on:boolean,why:string)=>void} [o.onToggle]
  * @param {(step:number)=>void} [o.onSeek]  a press on the ruler
  * @param {{bpm:number, whose:string, perBeat?:number}} [o.rate]  adds a `clock`; throws without `whose`
@@ -253,7 +254,7 @@ export function createStepGrid({
       for (let s = 0; s < S; s++) {
         const lit = !!on[r][s];
         const c = readOnly
-          ? el('div', 'pos-pg-pad', '', { role: 'cell' })
+          ? el('div', 'pos-pg-pad', '', fixed ? { role: 'cell' } : { role: 'cell', 'aria-label': `${label(r)}, step ${s + 1}` })
           : el('button', 'pos-pg-pad', '', {
             type: 'button',
             'aria-label': `${label(r)}, step ${s + 1}`,
@@ -265,7 +266,9 @@ export function createStepGrid({
         c.dataset.row = String(r); c.dataset.step = String(s);
         if (lit) c.dataset.on = '1';
         if (lit && mute) c.dataset.mute = '1';
-        const tip = padTitle ? padTitle(r, s) : '';
+        // With no label column the pad is where a row says its name.
+        // why: lessons/kit-step-grid.md#no-column
+        const tip = padTitle ? padTitle(r, s) : (fixed ? '' : label(r));
         if (tip) c.title = tip;
         if (!readOnly) c.tabIndex = (r === focusR && s === focusS) ? 0 : -1;
         line.push(c);

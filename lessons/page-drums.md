@@ -646,6 +646,15 @@ The full comments cut from the code under demo/ for drums, verbatim. Each headin
 <a id="drums-32"></a>
 ## drums-32: demo/drums/sample-voices.mjs, module, line 122
 
+2026-10-15: `short` is gone with the drum grids' label column (see
+`#drums-no-column`). The code it described was:
+
+````js
+    // Just the row number on the grid; the name is in the hover.
+    // See lessons/page-drums.md#drums-32
+    short: String(r + 1),
+````
+
 ````js
     // Just the row number on the grid, asked 2026-10-13: *"find a way to
     // shorten drum grid labels: just numbers and hover?"*.
@@ -664,6 +673,24 @@ The full comments cut from the code under demo/ for drums, verbatim. Each headin
 
 <a id="drums-34"></a>
 ## drums-34: demo/drums/samples/index.html, style, line 11
+
+2026-10-15: the rules this described left the page with the drum grids' label
+column (see `#drums-no-column`), and with them the `rh-samples` class that
+scoped them. They were:
+
+````html
+<style>
+  /* Label column: a fifth of the screen and at most 22 letters, a longer name ellipsed with the
+     whole in the hover. 75 px beside 16 pads at 375, 132 px at 1280.
+     See lessons/page-drums.md#drums-34 */
+  .rh-samples .pos-pg-labs { max-width: min(22ch, 20vw); }
+  .rh-samples .pos-pg-lab { text-overflow: ellipsis; }
+</style>
+````
+
+````js
+  m.surface.classList.add('rh-samples');
+````
 
 ````css
   /* A sample's name can be forty letters (`NOVHTG Hit - Drumstation - 808
@@ -848,3 +875,35 @@ The full comments cut from the code under demo/ for drums, verbatim. Each headin
  * See lessons/page-drums.md#drums-42
  */
 ````
+
+<a id="drums-no-column"></a>
+## drums-no-column: demo/drums/drum-machine.mjs, the grid, 2026-10-15
+
+The drum grids dropped their label column on the owner's ask, 2026-10-15:
+*"rm left labels from web ui kit drum grids. (arhve that knowledge). on hover
+say patch name."* The panel is `side: null` (no fixed column), the grid gets no
+`fixed`, and each pad's hover is the voice's `title` when it has one (the sample
+rows: `3 kick, kick.wav` or `row 3, nothing loaded`) and its `label` otherwise
+(`kick`). The pads' accessible names carry the full label.
+
+What the column did, moved here verbatim from the grid call:
+
+````js
+    fixed: panel.fixed, strip: panel.strip, rows: VOICES.length, steps: STEPS,
+    // A voice may carry a `short` grid label (rhythm/020's row numbers); the
+    // full name stays in the row's hover and everywhere else.
+    label: (r) => VOICES[r].short ?? VOICES[r].label,
+    title: (r) => VOICES[r].title ?? `${VOICES[r].label}, note ${VOICES[r].note}`,
+    padTitle: (r, s) => `${VOICES[r].label}, step ${s + 1}`,
+````
+
+and from `reshape()`, which emptied the column before building again:
+
+````js
+    panel.fixed.textContent = '';
+````
+
+Lost with it: the label's hover `<name>, note <n>` (the GM note a row answers;
+the patchbay still shows it as each wire's range), and the pad hover's
+`, step <n>` (the step is still in the pad's accessible name). The label column
+was never pressable on these pages (no `onLabel`), so no press went with it.

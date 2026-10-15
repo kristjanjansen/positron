@@ -93,9 +93,6 @@ export function sampleRows({ nameOf, fileOf, bufOf }) {
   return Array.from({ length: MAX_ROWS }, (_, r) => ({
     key: `s${r}`, name: 'drumsample', note: 36 + r, def,
     get label() { return nameOf(r) ?? `slot ${r + 1}`; },
-    // Just the row number on the grid; the name is in the hover.
-    // See lessons/page-drums.md#drums-32
-    short: String(r + 1),
     get title() { const f = fileOf(r), n = nameOf(r); return f ? `${r + 1} ${n ?? ''}, ${f}`.replace(' ,', ',') : `row ${r + 1}, nothing loaded`; },
     get opens() { return /open|\bo?hh?o\b|\boh\b/i.test(nameOf(r) ?? ''); },
     get closes() { return /closed|\bhhc\b|\bch\b/i.test(nameOf(r) ?? ''); },

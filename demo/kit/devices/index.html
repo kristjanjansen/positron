@@ -195,26 +195,24 @@ scope.flat()                    // stopped`,
     });
 
   /**
-   * A step grid with rows named in words: createStepGrid, with its label column as wide
-   * as its widest name (.pos-pg-labs) and 22 px as the floor, so STEP GRID still
-   * measures 22 px. No control in a .pos-controls row.
-   * See lessons/page-kit-devices.md#kit-devices-14
+   * The drum grid: createStepGrid with no `fixed`, so no label column; each pad's hover says
+   * its row's name. No control in a .pos-controls row.
+   * why: lessons/page-kit-devices.md#kit-devices-14
    */
-  section('STEP GRID WITH NAMED ROWS',
-    'The same step grid with its rows named in words, the label column as wide as the widest name.',
-    `createStepGrid({ fixed, strip, rows: 4, steps: 16,
+  section('DRUM GRID',
+    'The step grid the drum pages use, with no row names beside it. Hover a pad for its row.',
+    `createStepGrid({ strip, rows: 4, steps: 16,
   label: (r) => ['kick', 'snare', 'open hat', 'closed hat'][r],
   ticks: true })`,
     (box) => {
       const wrap = el('div', 'kit-pg');
-      const fixed = el('div');
       const strip = el('div', 'kit-pg-strip');
-      wrap.append(fixed, strip);
+      wrap.append(strip);
       const NAMES = ['kick', 'snare', 'open hat', 'closed hat'];
-      const named = createStepGrid({ fixed, strip, rows: 4, steps: 16, label: (r) => NAMES[r], ticks: true });
+      const named = createStepGrid({ strip, rows: 4, steps: 16, label: (r) => NAMES[r], ticks: true });
       for (const [r, s] of [[0, 0], [0, 4], [0, 8], [0, 12], [1, 4], [1, 12], [2, 2], [2, 6], [2, 10], [2, 14],
         [3, 0], [3, 3], [3, 4], [3, 7], [3, 8], [3, 11], [3, 12], [3, 15]]) named.set(r, s, true, 'quiet');
-      namedSpec = { named };
+      namedSpec = { named, NAMES };
       box.classList.add('kit-wide');
       box.append(wrap);
     });
@@ -2326,18 +2324,28 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       `mode ${trigSpec.held.mode}, ${g.points.length} points all zero, ${trigSpec.held.triggers().triggered} hits`);
   }
 
-  if (namedSpec && gridSpec) {
-    /* Nothing in either label column is cut. The numbered grid's column is over 22 px since
-       its corner says `beat`; its digits alone would sit at the 22 px floor.
-       See lessons/page-kit-devices.md#kit-devices-133 */
+  if (gridSpec) {
+    /* Nothing in the label column is cut: its corner says `beat`, so it is over the 22 px floor.
+       why: lessons/page-kit-devices.md#kit-devices-133 */
     const cutIn = (g) => [...g.labels, g.fixed.querySelector('.pos-pg-corner')]
       .filter((l) => l && l.scrollWidth > l.clientWidth + 0.5).map((l) => l.textContent);
-    const cut = [...cutIn(namedSpec.named), ...cutIn(gridSpec.edit)];
-    const w = namedSpec.named.fixed.getBoundingClientRect().width;
+    const cut = cutIn(gridSpec.edit);
     const nw = gridSpec.edit.fixed.getBoundingClientRect().width;
     d.assert('a step grid label column is as wide as its widest label, so no name and no corner word is cut',
-      cut.length === 0 && w > 22 && nw >= 22,
-      `named column ${w.toFixed(1)} px, numbered column ${nw.toFixed(1)} px, ${cut.length ? `${cut.join(', ')} cut` : 'nothing cut'}`);
+      cut.length === 0 && nw > 22,
+      `numbered column ${nw.toFixed(1)} px, ${cut.length ? `${cut.join(', ')} cut` : 'nothing cut'}`);
+  }
+
+  if (namedSpec) {
+    /* The drum grid has no label column; the row's name is on every pad's hover and accessible name. */
+    const g = namedSpec.named;
+    const bad = g.pads.flatMap((row, r) => row.filter((p) => p.title !== namedSpec.NAMES[r]
+      || !p.getAttribute('aria-label')?.startsWith(`${namedSpec.NAMES[r]}, step `)));
+    const cols = g.el.closest('.kit-pg').querySelectorAll('.pos-pg-labs, .pos-pg-lab').length;
+    d.assert('a drum grid draws no label column, and every pad says its row\'s name on hover',
+      g.fixed === null && g.labels.length === 0 && cols === 0 && bad.length === 0 && g.pads.flat().length === 64,
+      `${cols} label elements, ${bad.length} of ${g.pads.flat().length} pads without their row's name, `
+      + `row 3 reads "${g.pads[3][0].title}"`);
   }
 
   if (gridSpec) {
