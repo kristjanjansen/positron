@@ -1,5 +1,9 @@
 ## Open
 
+- **/connect/ test session: voice, typed and pills, told apart, logged and watched** (2026-10-15). Asked: *"i will do voide, keyb and pills testign. distiguis, log and monitor my test. say when ready"*. Log lines tagged [voice], [typed], [pill]; the page's warnings as [page warn]; the session tails pub.positron.studio/logs.
+
+- **A patch transform: instruments list their patch names, a link chooses one** (2026-10-15). Asked: *"you should know patch names not special case rhodes"*. Proposed in chat (catalogue patch lists, labels to the model, `{ op: 'patch', name }`, wish worker redeploy); waiting on the owner's go. In the tree already: rhodes-samples has a store runtime, a second web:sampler is allowed, named instances are made before an answer is checked.
+
 - ~~**/connect/: the patch room 20 % less tall**~~ (2026-10-15, DONE: aspect-ratio 5 / 4). Asked: *"reduce h by 20% -- say what should play what, press an example, or an out port and then an in port --"*.
 
 - **/connect/: a request went to the Pi unasked** (2026-10-15). Asked: *"why we go pi when i did not asked"*, on "keuboard plays rhodes on bottom and piano on top", which the model built as keys to pi-1:sampler and pi-1:drums. Fix: the facts tell the model to stay in this tab, and a request that does not name the Pi, the studio, the Circuit or remote builds nothing that reaches pi-1. Not yet: a Rhodes in this tab (two web:samplers, rhodes-samples offered to the model).

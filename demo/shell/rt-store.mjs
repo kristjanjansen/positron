@@ -8,12 +8,14 @@ const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media/';
 export const ADDRESS = {
   'typewriter-samples': `${MEDIA}typewriter/hermes-precisa-305/`,
   'piano-samples': `${MEDIA}sampler/`,
+  'rhodes-samples': `${MEDIA}sampler/`,
   recording: MEDIA,
 };
 
 export function make({ type }) {
   let reads = 0;
   return {
+    type,
     url: ADDRESS[type] ?? null,
     /** A reader says it fetched from here, so the count is the far side's. */
     read() { reads++; return ADDRESS[type] ?? null; },

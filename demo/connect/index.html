@@ -210,20 +210,30 @@
   // ── a second of a kind (decision D6) ─────────────────────────────────────
   // A synth, a scope or a screen may be used twice: once every one of them is linked,
   // the grid offers the next as `synth-2`, `scope-3`, with a runtime and a face of its own.
-  const MULTI = ['synth', 'scope', 'screen'];
+  const MULTI = ['synth', 'scope', 'screen', 'sampler'];
   const instancesOf = (type) => bay.nodes().filter((n) => TYPE.get(n.id) === type).map((n) => n.id);
   // The bay cannot drop a node, so an instance unlinked again stays in it and the grid shows the first free one.
   const firstFree = (type) => { const s = linkedNodes(); return instancesOf(type).find((id) => !s.has(id)) ?? null; };
-  function addInstance(type) {
+  function addInstance(type, on = bay) {
     const e = CATALOGUE[type], label = LABELS[type] ?? e.label;
     let k = 2;
-    while (bay.node(`web:${type}-${k}`)) k++;
+    while (on.node(`web:${type}-${k}`)) k++;
     const as = `${type}-${k}`;
-    addNodes(bay, 'web', [{ name: type, as, label }], { ports: Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${k} ${p}` }])) });
+    addNodes(on, 'web', [{ name: type, as, label }], { ports: Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${k} ${p}` }])) });
+    if (on !== bay) return `web:${as}`;
     TYPE.set(`web:${as}`, type);
     PAGES.set(`web:${as}`, e.pages);
     INSTANCE.set(`web:${as}`, `instance ${k} of ${type}, with its own runtime and face`);
     return `web:${as}`;
+  }
+  /** Every numbered instance an answer names (web:sampler-2) is made first, on `on`. */
+  function ensureNamed(links, on = bay) {
+    for (const id of links.flatMap((l) => [l.from, l.to])) {
+      const m = /^web:([a-z]+)-(\d+):/.exec(id);
+      if (!m || !MULTI.includes(m[1])) continue;
+      let guard = 0;
+      while (!on.node(`web:${m[1]}-${m[2]}`) && guard++ < 8) addInstance(m[1], on);
+    }
   }
   function spares() { for (const t of MULTI) if (!firstFree(t)) addInstance(t); }
   const PI_KEPT = PI.nodes.filter((n) => PI_PAGES[n.id.split(':')[1]]).length;
@@ -309,7 +319,7 @@
     + 'Ids starting web: are in this browser tab, pi-1: is a Raspberry Pi in the studio, cf- ids are Cloudflare, '
     + 'cf-r2:recording is a radio programme we recorded, and err:station is a live station on its broadcaster\'s server, '
     + 'which reaches this tab through cf-shout:relay. Use web: nodes; use pi-1: only when the sentence names the Pi, '
-    + 'the studio, the Circuit or remote. The piano in this tab is web:sampler, fed by cf-r2:piano-samples on its file-in.';
+    + 'the studio, the Circuit or remote.';
   /** A sentence that names somewhere else may reach it; any other stays in this tab. */
   const NAMES_PI = /\b(pi|raspberry|studio|circuit|remote|board|there)\b/i;
   // The self-check's stand-in for a sentence nobody listed, with one transform
@@ -370,20 +380,27 @@
     const b = el('button', 'cn-pill', ex.say, { type: 'button', title: lines.join('\n') });
     b.dataset.runs = r.press.length ? 'press' : r.missing.length ? 'marked' : 'runs';
     if (r.missing.length) b.dataset.missing = r.missing.join(' ');
-    b.addEventListener('click', (e) => { b.dataset.busy = '1'; build(ex, e.isTrusted); runtime.idle().finally(() => delete b.dataset.busy); });
+    b.addEventListener('click', (e) => {
+      b.dataset.busy = '1'; build(ex, e.isTrusted);
+      logAsk(`[pill] built "${ex.say}": ${bay.links().length} of ${ex.links.length} link(s)`);
+      runtime.idle().finally(() => delete b.dataset.busy);
+    });
     exRow.append(b);
   }
 
   // A person's own requests go to the device log (pub.positron.studio/logs), never a check's.
   const ship = SELFCHECK ? () => {} : createShipper();
   const logAsk = (line) => ship(`connect ${line}`);
+  if (!SELFCHECK) { const say = d.log.bind(d); d.log = (m, lv) => { say(m, lv); if (lv === 'warn' || lv === 'bad') logAsk(`[page ${lv}] ${m}`); }; }
   let asking = Promise.resolve(), inFlight = false;
   /** A sentence asks the model; its answer replaces the patch, or nothing is built and the reason is said. */
-  async function ask(text, by = null) {
+  let via = 'typed';
+  async function ask(text, by = null, how = 'typed') {
     text = String(text || '').trim();
     if (!text) { d.log('say something first, for example one of the sentences under the box'); return; }
     if (inFlight) return;
     inFlight = true;
+    via = how;
     const busy = by || askBtn.el;
     busy.dataset.busy = '1';
     const run = (async () => {
@@ -396,7 +413,7 @@
       } catch (e) {
         d.log(e.message, 'warn');
         unbuild(`nothing answered: ${e.message}`);
-        logAsk(`asked "${text}" -> failed: ${e.message}`);
+        logAsk(`[${via}] asked "${text}" -> failed: ${e.message}`);
       } finally {
         inFlight = false;
         delete busy.dataset.busy;
@@ -409,6 +426,7 @@
   /** Every link on a fresh bay, in order, so two that clash are caught too. */
   function tryLinks(links) {
     const s2 = makeBay().bay, why = [];
+    ensureNamed(links, s2);
     for (const l of links) {
       const bad = checkTransforms(l.transforms || []);
       if (bad) { why.push(`${printLink(l)}: ${bad.why}`); continue; }
@@ -438,28 +456,29 @@
   function buildAsked(text, links, out) {
     if (!links.length) {
       unbuild('nothing here matches that');
-      logAsk(`asked "${text}" -> nothing proposed in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
+      logAsk(`[${via}] asked "${text}" -> nothing proposed in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
       return;
     }
+    ensureNamed(links);
     const full = withSpeakers(links);
     const away = full.filter((l) => [l.from, l.to].some((p) => p.startsWith(`${BOARD_SITE}:`)));
     if (away.length && !NAMES_PI.test(text)) {
       const msg = `not built: the answer reached for the Pi (${[...new Set(away.flatMap((l) => [l.from, l.to]).filter((p) => p.startsWith(`${BOARD_SITE}:`)).map(nodeOf))].join(', ')}), and the sentence did not ask for it`;
       unbuild(msg);
       d.log(msg, 'warn');
-      logAsk(`asked "${text}" -> NOT BUILT, Pi unasked in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`);
+      logAsk(`[${via}] asked "${text}" -> NOT BUILT, Pi unasked in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`);
       return;
     }
     const { why } = tryLinks(full);
     if (why.length) {
       unbuild(`could not be made: ${why.join('; ')}`);
       d.log(`could not be made: ${why.join('; ')}`, 'warn');
-      logAsk(`asked "${text}" -> NOT BUILT in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')} | ${why.join('; ')}`);
+      logAsk(`[${via}] asked "${text}" -> NOT BUILT in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')} | ${why.join('; ')}`);
       return;
     }
     const added = full.length - links.length;
     build({ say: text, links: full }, true);
-    logAsk(`asked "${text}" -> BUILT ${full.length} link(s)${added ? `, ${added} to the speakers added` : ''} in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`);
+    logAsk(`[${via}] asked "${text}" -> BUILT ${full.length} link(s)${added ? `, ${added} to the speakers added` : ''} in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`);
   }
 
   // ── linking, by press or by confirming a proposal ────────────────────────
@@ -870,11 +889,11 @@
       const out = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
       const text = (out.text || '').trim();
-      logAsk(`heard "${text}" in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
+      logAsk(`[voice] heard "${text}" in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
       delete askBtn.el.dataset.busy;
       if (!text) { d.log('nothing was heard, so nothing was asked'); return; }
       askField.set(text);
-      ask(text);
+      ask(text, null, 'voice');
     } catch (e) {
       delete askBtn.el.dataset.busy;
       d.log(`could not hear that: ${e.message}`, 'warn');
