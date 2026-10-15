@@ -32,6 +32,30 @@ void main(){
   vec3 fb = texture(uPrev, dd * 0.9 + 0.5).rgb;
   o = vec4(mix(c, fb, uFb), 1.0); }`;
 
+// The uniforms a program here may read, parsed out of MIRROR_FS so the list is typed once; build()
+// binds these and the writer's contract (glslContract) names them.
+export const UNIFORMS = [...MIRROR_FS.matchAll(/\buniform\s+(\w+)\s+(\w+)\s*;/g)].map((m) => ({ type: m[1], name: m[2] }));
+/** What each uniform carries, for a reader and for the model. A uniform without one fails the test. */
+export const UNIFORM_MEANING = {
+  uT: 'time, rising by 1/30 every frame, so about 1 or 2 per second',
+  uRes: 'the canvas size in pixels',
+  uPrev: 'the previous frame as a texture, for feedback: texture(uPrev, gl_FragCoord.xy / uRes)',
+  uSegments: 'a knob from 1 to 32, opening on 8, for any count the picture has (repeats, mirrors, rings)',
+};
+/** The program a body must be: GLSL ES 3.00 with no `#version` line, each end adds its own. */
+export function glslContract() {
+  return [
+    'Write a GLSL ES 3.00 fragment shader BODY. Do not write a #version line, it is added for you.',
+    'Start with: precision highp float;',
+    'Declare these uniforms exactly, and use uT so the picture moves:',
+    ...UNIFORMS.map((u) => `  uniform ${u.type} ${u.name};  // ${UNIFORM_MEANING[u.name] ?? ''}`),
+    'Declare the output exactly as: out vec4 o;',
+    'Write void main() and set o to an opaque colour (alpha 1.0). Use gl_FragCoord.xy / uRes for position.',
+    'No Shadertoy names (iTime, iResolution, mainImage, fragColor), no textures other than uPrev,',
+    'no loops longer than 64 steps, and keep it under 3000 characters.',
+  ].join('\n');
+}
+
   // GLSL for the code box, page local (a kit candidate). `params` marks the
   // knob's uniform, so its declaration and every use wear the knob's hue.
 export const GLSL = {
@@ -96,7 +120,7 @@ export function createMirrorShader({ w: W = 640, h: H = 360, log = () => {} } = 
     prog = p2; fsShader = fs;
     gl.useProgram(prog);
     U = {};
-    for (const u of ['uT', 'uRes', 'uPrev', 'uSegments']) U[u] = gl.getUniformLocation(prog, u);
+    for (const { name } of UNIFORMS) U[name] = gl.getUniformLocation(prog, name);
     if (U.uRes) gl.uniform2f(U.uRes, W, H);
     if (U.uPrev) gl.uniform1i(U.uPrev, 0);
     compiles++;
@@ -131,7 +155,8 @@ export function createMirrorShader({ w: W = 640, h: H = 360, log = () => {} } = 
   // The routing follows the links: no link out, the canvas is the page's
   // ground; no value yet, the shader has no N and draws nothing.
   let i = 0;
-  function render(segments, { out = true } = {}) {
+  // `t` sets uT for one frame (the writer's trial at times of its choosing); without it uT is the frame clock.
+  function render(segments, { out = true, t } = {}) {
     if (!gl) return;
     const ready = prog && out && segments != null;
     if (!ready) {
@@ -142,7 +167,7 @@ export function createMirrorShader({ w: W = 640, h: H = 360, log = () => {} } = 
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, B.f);
     gl.viewport(0, 0, W, H);
-    if (U.uT) gl.uniform1f(U.uT, i / 30);
+    if (U.uT) gl.uniform1f(U.uT, t ?? i / 30);
     i++;
     if (U.uSegments) gl.uniform1f(U.uSegments, segments);
     gl.activeTexture(gl.TEXTURE0);

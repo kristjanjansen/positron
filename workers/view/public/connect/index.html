@@ -45,7 +45,13 @@
   .cn-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
 
   .cn-say { display: flex; flex-direction: column; gap: 12px; }
-  .cn-ex { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); }
+  /* One line that scrolls sideways; the fade sits in the gutter, so at rest the first pill lines up with the column. */
+  .cn-ex { --fade: 16px; display: flex; flex-wrap: nowrap; gap: var(--ctl-gap); overflow-x: auto; scrollbar-width: none; min-width: 0;
+    margin-inline: calc(-1 * var(--fade)); padding: 2px var(--fade);
+    mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent); }
+  .cn-ex::-webkit-scrollbar { display: none; }
+  /* start new is not drawn while there is nothing to clear, so the row keeps no gap for it. */
+  .cn-ex > button.cn-pill[hidden] { display: none; }
   .cn-ex > button.cn-pill { flex: none; }
 
   /* What a person says, in --voice (shell.css). Round, lowercase and in
@@ -74,6 +80,8 @@
   .cn-pic.cn-pic-empty { display: grid; place-items: center; }
   .cn-pic.cn-pic-empty > :not(.cn-empty) { display: none; }
   .cn-pic:not(.cn-pic-empty) > .cn-empty { display: none; }
+  /* A refused request over a standing patch says why under the drawing; the patch stays. */
+  .cn-pic[data-why]:not(.cn-pic-empty) > .cn-empty { display: block; margin: 0 auto 12px; color: var(--dim); }
   .cn-empty { margin: 0; max-width: 46ch; padding: 0 16px; text-align: center; text-wrap: balance; overflow-wrap: anywhere; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
   .cn-ex > button.cn-pill[aria-pressed="true"] { border-color: var(--voice); }
   /* An example whose patch does not run yet is dimmed, never disabled: it still
@@ -140,6 +148,7 @@
   import { pageGraph } from '/shell/announce.mjs';
   import { createField } from '/shell/field.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { withParams, checkSettings } from '/shell/settings.mjs';
 
   // Every socket this page opens, counted from its first line, so "a visit opens
   // nothing" is an assert over a counter rather than a reading of the file.
@@ -169,7 +178,7 @@
     'volume-knob': 'knob-volume', 'mix-knob': 'knob-mix' };
   // A type whose catalogue label is a pattern (`<drum>, SuperCollider`) is
   // named for what it is; the instances are in the box's hover.
-  const LABELS = { knob: 'knob', drum: 'drum voice', recording: 'radio recording', station: 'live station', shout: 'radio relay' };
+  const LABELS = { synth: 'synth', knob: 'knob', drum: 'drum voice', recording: 'radio recording', station: 'live station', shout: 'radio relay' };
   // A value-in whose names the catalogue leaves to the page, as the pages give
   // them, so the knob box asks which one. The collide runtime's own list is
   // held to this by the self-check.
@@ -196,7 +205,8 @@
       // A port has no label in the catalogue, and a refusal reads it.
       // An instrument's midi-in carries its patch names, in its label too, so the model reads them.
       const named = (p) => (p === 'midi-in' && PATCH_NAMES[name] ? { patches: PATCH_NAMES[name] } : {});
-      const ports = Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: withPatches(`${label} ${p}`, named(p).patches),
+      // A value-in carries the settings its runtime takes (settings.mjs), so the model reads them too.
+      const ports = Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: p === 'value-in' ? withParams(`${label} ${p}`, name) : withPatches(`${label} ${p}`, named(p).patches),
         ...named(p), ...(p === 'value-in' && PARAM_NAMES[name] ? { shape: { of: 'param', names: PARAM_NAMES[name] } } : {}) }]));
       try {
         addNodes(b, site, [{ name, as, site, label }], { ports });
@@ -234,7 +244,8 @@
     while (on.node(`web:${type}-${k}`)) k++;
     const as = `${type}-${k}`;
     addNodes(on, 'web', [{ name: type, as, label }], { ports: Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`,
-      p === 'midi-in' && PATCH_NAMES[type] ? { label: withPatches(`${label} ${k} ${p}`, PATCH_NAMES[type]), patches: PATCH_NAMES[type] } : { label: `${label} ${k} ${p}` }])) });
+      p === 'midi-in' && PATCH_NAMES[type] ? { label: withPatches(`${label} ${k} ${p}`, PATCH_NAMES[type]), patches: PATCH_NAMES[type] }
+        : { label: p === 'value-in' ? withParams(`${label} ${k} ${p}`, type) : `${label} ${k} ${p}` }])) });
     if (on !== bay) return `web:${as}`;
     TYPE.set(`web:${as}`, type);
     PAGES.set(`web:${as}`, e.pages);
@@ -352,26 +363,65 @@
   const MAX_PORTS = 64;
   const EXAMPLE_PORTS = new Set(EXAMPLES.flatMap((e) => e.links.flatMap((l) => [l.from, l.to])));
   const EXAMPLE_NODES = new Set([...EXAMPLE_PORTS].map(nodeOf));
-  // The examples' ports, then the Pi's when the sentence names it, then this tab's; nothing else.
-  const rankOf = (p, text) => (EXAMPLE_PORTS.has(p.id) ? 0
-    : p.id.startsWith(`${BOARD_SITE}:`) ? (NAMES_PI.test(text) ? 1 : 9)
-      : EXAMPLE_NODES.has(nodeOf(p.id)) ? 2 : p.id.startsWith('web:') || p.id.startsWith('cf-r2:') ? 3 : 9);
+  // Only the parts a sentence is about reach the model: with 64 ports it answered nothing in 11 s
+  // where six ports gave the right patch in 5 s (2026-10-15). A part counts when a word of the
+  // sentence is in its id, label or patch names; then the essentials; the examples only when nothing is named.
+  const ASK_PORTS = 40;
+  // The main instruments always go, named or not: with only the named ones, 0 of 11 models got a drum-machine
+  // or granulate sentence right (research/stt-and-patch-models-2026-10-15.md).
+  const ESSENTIAL = new Set(['web:keys', 'web:midi', 'web:speaker', 'cf-r2:piano-samples', 'cf-r2:rhodes-samples',
+    'web:synth', 'web:sampler', 'web:plaits', 'web:sequencer', 'web:grains']);
+  const STOP = new Set(['the', 'a', 'an', 'and', 'on', 'of', 'to', 'my', 'with', 'in', 'at', 'play', 'plays', 'playing', 'left', 'right', 'hand', 'it', 'is', 'from', 'into', 'i']);
+  const wordsOf = (t) => (String(t).toLowerCase().match(/[a-z0-9]+/g) || []).filter((w) => !STOP.has(w));
+  const stem = (w) => w.replace(/s$/, '');
+  // What people call a type (nodes.mjs `also`): "drum machine" is the sequencer, "plates" is Plaits.
+  const alsoOf = (id) => CATALOGUE[typeOf(id) ?? id.split(':')[1]]?.also ?? [];
+  const says = (text, phrase) => new RegExp(`\\b${phrase.replace(/[^a-z0-9 ]/gi, '').replace(/ /g, '\\s+')}s?\\b`, 'i').test(text);
+  const named = (text) => {
+    const said = new Set(wordsOf(text).map(stem));
+    if (!said.size) return new Set();
+    return new Set(bay.nodes().map((n) => n.id).filter((id) => {
+      const ws = wordsOf(`${id.replace(/[-:]/g, ' ')} ${bay.node(id)?.label || ''} ${bay.ports().filter((p) => nodeOf(p.id) === id).map((p) => (p.patches || []).join(' ')).join(' ')}`);
+      return ws.some((w) => said.has(stem(w))) || alsoOf(id).some((a) => says(text, a));
+    }));
+  };
+  const rankOf = (p, text, hit) => {
+    const n = nodeOf(p.id);
+    if (p.id.startsWith(`${BOARD_SITE}:`) && !NAMES_PI.test(text) && !hit.has(n)) return 9;
+    return hit.has(n) ? 0 : ESSENTIAL.has(n) ? 1 : !hit.size && EXAMPLE_PORTS.has(p.id) ? 2 : 9;
+  };
   // A type with patches is offered a second instance's midi-in before it exists, so two patches at once
   // can be two instruments; ensureNamed makes it when an answer names it.
   const secondOf = (p) => {
     const m = /^web:([a-z]+):midi-in$/.exec(p.id);
     if (!m || !MULTI.includes(m[1]) || !PATCH_NAMES[m[1]] || bay.port(`web:${m[1]}-2:midi-in`)) return [];
-    return [{ id: `web:${m[1]}-2:midi-in`, dir: 'in', label: withPatches(`${LABELS[m[1]] ?? CATALOGUE[m[1]].label} 2 midi-in`, PATCH_NAMES[m[1]]) }];
+    return [{ id: `web:${m[1]}-2:midi-in`, dir: 'in', label: withPatches(`${LABELS[m[1]] ?? CATALOGUE[m[1]].label} 2 midi-in`, PATCH_NAMES[m[1]]),
+      ...(alsoOf(`web:${m[1]}`).length ? { also: alsoOf(`web:${m[1]}`) } : {}) }];
   };
-  const portsForModel = (text = '') => bay.ports()
-    .map((p, i) => ({ p, i, r: rankOf(p, text) })).filter((x) => x.r < 9)
+  // A follow-up keeps the nodes of the patch now (`keep`) in front of the model, or it cannot answer them again.
+  const portsForModel = (text = '', keep = []) => { const hit = new Set([...named(text), ...keep]); return bay.ports()
+    .map((p, i) => ({ p, i, r: rankOf(p, text, hit) })).filter((x) => x.r < 9)
     .sort((a, b) => a.r - b.r || a.i - b.i)
-    .flatMap(({ p }) => [{ id: p.id, dir: p.dir, label: p.label }, ...secondOf(p)]).slice(0, MAX_PORTS);
+    .flatMap(({ p }) => [{ id: p.id, dir: p.dir, label: p.label, ...(alsoOf(nodeOf(p.id)).length ? { also: alsoOf(nodeOf(p.id)) } : {}) }, ...secondOf(p)])
+    .slice(0, ASK_PORTS); };
   let reached = 0;
-  async function post(text) {
+  // The conversation: the last turns that built (each the sentence, the links it built and its settings),
+  // and the settings in force now, by node. A pill, the start new pill or "start over" empties both.
+  const TURNS_MAX = 4;
+  let turns = [], settingsNow = {};
+  let lastBody = null, posted = 0;
+  const ASK_MS = 60000;
+  async function post(text, extra = {}) {
     if (SELFCHECK) {
+      lastBody = { text, ...extra }; posted++;
+      const canned = (links, settings) => ({ links, ...(settings ? { settings } : {}), fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } });
+      if (text === 'make it darker') return canned(extra.current || [], { 'web:synth': { cutoff: 400 } });
+      if (text === 'make it very bright') return canned(extra.current || [], { 'web:synth': { cutoff: 40000 } });
+      if (text === 'more wobble') return canned(extra.current || [], { 'web:synth': { wobble: 2 } });
+      if (text === 'add plaits') return canned([{ from: KEYS, to: W('plaits', 'midi-in'), transforms: [] }]);
       const ex = EXAMPLES.find((e) => e.say === text);
       if (text === 'the keys play the piano') return { links: [{ from: KEYS, to: `${BOARD_SITE}:sampler:midi-in`, transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
+      if (text === 'keys play a sawtooth') return { links: [{ from: KEYS, to: W('synth', 'midi-in'), transforms: [{ op: 'patch', name: 'sawtooth' }] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       if (text === 'keys play the sampler, nothing else') return { links: [{ from: KEYS, to: W('sampler', 'midi-in'), transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       if (text === 'keys play the rhodes') return { links: [{ from: KEYS, to: W('sampler', 'midi-in'), transforms: [{ op: 'patch', name: 'Rhodes' }] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       if (text === 'keys play the harpsichord') return { links: [{ from: KEYS, to: W('sampler', 'midi-in'), transforms: [{ op: 'patch', name: 'Harpsichord' }] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
@@ -380,12 +430,14 @@
     }
     reached++;
     let r;
+    // A model that never answers would hold the ask field busy for ever (measured once, minutes): 60 s, then it says so.
+    const quit = new AbortController(), timer = setTimeout(() => quit.abort(), ASK_MS);
     try {
-      r = await fetch(`${API}/wish`, { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text, ports: portsForModel(text), facts: FACTS }) });
+      r = await fetch(`${API}/wish`, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: quit.signal,
+        body: JSON.stringify({ text, ports: portsForModel(text, extra.keep), facts: FACTS, ...(extra.current ? { history: extra.history, current: extra.current, currentSettings: extra.currentSettings } : {}) }) });
     } catch {
-      throw new Error(`nothing answered at ${API}`);
-    }
+      throw new Error(quit.signal.aborted ? `nothing answered in ${ASK_MS / 1000} s at ${API}` : `nothing answered at ${API}`);
+    } finally { clearTimeout(timer); }
     const out = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(`the agent said: ${out.error || `HTTP ${r.status}`}`);
     return out;
@@ -403,6 +455,12 @@
     return { nodes, missing: nodes.filter((n) => !PRESS_ONLY[n] && !loaderOf(n, typeOf)), press: nodes.filter((n) => PRESS_ONLY[n]) };
   }
   const exRow = el('div', 'cn-ex');
+  // The first pill starts a new patch: no conversation, nothing linked, nothing asked.
+  const startPill = el('button', 'cn-pill', 'start new', { type: 'button', title: 'forget the earlier sentences and clear the patch' });
+  startPill.addEventListener('click', () => { via = 'typed'; newPatch('pressed start new'); logAsk('[new] pressed start new, history cleared'); });
+  exRow.append(startPill);
+  /** Shown once there is a patch or a conversation to clear. */
+  const showStart = () => { startPill.hidden = !(bay.links().length || turns.length); };
   for (const ex of EXAMPLES) {
     const r = runsOf(ex);
     const lines = [`builds ${r.nodes.join(', ')}`];
@@ -412,7 +470,7 @@
     b.dataset.runs = r.press.length ? 'press' : r.missing.length ? 'marked' : 'runs';
     if (r.missing.length) b.dataset.missing = r.missing.join(' ');
     b.addEventListener('click', (e) => {
-      b.dataset.busy = '1'; build(ex, e.isTrusted);
+      b.dataset.busy = '1'; startFresh(); build(ex, e.isTrusted);
       logAsk(`[pill] built "${ex.say}": ${bay.links().length} of ${ex.links.length} link(s)`);
       runtime.idle().finally(() => delete b.dataset.busy);
     });
@@ -427,25 +485,40 @@
   let asking = Promise.resolve(), inFlight = false;
   /** A sentence asks the model; its answer replaces the patch, or nothing is built and the reason is said. */
   let via = 'typed';
+  // "start over" or "new patch" at the start of a sentence is matched here, never asked of the model.
+  const RESET = /^\s*(start over|start again|start fresh|new patch|clear (?:the )?patch)\b[\s,.:;!]*/i;
   async function ask(text, by = null, how = 'typed') {
     text = String(text || '').trim();
     if (!text) { d.log('say something first, for example one of the sentences under the box'); return; }
     if (inFlight) return;
+    const again = RESET.exec(text);
+    if (again) {
+      via = how;
+      newPatch(`said "${again[1]}"`);
+      logAsk(`[${via}] said "${text}" -> new patch, history cleared`);
+      text = text.slice(again[0].length).trim();
+      if (!text) return;
+    }
     inFlight = true;
     via = how;
     const busy = by || askBtn.el;
     busy.dataset.busy = '1';
+    // What stands now, hand-wired links too, and the turns before it: a follow-up when either is there.
+    const prev = bay.links().map((l) => ({ from: l.from, to: l.to, transforms: l.transforms || [] }));
+    const n = turns.length;
+    const tag = n ? `follow-up ${n}` : prev.length ? 'on a standing patch' : '';
+    const extra = prev.length || n ? { history: turns, current: prev, currentSettings: settingsNow, keep: [...linkedNodes()] } : {};
     const run = (async () => {
-      d.log(`asking: ${text}`);
+      d.log(`asking${tag ? ` (${tag})` : ''}: ${text}`);
       try {
-        const out = await post(text);
+        const out = await post(text, extra);
         for (const f of out.fixed || []) d.log(`the model wrote "${f.said}" on ${f.op}, read as ${f.read}`);
         d.log(`the answer came back in ${out.ms ?? '?'} ms with ${out.links?.length ?? 0} link(s), ${out.usage?.total_tokens ?? '?'} tokens`);
-        buildAsked(text, out.links || [], out);
+        await buildAsked(text, out.links || [], out, { prev, tag });
       } catch (e) {
         d.log(e.message, 'warn');
-        unbuild(`nothing answered: ${e.message}`);
-        logAsk(`[${via}] asked "${text}" -> failed: ${e.message}`);
+        refuse(`nothing answered: ${e.message}`);
+        logAsk(`[${via}]${tag ? ` ${tag}` : ''} asked "${text}" -> failed: ${e.message}`);
       } finally {
         inFlight = false;
         delete busy.dataset.busy;
@@ -494,34 +567,91 @@
     for (const l of [...bay.links()]) bay.unlink(l.id);
     for (const b of exRow.children) b.setAttribute('aria-pressed', 'false');
     empty.textContent = msg;
+    delete pic.dataset.why;
     redraw();
   }
-  function buildAsked(text, links, out) {
+  /** A request that failed or was refused builds nothing new: the patch and the conversation stand, and the reason is said over it. */
+  function refuse(msg) {
+    if (!bay.links().length) { unbuild(msg); return; }
+    empty.textContent = msg;
+    pic.dataset.why = '1';
+  }
+  /** An answer's settings checked against the nodes its patch links: `{ set, why }`, set by node. */
+  function settingsWhy(settings, links) {
+    const linked = new Set(links.flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]));
+    const set = {}, why = [];
+    for (const [node, asked] of Object.entries(settings || {})) {
+      if (!linked.has(node)) { why.push(`settings for ${node}, which the patch does not have`); continue; }
+      const r = checkSettings(typeOf(node), node, asked);
+      why.push(...r.why);
+      if (Object.keys(r.set).length) set[node] = r.set;
+    }
+    return { set, why };
+  }
+  /** Every setting in force, delivered on its node's value-in as a knob's value is: `{ of: 'param', name, v }`. */
+  async function applySettings() {
+    await runtime.idle();
+    for (const [node, set] of Object.entries(settingsNow)) {
+      const port = bay.port(`${node}:value-in`);
+      for (const [name, v] of Object.entries(set)) {
+        if (port?.deliver) { port.deliver({ of: 'param', name, v }); d.log(`set ${node} ${name} ${v}`); }
+        else d.log(`${node} does not run here, so its ${name} is not set`, 'warn');
+      }
+    }
+  }
+  const settingsText = (set) => Object.entries(set).map(([n, s]) => `${n} ${Object.entries(s).map(([k, v]) => `${k} ${v}`).join(', ')}`).join('; ');
+  async function buildAsked(text, links, out, { prev = [], tag = '' } = {}) {
+    const who = `[${via}]${tag ? ` ${tag}` : ''}`;
     if (!links.length) {
-      unbuild('nothing here matches that');
-      logAsk(`[${via}] asked "${text}" -> nothing proposed in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
+      refuse('nothing here matches that');
+      logAsk(`${who} asked "${text}" -> nothing proposed in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
       return;
     }
     ensureNamed(links);
     const full = withSpeakers(withSources(links));
-    const away = full.filter((l) => [l.from, l.to].some((p) => p.startsWith(`${BOARD_SITE}:`)));
+    // A Pi node the patch already had may stay without the sentence naming it again.
+    const piBefore = new Set(prev.flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]).filter((n) => n.startsWith(`${BOARD_SITE}:`)));
+    const away = full.flatMap((l) => [l.from, l.to]).filter((p) => p.startsWith(`${BOARD_SITE}:`) && !piBefore.has(nodeOf(p)));
     if (away.length && !NAMES_PI.test(text)) {
-      const msg = `not built: the answer reached for the Pi (${[...new Set(away.flatMap((l) => [l.from, l.to]).filter((p) => p.startsWith(`${BOARD_SITE}:`)).map(nodeOf))].join(', ')}), and the sentence did not ask for it`;
-      unbuild(msg);
+      const msg = `not built: the answer reached for the Pi (${[...new Set(away.map(nodeOf))].join(', ')}), and the sentence did not ask for it`;
+      refuse(msg);
       d.log(msg, 'warn');
-      logAsk(`[${via}] asked "${text}" -> NOT BUILT, Pi unasked in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`);
+      logAsk(`${who} asked "${text}" -> NOT BUILT, Pi unasked in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`);
       return;
     }
-    const { why } = tryLinks(full);
+    const { why: linkWhy } = tryLinks(full);
+    const st = settingsWhy(out.settings, full);
+    const why = [...linkWhy, ...st.why];
     if (why.length) {
-      unbuild(`could not be made: ${why.join('; ')}`);
+      refuse(`could not be made: ${why.join('; ')}`);
       d.log(`could not be made: ${why.join('; ')}`, 'warn');
-      logAsk(`[${via}] asked "${text}" -> NOT BUILT in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')} | ${why.join('; ')}`);
+      logAsk(`${who} asked "${text}" -> NOT BUILT in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`
+        + `${Object.keys(out.settings || {}).length ? ` settings ${JSON.stringify(out.settings)}` : ''} | ${why.join('; ')}`);
       return;
     }
+    // Measured here, so the log says how often a model loses what the sentence did not touch.
+    const said = named(text), now = new Set(full.map((l) => `${l.from}>${l.to}`));
+    const dropped = prev.filter((l) => !now.has(`${l.from}>${l.to}`) && ![nodeOf(l.from), nodeOf(l.to)].some((n) => said.has(n)));
     const added = full.length - links.length;
     build({ say: text, links: full }, true);
-    logAsk(`[${via}] asked "${text}" -> BUILT ${full.length} link(s)${added ? `, ${added} to the speakers added` : ''} in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`);
+    const linked = linkedNodes();
+    settingsNow = Object.fromEntries(Object.entries(settingsNow).filter(([n]) => linked.has(n)));
+    for (const [n, set] of Object.entries(st.set)) settingsNow[n] = { ...(settingsNow[n] || {}), ...set };
+    turns = [...turns, { said: text, links: full.map((l) => ({ from: l.from, to: l.to, transforms: l.transforms || [] })),
+      ...(Object.keys(st.set).length ? { settings: st.set } : {}) }].slice(-TURNS_MAX);
+    showStart();
+    await applySettings();
+    logAsk(`${who} asked "${text}" -> BUILT ${full.length} link(s)${added ? `, ${added} to the speakers added` : ''} in ${out.ms ?? '?'} ms by ${out.model ?? '?'}: ${full.map(printLink).join('; ')}`
+      + `${prev.length ? `; dropped ${dropped.length} of ${prev.length} earlier link(s) the sentence did not name${dropped.length ? ` (${dropped.map(printLink).join('; ')})` : ''}` : ''}`
+      + `${Object.keys(st.set).length ? `; settings ${settingsText(st.set)}` : ''}`);
+  }
+  /** Forget the conversation and the settings; the patch stays. */
+  function startFresh() { turns = []; settingsNow = {}; }
+  /** A new patch: no conversation and nothing linked. */
+  function newPatch(why) {
+    startFresh();
+    unbuild(EMPTY);
+    d.log(`a new patch (${why}): the next sentence starts from nothing`);
   }
 
   // ── linking, by press or by confirming a proposal ────────────────────────
@@ -547,6 +677,7 @@
   // model is asked. It replaces whatever was linked, because an example is a whole patch.
   function build(ex, person) {
     empty.textContent = EMPTY;
+    delete pic.dataset.why;
     for (const l of [...bay.links()]) bay.unlink(l.id);
     let made = 0;
     for (const l of ex.links) made += connect(l.from, l.to, l.transforms || [], person, l.param) ? 1 : 0;
@@ -861,6 +992,7 @@
   }
   function redraw() {
     showZones();
+    showStart();
     if (armed && !bay.port(armed)) armed = null;
     spares();
     pic.classList.toggle('cn-pic-empty', bay.links().length === 0);
@@ -937,10 +1069,12 @@
     micOn = false; micBtn.el.setAttribute('aria-pressed', 'false');
     if (rec && rec.state !== 'inactive') rec.stop(); else { micStream?.getTracks().forEach((t) => t.stop()); }
   }
-  // Names Whisper should hear as written ("Rhodes", not "roads"): sent as its initial prompt, which the
-  // worker caps and gives to turbo only. The site's own names first, so the cap cuts generic labels.
-  const vocabulary = () => [...new Set(['Plaits', 'Circuit', 'Rhodes', 'SuperCollider', ...Object.values(PATCH_NAMES).flat(),
-    ...bay.nodes().map((n) => n.label).filter((l) => typeof l === 'string' && !l.includes('<'))])];
+  // Names Whisper should hear as written ("Rhodes", not "roads"), sent as turbo's initial prompt: this demo's
+  // own words, the ones it misheard first. No node labels: about 80 of them gave "Gradulate" and "drone machine".
+  const HEAR_WORDS = ['granulate', 'drum machine', 'bass synth', 'sawtooth', 'Rhodes', 'Plaits', 'piano', 'synth',
+    'sampler', 'keyboard', 'grains', 'scope', 'speakers', 'split', 'octave', 'transpose', 'record', 'loop', 'Circuit', 'SuperCollider'];
+  const vocabulary = () => [...HEAR_WORDS, ...Object.values(PATCH_NAMES).flat()]
+    .filter((w, i, all) => all.findIndex((x) => x.toLowerCase() === w.toLowerCase()) === i);
   async function heard() {
     micStream?.getTracks().forEach((t) => t.stop()); micStream = null;
     const blob = new Blob(chunks, { type: rec?.mimeType || 'audio/webm' }); rec = null;
@@ -1000,6 +1134,9 @@
     const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
     const runtimes = async () => { await runtime.idle(); await frame(); };
 
+    A('NEGATIVE CONTROL: on a visit there is nothing to clear, so "start new" is not drawn and takes no room',
+      startPill.hidden && getComputedStyle(startPill).display === 'none' && startPill.getBoundingClientRect().width === 0
+        && exRow.querySelector('.cn-pill:not([hidden])')?.textContent === EXAMPLES[0].say, getComputedStyle(startPill).display);
     // Before anything is pressed: no runtime, no face, no sound device.
     A('a visit opens no sound device and shows no face', contexts() === 0 && runtime.list().length === 0
       && faces.hidden && getComputedStyle(faces).display === 'none', `contexts ${contexts()}, runtimes ${runtime.list().length}`);
@@ -1082,12 +1219,15 @@
         && inPicture('web:plaits') && !inGrid('web:plaits') && reached === reached0,
       `${bay.links().length} links`);
 
-    // A sentence nobody listed gets the stand-in with a broken transform: nothing is built, and the reason is said.
+    // A sentence nobody listed gets the stand-in with a broken transform: nothing new is built, the patch stands, and the reason is said over it.
+    const linkIds = () => bay.links().map((l) => l.id).join(' ');
+    const whyShown = () => pic.dataset.why === '1' && !pic.classList.contains('cn-pic-empty') && getComputedStyle(empty).display !== 'none';
+    const standing = linkIds(), turnsAt = turns.length;
     const askedBusy = ask('something else');
     const shimmered = askBtn.el.dataset.busy === '1';
     await askedBusy; await frame();
-    A('a request whose answer cannot be made builds nothing and says why where the patch goes, with the send button busy while asking',
-      shimmered && !askBtn.el.dataset.busy && bay.links().length === 0 && pic.classList.contains('cn-pic-empty')
+    A('a request whose answer cannot be made builds nothing new, keeps the standing patch and the conversation, and says why under the drawing, with the send button busy while asking',
+      shimmered && !askBtn.el.dataset.busy && !!standing && linkIds() === standing && turns.length === turnsAt && whyShown()
         && /could not be made/.test(empty.textContent) && /transpose/.test(empty.textContent), empty.textContent);
     // A request that names an instrument but not the speakers is still heard.
     await ask('keys play the synth, nothing else'); await frame();
@@ -1105,19 +1245,98 @@
       patchOf(rhodesLink?.transforms) === 'Rhodes' && rhodesRt?.chosen?.() === 'Rhodes' && rhodesRt.sampler.stat().files === 0
         && /patches: Piano, Rhodes/.test(portsForModel().find((p) => p.id === W('sampler', 'midi-in'))?.label || ''),
       `${bay.links().map(printLink).join('; ')}; runtime chose ${rhodesRt?.chosen?.()}`);
+    const rhodesIds = linkIds();
     await ask('keys play the harpsichord'); await frame();
-    A('NEGATIVE CONTROL: an answer naming a patch the sampler does not have builds nothing and says which it has',
-      bay.links().length === 0 && /no patch called "Harpsichord"/.test(empty.textContent), empty.textContent);
+    A('NEGATIVE CONTROL: an answer naming a patch the sampler does not have builds nothing, the Rhodes patch stands, and it says which it has',
+      linkIds() === rhodesIds && runtime.get('web:sampler')?.chosen?.() === 'Rhodes' && whyShown() && /no patch called "Harpsichord"/.test(empty.textContent), empty.textContent);
     // A split by note ranges shows on the keys: two named zones with a gap track between them.
     [...exRow.children].find((b) => b.textContent === 'bass synth on my left hand, plaits on my right').click();
     await runtimes(); await frame();
     const kz = runtime.get('web:keys')?.kb, zl = [...(kz?.keysEl.querySelectorAll('.kbd-zone') || [])].map((e) => e.textContent);
     A('a keyboard split shows its zones on the keys, named for what each plays, with a gap between them',
       zl.length === 2 && /sine|synth/i.test(zl[0]) && /plaits/i.test(zl[1]) && /14px/.test(kz.keysEl.style.gridTemplateColumns), zl.join(' | '));
-    // An answer that reaches for the Pi when the sentence did not ask for it builds nothing.
+    // A patch link naming a wave sets the synth's oscillator to that wave, by its name.
+    await ask('keys play a sawtooth'); await runtime.idle(); await frame();
+    A('a link choosing sawtooth sets the synth to the sawtooth wave', runtime.get('web:synth')?.param('wave') === 'sawtooth',
+      `wave ${runtime.get('web:synth')?.param('wave')}`);
+    // An answer that reaches for the Pi when the sentence did not ask for it builds nothing; on an empty patch nothing at all.
+    newPatch('the check');
     await ask('the keys play the piano'); await frame();
-    A('an answer that reaches for the Pi unasked builds nothing and says so',
-      bay.links().length === 0 && /did not ask for it/.test(empty.textContent) && /pi-1:sampler/.test(empty.textContent), empty.textContent);
+    A('NEGATIVE CONTROL: a refused first request on an empty patch builds nothing, and says why where the patch goes',
+      bay.links().length === 0 && pic.classList.contains('cn-pic-empty') && !pic.dataset.why && turns.length === 0
+        && /did not ask for it/.test(empty.textContent) && /pi-1:sampler/.test(empty.textContent), empty.textContent);
+    // ── what a sentence finds, and what speech is told to hear ──
+    const drumPorts = portsForModel('the drum machine plays the piano');
+    const seqPort = drumPorts.find((p) => p.id === W('sequencer', 'midi-out'));
+    A('a drum-machine sentence offers the sequencer, named as the drum machine, and finds it by that name',
+      !!seqPort && seqPort.also?.includes('drum machine') && named('the drum machine plays the piano').has('web:sequencer'), JSON.stringify(seqPort));
+    A('"granulate" finds the grain ring, "plates" finds Plaits, and "synth" carries its other names',
+      named('granulate the piano').has('web:grains') && named('the drum machine plays plates').has('web:plaits')
+        && portsForModel('synth bass').find((p) => p.id === W('synth', 'midi-in'))?.also?.includes('synthesizer'));
+    const anyIds = new Set(portsForModel('play the circuit in the studio').map((p) => nodeOf(p.id)));
+    A('the main instruments are offered whatever the sentence names, and NEGATIVE CONTROL: a part nobody named stays out',
+      ['web:synth', 'web:sampler', 'web:plaits', 'web:sequencer', 'web:grains'].every((n) => anyIds.has(n)) && !anyIds.has('web:typewriter')
+        && !named('play the circuit in the studio').has('web:grains'), [...anyIds].join(' '));
+    const words = vocabulary(), joined = words.join(', ');
+    A('speech is told this demo\'s words, granulate, drum machine, bass synth, sawtooth, Rhodes, Plaits first, under 400 characters, and no node labels',
+      words.slice(0, 6).join() === 'granulate,drum machine,bass synth,sawtooth,Rhodes,Plaits' && joined.length <= 400
+        && !words.some((w) => ['admin', 'machine', 'chat', 'grain ring', 'notice', 'pick'].includes(w)), `${joined.length} chars: ${joined}`);
+    // ── follow-ups and settings, on canned answers ──
+    startPill.click();
+    await ask('keys play the synth, nothing else'); await runtimes();
+    const fresh = { body: lastBody, turns: turns.length };
+    await ask('make it darker'); await runtimes();
+    const fu = lastBody, synthRt = runtime.get('web:synth');
+    A('a first sentence sends no history; its follow-up sends that sentence, its links and the patch now, keeps every link, and the setting cutoff 400 reaches the synth',
+      !fresh.body.history && !fresh.body.current && fresh.turns === 1 && fu.history?.length === 1 && fu.history[0].said === 'keys play the synth, nothing else'
+        && fu.history[0].links.length === 2 && fu.current?.length === 2 && bay.links().length === 2 && has(KEYS, W('synth', 'midi-in')) && has(W('synth', 'audio-out'), SPK)
+        && synthRt?.param('cutoff') === 400 && turns.length === 2 && /value-in \(params: cutoff 80\.\.8000/.test(portsForModel('synth').find((p) => p.id === W('synth', 'value-in'))?.label || ''),
+      `cutoff ${synthRt?.param('cutoff')}, turns ${turns.length}, ${bay.links().map(printLink).join('; ')}`);
+    A('the follow-up is logged as follow-up 1, with the links it dropped that the sentence did not name (0) and its settings',
+      /^\[typed\] follow-up 1 asked "make it darker" -> BUILT/.test(lastLine) && /dropped 0 of 2 earlier link/.test(lastLine) && /settings web:synth cutoff 400/.test(lastLine), lastLine);
+    await ask('add plaits'); await runtimes();
+    A('an answer that loses links the sentence did not name is counted: "add plaits" dropping the synth logs dropped 2 of 2, and the synth\'s setting goes with it',
+      /follow-up 2 asked "add plaits"/.test(lastLine) && /dropped 2 of 2 earlier link/.test(lastLine) && has(KEYS, W('plaits', 'midi-in'))
+        && !has(KEYS, W('synth', 'midi-in')) && !settingsNow['web:synth'], lastLine);
+    await ask('keys play the synth, nothing else'); await runtimes();
+    const turnsBefore = turns.length;
+    const synthIds = linkIds();
+    await ask('make it very bright'); await frame();
+    A('NEGATIVE CONTROL: a setting out of its range sets nothing, the patch and the conversation stand, and it says why',
+      linkIds() === synthIds && whyShown() && /web:synth cutoff runs 80\.\.8000, and the answer asked 40000/.test(empty.textContent)
+        && turns.length === turnsBefore && runtime.get('web:synth')?.param?.('cutoff') !== 40000, empty.textContent);
+    await ask('keys play the synth, nothing else'); await runtimes();
+    const wobbleIds = linkIds();
+    await ask('more wobble'); await frame();
+    A('NEGATIVE CONTROL: a setting the synth does not have sets nothing, the patch stands, and it names the ones it has',
+      linkIds() === wobbleIds && whyShown() && /no setting called "wobble"; it has cutoff, q, attack, release/.test(empty.textContent), empty.textContent);
+    await ask('keys play the synth, nothing else'); await runtimes();
+    const had = turns.length;
+    [...exRow.children].find((b) => b.textContent === EXAMPLES[0].say).click();
+    await runtimes();
+    const afterPill = turns.length;
+    await ask('something else'); await frame();
+    A('a pill starts fresh: no turns after it, and the next sentence sends the pill\'s patch as the patch now and no history',
+      had > 0 && afterPill === 0 && Array.isArray(lastBody.history) && lastBody.history.length === 0 && lastBody.current?.length === EXAMPLES[0].links.length,
+      `turns ${had} then ${afterPill}, sent history ${lastBody.history?.length}, current ${lastBody.current?.length}`);
+    await ask('keys play the synth, nothing else'); await runtimes();
+    const p0 = posted, t0 = turns.length;
+    await ask('start over'); await frame();
+    const overNow = { posted: posted - p0, turns: turns.length, links: bay.links().length, line: lastLine };
+    await ask('Start over, keys play the synth, nothing else'); await runtimes();
+    A('"start over" is matched on the page: it asks nothing, forgets the turns and clears the patch; with more after it, the rest is asked fresh',
+      t0 > 0 && overNow.posted === 0 && overNow.turns === 0 && overNow.links === 0 && /-> new patch, history cleared/.test(overNow.line)
+        && lastBody.text === 'keys play the synth, nothing else' && !lastBody.history && turns.length === 1 && bay.links().length === 2,
+      JSON.stringify(overNow));
+    const posted1 = posted, shownWith = getComputedStyle(startPill).display !== 'none' && !startPill.hidden;
+    startPill.click(); await frame();
+    const rects = [...exRow.children].filter((b) => !b.hidden).map((b) => b.getBoundingClientRect());
+    A('the first pill, "start new", is shown while a patch stands; pressed, it forgets the turns, clears the patch, asks nothing and hides again; the pills sit on one line that scrolls inside the column',
+      exRow.firstElementChild === startPill && shownWith && startPill.hidden && getComputedStyle(startPill).display === 'none'
+        && turns.length === 0 && bay.links().length === 0 && posted === posted1
+        && /\[new\] pressed start new/.test(lastLine) && rects.every((r) => Math.abs(r.top - rects[0].top) < 1)
+        && exRow.scrollWidth > exRow.clientWidth && document.documentElement.scrollWidth <= innerWidth,
+      `${rects.length} pills, tops ${[...new Set(rects.map((r) => Math.round(r.top)))].join(' ')}, row ${exRow.scrollWidth} in ${exRow.clientWidth}, page ${document.documentElement.scrollWidth} in ${innerWidth}`);
     // The microphone: Caps Lock toggles it, the sustain pedal holds it, and a check opens none.
     const mic = () => micBtn.el.getAttribute('aria-pressed') === 'true', gum0 = CAMERA_ASKED.length;
     const keyEv = (type, k) => dispatchEvent(new KeyboardEvent(type, { key: k }));
@@ -1604,7 +1823,7 @@
     let ran = 0;
     const skipped = [];
     for (const [i, ex] of EXAMPLES.entries()) {
-      const pill = exRow.children[i];
+      const pill = exRow.children[i + 1];   // after the start new pill
       const r = runsOf(ex), want = EXPECT[ex.say] ?? 'runs';
       if (want === 'press' || r.press.length) {
         A(`"${ex.say}" is marked as a person's press only`, want === 'press' && pill.dataset.runs === 'press' && /person's press only/.test(pill.title), pill.title);

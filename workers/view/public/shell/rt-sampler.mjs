@@ -42,6 +42,9 @@ export function make({ upstream, log, wake, reroute }) {
     audio: { out: () => sampler.out() },
     heard: () => notes,
     stop: () => sampler.panic(),
-    close() { sampler.panic(); try { sampler.out()?.disconnect(); } catch { /* not connected */ } },
+    // Frees the engine and its buffers; disconnecting alone kept them, and a load still on its way
+    // into a worklet nothing pulls waited out SuperSonic's 30 s allocation timeout.
+    // why: lessons/page-code.md#sc-sampler-pool
+    close() { sampler.close(); },
   };
 }

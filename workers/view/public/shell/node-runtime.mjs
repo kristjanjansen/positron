@@ -33,6 +33,7 @@ export const RUNTIMES = {
   screen: () => import('./rt-screen.mjs'),
   'shader-dither': () => import('./rt-shader-dither.mjs'),
   shader: () => import('./rt-shader.mjs'),
+  writer: () => import('./rt-writer.mjs'),
   player: () => import('./rt-player.mjs'),
   grains: () => import('./rt-grains.mjs'),
   rec: () => import('./rt-rec.mjs'),
@@ -64,7 +65,7 @@ export const NOT_YET = {
 
 // The types whose runtime shows a face, so a check can require one rather than
 // accept a runtime that quietly drew nothing. A Pi node has one too (SITES).
-export const FACED = ['keys', 'knob', 'scope', 'plaits', 'midi', 'sequencer', 'patch', 'typing', 'pico', 'oled', 'collide', 'camera', 'screen', 'shader', 'player', 'rec'];
+export const FACED = ['keys', 'knob', 'scope', 'plaits', 'midi', 'sequencer', 'patch', 'typing', 'pico', 'oled', 'collide', 'camera', 'screen', 'shader', 'player', 'rec', 'grains'];
 
 // A node on another site runs here as that site's face (presence and Join),
 // keyed by site since its node is not a catalogue type.

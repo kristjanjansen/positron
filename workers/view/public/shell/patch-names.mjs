@@ -3,11 +3,14 @@
 
 import { SAMPLER_SET } from '/code/sampler.mjs';
 import { PATCHES } from './plaits-params.mjs';
+import { WAVES } from './synth-params.mjs';
 
 /** Catalogue type to patch names. The Pi's sampler plays the same programs (rig/board/scsampler.mjs SETS 0 and 1). */
 export const PATCH_NAMES = {
   sampler: SAMPLER_SET.map((i) => i.name),
   plaits: PATCHES.map((p) => p.name),
+  // The synth's patches are its waves, so "sawtooth" is said and chosen like a sampler's Rhodes.
+  synth: WAVES,
 };
 
 /** The program number a sampler patch name is, or null. */
