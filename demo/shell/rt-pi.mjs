@@ -45,7 +45,7 @@ export function make({ id, log, wake, reroute }) {
   if (!kind) buttons.enable('join', false, 'nothing here plays this Pi node yet');
   const row = document.createElement('div');
   row.className = 'cn-pi-row';
-  row.append(badge, buttons.el);
+  row.append(buttons.el, badge);
   const face = document.createElement('div');
   face.className = 'cn-panel';
   face.append(row, say);

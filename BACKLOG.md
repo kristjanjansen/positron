@@ -1,5 +1,17 @@
 ## Open
 
+- ~~**/connect/: a focused pill shows one lighter edge, not a second ring**~~ (2026-10-15, DONE). Asked: *"fix focus. no doubles, just lighter outline"*.
+
+- ~~**/connect/: on a Pi node, play and stop before the status**~~ (2026-10-15, DONE, rt-pi.mjs). Asked: *"switch order"*.
+
+- ~~**/connect/: remove the Pico example**~~ (2026-10-15, DONE). Asked: *"rm pico example"*. The self-check still grades the Pico runtime through its page fixture.
+
+- ~~**/connect/: one button, the microphone that turns into send once there is text**~~ (2026-10-15, DONE). Asked: *"make mic and send icon same. it turns into send when i input texxt"*.
+
+- **/connect/: "Play roads with a keyboard" built keys to web:sampler and was silent** (2026-10-15; the empty file-in part DONE, verify 102/102). Asked: *"Play roads with a keyboard - i get no soiund"*. Cause: nothing linked into the sampler's file-in. Fix: a request's patch gets each empty file-in fed from that type's usual samples. Still open: Whisper hears Rhodes as "roads" (3 of 3), and choosing Rhodes waits on the patch transform.
+
+- **/connect/: letting go of the talk key sends** (2026-10-15). Asked: *"letting hotkey off should submit. lets redo"*. Caps Lock down starts and up stops (a hold on Windows and Linux; on macOS Chrome fires down when it turns on and up when it turns off, so there it is press, press); Option (Alt) held alone talks and its release sends.
+
 - **/connect/ test session: voice, typed and pills, told apart, logged and watched** (2026-10-15). Asked: *"i will do voide, keyb and pills testign. distiguis, log and monitor my test. say when ready"*. Log lines tagged [voice], [typed], [pill]; the page's warnings as [page warn]; the session tails pub.positron.studio/logs.
 
 - **A patch transform: instruments list their patch names, a link chooses one** (2026-10-15). Asked: *"you should know patch names not special case rhodes"*. Proposed in chat (catalogue patch lists, labels to the model, `{ op: 'patch', name }`, wish worker redeploy); waiting on the owner's go. In the tree already: rhodes-samples has a store runtime, a second web:sampler is allowed, named instances are made before an answer is checked.

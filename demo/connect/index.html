@@ -44,16 +44,17 @@
     padding: 0 var(--pad-seg); color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
     background: transparent; }
   .cn-ex > button.cn-pill:hover { border-color: var(--voice); background: transparent; }
+  /* Focus colours the pill's own edge, lighter; no second ring outside it. */
+  .cn-ex > button.cn-pill:focus-visible { outline: none; border-color: color-mix(in oklab, var(--voice) 60%, #fff); }
   /* The ask field in the pills' voice: a sentence a person says. */
   /* The send button sits inside the field one inset from its edge, radii concentric, as chat-ui's compose. */
   .cn-ask { --send-in: 4px; position: relative; }
   .cn-ask > .pos-field { display: block; margin: 0; }
   .cn-ask .pos-field input { width: 100%; box-sizing: border-box; font-family: var(--sans); color: var(--voice);
-    min-height: calc(var(--ctl-sm) + 2 * var(--send-in)); padding-right: calc(2 * var(--ctl-sm) + 4 * var(--send-in));
+    min-height: calc(var(--ctl-sm) + 2 * var(--send-in)); padding-right: calc(var(--ctl-sm) + 3 * var(--send-in));
     border-radius: calc(var(--r) + var(--send-in)); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
   .cn-ask .pos-field input:focus { border-color: var(--voice); }
-  .cn-ask > button.cn-mic { right: calc(var(--ctl-sm) + 2 * var(--send-in)); }
-  .cn-ask > button.cn-mic[aria-pressed="true"] { color: var(--bg); background: var(--voice); border-color: var(--voice); }
+  .cn-ask > button[aria-pressed="true"] { color: var(--bg); background: var(--voice); border-color: var(--voice); }
   .cn-ask > button { position: absolute; bottom: var(--send-in); border-radius: var(--r); right: var(--send-in);
     color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
 
@@ -259,7 +260,6 @@
   const EXAMPLES = [
     ['the drum machine plays plaits', [[W('sequencer', 'midi-out'), W('plaits', 'midi-in')], [W('plaits', 'audio-out'), SPK]]],
     ['granulate plaits as i play', [[KEYS, W('plaits', 'midi-in')], [W('plaits', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
-    ['one keyboard plays the synth and lights the pico', [[KEYS, W('synth', 'midi-in')], [W('synth', 'audio-out'), SPK], [KEYS, W('pico', 'midi-in')], [W('pico', 'video-out'), W('oled', 'video-in')]]],
     ['granulate the piano as i play it', [[KEYS, W('sampler', 'midi-in')], ['cf-r2:piano-samples:file-out', W('sampler', 'file-in')], [W('sampler', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
     ['the drum machine plays the circuit', [[W('sequencer', 'midi-out'), `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, SPK]]],
     ['the drum machine plays the pi piano', [[W('sequencer', 'midi-out'), `${PIANO}:midi-in`], [`${PIANO}:audio-out`, SPK]]],
@@ -344,6 +344,7 @@
     if (SELFCHECK) {
       const ex = EXAMPLES.find((e) => e.say === text);
       if (text === 'the keys play the piano') return { links: [{ from: KEYS, to: `${BOARD_SITE}:sampler:midi-in`, transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
+      if (text === 'keys play the sampler, nothing else') return { links: [{ from: KEYS, to: W('sampler', 'midi-in'), transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       if (text === 'keys play the synth, nothing else') return { links: [{ from: KEYS, to: W('synth', 'midi-in'), transforms: [] }], fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
       return { links: ex ? ex.links : CANNED, fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
     }
@@ -447,6 +448,17 @@
     }
     return [...links, ...add];
   }
+  /** An instrument with nothing on its file-in is silent, so a request's patch feeds it its usual samples. */
+  const USUAL_FILES = { sampler: 'cf-r2:piano-samples:file-out', typewriter: 'cf-r2:typewriter-samples:file-out', player: 'cf-r2:recording:file-out' };
+  function withSources(links) {
+    const fed = new Set(links.map((l) => l.to));
+    const add = [];
+    for (const n of new Set(links.flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]))) {
+      const src = USUAL_FILES[typeOf(n)], to = `${n}:file-in`;
+      if (src && bay.port(to) && !fed.has(to)) add.push({ from: src, to, transforms: [] });
+    }
+    return [...links, ...add];
+  }
   function unbuild(msg) {
     for (const l of [...bay.links()]) bay.unlink(l.id);
     for (const b of exRow.children) b.setAttribute('aria-pressed', 'false');
@@ -460,7 +472,7 @@
       return;
     }
     ensureNamed(links);
-    const full = withSpeakers(links);
+    const full = withSpeakers(withSources(links));
     const away = full.filter((l) => [l.from, l.to].some((p) => p.startsWith(`${BOARD_SITE}:`)));
     if (away.length && !NAMES_PI.test(text)) {
       const msg = `not built: the answer reached for the Pi (${[...new Set(away.flatMap((l) => [l.from, l.to]).filter((p) => p.startsWith(`${BOARD_SITE}:`)).map(nodeOf))].join(', ')}), and the sentence did not ask for it`;
@@ -850,15 +862,20 @@
   // Your own sentence, asked of the model like an example pill's.
   const askRow = el('form', 'cn-ask');
   const askField = createField({ placeholder: 'say which part should play which' });
-  const askBtn = createIconButton({ icon: 'arrow-up', label: 'Ask', small: true, onPress: () => askRow.requestSubmit() });
+  // One button: the microphone while the field is empty, send once there is text.
+  const MIC_LABEL = 'Speak: hold Option or Caps Lock, or the sustain pedal, and let go to send';
+  const askBtn = createIconButton({ icon: 'mic', label: MIC_LABEL, small: true, pressed: false,
+    onPress: () => (askField.value().trim() ? askRow.requestSubmit() : micOn ? stopMic() : startMic()) });
+  const showBtn = () => { const typed = !!askField.value().trim(); askBtn.set(typed ? 'arrow-up' : 'mic', typed ? 'Ask' : MIC_LABEL); };
+  askField.input.addEventListener('input', showBtn);
   askBtn.el.type = 'submit';
-  const micBtn = createIconButton({ icon: 'mic', label: 'Speak (Caps Lock, or hold the sustain pedal)', small: true, pressed: false, onPress: () => (micOn ? stopMic() : startMic()) });
-  micBtn.el.classList.add('cn-mic');
-  askRow.append(askField.el, micBtn.el, askBtn.el);
+  const micBtn = askBtn;
+  askRow.append(askField.el, askBtn.el);
   // Spoken requests: recorded here, heard by the wish worker's /hear (Whisper), then asked as typed.
-  let micOn = false, rec = null, micStream = null, chunks = [];
+  let micOn = false, rec = null, micStream = null, chunks = [], cancelMic = false, recAt = 0, pressAt = 0, stopAt = 0;
   async function startMic() {
     if (micOn || inFlight) return;
+    pressAt = performance.now();
     micOn = true; micBtn.el.setAttribute('aria-pressed', 'true');
     if (SELFCHECK) return;
     try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
@@ -869,16 +886,19 @@
     rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     rec.onstop = heard;
     rec.start();
+    recAt = performance.now(); pressAt = pressAt || recAt;
     d.log('listening to the microphone');
   }
   function stopMic() {
     if (!micOn) return;
+    stopAt = performance.now();
     micOn = false; micBtn.el.setAttribute('aria-pressed', 'false');
     if (rec && rec.state !== 'inactive') rec.stop(); else { micStream?.getTracks().forEach((t) => t.stop()); }
   }
   async function heard() {
     micStream?.getTracks().forEach((t) => t.stop()); micStream = null;
     const blob = new Blob(chunks, { type: rec?.mimeType || 'audio/webm' }); rec = null;
+    if (cancelMic) { cancelMic = false; d.log('the talk key was part of a shortcut, so nothing was sent'); return; }
     if (!blob.size) return;
     askBtn.el.dataset.busy = '1';
     try {
@@ -889,18 +909,29 @@
       const out = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
       const text = (out.text || '').trim();
-      logAsk(`[voice] heard "${text}" in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
+      logAsk(`[voice] heard "${text}" from ${(blob.size / 1024).toFixed(1)} KB, mic opened ${Math.round(recAt - pressAt)} ms after the press, recorded ${Math.round(stopAt - recAt)} ms, in ${out.ms ?? '?'} ms by ${out.model ?? '?'}`);
       delete askBtn.el.dataset.busy;
       if (!text) { d.log('nothing was heard, so nothing was asked'); return; }
-      askField.set(text);
+      askField.set(text); showBtn();
       ask(text, null, 'voice');
     } catch (e) {
       delete askBtn.el.dataset.busy;
       d.log(`could not hear that: ${e.message}`, 'warn');
     }
   }
-  // Caps Lock toggles, as Claude's desktop app does; pressed twice it leaves Caps Lock as it was.
-  addEventListener('keydown', (e) => { if (e.key === 'CapsLock' && !e.repeat) (micOn ? stopMic() : startMic()); });
+  // Hold to talk, let go to send. Caps Lock (macOS Chrome fires its down on turning on and its up
+  // on turning off, so there it is press to talk, press to send) or Option/Alt held on its own.
+  let altAlone = false;
+  addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    if (e.key === 'CapsLock') { startMic(); return; }
+    if (e.key === 'Alt') { altAlone = true; startMic(); return; }
+    if (altAlone) { altAlone = false; if (micOn) { cancelMic = true; stopMic(); } }   // Alt with another key is a shortcut, not a talk
+  });
+  addEventListener('keyup', (e) => {
+    if (e.key === 'CapsLock') stopMic();
+    if (e.key === 'Alt' && altAlone) { altAlone = false; stopMic(); }
+  });
   // A plugged keyboard's sustain pedal holds to talk (rt-midi.mjs announces it once MIDI is on).
   addEventListener('pos-sustain', (e) => (e.detail?.down ? startMic() : stopMic()));
   askRow.addEventListener('submit', (e) => { e.preventDefault(); const t = askField.value().trim(); if (t) ask(t); });
@@ -1016,18 +1047,26 @@
     await ask('keys play the synth, nothing else'); await frame();
     A('a request that leaves a sound going nowhere gets that sound wired to the speakers',
       bay.links().length === 2 && has(KEYS, W('synth', 'midi-in')) && has(W('synth', 'audio-out'), SPK), bay.links().map(printLink).join('; '));
+    // A sampler with nothing on its file-in gets its usual samples, and its sound the speakers.
+    await ask('keys play the sampler, nothing else'); await frame();
+    A('a request that leaves a sampler without samples gets the piano samples on its file-in and its sound at the speakers',
+      bay.links().length === 3 && has(KEYS, W('sampler', 'midi-in')) && has('cf-r2:piano-samples:file-out', W('sampler', 'file-in'))
+        && has(W('sampler', 'audio-out'), SPK), bay.links().map(printLink).join('; '));
     // An answer that reaches for the Pi when the sentence did not ask for it builds nothing.
     await ask('the keys play the piano'); await frame();
     A('an answer that reaches for the Pi unasked builds nothing and says so',
       bay.links().length === 0 && /did not ask for it/.test(empty.textContent) && /pi-1:sampler/.test(empty.textContent), empty.textContent);
     // The microphone: Caps Lock toggles it, the sustain pedal holds it, and a check opens none.
     const mic = () => micBtn.el.getAttribute('aria-pressed') === 'true', gum0 = CAMERA_ASKED.length;
-    const caps = () => dispatchEvent(new KeyboardEvent('keydown', { key: 'CapsLock' }));
-    caps(); const on1 = mic(); caps(); const off1 = !mic();
+    const keyEv = (type, k) => dispatchEvent(new KeyboardEvent(type, { key: k }));
+    keyEv('keydown', 'CapsLock'); const on1 = mic(); keyEv('keyup', 'CapsLock'); const off1 = !mic();
+    keyEv('keydown', 'Alt'); const onAlt = mic(); keyEv('keyup', 'Alt'); const offAlt = !mic();
+    keyEv('keydown', 'Alt'); keyEv('keydown', 'k'); const altCombo = !mic(); keyEv('keyup', 'k'); keyEv('keyup', 'Alt');
     dispatchEvent(new CustomEvent('pos-sustain', { detail: { down: true } })); const on2 = mic();
     dispatchEvent(new CustomEvent('pos-sustain', { detail: { down: false } })); const off2 = !mic();
-    A('Caps Lock toggles the microphone, the sustain pedal holds it, and a check opens no microphone',
-      on1 && off1 && on2 && off2 && CAMERA_ASKED.length === gum0, `${on1} ${off1} ${on2} ${off2}, getUserMedia ${CAMERA_ASKED.length - gum0}`);
+    A('Caps Lock and Option talk while down and stop on up, Option with another key is no talk, the sustain pedal holds, and a check opens no microphone',
+      on1 && off1 && onAlt && offAlt && altCombo && on2 && off2 && CAMERA_ASKED.length === gum0,
+      `${on1} ${off1} ${onAlt} ${offAlt} ${altCombo} ${on2} ${off2}, getUserMedia ${CAMERA_ASKED.length - gum0}`);
     [...exRow.children].find((b) => b.textContent === ex.say).click();
 
     // Pressing a wire removes that link.
