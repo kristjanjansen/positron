@@ -57,9 +57,9 @@
   .cn-ask > button { position: absolute; bottom: var(--send-in); border-radius: var(--r); right: var(--send-in);
     color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2)); }
 
-  /* The picture's room is a square held from the first frame, so linking moves
-     nothing above or below it; a patch taller than the square grows it. */
-  .cn-pic { aspect-ratio: 1; }
+  /* The picture's room is held from the first frame, 4/5 as tall as wide, so linking moves
+     nothing above or below it; a taller patch grows it. */
+  .cn-pic { aspect-ratio: 5 / 4; }
   .cn-pic.cn-pic-empty { display: grid; place-items: center; }
   .cn-pic.cn-pic-empty > :not(.cn-empty) { display: none; }
   .cn-pic:not(.cn-pic-empty) > .cn-empty { display: none; }
@@ -926,7 +926,7 @@
     A('a type made per instance is one box, not one per knob', !bay.nodes().some((n) => /:knob-(?!volume$|mix$)|:midi-\d|:scope-|:screen-/.test(n.id)),
       bay.nodes().filter((n) => /:knob-|:midi-\d|:scope-|:screen-/.test(n.id)).map((n) => n.id).join(', '));
     { const r = pic.getBoundingClientRect();
-      A('nothing is linked on a visit, and the picture\'s square room is held empty', bay.links().length === 0 && pic.classList.contains('cn-pic-empty') && r.height >= r.width - 1, `${r.width.toFixed(0)} x ${r.height.toFixed(0)}`); }
+      A('nothing is linked on a visit, and the picture\'s room is held empty, 4/5 as tall as wide', bay.links().length === 0 && pic.classList.contains('cn-pic-empty') && Math.abs(r.height - 0.8 * r.width) <= 1, `${r.width.toFixed(0)} x ${r.height.toFixed(0)}`); }
 
     // Every example's links can be made, each on a fresh bay so one cannot
     // block another, and with the consent a person's press of Connect gives.

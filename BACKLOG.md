@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**/connect/: the patch room 20 % less tall**~~ (2026-10-15, DONE: aspect-ratio 5 / 4). Asked: *"reduce h by 20% -- say what should play what, press an example, or an out port and then an in port --"*.
+
 - **/connect/: a request went to the Pi unasked** (2026-10-15). Asked: *"why we go pi when i did not asked"*, on "keuboard plays rhodes on bottom and piano on top", which the model built as keys to pi-1:sampler and pi-1:drums. Fix: the facts tell the model to stay in this tab, and a request that does not name the Pi, the studio, the Circuit or remote builds nothing that reaches pi-1. Not yet: a Rhodes in this tab (two web:samplers, rhodes-samples offered to the model).
 
 - ~~**/connect/: the example pills in one row that scrolls sideways, edges faded**~~ (2026-10-15, DONE). Asked: *"make suggestions pills one row and overflow-x scrollable. add gradient to cover edges ub a bit"*.
