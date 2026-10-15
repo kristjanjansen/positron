@@ -58,6 +58,14 @@ export function make({ log, wake, reroute }) {
       },
       'value-in': (e) => { if (e?.of === 'param' && !set(e.name, e.v)) log(`Plaits has no ${e.name}, so it ignores it`); },
     },
+    /** A `patch` transform on a link into midi-in: the picker moves to it, as a press on it would. */
+    patch(name) {
+      const i = PATCHES.findIndex((p) => p.name === name);
+      if (i < 0) { log(`Plaits has no patch called ${name}`, 'warn'); return false; }
+      pick(i);
+      return true;
+    },
+    chosen: () => PATCHES[at].name,
     start(c) { ctx = c; voice.boot(); },
     audio: { out: () => voice.out() },
     level: () => voice.level(),

@@ -163,6 +163,9 @@ export const RHODES = {
   layerAt: rhodesLayerAt,
 };
 
+/** The browser sampler's instruments, in program order: its patch list everywhere it is offered. */
+export const SAMPLER_SET = [PIANO, RHODES];
+
 /**
  * What one press needs in hand before it sounds: one Salamander file, an
  * octave of the FluidR3 piano, or every layer of one Rhodes note.

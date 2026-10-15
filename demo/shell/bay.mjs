@@ -255,6 +255,18 @@ const OPS = {
       return { ...ev, d2: Math.max(1, Math.min(127, Math.round(a.to))) };
     },
   },
+  /**
+   * Choose the patch the receiving instrument plays. It changes no event: the runtime switches
+   * when the link is made. Only into an in-port that lists `patches`, checked in `validate`.
+   * why: lessons/kit-bay.md#patch
+   */
+  patch: {
+    args: ['name'], need: ['name'],
+    help: 'switch the instrument this link reaches to the patch called NAME, one of the patches its midi in lists',
+    eg: { op: 'patch', name: 'Rhodes' },
+    classes: (set) => set,
+    run: (ev) => ev,
+  },
   cc: {
     args: ['from', 'to', 'ch'], need: ['from', 'to'],
     help: 'move the controller numbered from onto the controller numbered to, optionally onto channel ch',
@@ -324,6 +336,11 @@ const SAYS = {
     part: { to: 'the loudness to give them' },
     ask: { to: 'Name one loudness from 1 to 127, and this desk\'s drums send 96.' },
   },
+  patch: {
+    does: 'chooses the sound the instrument it reaches plays',
+    part: { name: 'the name of a patch' },
+    ask: { name: 'Name one of the patches the instrument lists, such as Piano or Rhodes.' },
+  },
   cc: {
     does: 'moves one controller onto another',
     part: { from: 'the controller it comes from', to: 'the controller it goes to',
@@ -357,7 +374,9 @@ export const OP_SAYS = SAYS;
  * cannot disagree with `checkTransforms`. Every op needs `help`, asserted in bay-test.mjs.
  * why: lessons/kit-bay.md#vocabulary
  */
-const PLACE = { cls: 'C', scale: 'F' };
+const PLACE = { cls: 'C', scale: 'F', name: 'NAME' };
+/** The arguments that are words rather than numbers. */
+export const TEXT_ARGS = ['cls', 'name'];
 
 export const OP_HELP = OP_NAMES.map((op) => ({
   op,
@@ -421,9 +440,9 @@ export function checkTransforms(transforms) {
            */
           const gaps = op.need.filter((n) => t[n] === undefined || t[n] === null);
           const spare = strange.map((x) => t[x]).find((v) => v !== undefined);
-          const fits = gaps.length === 1 && (gaps[0] === 'cls'
-            ? CLASSES.includes(spare)
-            : typeof spare === 'number' && !Number.isNaN(spare));
+          const fits = gaps.length === 1 && (gaps[0] === 'cls' ? CLASSES.includes(spare)
+            : gaps[0] === 'name' ? typeof spare === 'string' && spare.trim() !== ''
+              : typeof spare === 'number' && !Number.isNaN(spare));
           const mend = { op: t.op };
           for (const a of op.args) if (t[a] !== undefined && t[a] !== null) mend[a] = t[a];
           if (fits) mend[gaps[0]] = spare;
@@ -460,8 +479,12 @@ export function checkTransforms(transforms) {
      * compares as a string.
      * why: lessons/kit-bay.md#ct-types
      */
+    if (t.op === 'patch' && (typeof t.name !== 'string' || !t.name.trim())) {
+      return { why: `${head(t.op)}, and ${part(t.op, 'name')} came as ${JSON.stringify(t.name)} rather than as a word.`,
+               fix: ask(t.op, 'name') };
+    }
     for (const k of op.args) {
-      if (t[k] === undefined || t[k] === null || k === 'cls') continue;
+      if (t[k] === undefined || t[k] === null || TEXT_ARGS.includes(k)) continue;
       if (typeof t[k] !== 'number' || Number.isNaN(t[k])) {
         return { why: `${head(t.op)}, and ${part(t.op, k)} came as ${JSON.stringify(t[k])} `
                       + 'rather than as a number.',
@@ -485,6 +508,12 @@ export function checkTransforms(transforms) {
    * the second is dead. Refused, not merged, since the pair sometimes arrives descending.
    * why: lessons/kit-bay.md#ct-two-ranges
    */
+  // Two patches on one link: one instrument plays one sound, so the second would silently win.
+  const named = (transforms || []).filter((t) => t?.op === 'patch');
+  if (named.length > 1) {
+    return { why: `this link chooses ${named.length} patches, ${named.map((t) => t.name).join(' and ')}, and an instrument plays one at a time.`,
+             fix: 'Keep one patch on the link, or send the other to a second instrument of the same kind.' };
+  }
   for (const end of ['lo', 'hi']) {
     const same = (transforms || []).filter((t) => OPS[t?.op]?.oneOf
       && t[end] !== undefined && t[end === 'lo' ? 'hi' : 'lo'] === undefined);
@@ -500,6 +529,34 @@ export function checkTransforms(transforms) {
     }
   }
   return '';
+}
+
+/** The patch name a list of transforms chooses, or null. */
+export function patchOf(transforms) {
+  const t = (transforms || []).find((x) => x?.op === 'patch');
+  return t && typeof t.name === 'string' ? t.name : null;
+}
+
+/**
+ * A patch is a word the receiving port must list in `patches`. Answers the refusal, or the
+ * port's own spelling of the name (matched without case, so "rhodes" chooses Rhodes).
+ * why: lessons/kit-bay.md#patch
+ */
+export function patchFor(transforms, port) {
+  const want = patchOf(transforms);
+  if (want === null) return { name: null };
+  const list = Array.isArray(port?.patches) ? port.patches : [];
+  const label = port?.label || port?.id || 'that input';
+  if (!list.length) {
+    return { refuse: { why: `${label} lists no patches, so there is nothing called ${JSON.stringify(want)} to choose.`,
+                       fix: 'Make the link without a patch, or link into an instrument whose midi in lists its patches.' } };
+  }
+  const name = list.find((n) => n.toLowerCase() === want.trim().toLowerCase());
+  if (!name) {
+    return { refuse: { why: `${label} has no patch called ${JSON.stringify(want)}.`,
+                       fix: `Name one of ${list.join(', ')}.` } };
+  }
+  return { name };
 }
 
 /** Run an ordered list. Returns the event, or null if something dropped it. */
@@ -543,6 +600,8 @@ export function printLink(link) {
     return [x.op, ...args]
       .map((v) => {
         if (v === undefined) return '*';
+        // A word with a space in it (a patch called Soft FM) is quoted, so it reads back whole.
+        if (typeof v === 'string' && /[\s"*]/.test(v)) return JSON.stringify(v);
         return (typeof v === 'number' && v > 0 && x.op === 'transpose') ? `+${v}` : `${v}`;
       })
       .join(' ');
@@ -573,12 +632,13 @@ export function parseLink(line) {
     options[k] = v === undefined ? undefined : (Number.isNaN(Number(v)) ? v : Number(v));
     return false;
   }).map((chunk) => {
-    const parts = chunk.split(/\s+/);
+    const parts = chunk.match(/"(?:[^"\\]|\\.)*"|\S+/g).map((x) => (x.startsWith('"') ? { q: JSON.parse(x) } : x));
     const op = parts.shift();
     if (!OPS[op]) throw new Error(`bay: no transform called "${op}". There are ${OP_NAMES.join(', ')}`);
     const t = { op };
     OPS[op].args.forEach((k, i) => {
       if (parts[i] === undefined || parts[i] === '*') return;   // `*` is an open end
+      if (typeof parts[i] === 'object') { t[k] = parts[i].q; return; }
       const n = Number(parts[i]);
       t[k] = Number.isNaN(n) ? parts[i] : n;
     });
@@ -701,6 +761,7 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
    * @param {string} p.medium  one of MEDIA
    * @param {object} p.shape   what the data IS
    * @param {string[]} [p.accepts] in-ports: the classes it consents to
+   * @param {string[]} [p.patches] in-ports: the patch names the instrument behind it can play, which a `patch` transform chooses from
    * @param {string[]} [p.never]   in-ports: classes that make a link a HARD REFUSAL rather than a quiet drop. See below.
    * @param {string[]} [p.emits]   out-ports: the classes it can produce
    * @param {Function} [p.deliver] in-ports: where a delivered event goes
@@ -801,6 +862,8 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
        schema valid transform with its argument under the wrong key. */
     const badT = checkTransforms(transforms);
     if (badT) return { ok: false, ...badT };
+    const chosen = patchFor(transforms, b);
+    if (chosen.refuse) return { ok: false, ...chosen.refuse };
     const badO = checkOptions(a.medium, opts?.options);   // link options, link-options.mjs
     if (badO) return { ok: false, ...badO };
     const badF = followRefusal(opts?.options?.follow, a, b);
@@ -875,10 +938,17 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
       warns.push(`${p.label} has not been heard from for ${Math.round((now() - (p.seenAt ?? 0)) / 1000)}s`);
     }
     if (dropped.length) warns.push(`${b.label} will drop ${dropped.join(', ')}`);
+    // One instrument plays one patch: a second link choosing another one switches it for both.
+    if (chosen.name) {
+      const other = [...links.values()].find((l) => l.to === b.id && patchOf(l.transforms)
+        && patchOf(l.transforms).toLowerCase() !== chosen.name.toLowerCase());
+      if (other) warns.push(`${b.label} plays ${patchOf(other.transforms)} for another link, and this one switches it to ${chosen.name}`);
+    }
     const ses = sessionFor(a, b, opts);
     if (ses.refuse) return { ok: false, ...ses.refuse };
     return { ok: true, why: '', ...(warns.length ? { warn: warns.join('. ') } : {}),
-             session: ses.session, ...(ses.via ? { via: ses.via } : {}) };
+             session: ses.session, ...(ses.via ? { via: ses.via } : {}),
+             ...(chosen.name ? { patch: chosen.name } : {}) };
   }
 
   /**
@@ -1109,6 +1179,8 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     const v = validate(fromId, toId, transforms, opts);
     if (!v.ok) return { ok: false, why: v.why, fix: v.fix || '' };
     const id = `L${nextLink++}`;
+    // The patch is stored in the instrument's own spelling, so a runtime matches it exactly.
+    if (v.patch) transforms = transforms.map((t) => (t?.op === 'patch' ? { ...t, name: v.patch } : t));
     links.set(id, { id, from: fromId, to: toId, transforms, enabled: true, sent: 0, dropped: 0,
                     session: v.session, ...(v.session?.via || v.via ? { via: v.session?.via || v.via } : {}),
                     ...(opts.options && Object.keys(opts.options).length ? { options: { ...opts.options } } : {}) });

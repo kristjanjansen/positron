@@ -496,5 +496,17 @@ console.log('\n== Plaits on the Pi, route A of plans/plan-plaits-on-pi.md ==');
     && !('names' in port(desk({ instruments: { plaits: true } }), 'pi-1:plaits:value-in').shape));
 }
 
+{
+  // Patch names ride the midi-in of the instrument they belong to, and only when passed in.
+  const g = boardGraph({ room: 'studio-1', gpu: false, instruments: { sampler: true, plaits: true },
+    patches: { sampler: ['Piano', 'Rhodes'], plaits: ['Soft FM'] } });
+  const at = (id) => g.ports.find((p) => p.id === id);
+  ok('the board\'s sampler and Plaits list their patches on their midi-in, and nothing else does',
+    at('pi-1:sampler:midi-in')?.patches?.join() === 'Piano,Rhodes' && at('pi-1:plaits:midi-in')?.patches?.join() === 'Soft FM'
+    && g.ports.filter((p) => p.patches).length === 2 && graphProblem(g) === '');
+  const bare = boardGraph({ room: 'studio-1', gpu: false, instruments: { sampler: true } });
+  ok('NEGATIVE CONTROL: a board told no patches lists none', !bare.ports.some((p) => 'patches' in p));
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

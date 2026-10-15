@@ -189,7 +189,7 @@ console.log('\n== the build recipe ==');
   ok('push.sh ships the shim and the provenance, runs the build, and prints the new md5s',
     /demo\/muta\/build\/plaits_shim\.cc demo\/muta\/vendor\/PROVENANCE-plaits\.json/.test(push) && /plaits\/build\.sh/.test(push)
     && /plaits\/posplaits\.cc/.test(push));
-  ok('packages.txt names libjack-jackd2-dev, commented out until it is approved', /^# libjack-jackd2-dev\t/m.test(read('./packages.txt')));
+  ok('packages.txt names libjack-jackd2-dev, installed on the board 2026-10-15', /^libjack-jackd2-dev\t/m.test(read('./packages.txt')));
 }
 
 console.log('\n== posplaits.cc against the shim and the board, as text ==');

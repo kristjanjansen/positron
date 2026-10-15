@@ -45,10 +45,28 @@ export const HEAR_SHAPE = {
   '@cf/openai/whisper-tiny-en': 'bytes',
 };
 
+// Whisper's prompt window is 224 tokens and a name is two or three, so 400 characters holds the
+// site's names with room left and cannot become a second request body.
+export const PROMPT_MAX = 400;
+
+/** The words a page wants heard as written (Rhodes, not roads), as one `initial_prompt` string or ''. */
+export function vocabularyPrompt(words) {
+  const list = (Array.isArray(words) ? words : [])
+    .filter((w) => typeof w === 'string').map((w) => w.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  let out = '';
+  for (const w of [...new Set(list)]) {
+    const next = out ? `${out}, ${w}` : w;
+    if (next.length > PROMPT_MAX) break;
+    out = next;
+  }
+  return out;
+}
+
 // The payload for one listening model; one function so the Worker and wish-local cannot drift.
-// Takes model (one of HEAR), audio (base64) and an optional language.
+// Takes model (one of HEAR), audio (base64), an optional language and the page's vocabulary,
+// which only `turbo` takes (as `initial_prompt`); the older two get none.
 // why: lessons/workers-wish.md#hear-payload
-export function hearPayload(model, audio, language) {
+export function hearPayload(model, audio, language, vocabulary) {
   if (HEAR_SHAPE[model] === 'bytes') {
     // `atob` is in both runtimes. The intermediate string is the only way
     // across without a Buffer, which a Worker does not have.
@@ -64,6 +82,7 @@ export function hearPayload(model, audio, language) {
     // Voice activity detection, since a studio microphone hears the synth. `turbo` only.
     // why: lessons/workers-wish.md#vad
     vad_filter: true,
+    ...(vocabularyPrompt(vocabulary) ? { initial_prompt: vocabularyPrompt(vocabulary) } : {}),
   };
 }
 // The models that turn a sentence into a patch.
@@ -86,7 +105,7 @@ import { OP_NAMES, OP_HELP, CLASSES } from '../../../demo/shell/bay.mjs';
 // why: lessons/workers-wish.md#loose-schema
 const ARG_PROPS = Object.fromEntries(
   [...new Set(OP_HELP.flatMap((o) => o.args))]
-    .map((a) => [a, a === 'cls' ? { type: 'string', enum: CLASSES } : { type: 'number' }]),
+    .map((a) => [a, a === 'cls' ? { type: 'string', enum: CLASSES } : a === 'name' ? { type: 'string' } : { type: 'number' }]),
 );
 
 /** Width of the widest signature, so the table lines up without a magic number. */
@@ -134,6 +153,7 @@ const SYNONYM = {
   transpose: { to: 'by' },
   range: { from: 'lo', to: 'hi' },
   vrange: { from: 'lo', to: 'hi' },
+  patch: { to: 'name' },
 };
 
 export function relabel(links) {
@@ -215,7 +235,7 @@ export async function handle(path, body, run) {
     if (!HEAR.includes(model)) return bad(`not a listening model: ${model}`);
     if (!body.audio) return bad('audio is base64');
     const t0 = Date.now();
-    const r = await run(model, hearPayload(model, body.audio, body.language));
+    const r = await run(model, hearPayload(model, body.audio, body.language, body.vocabulary));
     return { status: 200, body: { text: r.text ?? '', words: r.word_count ?? null, ms: Date.now() - t0, model } };
   }
 

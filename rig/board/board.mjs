@@ -10,7 +10,8 @@ import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          jackGraph, jackChain, jackRebuild, ensureJackd, setJackCard, wire as jackWire, setBayRows, getBayRows,
          setCaptureUnit,
        } from './jacksynth.mjs';
-import { startScSampler, samplerAvailable, startPlan, stopPlan, isForSampler } from './scsampler.mjs';
+import { startScSampler, samplerAvailable, startPlan, stopPlan, isForSampler, SETS as SAMPLER_SETS } from './scsampler.mjs';
+import { PATCHES as PLAITS_PATCHES } from '../../demo/shell/plaits-params.mjs';
 import { createCollideService, collideAvailable } from './scollide.mjs';
 import { createPlaitsService, plaitsAvailable, PLAITS_PARAMS } from './plaits.mjs';
 import { captureHolders } from './jacksynth.mjs';
@@ -1150,6 +1151,9 @@ function connect() {
     // why: lessons/rig-board.md#jack-announce
     const jack = samplerAvailable() || instruments.plaits || [...inputsCfg.inputs.values()].some((i) => i.via === 'jack');
     graphFacts = { room: ROOM, site: SITE, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports, jack, plaitsParams: PLAITS_PARAMS,
+                   // Patch names on each instrument's midi-in, for a `patch` transform (bay.mjs), in program order.
+                   patches: { sampler: Object.values(SAMPLER_SETS).sort((a, b) => a.program - b.program).map((x) => x.name),
+                              plaits: PLAITS_PATCHES.map((p) => p.name) },
                    midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable(), camera: cameraFound };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,

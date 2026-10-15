@@ -2,7 +2,7 @@
 // Drives handle() with a capturing stub, so it grades the payload that would leave for a model.
 // why: lessons/workers-wish.md#test-header
 
-import { handle, relabel, PATCH, HEAR, hearPayload, allowedOrigin, corsFor } from './wish.mjs';
+import { handle, relabel, PATCH, HEAR, hearPayload, vocabularyPrompt, PROMPT_MAX, allowedOrigin, corsFor } from './wish.mjs';
 import { OP_NAMES, OP_HELP } from '../../../demo/shell/bay.mjs';
 
 let ok = 0;
@@ -136,6 +136,35 @@ is('the two older ones are handed bytes and no options',
   [HEAR[1], HEAR[2]].every((m) => Array.isArray(hearPayload(m, b64).audio)
     && hearPayload(m, b64).vad_filter === undefined),
   JSON.stringify(hearPayload(HEAR[1], b64)));
+
+// The site's names reach Whisper as `initial_prompt`, on turbo only, capped, and never invented.
+{
+  const words = ['Plaits', 'Circuit', 'Rhodes', 'SuperCollider', 'Rhodes', 7, '  ', 'Soft  FM'];
+  const turbo = hearPayload(HEAR[0], b64, 'en', words);
+  is('turbo is handed the page\'s names as initial_prompt, each once, in the page\'s order',
+    turbo.initial_prompt === 'Plaits, Circuit, Rhodes, SuperCollider, Soft FM', JSON.stringify(turbo.initial_prompt));
+  is('NEGATIVE CONTROL: the older two are handed no prompt, which they do not take',
+    [HEAR[1], HEAR[2]].every((m) => hearPayload(m, b64, 'en', words).initial_prompt === undefined));
+  is('NEGATIVE CONTROL: a request with no vocabulary keeps the old shape exactly',
+    JSON.stringify(hearPayload(HEAR[0], b64)) === JSON.stringify({ audio: b64, task: 'transcribe', vad_filter: true }),
+    JSON.stringify(hearPayload(HEAR[0], b64)));
+  const long = vocabularyPrompt(Array.from({ length: 200 }, (_, i) => `name${i}`));
+  is('NEGATIVE CONTROL: a long vocabulary is cut at a whole name within the cap',
+    long.length <= PROMPT_MAX && long.length > PROMPT_MAX - 12 && !long.endsWith(','), `${long.length} chars`);
+  let sent = null;
+  await handle('/hear', { audio: b64, vocabulary: ['Rhodes'] }, (m, payload) => { sent = payload; return { text: 'Rhodes' }; });
+  is('/hear passes the vocabulary through to the model', sent?.initial_prompt === 'Rhodes', JSON.stringify(sent));
+}
+
+// A patch name is a word in the schema, and `to` written for it is read as the name.
+{
+  const { sent } = await ask(DESK);
+  const t = sent.payload.response_format.json_schema.properties.links.items.properties.transforms.items;
+  is('the schema types a patch name as a string', t.properties.name?.type === 'string', JSON.stringify(t.properties.name));
+  const r = relabel([{ from: 'a', to: 'b', transforms: [{ op: 'patch', to: 'Rhodes' }] }]);
+  is('patch given `to` is read as `name`, and the repair is reported',
+    r.links[0].transforms[0].name === 'Rhodes' && r.fixed[0]?.read === 'name', JSON.stringify(r));
+}
 
 /* A model nobody allowed must not be run, because the name arrives from a
    browser and somebody's account is being spent. */

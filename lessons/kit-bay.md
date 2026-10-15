@@ -1664,3 +1664,23 @@ SABOTAGES, MEASURED 2026-10-12 on a scratch copy of demo/shell, against 196
      emit stamps without adding ahead                             2 red there
      emit stamps even with no shared clock                        3 red there
 ```
+
+<a id="patch"></a>
+
+## `bay.mjs` OPS.patch, `patchFor`
+
+Added 2026-10-15 for /connect/. MEASURED that day in the owner's test log: "Play piano with keyboard"
+was built as keys to web:plaits, because nothing told the model web:sampler is a piano, and
+"keyboard plays rhodes on bottom and piano on top" had no way to choose the Rhodes in the browser.
+The owner: *"you should know patch names not special case rhodes"*.
+
+- A patch is a word an in-port lists in `patches`, read off the instrument's own module
+  (`demo/shell/patch-names.mjs`: the sampler's `SAMPLER_SET`, Plaits' `PATCHES`; the board passes
+  its own lists to `boardGraph`). The transform changes no event; the runtime its link reaches is
+  told the name when the link is made (`node-runtime.mjs` `choosePatches`).
+- Refused in words: a patch into a port that lists none, a name the port does not list (the fix
+  names the ones it has), no name, a number for a name, two patches on one link. Matched without
+  case and stored in the port's own spelling, so "rhodes" chooses Rhodes.
+- A second link choosing another patch into the same instrument is made with a warning: one
+  instrument plays one patch, so two at once is two instruments (`web:sampler-2`).
+- In the text form a name with a space is quoted (`patch "Soft FM"`) so it reads back whole.

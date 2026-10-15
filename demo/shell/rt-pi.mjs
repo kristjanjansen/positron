@@ -7,6 +7,7 @@ import { createBoard } from './board.mjs';
 import { createLease } from './openers.mjs';
 import { createButtonGroup } from './button-group.mjs';
 import { roomFor, STUDIO_ROOM } from './bay-node.mjs';
+import { samplerProgram } from './patch-names.mjs';
 
 // What each Pi node does with a note, and which room it answers in. The
 // Circuit is an input with its own room and a lease; the sampler is an
@@ -24,6 +25,11 @@ const KINDS = {
       if (ev.cls !== 'note') return false;
       return board.send(ev.d2 > 0 ? { type: 'note.on', node: 'sampler', note: ev.d1, vel: ev.d2, channel: 0 }
         : { type: 'note.off', node: 'sampler', note: ev.d1, channel: 0 });
+    },
+    // The board's own verb for the sampler's program, as /remote/piano/ sends it.
+    patch: (board, name) => {
+      const program = samplerProgram(name);
+      return program === null ? false : board.send({ type: 'voice.select', node: 'sampler', program });
     } },
 };
 
@@ -32,7 +38,9 @@ export function make({ id, log, wake, reroute }) {
   const kind = KINDS[name] ?? null;
   const base = roomFor({ slug: 'connect' });
   const room = kind ? kind.room(base) : base;
-  let board = null, lease = null, joined = false, sent = 0, heldOff = 0;
+  let board = null, lease = null, joined = false, sent = 0, heldOff = 0, chose = null, patched = null;
+  // A patch chosen before Join is kept and sent once joined, as /remote/piano/ keeps a program.
+  const sendPatch = () => { if (joined && board && chose && chose !== patched && kind?.patch?.(board, chose)) patched = chose; };
   const say = document.createElement('p');
   say.className = 'cn-face-say';
   say.textContent = kind ? `not joined: Join reaches ${kind.label} in ${room}` : `not joined: this Pi node is drawn, and nothing here plays it yet`;
@@ -79,13 +87,14 @@ export function make({ id, log, wake, reroute }) {
     }
     if (kind.lease) lease = createLease({ ask: (m, r, t) => board.ask(m, r, t), what: `${kind.label} capture`, log });
     joined = true;
+    sendPatch();
     say.textContent = `joined ${room}, ${kind.label} plays what arrives here`;
   }
   function leave() {
     if (!board) return;
     if (joined) board.send(name === 'circuit' ? { type: 'midi.panic' } : { type: 'note.panic' });
     lease?.stop(); lease = null;
-    board.close(); board = null; joined = false;
+    board.close(); board = null; joined = false; patched = null;
     badge.replaceChildren();
     buttons.enable('join', !!kind);
     buttons.enable('leave', false, 'not joined');
@@ -103,6 +112,13 @@ export function make({ id, log, wake, reroute }) {
     },
     audio: { out: () => board?.playout() ?? null },
     join, leave,
+    /** A `patch` transform on a link into this Pi node, sent now if joined or on Join. */
+    patch(name) {
+      if (!kind?.patch) { log(`${id} takes no patch from here`, 'warn'); return false; }
+      chose = name; sendPatch();
+      return true;
+    },
+    chosen: () => chose,
     joined: () => joined,
     board: () => board,
     lease: () => lease,

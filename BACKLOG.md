@@ -1,12 +1,24 @@
 ## Open
 
+- **Research: text that writes code, shaders, Faust or SuperCollider** (2026-10-15). Asked: *"do resraech of text input generatinv visual shaders, faust or supercollider code"*. A plan in plans/, from a background agent.
+
+- **/connect/: the grains box has at least a patch picker** (2026-10-15). The owner's feedback note: *"grains should have patch selector minimum in ui"*. rt-grains' face; the granulator's PATCHES (grain-rig.mjs).
+
+- ~~**Keyboard splits shown on the keys**~~ (2026-10-15, DONE: keyboard.mjs `zones`, a 14 px track at each split, zone names above; connect 102/102). Asked: *"can we visualize keyboard splits? add x spacing between split points and labels on top when doing so?"*. A kit option on the keyboard (zones: gap at each split, a label above each zone); /connect/ derives zones from web:keys:midi-out links with range transforms.
+
+- **Feedback: sending closes the panel** (2026-10-15). Asked: *"sending closes fedeback thing"*.
+
+- **/connect/: after a build, say what it does and how to hear it** (2026-10-15). The owner's own feedback note: *"i do not know what this did or how i suppest do listen ing"*, on a keyboard split built from a spoken request. A plain line under the field: what plays what, and what to press (the keys, ▶ on the drum machine or the MIDI keyboard, ▶ on a Pi part).
+
+- **/connect/: a split the model gets wrong is caught** (2026-10-15). From the log: a split built as two links into one web:synth, the upper range missing its bottom (`range * 60`). Refuse overlapping or gapped ranges into one instrument; tell the model a split is two instruments or web:synth-2 with ranges that meet. After the patch-transform work lands.
+
 - ~~**/connect/: pills wrap as a row, not a grid**~~ (2026-10-15, DONE). Asked: *"use flex wrap for pills, no awakard spacing in grid"*.
 
 - ~~**/connect/: Feedback carries the last request, how it came in and the patch**~~ (2026-10-15, DONE: mount's `feedback.context` and `onSent`, shown read-only in the panel, appended to the note, and the note echoed to the device log as [feedback]). Asked: *"can we use feedback field where you tie the current input, method and patchbay so i can comment on it?"*.
 
 - ~~**/connect/: more realistic example pills**~~ (2026-10-15, DONE: eight, all local and running, verify 98/98). Asked: *"add more realistic pills"*. Sentences a player says, local, each a patch no page makes, including a split and an octave double.
 
-- **The patch transform and Whisper hearing the site's names** (2026-10-15). Asked: *"fix. keep loggin, i will input more"*, on "the patch transform (piano or Rhodes chosen by name) and the roads to Rhodes name correction". Go given; to a background agent; the wish worker redeploy is the session's.
+- ~~**The patch transform and Whisper hearing the site's names**~~ (2026-10-15, DONE: `{ op: 'patch', name }`, patch names on midi-in labels from patch-names.mjs, `initial_prompt` vocabulary to turbo; bay 212, worker 29, graph 118, connect 102; the board's own patch names wait for a rig push). Asked: *"fix. keep loggin, i will input more"*, on "the patch transform (piano or Rhodes chosen by name) and the roads to Rhodes name correction". Go given; to a background agent; the wish worker redeploy is the session's.
 
 - ~~**/connect/: example pills on two lines**~~ (2026-10-15, DONE). Asked: *"make it 2 lines pills"*. Two rows that flow sideways and scroll, edges still faded.
 
@@ -26,7 +38,7 @@
 
 - **/connect/ test session: voice, typed and pills, told apart, logged and watched** (2026-10-15). Asked: *"i will do voide, keyb and pills testign. distiguis, log and monitor my test. say when ready"*. Log lines tagged [voice], [typed], [pill]; the page's warnings as [page warn]; the session tails pub.positron.studio/logs.
 
-- **A patch transform: instruments list their patch names, a link chooses one** (2026-10-15). Asked: *"you should know patch names not special case rhodes"*. Proposed in chat (catalogue patch lists, labels to the model, `{ op: 'patch', name }`, wish worker redeploy); waiting on the owner's go. In the tree already: rhodes-samples has a store runtime, a second web:sampler is allowed, named instances are made before an answer is checked.
+- ~~**A patch transform: instruments list their patch names, a link chooses one**~~ (2026-10-15, DONE, see the line above). Asked: *"you should know patch names not special case rhodes"*. Proposed in chat (catalogue patch lists, labels to the model, `{ op: 'patch', name }`, wish worker redeploy); waiting on the owner's go. In the tree already: rhodes-samples has a store runtime, a second web:sampler is allowed, named instances are made before an answer is checked.
 
 - ~~**/connect/: the patch room 20 % less tall**~~ (2026-10-15, DONE: aspect-ratio 5 / 4). Asked: *"reduce h by 20% -- say what should play what, press an example, or an out port and then an in port --"*.
 

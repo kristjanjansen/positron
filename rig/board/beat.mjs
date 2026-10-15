@@ -27,6 +27,7 @@ export function graphOf(f) {
       ...(i.via === 'jack' ? { jack: true, take: i.take ?? 1 } : {}) })),
     alsa: f.ports || [], frameMs: f.frameMs, gpu: f.gpu !== false, camera: f.camera === true, jack: f.jack === true,
     ...(Array.isArray(f.plaitsParams) ? { plaitsParams: f.plaitsParams } : {}),
+    ...(f.patches && typeof f.patches === 'object' ? { patches: f.patches } : {}),
   });
 }
 

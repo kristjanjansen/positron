@@ -6,7 +6,7 @@
 import { createBay, apply, delivers, printLink, parseLink, printPatch, parsePatch,
   classOf, eventOf, isNoteOff, checkTransforms, CLASSES, MEDIA, STALE_MS, OP_NAMES, OP_HELP,
   OP_SAYS, HEAVY, NODE_KINDS, WHERE, TRANSPORTS, chooseTransport,
-  RELAY, READS, TRANSPORT_NAMES, MACHINE_ONLY } from './bay.mjs';
+  RELAY, READS, TRANSPORT_NAMES, MACHINE_ONLY, patchOf } from './bay.mjs';
 import { STALE_MS as REGISTRY_STALE_MS } from './graph-registry.mjs';
 import { decode } from './midi-decode.mjs';
 
@@ -554,6 +554,8 @@ console.log('\n== the patch bay ==');
     [{ op: 'range', lo: 36, hi: '47' }], [{ op: 'vrange' }],
     [{ op: 'range', hi: 0 }, { op: 'range', hi: 7 }],
     [{ op: 'banana' }], [null], [{ op: 'velocity' }], [{ op: 'drop', to: 'sysex' }],
+    [{ op: 'patch' }], [{ op: 'patch', name: 7 }], [{ op: 'patch', to: 'Rhodes' }],
+    [{ op: 'patch', name: 'Piano' }, { op: 'patch', name: 'Rhodes' }],
   ];
   const said = BAD.map((t) => ({ t, ...checkTransforms(t) }));
 
@@ -1462,6 +1464,66 @@ function V0() { return { codec: 'h264' }; }
       back.join(' | '));
   }
   timers = [];
+}
+
+// -- the patch transform --
+// A patch is a word an in-port lists; most of these are negative controls on the refusal.
+// why: lessons/kit-bay.md#patch
+console.log('\n== choosing a patch ==');
+{
+  const sampled = [];
+  const P = () => {
+    const b = createBay();
+    b.addPort({ id: 'web:keys:midi-out', label: 'keyboard', dir: 'out', medium: 'midi', emits: ['note'] });
+    b.addPort({ id: 'web:sampler:midi-in', label: 'sampler midi-in', dir: 'in', medium: 'midi', accepts: ['note'],
+      patches: ['Piano', 'Rhodes'], deliver: (e) => sampled.push(e) });
+    b.addPort({ id: 'web:synth:midi-in', label: 'synth midi-in', dir: 'in', medium: 'midi', accepts: ['note'] });
+    b.addPort({ id: 'web:synth:audio-out', label: 'synth audio-out', dir: 'out', medium: 'audio', shape: { rate: 48000 } });
+    b.addPort({ id: 'web:speaker:audio-in', label: 'speaker', dir: 'in', medium: 'audio', shape: { rate: 48000 } });
+    return b;
+  };
+  const b = P();
+  const r = b.link('web:keys:midi-out', 'web:sampler:midi-in', [{ op: 'patch', name: 'Rhodes' }]);
+  ok('a patch the instrument lists is chosen on a MIDI link into it', r.ok && patchOf(b.links()[0].transforms) === 'Rhodes', r.why || r.id);
+  b.send('web:keys:midi-out', { cls: 'note', ch: 1, d1: 60, d2: 90 });
+  ok('the patch changes no event: the note arrives as it was played', sampled.length === 1 && sampled[0].d1 === 60 && sampled[0].d2 === 90,
+    JSON.stringify(sampled));
+  const lower = P().link('web:keys:midi-out', 'web:sampler:midi-in', [{ op: 'patch', name: 'rhodes' }]);
+  const b2 = P(); b2.link('web:keys:midi-out', 'web:sampler:midi-in', [{ op: 'patch', name: 'rhodes' }]);
+  ok('a name in other letters chooses the instrument\'s own spelling', lower.ok && patchOf(b2.links()[0].transforms) === 'Rhodes',
+    patchOf(b2.links()[0]?.transforms));
+
+  const unknown = P().link('web:keys:midi-out', 'web:sampler:midi-in', [{ op: 'patch', name: 'Harpsichord' }]);
+  ok('NEGATIVE CONTROL: a patch the instrument does not list is refused, naming the ones it has',
+    !unknown.ok && /no patch called "Harpsichord"/.test(unknown.why) && unknown.fix === 'Name one of Piano, Rhodes.',
+    `${unknown.why} / ${unknown.fix}`);
+  const none = P().link('web:keys:midi-out', 'web:synth:midi-in', [{ op: 'patch', name: 'Rhodes' }]);
+  ok('NEGATIVE CONTROL: a patch into an instrument that lists none is refused in words',
+    !none.ok && /lists no patches/.test(none.why), none.why);
+  const audio = P().link('web:synth:audio-out', 'web:speaker:audio-in', [{ op: 'patch', name: 'Rhodes' }]);
+  ok('NEGATIVE CONTROL: a patch on an audio link is refused, as every transform there is',
+    !audio.ok && /only works on MIDI/.test(audio.why), audio.why);
+  const empty = P().link('web:keys:midi-out', 'web:sampler:midi-in', [{ op: 'patch' }]);
+  const number = P().link('web:keys:midi-out', 'web:sampler:midi-in', [{ op: 'patch', name: 1 }]);
+  const two = P().link('web:keys:midi-out', 'web:sampler:midi-in', [{ op: 'patch', name: 'Piano' }, { op: 'patch', name: 'Rhodes' }]);
+  ok('NEGATIVE CONTROL: no name, a number for a name and two patches on one link are three refusals',
+    !empty.ok && !number.ok && !two.ok && /given nothing at all/.test(empty.why) && /rather than as a word/.test(number.why)
+    && /chooses 2 patches/.test(two.why), [empty.why, number.why, two.why].join(' | '));
+  const swap = checkTransforms([{ op: 'patch', to: 'Rhodes' }]);
+  ok('a name under the wrong key is offered back under the right one', swap.fix === 'Write it as {"op":"patch","name":"Rhodes"}.', swap.fix);
+
+  const b3 = P();
+  b3.link('web:keys:midi-out', 'web:sampler:midi-in', [{ op: 'range', hi: 59 }, { op: 'patch', name: 'Rhodes' }]);
+  const second = b3.link('web:keys:midi-out', 'web:sampler:midi-in', [{ op: 'range', lo: 60 }, { op: 'patch', name: 'Piano' }]);
+  ok('a second link choosing another patch into the same instrument is made, with a warning that it switches it',
+    second.ok && /plays Rhodes for another link, and this one switches it to Piano/.test(second.warn || ''), second.warn);
+
+  const line = printLink({ from: 'web:keys:midi-out', to: 'web:plaits:midi-in', transforms: [{ op: 'patch', name: 'Soft FM' }] });
+  const back = parseLink(line);
+  ok('a patch name with a space round trips through the text form', line.includes('patch "Soft FM"') && back.transforms[0].name === 'Soft FM',
+    `${line} | ${JSON.stringify(back.transforms)}`);
+  const sig = OP_HELP.find((o) => o.op === 'patch')?.sig;
+  ok('the patch signature names a word, not a number', sig === 'patch name=NAME', sig);
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
