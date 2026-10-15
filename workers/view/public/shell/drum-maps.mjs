@@ -43,10 +43,28 @@ export const DRUM_MAPS = {
 export function drumRows(m) {
   if (!m || m.map === null) return [];
   return Object.entries(m.map || {}).map(([from, to]) => {
-    const name = gmName(from), label = m.labels?.[to] || '';
+    const name = m.fromLabels?.[from] || gmName(from), label = m.labels?.[to] || '';
     return { from: Number(from), name, to, label, line: `${from} ${name} -> ${to}${label ? ` ${label}` : ''}` };
   }).sort((a, b) => a.from - b.from);
 }
 
 /** Does this map play a GM note: identity plays everything, otherwise only its keys. */
 export const plays = (m, note) => !!m && (m.map === null || m.map?.[note] !== undefined);
+
+/**
+ * A device's map read backwards, for a link OUT of the device into a General MIDI instrument: the
+ * device's notes onto GM, and only from its drum `channel` (`only`), so a synth note 60 on channel 1
+ * is never a kick. Null for General MIDI itself, whose read back is the identity it already is.
+ * why: lessons/kit-drum-maps.md#read-back
+ */
+export function readBack(m) {
+  if (!m || typeof m.name !== 'string' || !m.map) return null;
+  const map = {}, labels = {}, fromLabels = {};
+  for (const [gm, own] of Object.entries(m.map)) {
+    map[own] = Number(gm);
+    labels[gm] = gmName(gm);
+    if (m.labels?.[own]) fromLabels[own] = m.labels[own];
+  }
+  return { name: m.name, label: `${m.label || m.name} as General MIDI`, channel: 10, map, labels, fromLabels,
+    back: true, ...(Number.isInteger(m.channel) ? { only: m.channel } : {}) };
+}

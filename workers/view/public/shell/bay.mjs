@@ -10,6 +10,7 @@ import { STALE_MS, jackRows } from './graph-registry.mjs';
 export { STALE_MS };
 // Link options (`{ w 640, h 360, fps 15 }` on a video link) are not transforms; see link-options.mjs.
 import { isOption, checkOptions, printOptions } from './link-options.mjs';
+import { readBack } from './drum-maps.mjs';
 
 /**
  * What a link can carry. New media go on the end: pages index the first three by position.
@@ -279,6 +280,8 @@ const OPS = {
     eg: { op: 'drummap', name: 'circuit' },
     classes: (set) => set,
     run: (ev, a) => {
+      // A map read back from a device's out takes only that device's drum channel, every class.
+      if (Number.isInteger(a.only) && ev.ch !== a.only) return null;
       if (ev.cls !== 'note') return ev;
       if (!('map' in a)) return null;
       const ch = Number.isInteger(a.channel) ? a.channel : ev.ch;
@@ -594,11 +597,24 @@ export function patchFor(transforms, port) {
  * demo/shell/drum-maps.mjs). Answers the refusal, the resolved map, or `{ drums: null }` with no drummap.
  * why: lessons/kit-bay.md#drummap
  */
-export function drummapFor(transforms, port) {
+export function drummapFor(transforms, port, from = null) {
   const t = (transforms || []).find((x) => x?.op === 'drummap');
   if (!t) return { drums: null };
   const d = port?.drums;
   const label = port?.label || port?.id || 'that input';
+  // The map named by the SENDING end and not the receiving one: the device's notes read back onto
+  // General MIDI, into an instrument that plays General MIDI.
+  // why: lessons/kit-bay.md#drummap-back
+  const want = typeof t.name === 'string' ? t.name.trim().toLowerCase() : '';
+  const s = from?.drums;
+  if (s && typeof s.name === 'string' && s.name.toLowerCase() === want && s.map && !(d && d.name?.toLowerCase() === want)) {
+    const fromLabel = from.label || from.id || 'that output';
+    if (d && d.map) {
+      return { refuse: { why: `${fromLabel} sends its own drum notes and ${label} plays its own, so one map cannot carry both.`,
+                         fix: `Link into an instrument that plays General MIDI, or write ${JSON.stringify({ op: 'drummap', name: d.name })} from a General MIDI source.` } };
+    }
+    return { drums: readBack(s) };
+  }
   if (!d || typeof d.name !== 'string') {
     return { refuse: { why: `${label} lists no drum map, so there is nothing called ${JSON.stringify(t.name)} to play by.`,
                        fix: 'Make the link without a drummap, or link into an instrument whose midi in lists its drums.' } };
@@ -612,7 +628,8 @@ export function drummapFor(transforms, port) {
 
 /** The drummap transform with its map resolved from `drums`, as `link` stores it. */
 const resolveDrummap = (t, d) => ({ op: 'drummap', name: d.name, map: d.map === null ? null : { ...d.map },
-  ...(Number.isInteger(d.channel) ? { channel: d.channel } : {}), labels: { ...(d.labels || {}) } });
+  ...(Number.isInteger(d.channel) ? { channel: d.channel } : {}), labels: { ...(d.labels || {}) },
+  ...(d.back ? { back: true, fromLabels: { ...(d.fromLabels || {}) } } : {}), ...(Number.isInteger(d.only) ? { only: d.only } : {}) });
 
 /** Run an ordered list. Returns the event, or null if something dropped it. */
 export function apply(transforms, ev) {
@@ -919,7 +936,7 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     if (badT) return { ok: false, ...badT };
     const chosen = patchFor(transforms, b);
     if (chosen.refuse) return { ok: false, ...chosen.refuse };
-    const drum = drummapFor(transforms, b);
+    const drum = drummapFor(transforms, b, a);
     if (drum.refuse) return { ok: false, ...drum.refuse };
     const badO = checkOptions(a.medium, opts?.options);   // link options, link-options.mjs
     if (badO) return { ok: false, ...badO };
