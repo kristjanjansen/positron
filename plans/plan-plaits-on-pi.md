@@ -267,6 +267,17 @@ a go. The native build (1.A) is still the route that sounds beside the other
 engines on JACK; its cost is now expected under these figures, not above them.
 2.2 below is kept as the estimate this replaced.
 
+### 2.2c posplaits running on the board, MEASURED 2026-10-15 (steps 3 and 4 done)
+
+`libjack-jackd2-dev` 1.9.22 installed by the owner, `rig/board/push.sh` built
+`posplaits` on the Pi (`src 6d96a1b7f5f3faf0`, the wasm's own digest, g++ 14.2.0
+aarch64). Over the relay: `audio.start {source:'plaits'}` up in 952 ms,
+`posplaits:out_1` wired to `posboard:input_1`, one note on and off. The
+engine's own stats after 10 s, 6 voices, patch Wavetable drift: render
+**199 us average, 323 us worst per 10.7 ms period (load 1.87 %)**, 0 xruns, 0
+clipped, 0 dropped. Stopped again after. **Not heard**: nobody listened on the
+relay, so whether it sounds right is step 5.
+
 ### 2.2b Native, MEASURED on the Pi, 2026-10-14 (step 1 done, step 2 half done)
 
 Built in `/tmp` on the Pi with its own g++ 14.2.0, the 31 sources and the shim
