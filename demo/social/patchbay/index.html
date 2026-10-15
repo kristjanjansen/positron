@@ -29,12 +29,12 @@
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { font, drawWordmark, svgImage, X, TEXT_W, C } from '/shell/reel.mjs';
-  import { drawBay } from '/shell/bay-svg.mjs';
+  import { font, drawWordmark, X, TEXT_W, C } from '/shell/reel.mjs';
+  import { MEDIUM_COLOURS } from '/shell/patchbay.mjs';
   import { ranks } from '/shell/bay-layout.mjs';
 
   // Every concept page's patch (demo/resources/bays.json) drawn once, left to right as the page builds it,
-  // as large as the slide's height allows, running on across as many 4:5 slides as it needs; a swipe pans along it.
+  // on 4:5 slides that are each a board of two columns, running on to the next board when a column is full.
   const PW = 1080, PH = 1350, TITLE_Y = 236, SAY_Y = 296, SAY_LH = 44, BAY_TOP = 400, BAY_BOTTOM = PH - 90, BAND = BAY_BOTTOM - BAY_TOP;
   // Instagram shows a 1080 px slide about 390 px wide on a phone. 2.7 puts an 11 px port name at about
   // 10.7 px there. A patch taller than the band at that size is drawn smaller, and its row says so.
@@ -44,7 +44,7 @@
   const sans = getComputedStyle(document.documentElement).getPropertyValue('--sans').trim() || 'sans-serif';
   const onPhone = (k) => +(11 * k * PHONE).toFixed(1);
 
-  const d = mount({ name: 'social/patchbay', what: 'Every concept page’s patch as tall as a slide allows, running on across a carousel to pan with a swipe.',
+  const d = mount({ name: 'social/patchbay', what: 'Every concept page’s patch on slides of two columns each, running on to the next slide when it does not fit.',
     readout: null, index: '/social/', indexLabel: 'social' });
   const h1 = d.head.querySelector('.pos-name');
   if (h1) h1.textContent = 'patchbay';
@@ -52,14 +52,38 @@
   const { bays: BAYS } = await (await fetch('/resources/bays.json')).json();
   const asBay = (b) => ({ nodes: b.nodes, ports: b.ports, links: b.links.map((l, i) => ({ id: `l${i}`, ...l })) });
 
-  /** The patch at its own compact width, scaled until it fills the band's height (at most BIG), running on to as
-   *  many slides as it needs. */
-  const BIG = 4;
+  // Each slide is a board of two columns of boxes, drawn at READ so port names read on a phone. The boxes go in rank
+  // order, sources first; a new rank or a full column starts the next column, and after two the next board.
+  const K = READ, FONT = Math.round(11 * K), TITLE = Math.round(13 * K), ROW = Math.round(20 * K), PAD = Math.round(10 * K);
+  const HEAD = PAD + TITLE + Math.round(6 * K), FIELD = 140, COL_W = (PW - 2 * X - FIELD) / 2, VGAP = 28;
+  const colX = (c) => Math.floor(c / 2) * PW + X + (c % 2) * (COL_W + FIELD);
   function plan(b) {
-    const bay = asBay(b), drawn = drawBay(bay, { width: 480, stretch: false });
-    const k = Math.min(BIG, BAND / (drawn.height + 2));
-    const n = Math.max(1, Math.ceil((drawn.width * k + 2 * X) / PW));
-    return { n, k, drawn };
+    const bay = asBay(b), { rank } = ranks(bay.nodes, bay.links);
+    const portsOf = (id) => bay.ports.filter((q) => q.id.split(':').slice(0, 2).join(':') === id);
+    const order = bay.nodes.map((n, i) => [n, i]).sort((x, y) => rank.get(x[0].id) - rank.get(y[0].id) || x[1] - y[1]).map(([n]) => n);
+    const cols = [];
+    let lastRank = null, used = Infinity;
+    for (const n of order) {
+      const ps = portsOf(n.id), ins = ps.filter((q) => q.dir === 'in'), outs = ps.filter((q) => q.dir === 'out');
+      const h = HEAD + Math.max(ins.length, outs.length, 1) * ROW + Math.round(PAD / 2);
+      if (rank.get(n.id) !== lastRank || used + VGAP + h > BAND) { cols.push([]); used = -VGAP; }
+      cols.at(-1).push({ n, ins, outs, h });
+      used += VGAP + h; lastRank = rank.get(n.id);
+    }
+    // each column centred in the band; a box's ports at its left (in) and right (out) edge
+    const boxes = [], at = new Map();
+    cols.forEach((col, c) => {
+      const total = col.reduce((t, q) => t + q.h, 0) + VGAP * (col.length - 1);
+      let y = BAY_TOP + Math.max(0, (BAND - total) / 2);
+      for (const q of col) {
+        const x = colX(c);
+        boxes.push({ ...q, x, y, w: COL_W });
+        q.ins.forEach((pt, i) => at.set(pt.id, { x, y: y + HEAD + i * ROW + ROW / 2, medium: pt.medium }));
+        q.outs.forEach((pt, i) => at.set(pt.id, { x: x + COL_W, y: y + HEAD + i * ROW + ROW / 2, medium: pt.medium }));
+        y += q.h + VGAP;
+      }
+    });
+    return { n: Math.max(1, Math.ceil(cols.length / 2)), k: K, boxes, at, links: bay.links, cols: cols.length };
   }
 
   function wrap(ctx, text) {
@@ -71,9 +95,9 @@
     return lines;
   }
 
-  /** One patch's slides as canvases at scale `s` of 1080 x 1350, and where the patch landed. */
+  /** One patch's slides as canvases at scale `s` of 1080 x 1350, and where its boxes landed. */
   async function render(b, s) {
-    const p = plan(b), { n, k, drawn } = p;
+    const p = plan(b), { n } = p;
     const wide = document.createElement('canvas');
     wide.width = Math.round(n * PW * s); wide.height = Math.round(PH * s);
     const ctx = wide.getContext('2d');
@@ -87,10 +111,26 @@
     ctx.font = font(400, 30); ctx.textAlign = 'right';
     for (let i = 1; i < n; i++) ctx.fillText(`${i + 1} / ${n}`, (i + 1) * PW - X, 130);
     ctx.textAlign = 'left';
-    const pic = await svgImage(drawn.body, { width: drawn.width, height: drawn.height, scale: k * s });
-    const w = pic.w / s, h = pic.h / s;
-    const bx = Math.round(X + (n * PW - 2 * X - w) / 2), by = Math.round(BAY_TOP + (BAND - h) / 2);
-    ctx.drawImage(pic.img, bx, by, w, h);
+    // wires under the boxes, in the out port's medium colour
+    ctx.lineWidth = 3;
+    for (const l of p.links) {
+      const a = p.at.get(l.from), z = p.at.get(l.to);
+      if (!a || !z) continue;
+      const dx = Math.max(80, Math.abs(z.x - a.x) / 2);
+      ctx.strokeStyle = MEDIUM_COLOURS[a.medium] || C.dim;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(a.x + dx, a.y, z.x - dx, z.y, z.x, z.y); ctx.stroke();
+    }
+    for (const q of p.boxes) {
+      ctx.fillStyle = '#151b26'; ctx.strokeStyle = '#2a3240'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(q.x, q.y, q.w, q.h, 10); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = C.fg; ctx.font = font(600, TITLE); ctx.fillText(q.n.id, q.x + PAD, q.y + PAD + TITLE * 0.8);
+      ctx.font = font(400, FONT);
+      const name = (pt) => pt.id.split(':').slice(2).join(':');
+      q.ins.forEach((pt, i) => { ctx.fillStyle = MEDIUM_COLOURS[pt.medium] || C.dim; ctx.fillText(name(pt), q.x + PAD, q.y + HEAD + i * ROW + ROW / 2 + FONT * 0.35); });
+      ctx.textAlign = 'right';
+      q.outs.forEach((pt, i) => { ctx.fillStyle = MEDIUM_COLOURS[pt.medium] || C.dim; ctx.fillText(name(pt), q.x + q.w - PAD, q.y + HEAD + i * ROW + ROW / 2 + FONT * 0.35); });
+      ctx.textAlign = 'left';
+    }
     const slides = [];
     for (let i = 0; i < n; i++) {
       const cv = document.createElement('canvas');
@@ -98,7 +138,7 @@
       cv.getContext('2d').drawImage(wide, Math.round(i * PW * s), 0, cv.width, cv.height, 0, 0, cv.width, cv.height);
       slides.push(cv);
     }
-    return { p, slides, box: { bx, by, w, h, total: n * PW }, lines };
+    return { p, slides, lines };
   }
   const blobOf = (cv) => new Promise((r) => cv.toBlob(r, 'image/png'));
 
@@ -142,15 +182,11 @@
     const plans = BAYS.map((b) => ({ id: b.id, ...plan(b) }));
     d.assert('every concept page has a patch here', BAYS.length >= 40, `${BAYS.length} patches`);
     const counts = plans.reduce((m, p) => ((m[p.n] = (m[p.n] || 0) + 1), m), {});
-    d.assert('every patch fills the band or reaches the size cap', plans.every((p) => p.k >= BIG - 0.01 || Math.abs((p.drawn.height + 2) * p.k - BAND) < 1),
-      Object.entries(counts).map(([n, c]) => `${c} on ${n}`).join(', '));
-    const low = plans.filter((p) => p.k < MIN);
-    d.assert(`port names ${onPhone(MIN)} px or more on a phone, or the patch says it is not`, true,
-      low.length ? `${low.length} below: ${low.map((p) => `${p.id} ${onPhone(p.k)}`).join(', ')}` : `lowest ${onPhone(Math.min(...plans.map((p) => p.k)))} px`);
-    const { slides, box, lines } = await render(BAYS[0], VIEW);
-    d.assert('the first patch is whole 4:5 slides with the patch inside the margins and the band',
-      slides.every((c) => Math.abs(c.width / c.height - PW / PH) < 0.01) && box.bx >= X - 1 && box.bx + box.w <= box.total - X + 1 && box.by >= BAY_TOP - 1 && box.by + box.h <= BAY_BOTTOM + 1 && lines.length <= 2,
-      `${slides.length} slides, patch ${Math.round(box.w)} x ${Math.round(box.h)} at ${box.bx},${box.by}`);
+    const over = plans.filter((p) => p.boxes.some((q) => q.y < BAY_TOP - 1 || q.y + q.h > BAY_BOTTOM + 1));
+    d.assert('every box sits inside a board\'s band, two columns a slide', !over.length,
+      over.map((p) => p.id).join(', ') || Object.entries(counts).map(([n, c]) => `${c} on ${n}`).join(', '));
+    const { slides, lines } = await render(BAYS[0], VIEW);
+    d.assert('the first patch is whole 4:5 slides', slides.every((c) => Math.abs(c.width / c.height - PW / PH) < 0.01) && lines.length <= 2, `${slides.length} slides`);
   }
   d.ready();
 </script>
