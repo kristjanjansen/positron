@@ -38,8 +38,8 @@ export function make({ id, log, wake, reroute }) {
   say.textContent = kind ? `not joined: Join reaches ${kind.label} in ${room}` : `not joined: this Pi node is drawn, and nothing here plays it yet`;
   const badge = document.createElement('span');
   const buttons = createButtonGroup({ buttons: [
-    { id: 'join', label: 'Join', primary: true, onPress: () => join() },
-    { id: 'leave', label: 'Leave', onPress: () => leave() },
+    { id: 'join', icon: 'play', label: 'Join', onPress: () => join() },
+    { id: 'leave', icon: 'stop', label: 'Leave', onPress: () => leave() },
   ] });
   buttons.enable('leave', false, 'not joined');
   if (!kind) buttons.enable('join', false, 'nothing here plays this Pi node yet');

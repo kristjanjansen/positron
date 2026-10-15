@@ -1,5 +1,19 @@
 ## Open
 
+- **/connect/: the example pills in one row that scrolls sideways, edges faded** (2026-10-15). Asked: *"make suggestions pills one row and overflow-x scrollable. add gradient to cover edges ub a bit"*.
+
+- **/connect/: a microphone button beside send, the standard dictation shortcut, and the sustain pedal starts it, as the old wish demo did** (2026-10-15). Asked: *"can we have mike input button next to send button. what is standard dictate button shortcut in claude/chatgpt, use it. also activate on sustain button. see old wish demo"*.
+
+- **/connect/: "split onscreen keyboard to play rhodes on top and synth bass on bottom - there is no way to listen"** (2026-10-15). From the owner's own asks on /connect/ (device log). Find why nothing could be heard and what a keyboard split needs.
+
+- **Grains: a default that is heard at once, on every page that has the granulator** (2026-10-15). Asked: *"set grains default to something that is immediately listenambe (in others demos too), currently the sound takes forever to appear"*.
+
+- **/connect/: a Pi node's Join and LEAVE become the standard play and stop icon buttons** (2026-10-15). Asked: *"use standard play / stop iconbuttons"*, on a crop of `pi-1:shader`'s face.
+
+- **/connect/: each request replaces the patch; no connect or dismiss rows** (2026-10-15). Asked: *"on each input rm previpus patch. rm these. just build patch or not. when can not be made say it in centred text (parch placeholder aread). rm dotted line around."*
+
+- **/connect/: a shimmer on the pill or the send button while asking; the send button is an arrow up inside the field, as the chat components do** (2026-10-15). Asked: *"on submit show shimmer on pill or on send. use arrow up as send button, inside-field (see chat components)"*.
+
 - ~~**/connect/: a text field for my own requests, and a log of them**~~ (2026-10-15, DONE: field + send button in --voice; each ask, the model's links with refusals, and every connect/dismiss go to pub.positron.studio/logs as `connect ...` lines; never from a check; verify 98/98). Asked: *"in connect lets have regular input field (just accect in pill one). log my requests, i am trying to input differrent patcbays and lets see what works"*. A field in the pills' --voice colour; every request, the model's answer and what got built, logged where the session can read it.
 
 - ~~**/remote/plaits/: play the Pi's Plaits from a page**~~ (2026-10-15, DONE: self-check 7/7 on the relay, 14/14 on the stand-in board; not heard yet; a patch's level trim does not reach the Pi, because the picker sends knob values and only plaits.patch sets the trim). Asked: *"Do eemote plaits page"*. In the shape of /remote/collide/, a card in the remote group, the pi-1:plaits node /connect/ can link.

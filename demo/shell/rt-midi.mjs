@@ -19,6 +19,8 @@ export function make({ send, wake, log }) {
       if (closed) return;   // the inputs keep their listeners; a closed box says nothing
       const [b0, d1, d2 = 0] = e.data;
       const st = b0 & 0xf0, ch = (b0 & 0x0f) + 1;
+      // The sustain pedal (CC 64) is announced to the page, which may use it as a hold-to-talk.
+      if (st === 0xb0 && d1 === 64) { dispatchEvent(new CustomEvent('pos-sustain', { detail: { down: d2 >= 64 } })); return; }
       if (st !== 0x90 && st !== 0x80) return;
       const on = st === 0x90 && d2 > 0;
       hold(d1, on);
