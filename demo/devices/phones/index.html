@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Test signal from Pi</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<style>
+  .ph-sec { display: flex; flex-direction: column; gap: 12px; }
+</style>
+<script type="module">
+  // The Pi 4's own 3.5 mm jack plays a click or a tone, to test a drum machine's, a synth's or the
+  // Fast Track Pro's input. The board holds the JACK link (`jack.link`, rig/board/outputs.mjs), so it
+  // outlives this tab; the page asks on a press, never on load.
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { BOARD_SITE, boardGraph, addBoardNode, TEST_SIGNALS } from '/shell/graph-registry.mjs';
+  import { relayOverride } from '/shell/wire.mjs';
+
+  const d = mount({ name: 'Test signal from Pi', what: '', index: '/', indexLabel: 'positron',
+    // Readouts on top, the log at the foot (positron-concepts).
+    joined: false,
+    readout: { plays: '', level: 'dB', jack: '', restarts: '' } });
+  conceptNav('devices/phones');
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  // A check drives a board only on a relay on this machine, never the Pi.
+  const LOOP = !!relayOverride(location.search);
+  const MAY_SEND = !SELFCHECK || (q.get('board') === '1' && LOOP);
+  const P = BOARD_SITE;
+  const JACK_IN = `${P}:phones:audio-in`;
+  const outOf = (name) => `${P}:${name}:audio-out`;
+  const LEVELS = [-40, -30, -20, -10, 0];
+
+  // ── the bay: the test signals and the jack, as the board announces them ──
+  const G = boardGraph({ room: ROOM, gpu: false, jack: true, outputs: [{ device: 'hw:CARD=Headphones' }], tests: TEST_SIGNALS });
+  const bay = createBay();
+  for (const t of TEST_SIGNALS) addBoardNode(bay, G, t.name);
+  addBoardNode(bay, G, 'phones', { label: 'Pi 3.5 mm jack' });
+
+  let pb = null;
+  /** The source the picture links to the jack, or null. */
+  const drawn = () => bay.links().find((l) => l.to === JACK_IN) || null;
+  function draw(name) {
+    const L = drawn();
+    if (L && L.from === (name && outOf(name))) return;
+    if (L) bay.unlink(L.id);
+    if (name) {
+      const r = bay.link(outOf(name), JACK_IN);
+      if (!r.ok) d.log(`${outOf(name)} -> ${JACK_IN} refused: ${r.why}`, 'warn');
+    }
+    pb?.refresh();
+  }
+
+  // ── the board ──
+  let board = null, opened = null, plays = null, synced = false;
+  function connect() {
+    if (board || !MAY_SEND) return opened;
+    let open;
+    opened = new Promise((r) => { open = r; });
+    board = createBoard({ room: ROOM, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind),
+      onOpen: () => open(true) });
+    d.log(`reaching ${ROOM}`);
+    return opened;
+  }
+  async function ask(msg, type, ms = 8000) {
+    connect();
+    const ok = await Promise.race([opened, new Promise((r) => setTimeout(() => r(false), 6000))]);
+    if (!ok) { d.log('the Pi did not answer', 'warn'); return null; }
+    return board.ask(msg, type, ms);
+  }
+  const line = (name) => `${outOf(name)} -> ${JACK_IN}`;
+  /** What the board holds into the jack, read back; the picture and the choice follow it. */
+  async function sync() {
+    const r = await ask({ type: 'jack.links' }, 'jack.links');
+    if (!r?.ok) return;
+    const held = TEST_SIGNALS.find((t) => r.links.some((l) => l.link === line(t.name)));
+    plays = held?.name ?? null;
+    synced = true;
+    draw(plays);
+    pick.set(held ? 1 + TEST_SIGNALS.indexOf(held) : 0, true);
+    d.set('plays', plays ?? 'nothing');
+  }
+  async function status() {
+    const s = await ask({ type: 'outputs.status' }, 'outputs.status');
+    if (!s?.ok) return;
+    const jk = s.clients.find((c) => c.what === 'phones');
+    d.set('level', s.level);
+    d.set('jack', !s.phones ? 'none' : jk?.up ? 'up' : 'down');
+    d.set('restarts', s.clients.reduce((n, c) => n + Math.max(0, c.starts - 1), 0));
+    if (s.level != null) lvl.set(LEVELS.indexOf(s.level), true);
+  }
+
+  /** A press: the jack plays `name` (a test signal) or nothing. */
+  async function choose(name) {
+    if (!MAY_SEND) { draw(name); d.log('this run may not drive the board, add board=1 and a relay on this machine', 'dim'); return; }
+    if (!synced) await sync();
+    if (plays && plays !== name) {
+      const u = await ask({ type: 'jack.unlink', link: line(plays) }, 'jack.unlinked');
+      if (!u?.ok) { d.log(`the Pi did not let go of ${plays}: ${(u?.problems || []).join(', ') || 'no answer'}`, 'warn'); return; }
+      plays = null;
+    }
+    if (name && plays !== name) {
+      const r = await ask({ type: 'jack.link', link: line(name) }, 'jack.linked');
+      if (!r?.ok) d.log(`the Pi refused ${name}: ${(r?.problems || []).join(', ') || r?.hint || 'no answer'}`, 'warn');
+      else { plays = name; d.log(`the jack plays ${name}`, 'ok'); }
+    } else if (!name) d.log('the jack plays nothing', 'ok');
+    draw(plays);
+    d.set('plays', plays ?? 'nothing');
+    status();
+  }
+  async function level(db) {
+    if (!MAY_SEND) return;
+    const r = await ask({ type: 'phones.level', db }, 'phones.level');
+    if (!r?.ok) { d.log(`the level did not change: ${r?.why || 'no answer'}`, 'warn'); return; }
+    d.log(`the jack is at ${r.db} dB`, 'ok');
+    if (!synced) sync();
+    status();
+  }
+
+  const pick = createChoice({ label: 'jack plays', options: [['off', ''], ...TEST_SIGNALS.map((t) => [t.name, t.name])], at: 0,
+    title: (v) => { const t = TEST_SIGNALS.find((x) => x.name === v); return t ? `${t.hz} Hz at ${t.bpm} bpm` : 'nothing'; },
+    onPick: (v) => { choose(v); } });
+  const lvl = createChoice({ label: 'level dB', options: LEVELS.map((v) => [String(v), v]), at: 2,
+    title: (v) => (v === 0 ? 'full: loud in headphones' : `${v} dB`),
+    onPick: (v) => { level(v); } });
+
+  pb = createPatchbay(bay, { room: ROOM, flowing: (l) => l.to === JACK_IN });
+  const sec = el('section', 'ph-sec');
+  sec.append(pick.el, lvl.el);
+  d.stack.add(sec, pb.el);
+
+  window.__demo.bay = bay;
+  window.__demo.probe = () => ({ plays, synced, link: drawn()?.from ?? null });
+
+  if (SELFCHECK) {
+    await new Promise((r) => setTimeout(r, 300));
+    d.assert('a visit reaches nothing until a press', !board);
+    d.assert('the bay has both test signals and the jack', bay.nodes().length === 3, String(bay.nodes().length));
+    if (!MAY_SEND) {
+      pick.buttons[2].click(); await new Promise((r) => setTimeout(r, 50));
+      d.assert('tone draws pi-1:tone -> pi-1:phones', drawn()?.from === outOf('tone'), drawn()?.from);
+      pick.buttons[0].click(); await new Promise((r) => setTimeout(r, 50));
+      d.assert('off takes the link away and still reaches nothing', !drawn() && !board);
+    }
+  }
+  d.ready();
+</script>

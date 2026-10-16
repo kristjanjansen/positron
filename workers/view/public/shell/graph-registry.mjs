@@ -68,6 +68,13 @@ export const JACK_ENDS = {
   pappusOut: ['SuperCollider:out_1', 'SuperCollider:out_2'],
   capture: ['posboard:input_1'],
 };
+/** The Pi 4's 3.5 mm jack on JACK, by `alsa_out -j phones` (rig/board/outputs.mjs). */
+export const PHONES_JACK = ['phones:playback_1', 'phones:playback_2'];
+/** The board's test signals, one `jack_metro` each; it names its port `<bpm>_bpm`. */
+export const TEST_SIGNALS = [
+  { name: 'click', label: 'click', bpm: 120, hz: 1000, jack: ['posclick:120_bpm'] },
+  { name: 'tone', label: 'tone', bpm: 60, hz: 440, jack: ['postone:60_bpm'] },
+];
 /** The JACK port a hardware input lands on: `alsa_in -j <name>` registers `<name>:capture_N`. */
 export const inputJack = (name, take = 1) => [`${name}:capture_${take}`];
 

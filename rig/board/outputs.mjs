@@ -3,16 +3,14 @@
 // Each is a JACK client kept alive with a backoff; a link (`jack.link`) decides who hears what.
 // alsa_out resamples between two clocks: a test signal, not a clean recording.
 
-// The jack as an output: `phones:playback_1..2` once alsa_out is up.
-export const PHONES = { name: 'phones', card: 'Headphones', device: 'hw:CARD=Headphones', channels: 2 };
-export const PHONES_JACK = ['phones:playback_1', 'phones:playback_2'];
+import { PHONES_JACK, TEST_SIGNALS } from '../../demo/shell/graph-registry.mjs';
 
-// jack_metro names its one port `<bpm>_bpm`, so the bpm is fixed here and the port with it.
+export const PHONES = { name: 'phones', card: 'Headphones', device: 'hw:CARD=Headphones', channels: 2 };
+export { PHONES_JACK };
+
 // The tone is a 60 bpm beep held for 990 ms of each 1000: a near-steady 440 Hz.
-export const TEST_SOURCES = [
-  { name: 'click', label: 'click', args: ['-b', '120', '-f', '1000', '-A', '0.5', '-D', '20'], jack: ['posclick:120_bpm'] },
-  { name: 'tone', label: 'tone', args: ['-b', '60', '-f', '440', '-A', '0.25', '-D', '990', '-a', '1', '-d', '1'], jack: ['postone:60_bpm'] },
-];
+const METRO = { click: ['-A', '0.5', '-D', '20'], tone: ['-A', '0.25', '-D', '990', '-a', '1', '-d', '1'] };
+export const TEST_SOURCES = TEST_SIGNALS.map((t) => ({ ...t, args: ['-b', String(t.bpm), '-f', String(t.hz), ...METRO[t.name]] }));
 
 /** The graph's facts: which outputs and test sources this board has. */
 export function outputFacts({ phones }) {
@@ -28,7 +26,11 @@ export function clientsFor({ phones }) {
   ];
 }
 
-export function createOutputs({ phones, spawn, jack, log = () => {}, setTimer = setTimeout, now = Date.now }) {
+// The jack's level: ALSA's `PCM` control on the card, in dB, -40 to 0 here (the card goes to +4).
+export const LEVEL_RANGE = [-40, 0];
+export const parseLevel = (text) => { const m = /\[(-?\d+(?:\.\d+)?)dB\]/.exec(String(text)); return m ? Number(m[1]) : null; };
+
+export function createOutputs({ phones, spawn, jack, run = null, log = () => {}, setTimer = setTimeout, now = Date.now }) {
   const keep = clientsFor({ phones }).map(([cmd, args, what]) => ({ cmd, args, what, proc: null, at: 0, backoff: 2000, starts: 0 }));
   let closed = false;
   const quiet = (d) => String(d).split('\n').map((x) => x.trim())
@@ -58,7 +60,19 @@ export function createOutputs({ phones, spawn, jack, log = () => {}, setTimer = 
     setTimer(() => start(k), k.backoff);
     k.backoff = Math.min(k.backoff * 2, 60_000);
   }
+  const amixer = (args) => run('amixer', ['-c', PHONES.card, ...args]);
+  function level(db) {
+    if (!phones || !run) return { ok: false, why: 'no 3.5 mm jack on this board' };
+    if (db != null) {
+      const v = Number(db);
+      if (!Number.isFinite(v)) return { ok: false, why: 'db is a number' };
+      const c = Math.round(Math.min(LEVEL_RANGE[1], Math.max(LEVEL_RANGE[0], v)));
+      try { amixer(['sset', 'PCM', '--', `${c}dB`]); } catch (e) { return { ok: false, why: String(e.message).slice(0, 200) }; }
+    }
+    try { return { ok: true, db: parseLevel(amixer(['sget', 'PCM'])) }; } catch (e) { return { ok: false, why: String(e.message).slice(0, 200) }; }
+  }
   return {
+    level,
     start() { for (const k of keep) start(k); },
     status: () => keep.map((k) => ({ what: k.what, up: !!k.proc, starts: k.starts })),
     close() { closed = true; for (const k of keep) { try { k.proc?.kill('SIGTERM'); } catch {} } },

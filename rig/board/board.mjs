@@ -1211,7 +1211,8 @@ async function handle(msg, replyVia = null) {
       return answer({ ok: r.ok, applied: !DRY, held: had, rows: jr.rows, cut, kept: jr.rows.filter((x) => keep.has(k(x))),
                       steps: planned.steps, feeding: after ? feeding(after) : null });
     }
-    case 'outputs.status': return reply('outputs.status', { ok: true, phones: HAS_PHONES, clients: outs.status() });
+    case 'outputs.status': return reply('outputs.status', { ok: true, phones: HAS_PHONES, clients: outs.status(), level: outs.level().db ?? null });
+    case 'phones.level': return reply('phones.level', outs.level(msg.db));
     case 'jack.links': {
       const live = listJack();
       const links = [...bayLinks.entries()].map(([link, rows]) => {
@@ -1462,7 +1463,8 @@ const hwInputs = createInputs({
 });
 if (!DRY && !ONCE) hwInputs.start();
 // The Pi 4's 3.5 mm jack and the test signals, on JACK beside jackd's card (outputs.mjs).
-const outs = createOutputs({ phones: HAS_PHONES, spawn, log: (...a) => log('output', ...a),
+const outs = createOutputs({ phones: HAS_PHONES, spawn,
+  run: (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), log: (...a) => log('output', ...a),
   jack: { ensure: () => ensureJackd({ onLog: (l) => log('output', l) }) } });
 if (!DRY && !ONCE && backend() === 'alsa') outs.start();
 
