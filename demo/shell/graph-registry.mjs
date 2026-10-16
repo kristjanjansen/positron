@@ -242,7 +242,8 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
   for (const o of jack ? outputs : []) {
     const c = cardOf(o.device);
     node(c.name, 'device', c.label);
-    port(c.name, 'audio-in', { label: c.label, dir: 'in', medium: 'audio', shape: { rate: 48000, channels: 2 },
+    // No channel count: the board pairs channels on a JACK link (`jackRows`), so mono fills both sides.
+    port(c.name, 'audio-in', { label: c.label, dir: 'in', medium: 'audio', shape: { rate: 48000 },
       transports: ['jack'], jack: Array.isArray(o.jack) ? [...o.jack] : ['system:playback_1', 'system:playback_2'] });
   }
   // Test signals: a JACK client each, always running, heard only where a link takes them.

@@ -22,7 +22,7 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBoard } from '/shell/board.mjs';
-  import { BOARD_SITE, boardGraph, addBoardNode, TEST_SIGNALS } from '/shell/graph-registry.mjs';
+  import { BOARD_SITE, boardGraph, addBoardNode, TEST_SIGNALS, PHONES_JACK } from '/shell/graph-registry.mjs';
   import { relayOverride } from '/shell/wire.mjs';
 
   const d = mount({ name: 'Test signal from Pi', what: '', index: '/', indexLabel: 'positron',
@@ -42,7 +42,7 @@
   const LEVELS = [-40, -30, -20, -10, 0];
 
   // ── the bay: the test signals and the jack, as the board announces them ──
-  const G = boardGraph({ room: ROOM, gpu: false, jack: true, outputs: [{ device: 'hw:CARD=Headphones' }], tests: TEST_SIGNALS });
+  const G = boardGraph({ room: ROOM, gpu: false, jack: true, outputs: [{ device: 'hw:CARD=Headphones', jack: PHONES_JACK }], tests: TEST_SIGNALS });
   const bay = createBay();
   for (const t of TEST_SIGNALS) addBoardNode(bay, G, t.name);
   addBoardNode(bay, G, 'phones', { label: 'Pi 3.5 mm jack' });
@@ -149,6 +149,8 @@
     if (!MAY_SEND) {
       pick.buttons[2].click(); await new Promise((r) => setTimeout(r, 50));
       d.assert('tone draws pi-1:tone -> pi-1:phones', drawn()?.from === outOf('tone'), drawn()?.from);
+      d.assert('NEGATIVE CONTROL: the drawn link lands on the jack, not on the Fast Track Pro',
+        JSON.stringify(drawn()?.session?.rows?.map((r) => r.to)) === JSON.stringify(PHONES_JACK), JSON.stringify(drawn()?.session?.rows));
       pick.buttons[0].click(); await new Promise((r) => setTimeout(r, 50));
       d.assert('off takes the link away and still reaches nothing', !drawn() && !board);
     }
