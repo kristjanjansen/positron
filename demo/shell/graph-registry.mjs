@@ -44,7 +44,7 @@ const KNOWN_MIDI = {
   'FastTrack Pro': { name: 'ftpro', label: 'Fast Track Pro' },
 };
 /** Audio interfaces by ALSA card id, announced under the name the patches use. */
-const KNOWN_CARDS = { Pro: { name: 'ftpro', label: 'Fast Track Pro' }, Headphones: { name: 'phones', label: 'Pi 3.5 mm jack' } };
+const KNOWN_CARDS = { Pro: { name: 'ftpro', label: 'Fast Track Pro' }, Headphones: { name: 'pwm', label: 'PWM out' } };
 const cardOf = (device) => KNOWN_CARDS[/CARD=([^,]+)/.exec(String(device))?.[1]] ?? { name: 'out', label: 'audio out' };
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 
@@ -68,13 +68,8 @@ export const JACK_ENDS = {
   pappusOut: ['SuperCollider:out_1', 'SuperCollider:out_2'],
   capture: ['posboard:input_1'],
 };
-/** The Pi 4's 3.5 mm jack on JACK, by `alsa_out -j phones` (rig/board/outputs.mjs). */
-export const PHONES_JACK = ['phones:playback_1', 'phones:playback_2'];
-/** The board's test signals, one `jack_metro` each; it names its port `<bpm>_bpm`. */
-export const TEST_SIGNALS = [
-  { name: 'click', label: 'click', bpm: 120, hz: 1000, jack: ['posclick:120_bpm'] },
-  { name: 'tone', label: 'tone', bpm: 60, hz: 440, jack: ['postone:60_bpm'] },
-];
+/** The Pi 4's PWM output (the 3.5 mm socket) on the JACK graph, by `alsa_out -j pwm` (rig/board/outputs.mjs). */
+export const PWM_PORTS = ['pwm:playback_1', 'pwm:playback_2'];
 /** The JACK port a hardware input lands on: `alsa_in -j <name>` registers `<name>:capture_N`. */
 export const inputJack = (name, take = 1) => [`${name}:capture_${take}`];
 
@@ -106,7 +101,6 @@ export function jackRows(from, to) {
  * @param {object} [o.instruments]  `board.hello`'s own map: name -> available
  * @param {Array}  [o.inputs]    `[{ name, channels, midi: { port, channels } | null }]`
  * @param {Array}  [o.outputs]   `[{ device, jack? }]`, the jackd card when its jackd opens playback, or a card bridged by `alsa_out` with its own JACK ports (rig/board/outputs.mjs)
- * @param {Array}  [o.tests]     `[{ name, label, jack }]`, the board's test signals (rig/board/outputs.mjs `TEST_SOURCES`)
  * @param {Array}  [o.alsa]      `alsa.mjs` `addressable()` rows
  * @param {number} [o.frameMs]
  * @param {boolean} [o.gpu]      whether the GPU video path exists; announces the `shader` node
@@ -119,7 +113,7 @@ export function jackRows(from, to) {
  * @param {boolean} [o.sequencer]  announce `pi-1:sequencer`, the board's own step sequencer (rig/board/sequencer.mjs)
  * why: lessons/kit-graph-registry.md#boardgraph
  */
-export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], outputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false, plaitsParams = null, patches = {}, drums = {}, sequencer = false, tests = [] }) {
+export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], outputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false, plaitsParams = null, patches = {}, drums = {}, sequencer = false }) {
   const place = room;
   // Port names are `<medium>-<dir>` (plans/plan-site-names.md §4c), so the id
   // says what a port carries and which way. `graphProblem` holds a board to it.
@@ -245,12 +239,6 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     // No channel count: the board pairs channels on a JACK link (`jackRows`), so mono fills both sides.
     port(c.name, 'audio-in', { label: c.label, dir: 'in', medium: 'audio', shape: { rate: 48000 },
       transports: ['jack'], jack: Array.isArray(o.jack) ? [...o.jack] : ['system:playback_1', 'system:playback_2'] });
-  }
-  // Test signals: a JACK client each, always running, heard only where a link takes them.
-  for (const t of jack ? tests : []) {
-    node(t.name, 'engine', t.label);
-    port(t.name, 'audio-out', { label: t.label, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: t.jack.length },
-      transports: ['jack'], jack: [...t.jack] });
   }
   // Every other MIDI device the board sees. A device already described as an
   // input above is not described twice.

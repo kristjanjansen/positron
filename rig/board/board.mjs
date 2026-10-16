@@ -1211,8 +1211,8 @@ async function handle(msg, replyVia = null) {
       return answer({ ok: r.ok, applied: !DRY, held: had, rows: jr.rows, cut, kept: jr.rows.filter((x) => keep.has(k(x))),
                       steps: planned.steps, feeding: after ? feeding(after) : null });
     }
-    case 'outputs.status': return reply('outputs.status', { ok: true, phones: HAS_PHONES, clients: outs.status(), level: outs.level().db ?? null });
-    case 'phones.level': return reply('phones.level', outs.level(msg.db));
+    case 'outputs.status': return reply('outputs.status', { ok: true, pwm: HAS_PWM, clients: outs.status(), level: outs.level().db ?? null });
+    case 'pwm.level': return reply('pwm.level', outs.level(msg.db));
     case 'jack.links': {
       const live = listJack();
       const links = [...bayLinks.entries()].map(([link, rows]) => {
@@ -1261,7 +1261,7 @@ function connect() {
                    // Drum maps on each drum instrument's midi-in, for a `drummap` transform (drum-maps.mjs).
                    drums: { circuit: DRUM_MAPS.circuit, drums: DRUM_MAPS.gm }, sequencer: true,
                    midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
-                   ...outputFacts({ phones: HAS_PHONES }),
+                   ...outputFacts({ pwm: HAS_PWM }),
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable(), camera: cameraFound };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,
                     frameMs: 1000 * FRAME / RATE, instruments, error: s.error, hint: s.hint, graphFacts,
@@ -1416,7 +1416,7 @@ if (camera?.enabled) log(`camera: ${cameraFound ? 'found, announced as camera' :
 // Hardware inputs, each in its own room, from BOARD_INPUTS; a bad entry is reported and skipped.
 // why: lessons/rig-board.md#inputs
 const inputsCfg = parseInputs(process.env.BOARD_INPUTS || '');
-const HAS_PHONES = fsMod.existsSync('/proc/asound/Headphones');
+const HAS_PWM = fsMod.existsSync('/proc/asound/Headphones');
 for (const p of inputsCfg.problems) log('inputs:', p);
 // jackd on an input's card, set before anything can raise jackd.
 // why: lessons/rig-board.md#jackd-card
@@ -1462,8 +1462,8 @@ const hwInputs = createInputs({
           wire: (doc, what) => jackWire(doc, { onLog: (l) => log('input', l), what }) },
 });
 if (!DRY && !ONCE) hwInputs.start();
-// The Pi 4's 3.5 mm jack and the test signals, on JACK beside jackd's card (outputs.mjs).
-const outs = createOutputs({ phones: HAS_PHONES, spawn,
+// The Pi 4's PWM output, on the JACK graph beside jackd's card (outputs.mjs).
+const outs = createOutputs({ pwm: HAS_PWM, spawn,
   run: (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), log: (...a) => log('output', ...a),
   jack: { ensure: () => ensureJackd({ onLog: (l) => log('output', l) }) } });
 if (!DRY && !ONCE && backend() === 'alsa') outs.start();

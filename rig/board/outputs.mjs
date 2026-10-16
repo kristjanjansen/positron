@@ -1,37 +1,27 @@
-// The board's own outputs beyond jackd's card: the Pi 4's 3.5 mm jack (PWM, ALSA card
-// `Headphones`) bridged onto JACK by `alsa_out`, and two test signals from `jack_metro`.
-// Each is a JACK client kept alive with a backoff; a link (`jack.link`) decides who hears what.
-// alsa_out resamples between two clocks: a test signal, not a clean recording.
+// The Pi 4's own analogue output (PWM, ALSA card `Headphones`, the 3.5 mm socket), bridged onto the
+// JACK graph by `alsa_out` beside jackd's card and announced as `pi-1:pwm`. A link (`jack.link`)
+// decides what plays there. alsa_out resamples between two clocks: fine to listen to, not to record.
 
-import { PHONES_JACK, TEST_SIGNALS } from '../../demo/shell/graph-registry.mjs';
+import { PWM_PORTS } from '../../demo/shell/graph-registry.mjs';
 
-export const PHONES = { name: 'phones', card: 'Headphones', device: 'hw:CARD=Headphones', channels: 2 };
-export { PHONES_JACK };
+export const PWM = { name: 'pwm', card: 'Headphones', device: 'hw:CARD=Headphones', channels: 2 };
 
-// The tone is a 60 bpm beep held for 990 ms of each 1000: a near-steady 440 Hz.
-const METRO = { click: ['-A', '0.5', '-D', '20'], tone: ['-A', '0.25', '-D', '990', '-a', '1', '-d', '1'] };
-export const TEST_SOURCES = TEST_SIGNALS.map((t) => ({ ...t, args: ['-b', String(t.bpm), '-f', String(t.hz), ...METRO[t.name]] }));
-
-/** The graph's facts: which outputs and test sources this board has. */
-export function outputFacts({ phones }) {
-  return { outputs: phones ? [{ device: PHONES.device, jack: PHONES_JACK }] : [],
-           tests: TEST_SOURCES.map(({ name, label, jack }) => ({ name, label, jack })) };
+/** The graph's facts: the output, when this board has one. */
+export function outputFacts({ pwm }) {
+  return { outputs: pwm ? [{ device: PWM.device, jack: PWM_PORTS }] : [] };
 }
 
 /** The processes to keep alive, as `[cmd, args, what]`. */
-export function clientsFor({ phones }) {
-  return [
-    ...(phones ? [['alsa_out', ['-j', PHONES.name, '-d', PHONES.device, '-r', '48000', '-c', String(PHONES.channels), '-p', '512', '-n', '3'], 'phones']] : []),
-    ...TEST_SOURCES.map((t) => ['jack_metro', ['-n', `pos${t.name}`, ...t.args], t.name]),
-  ];
+export function clientsFor({ pwm }) {
+  return pwm ? [['alsa_out', ['-j', PWM.name, '-d', PWM.device, '-r', '48000', '-c', String(PWM.channels), '-p', '512', '-n', '3'], 'pwm']] : [];
 }
 
-// The jack's level: ALSA's `PCM` control on the card, in dB, -40 to 0 here (the card goes to +4).
+// The output's level: ALSA's `PCM` control on the card, in dB, -40 to 0 here (the card goes to +4).
 export const LEVEL_RANGE = [-40, 0];
 export const parseLevel = (text) => { const m = /\[(-?\d+(?:\.\d+)?)dB\]/.exec(String(text)); return m ? Number(m[1]) : null; };
 
-export function createOutputs({ phones, spawn, jack, run = null, log = () => {}, setTimer = setTimeout, now = Date.now }) {
-  const keep = clientsFor({ phones }).map(([cmd, args, what]) => ({ cmd, args, what, proc: null, at: 0, backoff: 2000, starts: 0 }));
+export function createOutputs({ pwm, spawn, jack, run = null, log = () => {}, setTimer = setTimeout, now = Date.now }) {
+  const keep = clientsFor({ pwm }).map(([cmd, args, what]) => ({ cmd, args, what, proc: null, at: 0, backoff: 2000, starts: 0 }));
   let closed = false;
   const quiet = (d) => String(d).split('\n').map((x) => x.trim())
     .filter((x) => x && !/^Cannot lock down \d+ byte memory area/.test(x)).join(' ');
@@ -60,9 +50,9 @@ export function createOutputs({ phones, spawn, jack, run = null, log = () => {},
     setTimer(() => start(k), k.backoff);
     k.backoff = Math.min(k.backoff * 2, 60_000);
   }
-  const amixer = (args) => run('amixer', ['-c', PHONES.card, ...args]);
+  const amixer = (args) => run('amixer', ['-c', PWM.card, ...args]);
   function level(db) {
-    if (!phones || !run) return { ok: false, why: 'no 3.5 mm jack on this board' };
+    if (!pwm || !run) return { ok: false, why: 'no PWM output on this board' };
     if (db != null) {
       const v = Number(db);
       if (!Number.isFinite(v)) return { ok: false, why: 'db is a number' };
