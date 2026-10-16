@@ -5,9 +5,15 @@ The Pico 2 W as a node on the relay, over wifi, over TLS: `plans/plan-pico.md`
 that `demo/shell/graph-registry.mjs` accepts, answers `graph.ask`, takes
 `light.set` aimed at its own port and answers `node.ping`.
 
-**Built for `pico2_w`, never run on one.** There is no board on the desk and
-rp2040js has neither the RP2350 nor a radio. The WebSocket client and the node
-protocol are the same C files the Linux test runs against the real relay.
+**First run on a real Pico 2 W, 2026-10-16**, nothing wired to it, flashed from
+the M1 (this laptop will not mount the `RP2350` drive). It joined the home
+Wi-Fi, made the TLS connection and joined `pico-test-ab59ad` as site
+`pico-a629d5` on one steady socket, announcing every 5 s. `node.ping` to the site
+answered `node.pong` 5 of 5, round trips 50, 43, 45, 49 and 42 ms from a laptop
+on the same LAN through `ws.positron.studio`. Its ports still use the names from
+before the 2026-10-11 rename (`din:in`, `din:out`, `led:light`, not
+`<medium>-<dir>`). The WebSocket client and the node protocol are the same C files
+the Linux test runs against the real relay.
 
 ## Run the test (Docker and node only)
 

@@ -1,5 +1,6 @@
 ## Open
 
+- **The Pico 2 W tested on a real board: rig/pico/net joins the relay** (2026-10-16, DONE as a test). Asked: *"i attached pico to this mac usb. you can test it"*, *"moved pico to m1, nothing wired"*. This laptop sees "RP2350 Boot" but will not mount its drive, even read-only (no ThreatLocker line names it); flashed from the M1 over ssh (scp is refused there, `ssh mbp 'cat > ...'` works). Result in rig/pico/net/README.md: joined, announced, node.pong 5/5 at 42 to 50 ms. OPEN: its port names predate the `<medium>-<dir>` rename; light.set untested (no LED wired); the UF2 holds the Wi-Fi password and is gitignored.
 - **Clean up the Pi device pages: stop the test tone, one page per patch** (2026-10-16, agreed; tone STOPPED: nothing feeds phones:playback_1/2, read with jack_lsp -c). Asked: *"rm test tone demom. convert https://positron.studio/devices/drums/ to use pwm output and actual sounds on pi an pwm output"*, *"also stop pi test tone"*, *"on clean this up. stop test tone. have separate demos"*, *"p25=mk25"*, then *"yes"* to:
   - Pi sequencer -> Pi drums -> Pi jack: /devices/drums/, converted. The sequencer gets a second target, pi-1:drums.
   - Pi sequencer -> Circuit drums: new /devices/beat/, split out of /devices/drums/.
