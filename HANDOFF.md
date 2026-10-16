@@ -1,3 +1,51 @@
+# Handoff, 2026-10-15, session 79: the Pi plays the Circuit, the Pi's screen draws patches, social patchbay done
+
+## Where it is right now
+
+- **Site: BUILD `86106293-192749-cc57`**, confirmed on the edge; the deployed build is committed (`b27e32d7`). Everything committed is live.
+- **The Pi (pi-1, 192.168.1.213 on the second site's LAN) runs everything below**: md5s matched after every push. Board service active. Nothing held on it at handoff: the drum sequencer stopped, the keyboard link removed (`kbd.unlink`), the Circuit drums link never made (the Circuit was unplugged, the owner was about to power it off).
+- **The Circuit may be off or unplugged.** None of the three Circuit paths below has been heard by the owner yet.
+- jackd on the Pi now runs duplex on the Fast Track Pro (`"playback": true` in BOARD_INPUTS, old file at `/etc/default/positron-board.bak-2026-10-15`); input floor measured identical both ways (-74 dBFS RMS, 0 xruns). The Fast Track outputs are announced as `pi-1:ftpro` and have NOT been heard (cabling, the owner said "postpone fasttrack").
+- Counted 2026-10-15 night: **62 demo rows, 61 built**; **129 plans**. No headless Chrome left running.
+- GitHub: not pushed this session (the push needs the personal account, CLAUDE.md).
+
+## What the owner can try, and how to stop each
+
+| URL | what | stop |
+| --- | --- | --- |
+| https://positron.studio/devices/drums/ | 8 row drum machine; "plays on" this tab or **Circuit on the Pi**: the Pi's own sequencer plays the Circuit's drums (60 62 64 65 on channel 10 through `{ drummap circuit }`); the Pi's screen draws dotted steps and the framed running step | Stop on the page, or `node rig/board/ask.mjs --room studio-1 seq.stop` |
+| https://positron.studio/devices/keys/ | the MK-425C plays the Circuit's synth 1 or 2 through a link the Pi holds | **off** on the page, or `kbd.unlink` |
+| https://positron.studio/devices/circuit/ | the Circuit's drums (pads or pattern) play the Pi's SuperCollider drums, heard in the tab over the relay; the Pi's screen draws a live grid from the Circuit's clock | **off** on the page, or `cdrums.unlink` |
+| https://positron.studio/devices/patches/ | small Pi patches as cards (oled-card.mjs), send with the chip icon; wires textured by medium (audio solid, MIDI dashed, value dotted, video two rails); audio and video march, events send a 2x2 dot (note button) | |
+| https://positron.studio/social/patchbay/ | every patch as Instagram slides: each slide a board of two columns at a readable size, fewest columns, gaps sized by the wires in them, laned so wires never cross. Owner: *"good job!!"* | |
+
+**Record off on the Circuit before any of the first three.** Notes into an armed Circuit get recorded.
+
+## What landed (all committed and deployed)
+
+- **Pi sequencer** (`985f3e0a`): `rig/board/sequencer.mjs` on the Pi's own clock (step times from a bar origin; a late step skipped, never sent late), `seq.*` verbs; `drummap` transform in bay.mjs resolved from a `drums` map published on the target port; `demo/shell/drum-maps.mjs`; `demo/shell/drum-pattern.mjs`; the bay's channel check is a subset rule now. Pi timer dry run: p50 0.67 ms, worst 1.31 ms.
+- **Keyboard to Circuit** (`b0135dfe`): `rig/board/keyboard.mjs` reads the MK-425C's raw MIDI (card found by name, it moved 6 to 7), `kbd.*` verbs, `circuitSend` the one writer the sequencer and keyboard share (whole messages only, tested interleaved). Bend and mod wheel are dropped (the Circuit's port does not accept them), program change passes. The keyboard reads a semitone flat (47 to 71); no transpose added. Read to write on the Pi: p50 0.22 ms.
+- **Circuit drums to Pi drums** (`86106293`): `rig/board/circuit-drums.mjs`, the drummap read backwards out of the Circuit, channel 10 only, a `tap` on the Circuit input (5 ms poll while tapped), `cdrums.*` verbs; while held it owns the Pi's screen. Not run with a real Circuit.
+- **Pi screen**: `steps-oled.mjs` grid (5 px squares, 7 px pitch, inset from every edge, 8 rows, dotted steps, framed or lane cursor); `bay-oled.mjs` patch renderer with medium textures, marching audio/video, event dots, rounded video corners, brackets clear of boxes.
+- **Names**: `pi-1:mk-425c` (Evolution MK-425C), `pi-1:ftpro` (Fast Track Pro, MIDI folded in); `KNOWN_MIDI` and `KNOWN_CARDS` in graph-registry.mjs.
+- **Kit**: `oled-card.mjs` (`.pos-oc*` in shell.css); browser drum grids lost their row names (hover says the row; `grid.lit()` is now a no-op there); `bay-traffic.mjs` keeps the glow by default, `?wires=beads` to compare.
+- **Plans**: `plans/plan-drums-tiny-screen.md` (prior art, a ladder of rungs), `plans/plan-pi-sequencer.md` (mapping decided: voice names in the pattern, GM on the wire, a drummap per device).
+
+## Open, waiting on the owner
+
+- Listen on the real Circuit: which sound is in each slot, whether note 65 plays, whether the Circuit's own pattern sends its drum notes and Start/Stop over USB, whether its drums answer velocity.
+- Keyboard: let bend/mod wheel through? transpose +1? block program change?
+- The Pi sequencer: a stop that does not need a page (the Pi's `*` key or a board-side button) was offered, not built.
+- Web patchbay wire style: glow stays default; beads behind `?wires=beads`.
+- Social patchbay: phone header puts the download button beside the title (minor).
+- Stale backlog lines from the morning (`evo` naming, the drum screen options line) are superseded by later ones.
+
+## Next, in order
+
+1. The owner's listen on the three Circuit paths; fix what it finds.
+2. Plan-pi-sequencer step 7 measurements on the real desk (timer under SuperCollider, the Circuit's own trigger time).
+3. Rung 1 of the tiny-screen plan on the Pi's keys (editing that works, a status line) now that the board owns the pattern.
+
 # Handoff, 2026-10-14, session 78: social reels, the review fixed, the repo made publishable
 
 ## Evening: the repo moved and was scrubbed (this supersedes the GitHub lines below)
