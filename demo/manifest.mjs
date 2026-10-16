@@ -393,7 +393,11 @@ export const DEMOS = [
   { name: 'slides', group: 'kit', act: 0, created: '2026-10-05', built: true, unlisted: true,
     one: 'A talk made of slides that hold running parts of this site, stepped inside a panel that fills the screen when you present.',
     tags: [] },
-  { name: 'parts', group: 'kit', act: 0, created: '2026-10-05', built: true, unlisted: true,
+  { name: 'parts', group: 'kit', act: 0, created: '2026-10-16', built: true, unlisted: true,
+    one: 'Parts to buy for the Pi and the Pico, read from Oomipood.',
+    tags: [] },
+  // The Pico router's build sheet, archived 2026-10-16 (*"add these to parts page, archive the old ones"*).
+  { name: 'archive/parts', group: 'kit', act: 0, created: '2026-10-05', built: true, unlisted: true,
     one: 'The parts, the breadboard and the power for the Pico router with its screen and four keys.',
     tags: [] },
   { name: 'feedback', group: 'kit', act: 0, created: '2026-09-15', built: true, unlisted: true,
