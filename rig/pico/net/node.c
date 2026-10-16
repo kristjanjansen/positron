@@ -39,16 +39,21 @@ int node_init(node_t *n, const node_cfg_t *cfg, ws_t *ws) {
   n->ws = ws;
   if (!id_ok(cfg->site, strlen(cfg->site)) || strchr(cfg->site, ':') || !id_ok(cfg->place, strlen(cfg->place))) return -1;
   const char *s = cfg->site, *p = cfg->place;
+  // A board: graphProblem holds every port name to <medium>-<dir>, named from the bay's side.
   int w = snprintf(n->graph, sizeof n->graph,
-    "\"graph\":{\"v\":1,\"site\":\"%s\",\"place\":\"%s\","
+    "\"graph\":{\"v\":1,\"site\":\"%s\",\"place\":\"%s\",\"kind\":\"board\",\"label\":\"Pico 2 W\","
     "\"nodes\":["
       "{\"id\":\"%s:din\",\"kind\":\"device\",\"label\":\"Pico DIN\",\"place\":\"%s\"},"
-      "{\"id\":\"%s:led\",\"kind\":\"device\",\"label\":\"Pico light\",\"place\":\"%s\"}],"
+      "{\"id\":\"%s:led\",\"kind\":\"device\",\"label\":\"Pico light\",\"place\":\"%s\"},"
+      "{\"id\":\"%s:button\",\"kind\":\"device\",\"label\":\"BOOTSEL\",\"place\":\"%s\"},"
+      "{\"id\":\"%s:temp\",\"kind\":\"device\",\"label\":\"chip temperature\",\"place\":\"%s\"}],"
     "\"ports\":["
-      "{\"id\":\"%s:din:in\",\"label\":\"Pico DIN in\",\"dir\":\"out\",\"medium\":\"midi\",\"emits\":[\"note\",\"cc\",\"clock\"]},"
-      "{\"id\":\"%s:din:out\",\"label\":\"Pico DIN out\",\"dir\":\"in\",\"medium\":\"midi\",\"accepts\":[\"note\",\"cc\",\"program\",\"sysex\"]},"
-      "{\"id\":\"%s:led:light\",\"label\":\"Pico light\",\"dir\":\"in\",\"medium\":\"value\",\"shape\":{\"channels\":3}}]},",
-    s, p, s, p, s, p, s, s, s);
+      "{\"id\":\"%s:din:midi-out\",\"label\":\"Pico DIN in\",\"dir\":\"out\",\"medium\":\"midi\",\"emits\":[\"note\",\"cc\",\"clock\"]},"
+      "{\"id\":\"%s:din:midi-in\",\"label\":\"Pico DIN out\",\"dir\":\"in\",\"medium\":\"midi\",\"accepts\":[\"note\",\"cc\",\"program\",\"sysex\"]},"
+      "{\"id\":\"%s:led:value-in\",\"label\":\"Pico light\",\"dir\":\"in\",\"medium\":\"value\",\"shape\":{\"channels\":3}},"
+      "{\"id\":\"%s:button:value-out\",\"label\":\"BOOTSEL\",\"dir\":\"out\",\"medium\":\"value\",\"emits\":[\"key\"],\"shape\":{\"of\":\"key\"}},"
+      "{\"id\":\"%s:temp:value-out\",\"label\":\"chip temperature\",\"dir\":\"out\",\"medium\":\"value\",\"emits\":[\"number\"],\"shape\":{\"of\":\"number\",\"unit\":\"C\"}}]},",
+    s, p, s, p, s, p, s, p, s, p, s, s, s, s, s);
   if (w < 0 || (size_t)w >= sizeof n->graph) return -2;
   n->graphn = (size_t)w;
   return 0;
@@ -80,12 +85,35 @@ int node_announce(node_t *n) {
   return node_send(n, "graph.announce", n->graph);
 }
 
+int node_event(node_t *n, const char *port, const char *ev) {
+  char body[256];
+  int w = snprintf(body, sizeof body, "\"source\":\"%s:%s\",\"ev\":%s,", n->c.site, port, ev);
+  if (w < 0 || (size_t)w >= sizeof body) return -2;
+  int r = node_send(n, "bay.event", body);
+  if (r == 0) n->st.events++;
+  return r;
+}
+
+int node_button(node_t *n, bool down) {
+  return node_event(n, "button:value-out", down ? "{\"of\":\"key\",\"cls\":\"key\",\"k\":0,\"down\":true}"
+                                                : "{\"of\":\"key\",\"cls\":\"key\",\"k\":0,\"down\":false}");
+}
+
+int node_temp(node_t *n, int dc) {
+  // Integer tenths, so no printf float support is needed; the sign is written once, so -0.5 is not 0.-5.
+  unsigned a = (unsigned)(dc < 0 ? -dc : dc);
+  char ev[96];
+  snprintf(ev, sizeof ev, "{\"of\":\"number\",\"cls\":\"number\",\"v\":%s%u.%u,\"unit\":\"C\"}", dc < 0 ? "-" : "", a / 10, a % 10);
+  return node_event(n, "temp:value-out", ev);
+}
+
 void node_on_open(void *v) {
   node_t *n = v;
   rand_id(n, n->from, 6);
   n->seq = 0;
   n->open = true;
   n->last_rx = n->last_ping = n->now;
+  n->last_temp = n->now - NODE_TEMP_MS;      // the first temperature goes on the first tick
   logf_(n, "open as %s, announcing %s", n->from, n->c.site);
   node_announce(n);
 }
@@ -234,7 +262,7 @@ void node_on_text(void *v, char *js, size_t len) {
     return;
   }
   char site_port[64];
-  snprintf(site_port, sizeof site_port, "%s:led:light", n->c.site);
+  snprintf(site_port, sizeof site_port, "%s:led:value-in", n->c.site);
 #define IS(s) (tl == sizeof(s) - 1 && memcmp(type, s, tl) == 0)
 #define TO(s) (to && tol == strlen(s) && memcmp(to, s, tol) == 0)
   if (IS("graph.ask")) {
@@ -267,6 +295,8 @@ int node_tick(node_t *n, uint32_t mono_ms) {
   if (n->ws->state != WS_OPEN) { n->open = false; return -1; }
   if (mono_ms - n->last_rx > NODE_DEAD_MS) { logf_(n, "nothing heard for %u ms, the link is dead", (unsigned)(mono_ms - n->last_rx)); n->open = false; return -1; }
   if (mono_ms - n->last_announce >= NODE_ANNOUNCE_MS) node_announce(n);
+  int dc;
+  if (n->c.temp && mono_ms - n->last_temp >= NODE_TEMP_MS) { n->last_temp = mono_ms; if (n->c.temp(n->c.user, &dc) == 0) node_temp(n, dc); }
   if (mono_ms - n->last_ping >= NODE_PING_MS) { n->last_ping = mono_ms; ws_send_text(n->ws, "ping", 4); }
   return 0;
 }

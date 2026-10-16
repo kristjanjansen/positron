@@ -8,7 +8,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 RIG="$(cd "$HERE/../.." && pwd)"
 IMAGE=positron-pico-net:2.2.0
 docker image inspect positron-pico-sdk:2.2.0 >/dev/null 2>&1 || docker build -t positron-pico-sdk:2.2.0 "$RIG/pico/firmware"
-docker image inspect "$IMAGE" >/dev/null 2>&1 || docker build -t "$IMAGE" "$HERE"
+# An image from before tinyusb was added is built again, or the USB log is silently left out.
+docker run --rm "$IMAGE" test -f /opt/pico-sdk/lib/tinyusb/src/tusb.h 2>/dev/null || docker build -t "$IMAGE" "$HERE"
 out="$HERE/build-pico2_w"
 mkdir -p "$out"
 docker run --rm -v "$RIG":/rig:ro -v "$out":/out "$IMAGE" sh -c "

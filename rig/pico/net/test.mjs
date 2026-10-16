@@ -1,6 +1,7 @@
 // node rig/pico/net/test.mjs [--no-build]: the Pico network code on Linux in Docker against the
 // real relay; only node runs on the Mac. Fresh `pico-test-<hex>` room and site, never studio-1.
-// Checks announce, ask, light.set, ping round trips, container probes and a 20 KB message.
+// Checks announce, ask, light.set, BOOTSEL and temperature as bay.event through a page's bay-node,
+// ping round trips, container probes and a 20 KB message.
 // why: lessons/rig-pico.md#pico-net-test
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -8,6 +9,8 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openWire } from '../../../demo/shell/wire.mjs';
 import { createRegistry, graphProblem } from '../../../demo/shell/graph-registry.mjs';
+import { createBayNode } from '../../../demo/shell/bay-node.mjs';
+import { createBay } from '../../../demo/shell/bay.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const IMAGE = 'positron-pico-net:2.2.0';
@@ -105,9 +108,16 @@ async function variant({ label, scheme, bin, probe = true }) {
     check(took === true, 'createRegistry().ingest() took the announcement');
     const m = reg.merged();
     const ids = m.ports.map((p) => p.id).sort();
-    check(ids.join() === [`${site}:din:in`, `${site}:din:out`, `${site}:led:light`].sort().join(), 'the registry lists the three ports', ids.join(' '));
-    const light = m.ports.find((p) => p.id === `${site}:led:light`);
+    const want = ['din:midi-out', 'din:midi-in', 'led:value-in', 'button:value-out', 'temp:value-out'].map((p) => `${site}:${p}`).sort();
+    check(ids.join() === want.join(), 'the registry lists the five ports, named <medium>-<dir>', ids.join(' '));
+    check(ann.graph.kind === 'board' && ann.graph.label === 'Pico 2 W', 'the graph says kind board, label Pico 2 W', `${ann.graph.kind} ${ann.graph.label}`);
+    const renamed = { ...ann.graph, ports: ann.graph.ports.map((p) => (p.id.endsWith(':led:value-in') ? { ...p, id: `${site}:led:light` } : p)) };
+    check(/named light/.test(graphProblem(renamed)), 'NEGATIVE CONTROL: graphProblem refuses the same board graph with the old led:light name', graphProblem(renamed));
+    const light = m.ports.find((p) => p.id === `${site}:led:value-in`);
     check(light?.medium === 'value' && light?.shape?.channels === 3 && light?.dir === 'in', 'the light port is an input, medium value, three channels');
+    const btn = m.ports.find((p) => p.id === `${site}:button:value-out`), tmp = m.ports.find((p) => p.id === `${site}:temp:value-out`);
+    check(btn?.dir === 'out' && btn?.medium === 'value' && btn?.emits?.includes('key') && tmp?.dir === 'out' && tmp?.shape?.of === 'number',
+      'BOOTSEL and the temperature are value outputs, a key and a number');
     // `sent` whichever firmware is running: parse() renames an old build's `at`.
     check(['id', 'type', 'from', 'sent', 'seq'].every((k) => k in ann) && typeof ann.seq === 'number' && typeof ann.sent === 'number', 'the envelope has id, type, from, sent, seq', `sent ${ann.sent}, seq ${ann.seq}, by ${ann.by}`);
     out.announceBytes = Buffer.byteLength(JSON.stringify(ann));
@@ -121,12 +131,48 @@ async function variant({ label, scheme, bin, probe = true }) {
   check(!!again, 'graph.ask brought another announce', `${out.askMs} ms`);
 
   // 3. light.set
-  wire.send({ type: 'light.set', to: `${site}:led:light`, hex: '#ff8800', name: 'test', parts: [{ hex: '#0000ff', across: [0.2, 0.4] }], sender: 'pico-net-test' });
+  wire.send({ type: 'light.set', to: `${site}:led:value-in`, hex: '#ff8800', name: 'test', parts: [{ hex: '#0000ff', across: [0.2, 0.4] }], sender: 'pico-net-test' });
   const lit = await waitLine(/LIGHT #ff8800 parts=1 #0000ff@200-400/, 5000);
   check(!!lit, 'the C side logged the colour and the part', lit?.trim() || 'nothing');
-  wire.send({ type: 'light.set', to: `pico-zzzzzz:led:light`, hex: '#123456' });
+  wire.send({ type: 'light.set', to: `pico-zzzzzz:led:value-in`, hex: '#123456' });
+  wire.send({ type: 'light.set', to: `${site}:led:light`, hex: '#654321' });
   await sleep(500);
   check(!lines.some((l) => /LIGHT #123456/.test(l)), 'a light.set to another port is ignored');
+  check(!lines.some((l) => /LIGHT #654321/.test(l)), 'NEGATIVE CONTROL: a light.set to the old name led:light is ignored');
+
+  // 3b. BOOTSEL and the temperature, delivered by a page's own bay-node along links it holds
+  const page = 'web-p1t';
+  const pageGraph = { v: 1, site: page, place: 'browser', nodes: [{ id: `${page}:keys`, kind: 'endpoint', label: 'keys' }, { id: `${page}:meter`, kind: 'endpoint', label: 'meter' }],
+    ports: [{ id: `${page}:keys:value-in`, label: 'keys', dir: 'in', medium: 'value', shape: { of: 'key' } },
+            { id: `${page}:meter:value-in`, label: 'meter', dir: 'in', medium: 'value', shape: { of: 'number' } }] };
+  const got = [];
+  const linked = [];
+  let bn;
+  const pageBay = () => {
+    const b = bn.registry.fill(createBay());
+    for (const id of [`${page}:keys:value-in`, `${page}:meter:value-in`]) b.addPort({ ...b.port(id), deliver: (e, l, meta) => got.push({ to: id, e, meta }) });
+    linked.length = 0;
+    linked.push(b.link(`${site}:button:value-out`, `${page}:keys:value-in`), b.link(`${site}:temp:value-out`, `${page}:meter:value-in`));
+    return b;
+  };
+  bn = createBayNode({ room, graphs: [pageGraph], bay: pageBay, wire: (r, o) => openWire(r, { ...o, by: 'tool', reconnect: false }) });
+  await bn.join();
+  await sleep(1500);
+  pageBay();
+  check(linked.every((l) => l.ok), "the page's bay links button:value-out to a key input and temp:value-out to a number input", linked.map((l) => l.why || 'ok').join(' | '));
+  const tempAt = got.length;
+  const tGot = await new Promise((resolve) => { const t0b = Date.now(); const iv = setInterval(() => { const h = got.slice(tempAt).find((g) => g.to.endsWith(':meter:value-in')); if (h || Date.now() - t0b > 12_000) { clearInterval(iv); resolve(h || null); } }, 100); });
+  check(tGot?.e?.of === 'number' && typeof tGot.e.v === 'number' && tGot.e.unit === 'C' && tGot.meta.from === `${site}:temp:value-out`,
+    'a temperature arrived at the page port as a number in C, through bay.event', JSON.stringify(tGot?.e));
+  wire.send({ type: 'test.press', to: site });
+  await sleep(1500);
+  const keys = got.filter((g) => g.to.endsWith(':keys:value-in')).map((g) => g.e);
+  check(keys.length === 2 && keys[0].of === 'key' && keys[0].k === 0 && keys[0].down === true && keys[1].down === false,
+    'BOOTSEL down then up arrived at the page key input, through bay.event', JSON.stringify(keys));
+  out.temps = got.filter((g) => g.to.endsWith(':meter:value-in')).map((g) => g.e.v);
+  out.bayNode = bn.stats();
+  check(out.bayNode.refused === 0, 'the page refused no bay.event from the Pico site', JSON.stringify(out.bayNode));
+  bn.leave();
 
   // 4. node.ping round trips
   const rtt = [];

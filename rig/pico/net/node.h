@@ -6,10 +6,15 @@
 //
 //   on open        graph.announce, a graph built ONCE at init from constants and the site id
 //   graph.ask      graph.announce again, now
-//   light.set      to <site>:led:light, a #rrggbb and up to NODE_PARTS parts: stored, logged, handed on
+//   light.set      to <site>:led:value-in, a #rrggbb and up to NODE_PARTS parts: stored, logged, handed on
 //   node.ping      to <site>: answered with node.pong {to: <sender>, n: <its n>}
-//   every 5 s      graph.announce (the registry calls a site stale after 15 s)
+//   every 5 s      graph.announce (the registry calls a site stale after 15 s), and the
+//                  chip temperature as a bay.event from <site>:temp:value-out when cfg.temp reads one
+//   node_button    a bay.event from <site>:button:value-out, {of:"key",cls:"key",k:0,down}
 //   every 20 s     the text "ping", which the relay's runtime answers "pong"
+//
+// A bay.event is bay-node.mjs's own shape ({source, ev}), so a page holding a
+// link out of the port delivers it as if the source were on the page.
 //
 // Anything else is passed to `on_other` untouched, which is where a test
 // harness hangs its own verbs without this file knowing about them.
@@ -24,6 +29,7 @@
 #define NODE_TOKENS 256        // jsmn tokens, 16 bytes each on a 32 bit target; a message needing more is ignored
 #endif
 #define NODE_ANNOUNCE_MS 5000
+#define NODE_TEMP_MS 5000
 #define NODE_PING_MS 20000
 #define NODE_DEAD_MS 45000     // nothing heard at all for this long: the transport should reconnect
 
@@ -42,11 +48,13 @@ typedef struct node_cfg {
   void (*log)(void *user, const char *line);
   void (*on_light)(void *user, const node_light_t *l);
   void (*on_other)(void *user, const char *type, char *msg, size_t n);
+  // Tenths of a degree C into *dc, returning 0; NULL or nonzero sends no temperature.
+  int (*temp)(void *user, int *dc);
   void *user;
 } node_cfg_t;
 
 typedef struct node_stats {
-  uint32_t announced, asked, lights, pings, pongs_relay, echoes, ignored, unreadable, too_many_tokens;
+  uint32_t announced, asked, lights, pings, pongs_relay, echoes, ignored, unreadable, too_many_tokens, events;
 } node_stats_t;
 
 typedef struct node {
@@ -54,10 +62,10 @@ typedef struct node {
   ws_t *ws;
   char from[8];                // per CONNECTION, like wire.mjs's randomId(6)
   uint32_t seq;
-  char graph[1024];            // "graph":{...} rendered once
+  char graph[1536];            // "graph":{...} rendered once
   size_t graphn;
   char out[WS_TX_MAX - 14];
-  uint32_t now, last_rx, last_announce, last_ping;
+  uint32_t now, last_rx, last_announce, last_ping, last_temp;
   bool open;
   node_light_t light;
   node_stats_t st;
@@ -75,6 +83,11 @@ int node_tick(node_t *n, uint32_t mono_ms);
 // empty or ending in a comma, e.g. "\"to\":\"x\",\"n\":3,".
 int node_send(node_t *n, const char *type, const char *body);
 int node_announce(node_t *n);
+// A bay.event from <site>:<port>, e.g. port "button:value-out" and ev "{\"of\":...}".
+int node_event(node_t *n, const char *port, const char *ev);
+int node_button(node_t *n, bool down);
+// dc is tenths of a degree C: 234 is sent as 23.4.
+int node_temp(node_t *n, int dc);
 // Exposed for tests: "#rrggbb" to rgb. Returns 0 or -1.
 int node_hex(const char *s, size_t len, node_rgb_t *out);
 #endif

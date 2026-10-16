@@ -14,7 +14,11 @@
 // Test verbs it adds on top of node.c (on_other), aimed at its own site:
 //   test.probe   run 100 relay pings and 100 room echoes from HERE, then
 //                send test.probed with the numbers
+//   test.press   press and release BOOTSEL, as node_button(true) then node_button(false)
 //   test.done    close with 1000 and exit 0
+//
+// The temperature is a stand-in, -0.5 C then 23.4 C after, so the sign and the decimal
+// are both read by the page side.
 #define _GNU_SOURCE
 #include <errno.h>
 #include <netdb.h>
@@ -89,6 +93,8 @@ static int closed = 0, done = 0;
 static double opened_at = 0, upgrade_sent_at = 0;
 
 static void on_log(void *u, const char *line) { (void)u; say("%s", line); }
+static int temps = 0;
+static int fake_temp(void *u, int *dc) { (void)u; *dc = temps++ ? 234 : -5; return 0; }
 static void on_open(void *u) { opened_at = ms(); say("ws open, upgrade took %.1f ms", opened_at - upgrade_sent_at); node_on_open(u); }
 static void on_close(void *u, int code, const char *why) { (void)u; closed = 1; say("ws closed %d (%s)", code, why); }
 
@@ -137,6 +143,7 @@ static void on_other(void *u, const char *type, char *msg, size_t n) {
   snprintf(to, sizeof to, "\"to\":\"%s\"", node.c.site);
   if (!strstr(msg, to)) return;
   if (!strcmp(type, "test.probe")) { say("test.probe: %d relay pings, then %d room echoes", PROBES, PROBES); probe_phase = 1; probe_i = 0; lost_relay = lost_echo = 0; probe_next(); }
+  else if (!strcmp(type, "test.press")) { say("test.press"); node_button(&node, true); node_button(&node, false); }
   else if (!strcmp(type, "test.done")) { say("test.done"); done = 1; }
 }
 
@@ -150,6 +157,13 @@ static int st_texts = 0, st_closed_code = 0;
 static void st_text(void *u, char *m, size_t n) { (void)u; memcpy(st_last, m, n + 1); st_texts++; }
 static void st_close(void *u, int c, const char *w) { (void)u; (void)w; st_closed_code = c; }
 static int fails = 0;
+// The last frame st_send took, unmasked into `out` as text.
+static void st_unmask(char *out) {
+  int len7 = selftest_out[1] & 0x7f, h = 2 + (len7 == 126 ? 2 : 0);
+  int on = selftest_out_n - h - 4;
+  for (int i = 0; i < on; i++) out[i] = (char)(selftest_out[h + 4 + i] ^ selftest_out[h + (i & 3)]);
+  out[on] = 0;
+}
 #define CHECK(c, what) do { if (c) printf("PASS %s\n", what); else { printf("FAIL %s\n", what); fails++; } } while (0)
 
 static void st_open_ws(ws_t *w) {
@@ -255,14 +269,14 @@ static int selftest(void) {
   snprintf(resp, sizeof resp, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nSec-WebSocket-Accept: %s\r\n\r\n", wn.accept);
   ws_feed(&wn, (const uint8_t *)resp, strlen(resp));
   CHECK(nd.st.announced == 1, "open sends graph.announce");
-  const char *lit = "{\"id\":\"q\",\"type\":\"light.set\",\"to\":\"pico-abc123:led:light\",\"hex\":\"#FF8000\",\"parts\":[{\"hex\":\"#0000ff\",\"across\":[0.2,0.4]},{\"hex\":\"#zz0000\",\"across\":[0,1]},{\"hex\":\"#00ff00\",\"across\":[0.5,1]}],\"from\":\"pagexx\",\"sent\":1,\"seq\":3}";
+  const char *lit = "{\"id\":\"q\",\"type\":\"light.set\",\"to\":\"pico-abc123:led:value-in\",\"hex\":\"#FF8000\",\"parts\":[{\"hex\":\"#0000ff\",\"across\":[0.2,0.4]},{\"hex\":\"#zz0000\",\"across\":[0,1]},{\"hex\":\"#00ff00\",\"across\":[0.5,1]}],\"from\":\"pagexx\",\"sent\":1,\"seq\":3}";
   char buf[512];
   strcpy(buf, lit);
   node_on_text(&nd, buf, strlen(buf));
   node_light_t *L = &nd.light;
   CHECK(nd.st.lights == 1 && L->hex.r == 0xff && L->hex.g == 0x80 && L->hex.b == 0 && L->nparts == 2 && L->part[0].a == 200 && L->part[0].b == 400 && L->part[1].hex.g == 0xff && L->part[1].b == 1000,
         "light.set: colour, two good parts kept, the bad one skipped, across in thousandths");
-  strcpy(buf, "{\"type\":\"light.set\",\"to\":\"pico-other:led:light\",\"hex\":\"#000000\",\"from\":\"p\"}");
+  strcpy(buf, "{\"type\":\"light.set\",\"to\":\"pico-other:led:value-in\",\"hex\":\"#000000\",\"from\":\"p\"}");
   node_on_text(&nd, buf, strlen(buf));
   CHECK(nd.st.lights == 1, "light.set to another port is not ours");
   strcpy(buf, "{\"type\":\"graph.ask\",\"from\":\"p\"}");
@@ -270,12 +284,29 @@ static int selftest(void) {
   CHECK(nd.st.announced == 2, "graph.ask announces again");
   strcpy(buf, "{\"type\":\"node.ping\",\"to\":\"pico-abc123\",\"n\":42,\"from\":\"macabc\"}");
   node_on_text(&nd, buf, strlen(buf));
-  // unmask what went out
-  int h = 2 + ((selftest_out[1] & 0x7f) == 126 ? 2 : 0);
-  char outp[600]; int on = selftest_out_n - h - 4;
-  for (int i = 0; i < on; i++) outp[i] = (char)(selftest_out[h + 4 + i] ^ selftest_out[h + (i & 3)]);
-  outp[on] = 0;
+  char outp[WS_TX_MAX];
+  st_unmask(outp);
   CHECK(strstr(outp, "\"type\":\"node.pong\",\"to\":\"macabc\",\"n\":42,") != NULL, "node.ping is answered with node.pong to the sender with its n");
+  strcpy(buf, "{\"type\":\"light.set\",\"to\":\"pico-abc123:led:light\",\"hex\":\"#00ff00\",\"from\":\"p\"}");
+  node_on_text(&nd, buf, strlen(buf));
+  CHECK(nd.st.lights == 1, "NEGATIVE CONTROL: light.set to the old name led:light is not ours any more");
+  node_button(&nd, true);
+  st_unmask(outp);
+  CHECK(strstr(outp, "\"type\":\"bay.event\",\"source\":\"pico-abc123:button:value-out\",\"ev\":{\"of\":\"key\",\"cls\":\"key\",\"k\":0,\"down\":true},") != NULL,
+        "node_button(true) sends a bay.event from button:value-out with a key down");
+  node_button(&nd, false);
+  st_unmask(outp);
+  CHECK(strstr(outp, "\"down\":false}") != NULL && nd.st.events == 2, "node_button(false) sends the key up");
+  node_temp(&nd, -5);
+  st_unmask(outp);
+  CHECK(strstr(outp, "\"source\":\"pico-abc123:temp:value-out\",\"ev\":{\"of\":\"number\",\"cls\":\"number\",\"v\":-0.5,\"unit\":\"C\"}") != NULL,
+        "node_temp(-5) sends v -0.5, the sign once");
+  node_temp(&nd, 1234);
+  st_unmask(outp);
+  CHECK(strstr(outp, "\"v\":123.4,") != NULL, "node_temp(1234) sends v 123.4");
+  CHECK(strstr(nd.graph, "\"kind\":\"board\",\"label\":\"Pico 2 W\"") && strstr(nd.graph, "pico-abc123:din:midi-out") && strstr(nd.graph, "pico-abc123:din:midi-in")
+        && strstr(nd.graph, "pico-abc123:led:value-in") && !strstr(nd.graph, ":light\""), "the graph says kind board and names its ports <medium>-<dir>");
+  printf("graph %zu of %zu bytes\n", nd.graphn, sizeof nd.graph);
   char own[200];
   snprintf(own, sizeof own, "{\"type\":\"graph.ask\",\"from\":\"%s\"}", nd.from);
   node_on_text(&nd, own, strlen(own));
@@ -372,7 +403,7 @@ int main(int argc, char **argv) {
 
   ws_cfg_t wc = { .host = host, .path = path, .send = io_send, .rand32 = io_rand, .on_open = on_open, .on_text = node_on_text, .on_close = on_close, .user = &node };
   ws_init(&ws, &wc);
-  node_cfg_t nc = { .site = site, .place = "studio-1", .by = "tool", .now_ms = epoch_ms, .log = on_log, .on_other = on_other, .user = NULL };
+  node_cfg_t nc = { .site = site, .place = "studio-1", .by = "tool", .now_ms = epoch_ms, .log = on_log, .on_other = on_other, .temp = fake_temp, .user = NULL };
   if (node_init(&node, &nc, &ws)) { say("bad site"); return 2; }
   upgrade_sent_at = ms();
   if (ws_start(&ws)) { say("upgrade send failed"); return 1; }
@@ -403,9 +434,9 @@ int main(int argc, char **argv) {
     mbedtls_memory_buffer_alloc_max_get(&mx, &mb);
     say("ARENA peak over the whole run %zu bytes", mx);
   }
-  say("STATS ws rx_text %u rx_binary %u rx_dropped_big %u tx_frames %u | node announced %u asked %u lights %u pings %u echoes %u ignored %u unreadable %u too_many_tokens %u",
+  say("STATS ws rx_text %u rx_binary %u rx_dropped_big %u tx_frames %u | node announced %u asked %u lights %u pings %u echoes %u ignored %u unreadable %u too_many_tokens %u events %u",
       ws.st.rx_text, ws.st.rx_binary, ws.st.rx_dropped_big, ws.st.tx_frames,
-      node.st.announced, node.st.asked, node.st.lights, node.st.pings, node.st.echoes, node.st.ignored, node.st.unreadable, node.st.too_many_tokens);
+      node.st.announced, node.st.asked, node.st.lights, node.st.pings, node.st.echoes, node.st.ignored, node.st.unreadable, node.st.too_many_tokens, node.st.events);
   close(fd);
   return done ? 0 : 1;
 }

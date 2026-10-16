@@ -51,12 +51,15 @@ target_sources(net PRIVATE
 )
 target_link_libraries(net
   pico_stdlib
+  hardware_adc
   pico_unique_id
   pico_rand
   pico_cyw43_arch_lwip_poll
   pico_lwip_mbedtls
   pico_mbedtls
 )
+# Logs on both: UART1 as before, and USB CDC, read on the host as /dev/cu.usbmodem*.
+# USB also lets picotool reboot it into BOOTSEL without holding the button.
 pico_enable_stdio_uart(net 1)
-pico_enable_stdio_usb(net 0)
+pico_enable_stdio_usb(net 1)
 pico_add_extra_outputs(net)

@@ -4,7 +4,8 @@
 #   docker build -t positron-pico-net:2.2.0 rig/pico/net    (build.sh and test.sh do this)
 #
 # Built FROM `positron-pico-sdk:2.2.0` (rig/pico/firmware/Dockerfile), which has
-# NO submodules, so the router build is untouched by this file.
+# NO submodules, so the router build is untouched by this file. tinyusb is here
+# for the USB serial log (pico_enable_stdio_usb).
 #
 # PINNED BY THE SDK, NOT BY HAND: `git submodule update` checks out exactly the
 # commit the pico-sdk 2.2.0 tag records for each path, so the versions here are
@@ -18,6 +19,6 @@
 # would not work anyway: 3.6 wants its nested `framework` submodule for that.
 FROM positron-pico-sdk:2.2.0
 RUN cd /opt/pico-sdk \
- && git submodule update --init --depth 1 lib/cyw43-driver lib/lwip lib/mbedtls \
+ && git submodule update --init --depth 1 lib/cyw43-driver lib/lwip lib/mbedtls lib/tinyusb \
  && git submodule status > /opt/pico-sdk/SUBMODULES.txt \
  && cat /opt/pico-sdk/SUBMODULES.txt
