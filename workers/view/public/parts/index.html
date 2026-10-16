@@ -53,6 +53,18 @@
   const SOUND = [
     { part: 'Goobay HDMI 1.4 audio extractor, HDMI through, Toslink and 3.5 mm out', stock: 'in stock', price: '€32.00', url: `${OOMI}/product/hdmi_14_heli_ekstraktor_hdmi_toslink_35_mm_arc` },
   ];
+  // HDMI to VGA with a 3.5 mm audio out: an old VGA screen, and the sound out of the same adapter.
+  const VGA = [
+    { part: 'HDMI to VGA adapter with audio out, 1920x1080', stock: 'in stock', price: '€9.50', url: `${OOMI}/product/hdmi_vga_adapter_muundur_audio_19201080_must` },
+    { part: 'HDMI to VGA adapter with audio out, 1080p', stock: 'in stock', price: '€12.00', url: `${OOMI}/product/hdmi_vga_audio_adapter_muundur_1080p_resolutsioonu_must` },
+  ];
+  // The kit: both HDMI outputs, a modern screen on one, an old VGA screen with sound out on the other.
+  const byUrl = (u) => [...PICTURE, ...SOUND, ...VGA].find((p) => p.url.endsWith(u));
+  const KIT = [
+    { ...byUrl('hs_518d08_1m_hdmi_micro_hdmi_2_0_kaabel_1m_premium_must_4k_60hz_18gbps'), stock: 'HDMI0' },
+    { ...byUrl('cvgp34790bk02_micro_hdmi_pistik_hdmi_pesa_uleminek_20cm_must_juhe'), stock: 'HDMI1' },
+    { ...byUrl('hdmi_vga_adapter_muundur_audio_19201080_must'), stock: 'HDMI1' },
+  ];
   const cols = [
     { key: 'part', label: 'part', grow: true, link: 'url' },
     { key: 'stock', label: 'stock', width: 80 },
@@ -62,6 +74,15 @@
   picture.set(PICTURE);
   const sound = createTable({ columns: cols });
   sound.set(SOUND);
+  const vga = createTable({ columns: cols });
+  vga.set(VGA);
+  const kit = createTable({ columns: [cols[0], { key: 'stock', label: 'socket', width: 80 }, cols[2]] });
+  kit.set(KIT);
+  const kitTotal = KIT.reduce((n, p) => n + parseFloat(p.price.slice(1)), 0);
+
+  d.stack.titled('KIT', kit.el,
+    say(`€${kitTotal.toFixed(2)} for both HDMI outputs. HDMI0, beside the USB-C power, goes to a modern screen or a TV by the cable, picture and sound.`,
+      'HDMI1 goes to an old VGA screen through the short adapter and the VGA converter, whose 3.5 mm jack carries the sound to a mixer or the Fast Track Pro.'));
 
   d.stack.titled('HDMI, PICTURE', picture.el,
     say('The Pi 4 has two micro-HDMI outputs and no input, so one cable per screen, two screens at most.',
@@ -70,7 +91,12 @@
     say('HDMI carries sound too, and an extractor takes it out to a 3.5 mm or optical cable while the picture passes through.',
       'Its page does not say whether it works with no screen behind it, and the Pi sends HDMI sound only to something that says it takes sound, so with a screen behind it is the safe way. Read at Oomipood on 2026-10-16.'));
 
-  const ALL = [...PICTURE, ...SOUND];
+  d.stack.titled('VGA, PICTURE AND SOUND', vga.el,
+    say('The cheap way to an old VGA screen, with the sound on a 3.5 mm jack of the adapter itself.',
+      'Both have a full size HDMI plug, so on the Pi each goes on the 20 cm micro-HDMI to HDMI socket adapter above, then your VGA cable into the converter. Whether the Pi sends sound to the jack is not measured. Read at Oomipood on 2026-10-16.'));
+
+  const ALL = [...PICTURE, ...SOUND, ...VGA];
+  d.assert('the kit is three parts from the lists, each with a socket', KIT.length === 3 && KIT.every((p) => p.url && /^HDMI[01]$/.test(p.stock)));
   d.assert('every part has a shop link', ALL.every((p) => p.url.startsWith(OOMI)));
   d.assert('every price was read', ALL.every((p) => /^€\d+\.\d\d$/.test(p.price)));
   d.assert('the description is one sentence', !/[;:]/.test(WHAT), WHAT);
