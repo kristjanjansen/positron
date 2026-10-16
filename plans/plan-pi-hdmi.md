@@ -1,0 +1,76 @@
+# plan-pi-hdmi: the Pi's two HDMI outputs as screens, with no browser
+
+Status (2026-10-16): proposal. Nothing built, nothing measured on the board; no
+screen and no cable on the desk yet. Asked: *"my pi: how i get hdmi out?"*, *"it
+supports two screens? in our out?"*, *"how can we output to screen with no
+browser?"*, then *"yes. can we output same video as we to to pi's oled with no
+overhead?"*.
+
+## 1. What the board is today
+
+- **Pi 4, two micro-HDMI outputs, no HDMI input.** Two screens at once, each up
+  to 4K at 30 Hz, or one at 4K at 60 Hz (READ, Raspberry Pi product page). HDMI0
+  is the socket next to USB-C power.
+- **Headless.** `rig/vis/README.md`: both HDMI ports disconnected, no X server,
+  `glmark2-es2-drm` finds no connector. The shader renders through EGL
+  surfaceless on `/dev/dri/renderD128` into an FBO that is read back and encoded.
+  `research/pi-screens-estonia-2026-10-04.md` says the same.
+- **The OLED** (`rig/board/panel.mjs`): `oled-ui.wasm` in the board's node
+  process makes one 1,024 byte frame (128x64, 1 bit) about every 66 ms, written
+  to the SSD1306 as nine `i2ctransfer` calls.
+- **Cables** (Oomipood, in stock 2026-10-16): the official Raspberry Pi micro-HDMI
+  to HDMI 1 m, EUR 9.50; HDMI 2.0 micro-HDMI cables 1/2/3 m at EUR 8/11/14; a
+  20 cm micro-HDMI plug to HDMI socket adapter, EUR 6.
+
+## 2. Three ways to a screen with no browser
+
+All three use the kernel's DRM/KMS directly. One process owns a connector at a
+time; the text console must give that output up, or it draws over the picture.
+
+| way | for | cost | work |
+| --- | --- | --- | --- |
+| **A. KMS scan-out from `rig/vis/`** | the shader, full rate | GPU, zero copy: render into a GBM surface on the connector and page flip | extend `v3dpipe`, native C on the Pi |
+| **B. A KMS helper fed frames by node** | the OLED picture, patches, the step grid | see §3 | a small native helper, node writes frames to its stdin |
+| **C. `mpv --vo=drm`** | video: the camera, a file, a stream | the player's decode | an install and a command |
+
+## 3. The OLED's picture on HDMI, with almost no overhead (way B)
+
+- The board already has each frame as 1,024 bytes. `panel.mjs` hands the same
+  buffer to a helper process as well as to the OLED: one 1 KB pipe write a frame,
+  less than the nine `i2ctransfer` spawns it already pays.
+- The helper keeps a 128x64 XRGB dumb buffer (32 KB) on a KMS plane and asks the
+  display controller (the Pi 4's HVS) to scale it to the screen. Plane scaling is
+  done in hardware. Per frame the CPU expands 1,024 bytes to 8,192 pixels and
+  page flips: microseconds.
+- 128x64 is 2:1, so a 1920x1080 screen fits it at 15x (1920x960) with bars.
+- ⚖️ INFERRED, to measure first: whether this kernel's vc4 driver offers the
+  plane property `SCALING_FILTER` with `Nearest Neighbor`, so the pixels stay
+  square. Without it, the choices are the HVS's smooth scaling (soft edges) or
+  expanding to 1920x960 on the CPU (about 7.4 MB a frame, about 110 MB/s at 15
+  fps: fine on a Pi 4, not zero).
+- Two screens: the OLED's picture on one output and the shader (way A) on the
+  other, each with its own owner.
+
+## 4. In the patchbay
+
+Each output is a node with a video input, `pi-1:hdmi0:video-in` and
+`pi-1:hdmi1:video-in`, announced only while KMS sees a connected screen. A page
+links `pi-1:screen:value-out` (the OLED's frames), `pi-1:shader:video-out` or
+`pi-1:camera:video-out` to it; on the board a link is the helper or player
+started on that connector, as a JACK link is a connection.
+
+## 5. Steps
+
+1. Plug a screen into HDMI0 with the VPN off; `kmsprint` (or `modetest -c`) on
+   the Pi: is the connector seen, which modes, which plane properties
+   (`SCALING_FILTER`).
+2. Way C once, `mpv --vo=drm` on a file: the quickest proof a picture appears.
+3. Way B: the helper, then `panel.mjs` feeding it; measure CPU per frame.
+4. Way A for the shader.
+5. The `hdmi0` and `hdmi1` nodes in `boardGraph`, and a `/devices/` page.
+
+## 6. What could not be settled here
+
+Everything on the board: whether the screen is detected after boot or needs
+`video=HDMI-A-1:...` on the kernel command line, the plane properties, the real
+CPU cost, and whether the console gives the output up cleanly.
