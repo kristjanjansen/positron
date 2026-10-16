@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta property="og:site_name" content="positron.studio">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Keyboard to Pi synth">
+<meta property="og:description" content="The keyboard on the Pi plays Plaits on the Pi, heard from the Pi&apos;s PWM output.">
+<meta property="og:url" content="https://positron.studio/devices/synth/">
+<meta property="og:image" content="https://positron.studio/og/site-98871a52.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="positron.studio: Connect anything to everything. Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-c7b28d7f.png">
+<link rel="manifest" href="/icons/manifest-8e6dda01.webmanifest">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Keyboard to Pi synth</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
+<style>
+  .ky-sec { display: flex; flex-direction: column; gap: 12px; }
+</style>
+<script type="module">
+  // The Evolution MK-425C plugged into the Pi plays Plaits on the Pi, heard from the Pi's PWM output. The board
+  // reads the keyboard and holds `pi-1:mk-425c:midi-out -> pi-1:plaits:midi-in` (rig/board/keyboard.mjs) and
+  // `pi-1:plaits:audio-out -> pi-1:pwm:audio-in` on JACK, so both outlive this tab. Asked on a press, never on load.
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createOledCard, createOledGrid } from '/shell/oled-card.mjs';
+  import { createBay, printLink } from '/shell/bay.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { BOARD_SITE, boardGraph, addBoardNode, PWM_PORTS } from '/shell/graph-registry.mjs';
+  import { relayOverride } from '/shell/wire.mjs';
+  import { paintFrame, loadPanelUi } from '/shell/panel-screen.mjs';
+
+  const d = mount({ name: 'Keyboard to Pi synth', what: '', index: '/', indexLabel: 'positron',
+    // Readouts on top, the log at the foot (positron-concepts). From the board: notes it played on
+    // Plaits, messages the link or Plaits did not take, and its read to play time.
+    joined: false,
+    readout: { notes: '', 'not taken': '', 'read to write': 'ms', worst: 'ms' } });
+  conceptNav('devices/synth');
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  // A check drives a board only on a relay on this machine (demo/fake-board.mjs), never the Pi.
+  const LOOP = !!relayOverride(location.search);
+  const MAY_SEND = !SELFCHECK || (q.get('board') === '1' && LOOP);
+  const P = BOARD_SITE;
+  const KBD = `${P}:mk-425c`, SYNTH = `${P}:plaits`;
+  const KBD_OUT = `${KBD}:midi-out`, SYNTH_IN = `${SYNTH}:midi-in`, SYNTH_OUT = `${SYNTH}:audio-out`, PWM_IN = `${P}:pwm:audio-in`;
+  const PATCH_OUT = 'web:patch:value-out', SCREEN_IN = `${P}:screen:value-in`;
+
+  // ── the bay: the keyboard, Plaits and the PWM output as the board announces them, and this patch to the Pi's screen ──
+  const G = boardGraph({ room: ROOM, gpu: false, jack: true, instruments: { plaits: true }, alsa: [{ client: 'MK-425C USB MIDI Keyboard' }],
+    outputs: [{ device: 'hw:CARD=Headphones', jack: PWM_PORTS }] });
+  const bay = createBay();
+  addBoardNode(bay, G, 'mk-425c', { withPorts: false });
+  bay.addPort({ ...G.ports.find((p) => p.id === KBD_OUT), label: 'mk-425c:midi-out' });
+  addBoardNode(bay, G, 'plaits', { label: 'Plaits on the Pi', withPorts: false });
+  // The board holds the real links and plays Plaits; this in-port delivers nothing here.
+  let heard = [];
+  bay.addPort({ ...G.ports.find((p) => p.id === SYNTH_IN), label: 'plaits:midi-in', deliver: (ev) => { heard.push(ev); } });
+  bay.addPort({ ...G.ports.find((p) => p.id === SYNTH_OUT), label: 'plaits:audio-out' });
+  addBoardNode(bay, G, 'pwm', { label: 'PWM out' });
+  bay.addNode({ id: 'web:patch', kind: 'store', label: 'this patch', place: 'browser' });
+  bay.addNode({ id: `${P}:screen`, kind: 'device', label: 'OLED 128x64', place: ROOM });
+  bay.addPort({ id: PATCH_OUT, dir: 'out', medium: 'value', emits: ['patch'], label: 'patch:value-out' });
+  bay.addPort({ id: SCREEN_IN, dir: 'in', medium: 'value', accepts: ['patch'], label: 'screen:value-in', deliver: (ev) => toScreen(ev) });
+  const screenLink = bay.link(PATCH_OUT, SCREEN_IN);
+  if (!screenLink.ok) d.log(`${PATCH_OUT} -> ${SCREEN_IN} refused: ${screenLink.why}`, 'warn');
+
+  let pb = null;
+  /** The keyboard link and the sound link this page draws, or null. */
+  const kbdLink = () => bay.links().find((l) => l.from === KBD_OUT && l.to === SYNTH_IN) || null;
+  const outLink = () => bay.links().find((l) => l.from === SYNTH_OUT && l.to === PWM_IN) || null;
+  /** Draw what the board holds: the keyboard on Plaits and Plaits on the PWM output, or neither. */
+  function draw(on) {
+    if (!!kbdLink() === !!on) return kbdLink();
+    for (const L of [kbdLink(), outLink()]) if (L) bay.unlink(L.id);
+    if (on) {
+      for (const [from, to] of [[KBD_OUT, SYNTH_IN], [SYNTH_OUT, PWM_IN]]) {
+        const r = bay.link(from, to);
+        if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
+      }
+    }
+    pb?.refresh();
+    return kbdLink();
+  }
+
+  // ── the Pi's screen: the same patch, drawn here as the Pi draws it ──
+  const PATCH = { nodes: [{ id: KBD }, { id: SYNTH }, { id: `${P}:pwm` }], links: [{ from: `${KBD}:out`, to: `${SYNTH}:in`, medium: 'midi' },
+    { from: `${SYNTH}:out`, to: `${P}:pwm:in`, medium: 'audio' }] };
+  const ui = await loadPanelUi(await (await fetch('/resources/pico/oled-ui.wasm')).arrayBuffer());
+  const cv = Object.assign(document.createElement('canvas'), { width: 128, height: 64 });
+  const events = {};
+  let frames = 0;
+  const card = createOledCard({ name: 'On the Pi\'s screen', say: 'A dot runs along the wire for every key the board passes on.', canvas: cv });
+  const grid = createOledGrid(2);
+  grid.append(card.el);
+
+  // ── the board ──
+  let board = null, connected = false, opened = null, said = null, screenAsked = 0, screenSaid = null, screenP = null, lastNotes = -1;
+  const flash = { until: 0 };
+  function connect() {
+    if (board || !MAY_SEND) return opened;
+    let open;
+    opened = new Promise((r) => { open = r; });
+    board = createBoard({ room: ROOM, of: 'Raspberry Pi', showName: false, log: (line, kind) => d.log(line, kind),
+      onOpen: () => { connected = true; open(true); },
+      onMessage: (msg) => {
+        if (msg.type === 'kbd.state') take(msg);
+        else if (msg.type === 'board.alive' && msg.kbd) take({ held: msg.kbd.held && msg.kbd.target === 'plaits', channel: msg.kbd.channel, beat: msg.kbd });
+      } });
+    d.log(`reaching ${ROOM}`);
+    return opened;
+  }
+  /** What the board says it holds: the picture, the choice and the readout follow it. */
+  function take(st) {
+    said = st.beat ? { ...said, held: st.held, channel: st.channel } : st;
+    const on = !!st.held && (st.beat ? true : st.target === 'plaits');
+    draw(on);
+    pick.set(on ? 1 : 0, true);
+    const c = st.counts;
+    if (!c) return;
+    if (lastNotes >= 0 && c.forwarded > lastNotes) { flash.until = performance.now() + 1200; events[0] = performance.now() / 1000; }
+    lastNotes = c.forwarded;
+    d.set('notes', c.forwarded);
+    d.set('not taken', c.dropped + c.refused);
+    d.set('read to write', st.lat?.n ? st.lat.p50 : '');
+    d.set('worst', st.lat?.n ? st.lat.max : '');
+  }
+  async function ask(msg, type, ms = 4000) {
+    connect();
+    const ok = await Promise.race([opened, new Promise((r) => setTimeout(() => r(false), 6000))]);
+    if (!ok) { d.log('the Pi did not answer', 'warn'); return null; }
+    return board.ask(msg, type, ms);
+  }
+  /** What arrives at pi-1:screen:value-in leaves for the board as `screen.patch`. */
+  function toScreen(ev) {
+    if (ev?.of !== 'patch' || !MAY_SEND) return;
+    screenAsked++;
+    screenP = shown(ev);
+  }
+  async function shown(ev) {
+    screenSaid = await ask({ type: 'screen.patch', patch: ev.patch }, 'screen.patched', 3000);
+    d.log(screenSaid?.ok ? 'the Pi\'s screen shows mk-425c to plaits to pwm' : `the Pi's screen did not draw it: ${screenSaid?.why || 'no answer in 3 s'}`, screenSaid?.ok ? 'ok' : 'warn');
+  }
+
+  /** On: Plaits started on the Pi, its sound linked to the PWM output. Answers true when both stand. */
+  async function synthUp() {
+    const up = await ask({ type: 'audio.start', source: 'plaits' }, 'audio.started', 15000);
+    if (!up?.ok) { d.log(`Plaits did not start on the Pi: ${up?.reason ?? 'no answer'}`, 'warn'); return false; }
+    const j = await ask({ type: 'jack.link', link: `${SYNTH_OUT} -> ${PWM_IN}` }, 'jack.linked', 8000);
+    if (!j?.ok) { d.log(`Plaits' sound did not reach the PWM output: ${(j?.problems || []).join(', ') || j?.hint || 'no answer'}`, 'warn'); return false; }
+    d.log(`the Pi holds ${SYNTH_OUT} -> ${PWM_IN}`, 'ok');
+    return true;
+  }
+  /** A press: ask the board to hold the keyboard on Plaits (1) or to let it go (0). */
+  async function choose(on) {
+    if (!MAY_SEND) { draw(on); d.log('this run may not drive the board, add board=1 and a relay on this machine', 'dim'); return null; }
+    if (on && !await synthUp()) return null;
+    const st = await ask(on ? { type: 'kbd.link', target: 'plaits' } : { type: 'kbd.unlink' }, 'kbd.state');
+    if (!st) { d.log('the Pi did not answer, nothing changed there', 'warn'); return null; }
+    take(st);
+    if (!st.ok) d.log(`the Pi refused: ${st.why || 'no reason given'}`, 'warn');
+    else if (st.held) {
+      d.log(`the Pi holds ${st.link}${st.reading ? '' : `, not reading the keyboard yet: ${st.why || ''}`}`, st.reading ? 'ok' : 'warn');
+      bay.send(PATCH_OUT, { of: 'patch', cls: 'patch', patch: PATCH });
+    } else d.log('the Pi holds no keyboard link, the keyboard plays nothing', 'ok');
+    return st;
+  }
+  let pending = null;
+  const pick = createChoice({ label: 'keyboard plays', options: [['off', 0], ['Plaits', 1]], at: 0,
+    title: (v) => (v ? 'Plaits on the Pi, out of its PWM output' : 'the Pi lets go of the keyboard'),
+    onPick: (v) => { pending = choose(v); } });
+
+  pb = createPatchbay(bay, { room: ROOM, flowing: (l) => l.from === KBD_OUT && flash.until > performance.now() });
+  draw(0);
+  const sec = el('section', 'ky-sec');
+  sec.append(grid, pick.el);
+  d.stack.add(sec, pb.el);
+
+  // The screen's wire runs, about 15 frames a second, as the Pi's does.
+  let last = 0;
+  (function run(now) {
+    if (now - last > 66) { last = now; paintFrame(cv, ui.frame({ mode: 'patch', patch: PATCH, t: now / 1000, events })); frames++; }
+    requestAnimationFrame(run);
+  })(0);
+  setInterval(() => { if (flash.until > performance.now() - 300) pb.refresh?.(); }, 200);
+
+  window.__demo.bay = bay;
+  window.__demo.probe = () => ({ connected, said, screenAsked, screenSaid, frames, link: kbdLink() ? printLink(kbdLink()) : null });
+
+  if (SELFCHECK) {
+    await new Promise((r) => setTimeout(r, 300));
+    d.assert('a visit reaches nothing until a press', !board);
+    d.assert('no keyboard link is drawn before a choice, the screen\'s is', !kbdLink() && bay.links().length === 1);
+    d.assert('the screen drew the patch', frames > 0);
+    if (!MAY_SEND) {
+      pick.buttons[1].click(); await pending;
+      heard = [];
+      bay.send(KBD_OUT, { cls: 'note', ch: 2, d1: 47, d2: 100 });
+      bay.send(KBD_OUT, { cls: 'bend', ch: 2, d1: 0, d2: 80 });
+      d.assert('on draws mk-425c -> plaits and a key lands on Plaits as it was played', !!kbdLink() && heard.length === 1 && heard[0].d1 === 47, JSON.stringify(heard));
+      d.assert('NEGATIVE CONTROL: pitch bend is dropped at Plaits\' midi-in, which takes notes only', kbdLink()?.dropped === 1);
+      d.assert('Plaits\' sound is drawn to the PWM output, by JACK on the Pi',
+        JSON.stringify(outLink()?.session?.rows?.map((r) => r.to)) === JSON.stringify(PWM_PORTS), JSON.stringify(outLink()?.session?.rows));
+      pick.buttons[0].click(); await pending;
+      d.assert('off takes both links away and still reaches nothing', !kbdLink() && !outLink() && !board);
+    }
+  }
+  d.ready();
+</script>

@@ -6,6 +6,7 @@
 import { normalizePattern, notesAt, stepMs as stepMsOf } from '../../demo/shell/drum-pattern.mjs';
 import { createBay, printLink } from '../../demo/shell/bay.mjs';
 import { boardPort } from '../../demo/shell/graph-registry.mjs';
+import { GM_VOICES } from '../../demo/shell/drum-maps.mjs';
 
 const LATE_KEEP = 512;
 
@@ -130,22 +131,29 @@ export function createSequencer({ now, setTimer, clearTimer, emit, onStep = () =
 
 /**
  * The board's verbs around one sequencer: `seq.pattern`, `seq.start`, `seq.stop`, `seq.status`, each
- * answered `seq.state`. Notes leave by a bay link `pi-1:sequencer:midi-out -> pi-1:circuit:midi-in
- * { drummap circuit }`, made against the board's own graph, so the port's consent and map apply.
+ * answered `seq.state`. Notes leave by a bay link `pi-1:sequencer:midi-out -> pi-1:<target>:midi-in
+ * { drummap <target> }`, made against the board's own graph, so the port's consent and map apply.
+ * `seq.start {target}` picks `circuit` (bytes into its gate) or `drums` (a hit on the board's drums).
  * @param {object} o
  * @param {() => object|null} o.graph   the board's graph (beat.mjs `graphOf`), null before the hello
  * @param {(bytes: number[], why: (w: string) => void) => void} o.midiSend  into the Circuit's gate
+ * @param {(name: string) => {ok: boolean, why?: string}} [o.hit]  one hit on the board's drums, by GM voice name
  * @param {(steps: object) => void} [o.screen]  panel.steps, while running
  * why: lessons/rig-board-sequencer.md#service
  */
-export function createSequencerService({ graph, midiSend, screen = () => {}, log = () => {}, target = 'circuit',
-  now = () => performance.now(), setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (t) => clearTimeout(t) }) {
-  const SEQ = boardPort('sequencer', 'midi-out'), TO = boardPort(target, 'midi-in');
+export const SEQ_TARGETS = Object.freeze(['circuit', 'drums']);
+const VOICE_OF_NOTE = new Map(Object.entries(GM_VOICES).map(([k, v]) => [v.note, k]));
+
+export function createSequencerService({ graph, midiSend, hit = () => ({ ok: false, why: 'this board has no drums' }), screen = () => {},
+  log = () => {}, target = 'circuit', now = () => performance.now(), setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (t) => clearTimeout(t) }) {
+  const SEQ = boardPort('sequencer', 'midi-out');
+  let TO = boardPort(target, 'midi-in');
   let bay = null, linkWhy = '', delivered = 0, refused = 0, lastRefusal = '';
   let look = { empty: 'dot', head: 'frame' }, shorts = null, startedBy = null;
 
-  /** The board's own bay: the two nodes from its graph and the one link. Rebuilt when it is missing. */
-  function wire() {
+  /** The board's own bay: the two nodes from its graph and the one link. Rebuilt when it is missing or the target moved. */
+  function wire(to = target) {
+    if (to !== target) { target = to; TO = boardPort(target, 'midi-in'); bay = null; }
     if (bay && bay.links().length) return true;
     const g = graph();
     if (!g) { linkWhy = 'the board has not said what it is yet'; return false; }
@@ -155,14 +163,25 @@ export function createSequencerService({ graph, midiSend, screen = () => {}, log
       if (p.id !== SEQ && p.id !== TO) continue;
       bay.addPort({ ...p, ...(p.id === TO ? { deliver: (ev) => out(ev) } : {}) });
     }
-    const r = bay.link(SEQ, TO, [{ op: 'drummap', name: target }]);
+    // The map by the name the target's port publishes: `circuit` on the Circuit, `gm` on the drums.
+    const map = g.ports.find((p) => p.id === TO)?.drums?.name ?? target;
+    const r = bay.link(SEQ, TO, [{ op: 'drummap', name: map }]);
     linkWhy = r.ok ? '' : `${r.why} ${r.fix || ''}`.trim();
     if (!r.ok) log(`sequencer: ${SEQ} -> ${TO} refused: ${linkWhy}`);
     return r.ok;
   }
 
-  /** A bay event as bytes into the Circuit's gate. Notes and CC only; the gate refuses the rest. */
+  /** A bay event into the target: bytes into the Circuit's gate, or a hit by name on the board's drums. */
   function out(ev) {
+    if (target === 'drums') {
+      if (ev.cls !== 'note' || ev.off || !ev.d2) return;          // a drum hit has no note off
+      const name = VOICE_OF_NOTE.get(ev.d1);
+      if (!name) { refused++; lastRefusal = `no drum voice for note ${ev.d1}`; return; }
+      delivered++;
+      const r = hit(name);
+      if (!r?.ok) { refused++; lastRefusal = r?.why || 'refused'; }
+      return;
+    }
     const c = (ev.ch - 1) & 0x0F;
     const bytes = ev.cls === 'note'
       ? (ev.off || !ev.d2 ? [0x80 | c, ev.d1, 0] : [0x90 | c, ev.d1, ev.d2])
@@ -214,7 +233,10 @@ export function createSequencerService({ graph, midiSend, screen = () => {}, log
         case 'seq.start': {
           const v = take(msg);
           if (!v.ok) return reply('seq.state', state({ ok: false, why: v.why }));
-          if (!wire()) return reply('seq.state', state({ ok: false, why: linkWhy }));
+          const to = msg.target ?? target;
+          if (!SEQ_TARGETS.includes(to)) return reply('seq.state', state({ ok: false, why: `target is one of ${SEQ_TARGETS.join(', ')}` }));
+          if (to !== target && core.running()) core.stop();
+          if (!wire(to)) return reply('seq.state', state({ ok: false, why: linkWhy }));
           const r = core.start();
           if (!r.ok) return reply('seq.state', state({ ok: false, why: r.why }));
           if (!r.already) { startedBy = msg.from ?? null; log(`sequencer: started at ${core.pattern().bpm} bpm into ${TO}, by ${startedBy ?? 'nobody named'}`); }

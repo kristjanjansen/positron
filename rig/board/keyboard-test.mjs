@@ -143,7 +143,7 @@ console.log('\n== a replug, and a board without the keyboard ==');
   ok('back in, it is opened again and the link was kept', k.opened === 2 && svc.status().reading && svc.status().held);
   k.play([0x91, 51, 100]);
   ok('and a key plays again', same(c.written.at(-1), [0x90, 51, 100]));
-  ok('the beat says the link is held on channel 1 and read', same(svc.beat(), { held: true, channel: 1, reading: true, forwarded: svc.status().counts.forwarded }));
+  ok('the beat says the link is held on channel 1 and read', same(svc.beat(), { held: true, target: 'circuit', channel: 1, reading: true, forwarded: svc.status().counts.forwarded }));
   const alive = aliveMsg({ name: 'b', id: 'b', upSec: 1, audio: null, voices: 0, frames: 0, insert: {}, kbd: svc.beat() });
   ok('board.alive carries it', alive.kbd?.held === true && alive.kbd?.channel === 1);
   const hello = helloMsg({ name: 'b', id: 'b', backend: 'x', ports: [], dry: false, since: 0, frameMs: 20, instruments: {}, graphFacts: { room: 'studio-1' }, kbd: svc.beat() });
@@ -198,6 +198,35 @@ console.log('\n== the answers survive the wire ==');
   let why = '';
   try { for (const a of answers) format(a, { from: 'b', seq: 0 }); } catch (e) { why = e.message; }
   ok('NEGATIVE CONTROL: no payload field named like the envelope (from, sent, seq, by)', answers.length === 3 && !why, why || `${answers.length} answers`);
+  c.close(); svc.stop();
+}
+
+console.log('\n== the keyboard into the board\'s own Plaits ==');
+{
+  const graph = boardGraph({ room: 'studio-1', gpu: false, instruments: { plaits: true },
+    inputs: [{ name: 'circuit', channels: 2, midi: { port: 'Circuit', channels: [1, 2, 10] } }], alsa: [{ client: 'MK-425C USB MIDI Keyboard' }] });
+  const c = fakeCircuit(), k = fakeKeyboard(), t = fakeTimers(), played = [];
+  let up = true;
+  const svc = createKeyboardService({ graph: () => graph, midiSend: c.midiSend, open: k.open, present: () => k.present,
+    play: (ev) => (up ? (played.push([ev.d1, ev.off || !ev.d2 ? 0 : ev.d2]), { ok: true }) : { ok: false, why: 'Plaits is not running on the Pi' }),
+    setTimer: t.setTimer, clearTimer: t.clearTimer, now: () => 0 });
+  const ask = async (msg) => { let out = null; await svc.handle(msg, (type, body) => { out = { type, ...body }; }); return out; };
+  const st = await ask({ type: 'kbd.link', target: 'plaits' });
+  ok('kbd.link {target: plaits} holds pi-1:mk-425c -> pi-1:plaits with no channel transform', st.ok && st.target === 'plaits'
+    && st.link === 'pi-1:mk-425c:midi-out -> pi-1:plaits:midi-in' && st.reading, st.why || st.link);
+  k.play([0x91, 60, 100, 0x91, 60, 0]);
+  ok('a key plays Plaits on and off, and nothing is written to the Circuit', same(played, [[60, 100], [60, 0]]) && c.written.length === 0, JSON.stringify(played));
+  k.play([0xE1, 0x00, 0x50, 0xB1, 74, 33]);
+  ok('NEGATIVE CONTROL: bend and CC are dropped at Plaits\' midi-in, which takes notes only', played.length === 2 && svc.status().counts.dropped === 2);
+  k.play([0x91, 64, 90]);
+  const moved = await ask({ type: 'kbd.link', channel: 1 });
+  ok('moving to the Circuit releases the held key on Plaits first', moved.ok && same(played.at(-1), [64, 0]) && /circuit/.test(moved.link || ''), JSON.stringify(played));
+  await ask({ type: 'kbd.link', target: 'plaits' });
+  up = false;
+  k.play([0x91, 65, 90]);
+  ok('NEGATIVE CONTROL: with Plaits not started a key is counted refused with the reason', /not running/.test(svc.status().lastRefusal || ''), svc.status().lastRefusal);
+  const bad = await ask({ type: 'kbd.link', target: 'speaker' });
+  ok('NEGATIVE CONTROL: a target that is not circuit or plaits is refused in words', bad.ok === false && /circuit, plaits/.test(bad.why), bad.why);
   c.close(); svc.stop();
 }
 

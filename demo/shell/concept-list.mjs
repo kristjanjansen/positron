@@ -33,9 +33,11 @@ export const CONCEPTS = [
   { id: 'devices/text', title: 'Text on Pi screen', say: 'Type a line and it shows on a small screen on the Pi. Its four keys show up here.' },
   { id: 'devices/dots', title: 'Dots on Pi screen', say: 'A short score plays as rings of dots on the Pi\'s small screen, the dot piano of the Pico.' },
   { id: 'devices/patches', title: 'Patches on Pi screen', say: 'Small patches drawn as the Pi\'s screen shows them. Send one to the Pi to check it.' },
-  { id: 'devices/drums', title: 'Drums on Pi screen', say: 'A drum machine plays here and its steps show on the Pi\'s small screen. Its keys edit them.' },
+  { id: 'devices/drums', title: 'Drums on Pi', say: 'The Pi\'s sequencer plays its own drums out of its PWM output. Its keys edit the steps.' },
+  { id: 'devices/beat', title: 'Circuit drums from Pi', say: 'The Pi\'s sequencer plays the Circuit\'s drums. Its keys edit the steps.' },
   { id: 'devices/camera', title: 'Camera on Pi screen', say: 'The Pi\'s camera plays in one bit dots on its small screen and here. It needs the camera key.' },
   { id: 'devices/keys', title: 'Keyboard to Circuit on Pi', say: 'The keyboard on the Pi plays the Circuit\'s synth 1 or 2. The Pi keeps the link when the tab closes.' },
+  { id: 'devices/synth', title: 'Keyboard to Pi synth', say: 'The keyboard on the Pi plays Plaits on the Pi, heard from the Pi\'s PWM output.' },
   { id: 'devices/circuit', title: 'Circuit drums on Pi', say: 'The Circuit\'s drums play SuperCollider drums on the Pi, heard here. The Pi\'s screen draws them.' },
   // why: lessons/kit-concept-list.md#draw
   { id: 'radio/blend', title: 'Blend', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },

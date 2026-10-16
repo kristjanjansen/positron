@@ -182,5 +182,34 @@ console.log('\n== the verbs, into a fake Circuit through the board\'s own bay ==
   ok('spread() reads p50, p99 and the worst', JSON.stringify(spread([1, 2, 3, 4, 100])) === '{"n":5,"p50":3,"p99":100,"max":100}');
 }
 
+console.log('\n== the drums target: the same pattern as hits on the board\'s own drums ==');
+{
+  const c = fakeClock();
+  const g = boardGraph({ room: 'studio-1', gpu: false, sequencer: true, instruments: { collide: true }, drums: { circuit: DRUM_MAPS.circuit, drums: DRUM_MAPS.gm },
+    inputs: [{ name: 'circuit', channels: 2, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
+  const hits = [], wrote = [];
+  const svc = createSequencerService({ graph: () => g, midiSend: (b) => wrote.push(b), hit: (name) => { hits.push(name); return { ok: true }; },
+    now: c.now, setTimer: c.setTimer, clearTimer: c.clearTimer });
+  const ask = async (msg) => { let out = null; await svc.handle(msg, (type, body) => { out = { type, ...body }; }); return out; };
+  const rows = ['kick', 'snare', 'hhc', 'hho', 'clap', 'tomlo', 'tomhi', 'cowbell'].map((voice) => ({ voice, steps: '1000000000000000' }));
+  const st = await ask({ type: 'seq.start', target: 'drums', pattern: P(120, rows) });
+  ok('seq.start {target: drums} links the sequencer to pi-1:drums', st.ok && st.target === 'drums' && /-> pi-1:drums:midi-in/.test(st.link || ''), st.why || st.link);
+  c.run(svc.core.epoch() + stepMs(120) / 2 + 1);
+  ok('step 1 of eight rows is eight hits, one per voice, and the note offs hit nothing', JSON.stringify([...hits].sort()) === JSON.stringify(rows.map((r) => r.voice).sort()), hits.join(' '));
+  ok('NEGATIVE CONTROL: nothing was written to the Circuit', wrote.length === 0, JSON.stringify(wrote));
+  const bad = await ask({ type: 'seq.start', target: 'speaker', pattern: P(120, rows) });
+  ok('NEGATIVE CONTROL: a target that is not circuit or drums is refused in words', bad.ok === false && /target is one of circuit, drums/.test(bad.why), bad.why);
+  const back = await ask({ type: 'seq.start', target: 'circuit', pattern: P(120, rows) });
+  ok('switching back to the Circuit relinks', back.ok && /-> pi-1:circuit:midi-in/.test(back.link || ''), back.why || back.link);
+  await ask({ type: 'seq.stop' });
+  const down = createSequencerService({ graph: () => g, midiSend: () => {}, hit: () => ({ ok: false, why: 'the drums are not running on the Pi' }),
+    now: c.now, setTimer: c.setTimer, clearTimer: c.clearTimer });
+  let r = null; await down.handle({ type: 'seq.start', target: 'drums', pattern: P(120, rows) }, (t, b) => { r = b; });
+  c.run(down.core.epoch() + 1);
+  await down.handle({ type: 'seq.status' }, (t, b) => { r = b; });
+  ok('NEGATIVE CONTROL: with the drums not started, every hit is counted refused with the reason', r.refused === 8 && /not running/.test(r.lastRefusal || ''), `${r.refused} ${r.lastRefusal}`);
+  down.stop();
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

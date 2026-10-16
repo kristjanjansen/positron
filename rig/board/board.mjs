@@ -103,9 +103,18 @@ function circuitSend(bytes, refused) {
   if (!c) { refused('this board has no circuit input'); return; }
   c.handle({ type: 'midi.send', bytes }, (type, body) => { if (type === 'midi.refused') refused(body?.why || 'refused'); });
 }
+// One hit on the board's SuperCollider drums by GM voice name; a closed hat chokes the open one.
+function drumHit(name, from) {
+  const core = collide.core();
+  if (!core) return { ok: false, why: 'the drums are not running on the Pi, a page starts them' };
+  const choke = name === 'hhc' && core.loaded().some((d) => d.name === 'hho') ? { choke: 'hho' } : {};
+  const r = core.hit({ hits: [{ name, ...choke }] }, { from });
+  return r.ok ? { ok: true } : { ok: false, why: r.refused?.[0]?.reason || 'refused' };
+}
 const drumSeq = createSequencerService({
   graph: () => (graphFacts ? graphOf(graphFacts) : null),
   midiSend: circuitSend,
+  hit: (name) => drumHit(name, 'sequencer'),
   // While the Circuit's drums hold the screen, the sequencer runs without drawing.
   screen: (steps) => { if (panel && steps && !cdrums.held()) panel.steps(steps); },
   log: (l) => log(l),
@@ -118,6 +127,13 @@ const kbd = createKeyboardService({
   graph: () => (graphFacts ? graphOf(graphFacts) : null),
   refresh: () => { state(); },
   midiSend: circuitSend,
+  // Into the board's own Plaits with no sender, so its quiet sweep never ends a key still held.
+  play: (ev) => {
+    const core = plaits.core();
+    if (!core) return { ok: false, why: 'Plaits is not running on the Pi, a page starts it' };
+    const r = ev.off || !ev.d2 ? core.noteOff({ note: ev.d1 }) : core.noteOn({ note: ev.d1, vel: ev.d2 });
+    return r?.ok === false ? { ok: false, why: r.why || r.reason || 'refused' } : { ok: true };
+  },
   open: rawMidiReader({ spawn, readlinkSync: fsMod.readlinkSync }),
   present: (card) => fsMod.existsSync(`/proc/asound/${card}`),
   onNote: () => {
@@ -134,13 +150,7 @@ const kbd = createKeyboardService({
 const cdrums = createCircuitDrumsService({
   graph: () => (graphFacts ? graphOf(graphFacts) : null),
   tap: (fn) => hwInputs.get('circuit')?.tap(fn) ?? null,
-  hit: (name) => {
-    const core = collide.core();
-    if (!core) return { ok: false, why: 'the drums are not running on the Pi, a page starts them (Listen on /devices/circuit/)' };
-    const choke = name === 'hhc' && core.loaded().some((d) => d.name === 'hho') ? { choke: 'hho' } : {};
-    const r = core.hit({ hits: [{ name, ...choke }] }, { from: 'circuit-drums' });
-    return r.ok ? { ok: true } : { ok: false, why: r.refused?.[0]?.reason || 'refused' };
-  },
+  hit: (name) => drumHit(name, 'circuit-drums'),
   screen: (steps) => { if (panel && steps) panel.steps(steps); },
   log: (l) => log(l),
 });

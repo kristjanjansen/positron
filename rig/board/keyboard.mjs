@@ -10,6 +10,8 @@ import { spread } from './sequencer.mjs';
 
 /** Synth 1 and Synth 2 of the Circuit, which listen on channels 1 and 2. */
 export const KBD_CHANNELS = Object.freeze([1, 2]);
+/** Where the keyboard can play: the Circuit (a channel) or the board's own Plaits. */
+export const KBD_TARGETS = Object.freeze(['circuit', 'plaits']);
 /** The keyboard's ALSA card id (`/proc/asound/Keyboard`), resolved to a card number at every open. */
 export const KBD_CARD = 'Keyboard';
 const LAT_KEEP = 512;
@@ -37,52 +39,64 @@ export function bytesOfEvent(ev) {
 }
 
 /**
- * The board's verbs around the keyboard: `kbd.link { channel }`, `kbd.unlink`, `kbd.status`, each
+ * The board's verbs around the keyboard: `kbd.link { target, channel }`, `kbd.unlink`, `kbd.status`, each
  * answered `kbd.state`. The device is open only while the link is held, and reopened after a replug.
+ * `target` is `circuit` (default, needs a channel) or `plaits` (notes to `play`).
  * @param {object} o
  * @param {() => object|null} o.graph    the board's graph (beat.mjs `graphOf`)
  * @param {() => void} [o.refresh]       list the ALSA ports again, so a replugged keyboard is in the graph
  * @param {(bytes: number[], refused: (why: string) => void) => void} o.midiSend  into the Circuit's gate
  * @param {(card: string, h: { data: (chunk: Uint8Array) => void, end: (why: string) => void }) => { close(): void }} o.open
  * @param {(card: string) => boolean} o.present
+ * @param {(ev: object) => {ok: boolean, why?: string}} [o.play]  a note into the board's Plaits
  * @param {(ev: object) => void} [o.onNote]  each note on forwarded, after it is written
  * why: lessons/rig-board-keyboard.md#service
  */
-export function createKeyboardService({ graph, refresh = () => {}, midiSend, open, present, onNote = () => {}, log = () => {},
+export function createKeyboardService({ graph, refresh = () => {}, midiSend, play = () => ({ ok: false, why: 'this board has no Plaits' }), open, present, onNote = () => {}, log = () => {},
   card = KBD_CARD, source = 'mk-425c', target = 'circuit', checkMs = 2000,
   now = () => performance.now(), setTimer = (fn, ms) => setInterval(fn, ms), clearTimer = (t) => clearInterval(t) }) {
-  const SRC = boardPort(source, 'midi-out'), TO = boardPort(target, 'midi-in');
+  const SRC = boardPort(source, 'midi-out');
+  let to = target, TO = boardPort(target, 'midi-in');
   let bay = null, channel = null, linkWhy = '', reader = null, readerSaid = '', parser = createMidiParser();
   const held = new Set();               // `${ch}:${note}` this link started on the Circuit and has not ended
   const n = { read: 0, forwarded: 0, refused: 0, sysex: 0, realtime: 0, opens: 0, ends: 0 };
   const lat = [];
   let lastRefusal = '', lastWritten = [];
 
-  /** The bay from the board's graph: the keyboard's out, the Circuit's in, the one link. */
-  function wire(ch) {
+  /** The bay from the board's graph: the keyboard's out, the target's in, the one link. */
+  function wire(ch, dest) {
+    to = dest; TO = boardPort(dest, 'midi-in');
     let g = graph();
     if (g && !g.ports.some((p) => p.id === SRC)) { refresh(); g = graph(); }
     if (!g) return 'the board has not said what it is yet';
     const a = g.ports.find((p) => p.id === SRC), b = g.ports.find((p) => p.id === TO);
     if (!a) return `${SRC} is not on this board: is the keyboard plugged in?`;
-    if (!b) return `${TO} is not on this board: is the Circuit plugged in?`;
+    if (!b) return `${TO} is not on this board: ${dest === 'circuit' ? 'is the Circuit plugged in?' : 'is Plaits built on this board?'}`;
     const next = createBay();
     const ends = [SRC, TO].map((id) => id.split(':').slice(0, 2).join(':'));
     for (const nd of g.nodes) if (ends.includes(nd.id)) next.addNode(nd);
     next.addPort(a);
     next.addPort({ ...b, deliver: (ev, l, meta) => out(ev, meta) });
-    const r = next.link(SRC, TO, [{ op: 'channel', to: ch }]);
+    const r = next.link(SRC, TO, dest === 'circuit' ? [{ op: 'channel', to: ch }] : []);
     if (!r.ok) return `${r.why} ${r.fix || ''}`.trim();
     bay = next;
     return '';
   }
 
-  function write(bytes, ev, meta) {
+  /** One event into the target; answers '' or why it was not taken. */
+  function send(ev) {
+    if (to === 'plaits') { const r = play(ev); return r?.ok === false ? (r.why || 'refused') : ''; }
+    const bytes = bytesOfEvent(ev);
+    if (!bytes) return `${ev.cls} is not written by the keyboard link`;
     let no = '';
     midiSend(bytes, (why) => { no = why || 'refused'; });
+    if (!no) lastWritten = [...lastWritten, bytes].slice(-8);
+    return no;
+  }
+  function write(ev, meta) {
+    const no = send(ev);
     if (no) { n.refused++; lastRefusal = no; return false; }
     n.forwarded++;
-    lastWritten = [...lastWritten, bytes].slice(-8);
     if (ev?.cls === 'note') {
       const key = `${ev.ch}:${ev.d1}`;
       if (ev.off || !ev.d2) held.delete(key);
@@ -94,11 +108,7 @@ export function createKeyboardService({ graph, refresh = () => {}, midiSend, ope
     }
     return true;
   }
-  function out(ev, meta) {
-    const bytes = bytesOfEvent(ev);
-    if (!bytes) { n.refused++; lastRefusal = `${ev.cls} is not written by the keyboard link`; return; }
-    write(bytes, ev, meta);
-  }
+  function out(ev, meta) { write(ev, meta); }
 
   /** Every note this link started, ended, so a key let go while unlinking does not hang on the Circuit. */
   function release(why) {
@@ -106,7 +116,7 @@ export function createKeyboardService({ graph, refresh = () => {}, midiSend, ope
     const k = held.size;
     for (const key of [...held]) {
       const [ch, d1] = key.split(':').map(Number);
-      write(bytesOfEvent({ cls: 'note', ch, d1, d2: 0, off: true }), { cls: 'note', ch, d1, d2: 0, off: true });
+      write({ cls: 'note', ch, d1, d2: 0, off: true });
     }
     held.clear();
     log(`keyboard: released ${k} held note${k === 1 ? '' : 's'}, ${why}`);
@@ -158,7 +168,7 @@ export function createKeyboardService({ graph, refresh = () => {}, midiSend, ope
 
   function state(extra = {}) {
     const L = bay?.links()[0];
-    return { ok: true, held: channel !== null, channel, synth: channel, link: L ? printLink(L) : null,
+    return { ok: true, held: channel !== null, target: channel !== null ? to : null, channel, synth: channel, link: L ? printLink(L) : null,
       reading: !!reader, present: !!present(card), card, why: linkWhy || readerSaid || undefined,
       counts: { ...n, dropped: L?.dropped ?? 0, notesHeld: held.size }, lastRefusal: lastRefusal || undefined,
       written: lastWritten, lat: spread(lat), ...extra };
@@ -178,11 +188,14 @@ export function createKeyboardService({ graph, refresh = () => {}, midiSend, ope
     async handle(msg, reply) {
       switch (msg.type) {
         case 'kbd.link': {
-          const ch = Number(msg.channel);
-          if (!KBD_CHANNELS.includes(ch)) return reply('kbd.state', state({ ok: false, why: `channel is ${KBD_CHANNELS.join(' or ')}, synth 1 or synth 2 of the Circuit` }));
-          if (channel === ch && bay) { openReader(); return reply('kbd.state', state({ already: true })); }
-          if (channel !== null) unlink(`moving to channel ${ch}`);
-          linkWhy = wire(ch);
+          const dest = msg.target ?? 'circuit';
+          if (!KBD_TARGETS.includes(dest)) return reply('kbd.state', state({ ok: false, why: `target is one of ${KBD_TARGETS.join(', ')}` }));
+          // On Plaits the keyboard plays as it is; `channel` 0 marks the link held.
+          const ch = dest === 'plaits' ? 0 : Number(msg.channel);
+          if (dest === 'circuit' && !KBD_CHANNELS.includes(ch)) return reply('kbd.state', state({ ok: false, why: `channel is ${KBD_CHANNELS.join(' or ')}, synth 1 or synth 2 of the Circuit` }));
+          if (channel === ch && to === dest && bay) { openReader(); return reply('kbd.state', state({ already: true })); }
+          if (channel !== null) unlink(`moving to ${dest === 'plaits' ? 'Plaits' : `channel ${ch}`}`);
+          linkWhy = wire(ch, dest);
           if (linkWhy) { log(`keyboard: ${SRC} -> ${TO} refused: ${linkWhy}`); return reply('kbd.state', state({ ok: false })); }
           channel = ch;
           log(`keyboard: ${printLink(bay.links()[0])} held, by ${msg.from ?? 'nobody named'}`);
@@ -195,7 +208,7 @@ export function createKeyboardService({ graph, refresh = () => {}, midiSend, ope
       }
     },
     /** For the beat: whether the link is held, on which channel, and whether the keyboard is being read. */
-    beat: () => ({ held: channel !== null, channel, reading: !!reader, forwarded: n.forwarded }),
+    beat: () => ({ held: channel !== null, target: channel !== null ? to : null, channel, reading: !!reader, forwarded: n.forwarded }),
     status: state,
     stop() { unlink('the board is stopping'); clearTimer(ticker); },
   };
