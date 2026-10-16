@@ -50,7 +50,8 @@
   const ADAPTER = byUrl('cvgp34790bk02_micro_hdmi_pistik_hdmi_pesa_uleminek_20cm_must_juhe');
   const KITS = [
     { name: 'KIT A, SOUND', parts: [ADAPTER, byUrl('hdmi_vga_adapter_muundur_audio_19201080_must')] },
-    { name: 'KIT B, PICTURE', parts: [ADAPTER], say: 'Pi micro-HDMI, then the adapter, then an HDMI cable you have, to the screen.' },
+    { name: 'KIT B, PICTURE, OPTIONAL', parts: [byUrl('hs_518d08_1m_hdmi_micro_hdmi_2_0_kaabel_1m_premium_must_4k_60hz_18gbps')],
+      say: 'Only if a screen is wanted. Pi micro-HDMI straight to the screen. With an HDMI cable you already have, the 20 cm adapter for €6 does instead.' },
   ];
   const cols = [
     { key: 'part', label: 'part', grow: true, link: 'url' },
@@ -69,7 +70,7 @@
     t.set(k.parts.map((p) => ({ ...p, stock: 'in stock' })));
     d.stack.titled(k.name, t.el, say(`€${sum(k.parts).toFixed(2)}. ${k.say ?? 'Pi micro-HDMI, then the adapter, then the converter, whose 3.5 mm jack goes to a mixer, speakers or the Fast Track Pro. No screen needed.'}`));
   }
-  d.stack.titled('WHY THESE', say('Two kits, one for each of the Pi\'s two micro-HDMI outputs, so each needs its own adapter.',
+  d.stack.titled('WHY THESE', say('Kit A on one of the Pi\'s two micro-HDMI outputs, kit B on the other if it is bought.',
     'The converter tells the Pi it is a display that takes sound and is powered by the HDMI line, so the Pi should send sound with nothing in its VGA socket.',
     'Not measured until the parts are here. Plug it in before the Pi powers on, the safe way for the Pi to see it. The Pi\'s own 3.5 mm socket already plays, 11 bit and noisy, and this route is digital up to the converter.'));
 
@@ -85,7 +86,7 @@
       'Both have a full size HDMI plug, so on the Pi each goes on the 20 cm micro-HDMI to HDMI socket adapter above, then your VGA cable into the converter. Whether the Pi sends sound to the jack is not measured. Read at Oomipood on 2026-10-16.'));
 
   const ALL = [...PICTURE, ...SOUND, ...VGA];
-  d.assert('each kit starts with the adapter, all from the lists', KITS.every((k) => k.parts.every((p) => p?.url) && k.parts[0] === ADAPTER));
+  d.assert('every kit part is from the lists', KITS.every((k) => k.parts.every((p) => p?.url)));
   d.assert('every part has a shop link', ALL.every((p) => p.url.startsWith(OOMI)));
   d.assert('every price was read', ALL.every((p) => /^€\d+\.\d\d$/.test(p.price)));
   d.assert('the description is one sentence', !/[;:]/.test(WHAT), WHAT);
