@@ -49,7 +49,7 @@ const read = (x) => (typeof x === 'function' ? x() : x);
  * each link's `{ id, from, to, medium, colour, d }`, so a canvas can light one.
  * `wires: false` leaves the wire paths out of `body` and `svg` for that caller.
  */
-export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infinity, detail = null, wires: withWires = true, arrange = 'auto' } = {}) {
+export function drawBay(bay, { width, stretch = false, sizeAs = 0, maxWire = Infinity, detail = null, wires: withWires = true, arrange = 'auto' } = {}) {
   if (!(width > 0)) throw new Error('drawBay needs a width');
   const nodes = read(bay.nodes), ports = read(bay.ports), links = read(bay.links);
   const fieldsOf = (n) => (detail ? detail(n) || [] : []).map((f) => (f == null ? null : typeof f === 'string' ? { text: f } : f));

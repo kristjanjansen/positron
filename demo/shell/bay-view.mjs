@@ -18,7 +18,7 @@ const { FONT, TITLE, ROW, PAD, TGAP, DROW, PLANE } = BAY_GEOMETRY;
 // bay-svg.mjs and older callers read these from here.
 export { BAY_GEOMETRY, ranks, rounded };
 
-export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infinity, detail = null, arrange = 'auto' } = {}) {
+export function createBayView(bay, { stretch = false, sizeAs = 0, maxWire = Infinity, detail = null, arrange = 'auto' } = {}) {
   // stretch, sizeAs, maxWire and detail size the boxes and wires; see the lesson for each.
   // `arrange: 'pair'` is two facing columns at any width (lessons/kit-bay-layout.md#pair).
   // why: lessons/kit-bay-view.md#options

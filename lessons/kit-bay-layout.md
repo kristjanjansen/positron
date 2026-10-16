@@ -26,6 +26,13 @@ a four column chain as wide as four of its widest box, and Yoshimi's
 row ran off the page for one long knob name in the first column.
 ```
 
+```text
+One width for every box by default since 2026-10-16 (*"can boxes be same w in general?"*),
+falling back to one width per column only when the equal row does not fit at MIN_GAP:
+measured that day, /remote/circuit/'s four columns ran web:speaker off the right edge at
+1280 px with one width for all.
+```
+
 <a id="stack"></a>
 
 ## `bay-layout.mjs` layoutBay: stacking

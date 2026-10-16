@@ -65,7 +65,7 @@ export function ranks(nodes, links) {
  * the stacked layout and the writers read: `fieldsR`, `portsOf`, `order`,
  * `backs`, `pairCount`, `longest`, `HEAD`, `LANE`, `STEP`.
  */
-export function layoutBay({ nodes, ports, links }, { avail, stretch = true, sizeAs = 0, maxWire = Infinity, fieldsOf, width }) {
+export function layoutBay({ nodes, ports, links }, { avail, stretch = false, sizeAs = 0, maxWire = Infinity, fieldsOf, width }) {
   // A row that does not fit folds the grey field under each title first, before it scrolls.
   // why: lessons/kit-bay-layout.md#fold
   let folded = false;
@@ -75,6 +75,14 @@ export function layoutBay({ nodes, ports, links }, { avail, stretch = true, size
     return { ins: mine.filter((p) => p.dir === 'in'), outs: mine.filter((p) => p.dir === 'out') };
   };
   const { rank, back } = ranks(nodes, links);
+  // A sink no link reaches yet stands where a link would put it, right of the sources, not under them.
+  const linked = new Set(links.flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]));
+  const dirs = (id) => new Set(ports.filter((p) => nodeOf(p.id) === id).map((p) => p.dir));
+  const loose = nodes.filter((n) => { const d = dirs(n.id); return !linked.has(n.id) && d.has('in') && !d.has('out'); });
+  if (loose.length && loose.length < nodes.length) {
+    const top = Math.max(1, ...nodes.filter((n) => !loose.includes(n)).map((n) => rank.get(n.id)));
+    for (const n of loose) rank.set(n.id, top);
+  }
   const backs = links.filter((l) => back.has(l.id));
   const LANE = 10;                // room per return wire, under the row or beside the stack
   const cols = [];
@@ -112,6 +120,9 @@ export function layoutBay({ nodes, ports, links }, { avail, stretch = true, size
     .map((l) => rank.get(nodeOf(l.from))));
   const extra = (g) => wide.size * Math.max(0, TWIN_GAP - g);
   const gapFor = (g) => boxesW() + (cols.length - 1) * g + extra(g) + 2 * M <= avail;
+  // One width for every box when the row fits that way; a row that does not gets each column its own.
+  // why: lessons/kit-bay-layout.md#nodew
+  if (!stretch && !sizeAs && !gapFor(MIN_GAP)) stretch = true;
   // Too wide even then: a wide host keeps the chain and scrolls sideways; only a phone stacks.
   // why: lessons/kit-bay-layout.md#stack
   if (avail >= STACK_BELOW && !gapFor(MIN_GAP) && order.some((n) => fieldsOf(n)[0] && !fieldsOf(n)[1])) { folded = true; boxW = boxWidth(); colW = colWidths(); }
