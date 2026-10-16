@@ -51,6 +51,16 @@ time; the text console must give that output up, or it draws over the picture.
 - Two screens: the OLED's picture on one output and the shader (way A) on the
   other, each with its own owner.
 
+## 3b. Sound over HDMI
+
+HDMI carries sound too. The board already lists both as ALSA cards (`aplay -l`,
+2026-10-16): `card 4: vc4hdmi0` and `card 5: vc4hdmi1`. So each output can also be
+an audio node, `pi-1:hdmi0:audio-in`, bridged onto JACK by `alsa_out` exactly as
+`pi-1:pwm` is (rig/board/outputs.mjs), and digital, so cleaner than the PWM socket.
+⚖️ INFERRED, to measure: it plays only while a screen or TV with speakers (or an
+HDMI audio extractor) is connected, and vc4 HDMI audio wants IEC958 frames, so the
+device is `hdmi:CARD=vc4hdmi0` (the plugin converts), not `hw:`.
+
 ## 4. In the patchbay
 
 Each output is a node with a video input, `pi-1:hdmi0:video-in` and
