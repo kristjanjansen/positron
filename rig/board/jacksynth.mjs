@@ -165,7 +165,14 @@ export const jackdStats = () => ({ ...jackdState });
 // jackd, raised if JACK does not answer; shared with the inputs on JACK. Returns the clock card or
 // null.
 // why: lessons/rig-board-synth.md#ensure-jackd
-export async function ensureJackd({ onLog } = {}) {
+// Callers at the same moment share one attempt: a second one's `pkill -9 -x jackd` would kill the
+// server the first is still raising.
+let jackdRaising = null;
+export function ensureJackd(o = {}) {
+  if (!jackdRaising) jackdRaising = raiseJackd(o).finally(() => { jackdRaising = null; });
+  return jackdRaising;
+}
+async function raiseJackd({ onLog } = {}) {
   // Ask JACK (jack_lsp), not the process table: pgrep finds servers this process may not reach.
   // why: lessons/rig-board-synth.md#ask-jack
   if (sh('jack_lsp 2>/dev/null').trim()) {

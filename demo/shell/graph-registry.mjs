@@ -44,7 +44,7 @@ const KNOWN_MIDI = {
   'FastTrack Pro': { name: 'ftpro', label: 'Fast Track Pro' },
 };
 /** Audio interfaces by ALSA card id, announced under the name the patches use. */
-const KNOWN_CARDS = { Pro: { name: 'ftpro', label: 'Fast Track Pro' } };
+const KNOWN_CARDS = { Pro: { name: 'ftpro', label: 'Fast Track Pro' }, Headphones: { name: 'phones', label: 'Pi 3.5 mm jack' } };
 const cardOf = (device) => KNOWN_CARDS[/CARD=([^,]+)/.exec(String(device))?.[1]] ?? { name: 'out', label: 'audio out' };
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 
@@ -98,7 +98,8 @@ export function jackRows(from, to) {
  * @param {string} [o.net]       the network it is on, if known
  * @param {object} [o.instruments]  `board.hello`'s own map: name -> available
  * @param {Array}  [o.inputs]    `[{ name, channels, midi: { port, channels } | null }]`
- * @param {Array}  [o.outputs]   `[{ device }]`, the jackd card when its jackd opens playback
+ * @param {Array}  [o.outputs]   `[{ device, jack? }]`, the jackd card when its jackd opens playback, or a card bridged by `alsa_out` with its own JACK ports (rig/board/outputs.mjs)
+ * @param {Array}  [o.tests]     `[{ name, label, jack }]`, the board's test signals (rig/board/outputs.mjs `TEST_SOURCES`)
  * @param {Array}  [o.alsa]      `alsa.mjs` `addressable()` rows
  * @param {number} [o.frameMs]
  * @param {boolean} [o.gpu]      whether the GPU video path exists; announces the `shader` node
@@ -111,7 +112,7 @@ export function jackRows(from, to) {
  * @param {boolean} [o.sequencer]  announce `pi-1:sequencer`, the board's own step sequencer (rig/board/sequencer.mjs)
  * why: lessons/kit-graph-registry.md#boardgraph
  */
-export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], outputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false, plaitsParams = null, patches = {}, drums = {}, sequencer = false }) {
+export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], outputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false, plaitsParams = null, patches = {}, drums = {}, sequencer = false, tests = [] }) {
   const place = room;
   // Port names are `<medium>-<dir>` (plans/plan-site-names.md §4c), so the id
   // says what a port carries and which way. `graphProblem` holds a board to it.
@@ -235,7 +236,13 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     const c = cardOf(o.device);
     node(c.name, 'device', c.label);
     port(c.name, 'audio-in', { label: c.label, dir: 'in', medium: 'audio', shape: { rate: 48000, channels: 2 },
-      transports: ['jack'], jack: ['system:playback_1', 'system:playback_2'] });
+      transports: ['jack'], jack: Array.isArray(o.jack) ? [...o.jack] : ['system:playback_1', 'system:playback_2'] });
+  }
+  // Test signals: a JACK client each, always running, heard only where a link takes them.
+  for (const t of jack ? tests : []) {
+    node(t.name, 'engine', t.label);
+    port(t.name, 'audio-out', { label: t.label, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: t.jack.length },
+      transports: ['jack'], jack: [...t.jack] });
   }
   // Every other MIDI device the board sees. A device already described as an
   // input above is not described twice.

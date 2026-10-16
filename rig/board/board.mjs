@@ -19,6 +19,7 @@ import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
 import { createCameraRoom, framePieces, findCamera } from './camera.mjs';
 import { parseInputs, createInputs } from './inputs.mjs';
+import { createOutputs, outputFacts } from './outputs.mjs';
 import { createMainDirect } from './rtc.mjs';
 import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
 import { jackRows } from '../../demo/shell/graph-registry.mjs';
@@ -1210,6 +1211,7 @@ async function handle(msg, replyVia = null) {
       return answer({ ok: r.ok, applied: !DRY, held: had, rows: jr.rows, cut, kept: jr.rows.filter((x) => keep.has(k(x))),
                       steps: planned.steps, feeding: after ? feeding(after) : null });
     }
+    case 'outputs.status': return reply('outputs.status', { ok: true, phones: HAS_PHONES, clients: outs.status() });
     case 'jack.links': {
       const live = listJack();
       const links = [...bayLinks.entries()].map(([link, rows]) => {
@@ -1258,6 +1260,7 @@ function connect() {
                    // Drum maps on each drum instrument's midi-in, for a `drummap` transform (drum-maps.mjs).
                    drums: { circuit: DRUM_MAPS.circuit, drums: DRUM_MAPS.gm }, sequencer: true,
                    midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
+                   ...outputFacts({ phones: HAS_PHONES }),
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable(), camera: cameraFound };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,
                     frameMs: 1000 * FRAME / RATE, instruments, error: s.error, hint: s.hint, graphFacts,
@@ -1372,7 +1375,7 @@ function sweepOrphans() {
   // Names nothing here starts any more stay listed: an old build's process can still hold JACK or a
   // device after a restart. `alsa_in` holds its card while it runs.
   // why: lessons/rig-board.md#orphan-names
-  for (const name of ['fluidsynth', 'jack-dssi-host', 'yoshimi', 'sclang', 'scsynth', 'posplaits', 'csound', 'ffmpeg', 'alsa_in', 'jackd']) {
+  for (const name of ['fluidsynth', 'jack-dssi-host', 'yoshimi', 'sclang', 'scsynth', 'posplaits', 'csound', 'ffmpeg', 'alsa_in', 'alsa_out', 'jack_metro', 'jackd']) {
     try { execFileSync('pkill', ['-9', '-x', name], { stdio: 'pipe' }); log(`swept a stray ${name}`); }
     catch { /* nothing of that name, which is the normal case */ }
   }
@@ -1412,6 +1415,7 @@ if (camera?.enabled) log(`camera: ${cameraFound ? 'found, announced as camera' :
 // Hardware inputs, each in its own room, from BOARD_INPUTS; a bad entry is reported and skipped.
 // why: lessons/rig-board.md#inputs
 const inputsCfg = parseInputs(process.env.BOARD_INPUTS || '');
+const HAS_PHONES = fsMod.existsSync('/proc/asound/Headphones');
 for (const p of inputsCfg.problems) log('inputs:', p);
 // jackd on an input's card, set before anything can raise jackd.
 // why: lessons/rig-board.md#jackd-card
@@ -1457,6 +1461,10 @@ const hwInputs = createInputs({
           wire: (doc, what) => jackWire(doc, { onLog: (l) => log('input', l), what }) },
 });
 if (!DRY && !ONCE) hwInputs.start();
+// The Pi 4's 3.5 mm jack and the test signals, on JACK beside jackd's card (outputs.mjs).
+const outs = createOutputs({ phones: HAS_PHONES, spawn, log: (...a) => log('output', ...a),
+  jack: { ensure: () => ensureJackd({ onLog: (l) => log('output', l) }) } });
+if (!DRY && !ONCE && backend() === 'alsa') outs.start();
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { drumSeq.stop(); kbd.stop(); cdrums.stop(); camera?.stop(); screenCam?.stop(); stopAudio(); collide.stop(); plaits.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { drumSeq.stop(); kbd.stop(); cdrums.stop(); camera?.stop(); screenCam?.stop(); stopAudio(); collide.stop(); plaits.stop(); stopSampler(); hwInputs.close(); outs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
 connect();
